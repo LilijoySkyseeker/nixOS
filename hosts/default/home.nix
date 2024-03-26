@@ -6,6 +6,11 @@
   home.username = "lilijoy";
   home.homeDirectory = "/home/lilijoy";
 
+  imports = [
+  ../../modules/home-manager/tools/git.nix
+
+  ];
+
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
@@ -82,7 +87,7 @@
       set scrolloff=8
       set signcolumn=number
 
-      " set relativenumber
+      set relativenumber
 
       set showcmd
       set noshowmode
