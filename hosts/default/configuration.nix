@@ -111,7 +111,7 @@
     wget
     grc
     nvtop
-    distrobox
+    tree
     
     gitFull
     jdk
