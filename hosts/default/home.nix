@@ -43,7 +43,7 @@
     interactiveShellInit = ''
       set fish_greeting # Disable greeting
       tide configure --auto --style=Rainbow --prompt_colors='16 colors' --show_time='12-hour format' --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character and frame' --prompt_connection=Dotted --powerline_right_prompt_frame=Yes --prompt_spacing=Sparse --icons='Many icons' --transient=No
-
+      clear
     '';
     plugins = [
       { name = "grc"; src = pkgs.fishPlugins.grc.src; }

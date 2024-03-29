@@ -175,6 +175,7 @@
     package = pkgs.mullvad-vpn;
   };
 
+
 # Enable OpenGL, needed for NVIDIA drivers
   hardware.opengl = {
     enable = true;
