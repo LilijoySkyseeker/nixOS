@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, inputs, lib, ... }:
 
 {
   imports =
@@ -13,9 +13,33 @@
        ../../modules/nixos/DE/gnome.nix
        ../../modules/nixos/hardware/keyboard-layout.nix
 
+#       ../../modules/nixos/utils/system-maintainence.nix
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+    # unitened upgrades
+    system.autoUpgrade = {
+      enable = true;
+      flake = inputs.self.outPath;
+      flags = [
+        "--update-input"
+        "nixpkgs"
+        "--commit-lock-file"
+        "-L" # print build logs
+      ];
+    };
+    
+    # store optimization
+    nix.optimise = {
+      automatic = true;
+    };
+
+    # garbage collection
+    nix.gc = {
+      automatic = true;
+      options = "--delete-older-than 30d";
+    };
 
 
   # Bootloader.
