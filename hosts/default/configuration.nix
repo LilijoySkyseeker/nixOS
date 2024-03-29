@@ -112,6 +112,14 @@
     grc
     nvtop
     tree
+
+    eza 
+    bat
+    mprocs
+    zellij
+    ripgrep
+    gitui
+    speedtest-rs
     
     gitFull
     jdk
