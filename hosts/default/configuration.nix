@@ -150,6 +150,17 @@
     remotePlay.openFirewall = true;
   };
 
+  # feral gamemode
+  programs.gamemode ={
+    enable = true;
+    settings = {
+      cpu = {
+        park_cores = "no";
+        pin_cores = "yes";
+      };
+    };
+  };
+
    # docker
   virtualisation.docker = {
     enable = true;
@@ -174,7 +185,6 @@
     enable = true;
     package = pkgs.mullvad-vpn;
   };
-
 
 # Enable OpenGL, needed for NVIDIA drivers
   hardware.opengl = {

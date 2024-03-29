@@ -26,9 +26,10 @@
   programs.btop = {
     enable = true;
     settings = {
-      color_theme = "night_owl";
+      color_theme = "night-owl";
       update_ms = 1000;
       cpu_single_graph = true;
+      per_core = true;
     };
   };
 
