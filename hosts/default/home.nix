@@ -50,6 +50,16 @@
       { name = "grc"; src = pkgs.fishPlugins.grc.src; }
       { name = "tide"; src = pkgs.fishPlugins.tide.src; }
     ];
+    functions = {
+      #l = "eza -laM --git --header --time-style relative $argv";
+      #lt = "eza -laM --git --header --time-style relative -T $argv";
+    };
+  };
+
+  # eza
+  programs.eza = {
+    enable = true;
+    extraOptions = ["--group-directories-first" "--header" "--git" "--icons" "-laM"];
   };
 
   # NVIM
