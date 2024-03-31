@@ -10,7 +10,7 @@
       ./hardware-configuration.nix
        inputs.home-manager.nixosModules.default
 
-       ../../modules/nixos/DE/gnome.nix
+#       ../../modules/nixos/DE/gnome.nix
        ../../modules/nixos/hardware/keyboard-layout.nix
 
 #       ../../modules/nixos/utils/system-maintenance.nix
@@ -19,7 +19,9 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
 
-  system-maintenance.enable = true;
+  # hyprland
+  programs.hyprland.enable = true;
+
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;

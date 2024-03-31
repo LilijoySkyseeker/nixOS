@@ -9,6 +9,8 @@
   imports = [
   ../../modules/home-manager/tools/git.nix
 
+  ../../modules/home-manager/DE/hyprland.nix
+
   ];
 
   # Allow Unfree
