@@ -10,7 +10,7 @@
       ./hardware-configuration.nix
        inputs.home-manager.nixosModules.default
 
-#       ../../modules/nixos/DE/gnome.nix
+       ../../modules/nixos/DE/gnome.nix
        ../../modules/nixos/hardware/keyboard-layout.nix
 
 #       ../../modules/nixos/utils/system-maintenance.nix
