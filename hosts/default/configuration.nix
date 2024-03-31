@@ -13,34 +13,13 @@
        ../../modules/nixos/DE/gnome.nix
        ../../modules/nixos/hardware/keyboard-layout.nix
 
-#       ../../modules/nixos/utils/system-maintainence.nix
+#       ../../modules/nixos/utils/system-maintenance.nix
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-    # unitened upgrades
-    system.autoUpgrade = {
-      enable = true;
-      flake = inputs.self.outPath;
-      flags = [
-        "--update-input"
-        "nixpkgs"
-        "--commit-lock-file"
-        "-L" # print build logs
-      ];
-    };
-    
-    # store optimization
-    nix.optimise = {
-      automatic = true;
-    };
 
-    # garbage collection
-    nix.gc = {
-      automatic = true;
-      options = "--delete-older-than 30d";
-    };
-
+  system-maintenance.enable = true;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -136,15 +115,15 @@
     grc
     nvtop
     tree
-
-    eza 
     bat
-    mprocs
-    zellij
     ripgrep
     gitui
-    speedtest-rs
-    
+    mprocs
+
+    eza 
+
+    zellij
+
     gitFull
     jdk
   ];

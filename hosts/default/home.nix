@@ -51,8 +51,7 @@
       { name = "tide"; src = pkgs.fishPlugins.tide.src; }
     ];
     functions = {
-      #l = "eza -laM --git --header --time-style relative $argv";
-      #lt = "eza -laM --git --header --time-style relative -T $argv";
+      cat = "bat $argv";
     };
   };
 
