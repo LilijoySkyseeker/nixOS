@@ -9,7 +9,7 @@
   imports = [
   ../../modules/home-manager/tools/git.nix
 
-  ../../modules/home-manager/DE/hyprland.nix
+#  ../../modules/home-manager/DE/hyprland.nix
 
   ];
 
@@ -151,7 +151,7 @@
         "appindicatorsupport@rgcjonas.gmail.com"
         "gsconnect@andyholmes.github.io"
         "clipboard-indicator@tudmotu.com"
-        "forge@jmmaranan.com"
+        "tiling-assistant@leleat-on-github"
       ];
     };
     "org/gnome/mutter" = {
@@ -192,14 +192,18 @@
       enable-keybindings = false;
       history-size = "100";
     };
-
-    # Forge
-    "org/gnome/shell/extensions/forge" = {
-      tabbed-tiling-mode-enabled = false;
-      stacked-tiling-mode-enabled = false;
+    
+    # Tiling Assistant
+    "org/gnome/shell/extensions/tiling-assistant" = {
+      enable-tiling-popup = false;
+      enable-raise-tile-group = false;
+      window-gap = "8";
+      single-screen-gap = "8";
+      maximize-with-gap = true;
+      dynamic-keybinding-behavior = "2";
+      active-window-hint = "1";
+      monitor-switch-grace-period = true;
     };
-
-
 
   };
 
@@ -232,10 +236,10 @@
 
 
   gnomeExtensions.dash-to-panel
-#  gnomeExtensions.appindicatorsupport  # tempory error
+  #gnomeExtensions.appindicatorsupport # tempory error
   gnomeExtensions.gsconnect
   gnomeExtensions.clipboard-indicator
-  gnomeExtensions.forge
+  gnomeExtensions.tiling-assistant
   ];
 
   home.file = {

@@ -116,14 +116,13 @@
     wget
     grc
     nvtop
-    tree
+    eza 
+    vlc
+
     bat
     ripgrep
     gitui
     mprocs
-
-    eza 
-
     zellij
 
     gitFull

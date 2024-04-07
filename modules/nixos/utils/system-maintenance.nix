@@ -30,3 +30,4 @@ config = lib.mkIf config.system-maintenance.enable {
     };
 };
 }
+
