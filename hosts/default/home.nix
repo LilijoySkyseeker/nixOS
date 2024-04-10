@@ -149,7 +149,7 @@
         "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
         "dash-to-panel@jderose9.github.com"
         "appindicatorsupport@rgcjonas.gmail.com"
-        "gsconnect@andyholmes.github.io"
+        #"gsconnect@andyholmes.github.io"
         "clipboard-indicator@tudmotu.com"
         "tiling-assistant@leleat-on-github"
       ];
@@ -190,18 +190,18 @@
     # Clipboard Indicator
     "org/gnome/shell/extensions/clipboard-indicator" = {
       enable-keybindings = false;
-      history-size = "100";
+      history-size = 100;
     };
     
     # Tiling Assistant
     "org/gnome/shell/extensions/tiling-assistant" = {
       enable-tiling-popup = false;
       enable-raise-tile-group = false;
-      window-gap = "8";
-      single-screen-gap = "8";
+      window-gap = 8;
+      single-screen-gap = 8;
       maximize-with-gap = true;
-      dynamic-keybinding-behavior = "2";
-      active-window-hint = "1";
+      dynamic-keybinding-behavior = 2;
+      active-window-hint = 1;
       monitor-switch-grace-period = true;
     };
 
@@ -237,7 +237,8 @@
 
   gnomeExtensions.dash-to-panel
   #gnomeExtensions.appindicatorsupport # tempory error
-  gnomeExtensions.gsconnect
+  #gnomeExtensions.gsconnect
+    gjs
   gnomeExtensions.clipboard-indicator
   gnomeExtensions.tiling-assistant
   ];
