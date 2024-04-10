@@ -12,6 +12,7 @@
 
        ../../modules/nixos/DE/gnome.nix
        ../../modules/nixos/hardware/keyboard-layout.nix
+       ../../modules/nixos/hardware/wooting.nix
 
 #       ../../modules/nixos/utils/system-maintenance.nix
     ];
@@ -118,6 +119,10 @@
     nvtop
     eza 
     vlc
+
+    obsidian
+
+    qpwgraph
 
     bat
     ripgrep
