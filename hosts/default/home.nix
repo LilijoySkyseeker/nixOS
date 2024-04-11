@@ -16,6 +16,15 @@
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
+  # Virt-manager (also neeed nixos module)
+  dconf.settings = {
+  "org/virt-manager/virt-manager/connections" = {
+    autoconnect = ["qemu:///system"];
+    uris = ["qemu:///system"];
+  };
+};
+
+
   # OBS Studio
   programs.obs-studio = {
     enable = true;
