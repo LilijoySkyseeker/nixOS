@@ -15,6 +15,7 @@
        ../../modules/nixos/hardware/wooting.nix
 
 #       ../../modules/nixos/utils/system-maintenance.nix
+        ../../modules/nixos/utils/virt-manager.nix #(also needs home manager config
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
