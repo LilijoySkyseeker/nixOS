@@ -133,6 +133,7 @@
 
     gitFull
     jdk
+    python3
   ];
   
   # Git
