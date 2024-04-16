@@ -16,9 +16,16 @@
 
 #       ../../modules/nixos/utils/system-maintenance.nix
         ../../modules/nixos/utils/virtual-machines.nix #(also needs home manager config
+        ../../modules/nixos/utils/docker.nix
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # LD fix
+  programs.nix-ld.enable = true;
+  programs.nix-ld.libraries = with pkgs; [
+    # add any missing dynamic libraries for unpackaged programs here
+  ];
 
 
   # hyprland
@@ -122,18 +129,17 @@
     vlc
 
     obsidian
-
     qpwgraph
+
+    zoxide
 
     bat
     ripgrep
-    gitui
-    mprocs
-    zellij
-
     gitFull
     jdk
     python3
+
+    distrobox
   ];
   
   # Git
@@ -167,6 +173,12 @@
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
+    package = with pkgs; steam.override { extraPkgs = pkgs: [
+    # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982
+    jq
+    cabextract
+    wget 
+    ]; };
   };
 
   # feral gamemode
@@ -180,10 +192,6 @@
     };
   };
 
-   # docker
-  virtualisation.docker = {
-    enable = true;
-  };
 
   # flatpak
   services.flatpak.enable = true;
