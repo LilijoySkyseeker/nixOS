@@ -16,7 +16,6 @@
         inherit system;
         config = {
           allowUnfree = true;
-          allowUnfreePredicate = (_: true);
         };
       };
 
@@ -24,21 +23,18 @@
         inherit system;
         config = {
           allowUnfree = true;
-          allowUnfreePredicate = (_: true);
         };
       };
 
-      #pkgs = nixpkgs.legacyPackages.${system};
-      #pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
     in
     {
       nixosConfigurations = {
-        default = nixpkgs.lib.nixosSystem {
+        nixos-legion = nixpkgs.lib.nixosSystem {
           specialArgs = {
             inherit inputs pkgs pkgs-unstable;
           };
           modules = [ 
-            ./hosts/default/configuration.nix
+            ./hosts/nixos-legion/configuration.nix
             inputs.home-manager.nixosModules.default
           ];
         };
