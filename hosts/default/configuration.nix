@@ -1,12 +1,8 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
-
-{ config, pkgs, inputs, lib, ... }:
+{ config, pkgs, pkgs-unstable, inputs, lib, ... }:
 
 {
   imports =
-    [ # Include the results of the hardware scan.
+    [
       ./hardware-configuration.nix
        inputs.home-manager.nixosModules.default
 
@@ -14,7 +10,7 @@
        ../../modules/nixos/hardware/keyboard-layout.nix
        ../../modules/nixos/hardware/wooting.nix
 
-#       ../../modules/nixos/utils/system-maintenance.nix
+       #../../modules/nixos/utils/system-maintenance.nix
         ../../modules/nixos/utils/virtual-machines.nix #(also needs home manager config
         ../../modules/nixos/utils/docker.nix
     ];
@@ -29,7 +25,7 @@
 
 
   # hyprland
-  programs.hyprland.enable = true;
+  #programs.hyprland.enable = true;
 
 
   # Bootloader.
@@ -105,10 +101,6 @@
     ];
   };
 
-
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
-
   # Home Manager
   home-manager = {
     # also pass inputs to home-manager modules
@@ -118,17 +110,15 @@
     };
   };
 
-
-  # List packages installed in system profile. To search, run:
-  # $ nix search wget
-  environment.systemPackages = with pkgs; [
+  # System installed pkgs
+  environment.systemPackages =
+    (with pkgs; [ # STABLE installed packages
     wget
     grc
     nvtop
     eza 
     vlc
 
-    obsidian
     qpwgraph
 
     zoxide
@@ -140,7 +130,12 @@
     python3
 
     distrobox
-  ];
+    ])
+    ++
+    (with pkgs-unstable; [ # UNSTABLE installed packages
+    obsidian
+    ]);
+
   
   # Git
   programs.git = {
@@ -168,6 +163,11 @@
     fi
   '';
   };
+
+  # nh, yet-another-nix-helper
+  #programs.nh = {
+    #enable = true;
+  #};
 
   # steam
   programs.steam = {
