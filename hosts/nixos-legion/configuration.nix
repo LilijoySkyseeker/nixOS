@@ -19,7 +19,7 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   environment.sessionVariables = {
-    FLAKE = "~/dotfiles";
+    FLAKE = "/home/lilijoy/dotfiles";
   };
 
   # LD fix
