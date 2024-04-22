@@ -22,6 +22,7 @@
     FLAKE = "/home/lilijoy/dotfiles";
   };
 
+
   # LD fix
   programs.nix-ld.enable = true;
   programs.nix-ld.libraries = with pkgs; [
@@ -130,6 +131,14 @@
     python3
 
     distrobox
+    easyeffects
+
+
+    # Fixes for gnome nautilus
+    gst_all_1.gst-plugins-bad
+    gst_all_1.gst-plugins-good
+    gst_all_1.gst-plugins-ugly
+
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages

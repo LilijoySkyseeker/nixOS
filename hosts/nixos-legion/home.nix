@@ -166,6 +166,7 @@
         #"gsconnect@andyholmes.github.io"
         "clipboard-indicator@tudmotu.com"
         "tiling-assistant@leleat-on-github"
+        "openweather-extension@penguin-teal.github.io"
       ];
     };
     "org/gnome/mutter" = {
@@ -219,6 +220,45 @@
       monitor-switch-grace-period = true;
     };
 
+  # Openweather
+  "org/gnome/shell/extensions/openweatherrefined" = {
+    refresh-interval-current = 600;
+    refresh-interval-forecast = 3600;
+    loc-refresh-interval = 60;
+    disable-forecast = false;
+    use-system-icons = true;
+    delay-ext-init = 15;
+    unit = "fahrenheit";
+    wind-speed-unit = "mph";
+    pressure-unit = "atm";
+    clock-format = "12h";
+    simplify-degrees = true;
+    weather-provider = "openweathermap";
+    own-api-translate = false;
+    use-default-own-key = true;
+    position-in-panel = "right";
+    position-index = 0;
+    show-text-in-panel = true;
+    show-comment-in-panel = true;
+    show-sunrise-in-panel = true;
+    sun-in-panel-first = false;
+    menu-alignment = 82;
+    translate-condition = true;
+    decimal-places = 0;
+    pressure-decimal-places = -2;
+    speed-decimal-places = -1;
+    location-text-lenght = 0;
+    hi-contrast = "none";
+    center-forecast = true;
+    show-comment-in-forecast = true;
+    days-forecast = 5;
+    expand-forecast = true;
+    actual-city = 0;
+    locs = "[(uint32 0, 'Lexington, Virginia, United States', uint32 0, '37.7840208,-79.4428157')]";
+    my-loc-prov = "ipinfoio";
+    geolocation-provider = "openstreetmaps";
+  };
+
   };
 
   # This value determines the Home Manager release that your configuration is
@@ -255,6 +295,7 @@
     gjs
   gnomeExtensions.clipboard-indicator
   gnomeExtensions.tiling-assistant
+  gnomeExtensions.openweather
   ];
 
   home.file = {
