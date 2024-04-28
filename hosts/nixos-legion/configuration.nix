@@ -18,9 +18,22 @@
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # enviorment variables
   environment.sessionVariables = {
-    FLAKE = "/home/lilijoy/dotfiles";
+    FLAKE = "/home/lilijoy/dotfiles"; # for nh
   };
+
+  # gnome audo visual prop screen fix
+    nixpkgs.overlays = [(self: super: {
+    gnome = super.gnome.overrideScope' (gself: gsuper: {
+      nautilus = gsuper.nautilus.overrideAttrs (nsuper: {
+        buildInputs = nsuper.buildInputs ++ (with self.gst_all_1; [
+          gst-plugins-good
+          gst-plugins-bad
+        ]);
+      });
+    });
+  })];
 
 
   # LD fix
@@ -29,9 +42,8 @@
     # add any missing dynamic libraries for unpackaged programs here
   ];
 
-
-  # hyprland
-  #programs.hyprland.enable = true;
+  # sudo insults
+  security.sudo.package = pkgs.sudo.override { withInsults = true; };
 
 
   # Bootloader.
@@ -135,9 +147,9 @@
 
 
     # Fixes for gnome nautilus
-    gst_all_1.gst-plugins-bad
-    gst_all_1.gst-plugins-good
-    gst_all_1.gst-plugins-ugly
+    #gst_all_1.gst-plugins-bad
+    #gst_all_1.gst-plugins-good
+    #gst_all_1.gst-plugins-ugly
 
     ])
     ++
