@@ -167,6 +167,7 @@
         "clipboard-indicator@tudmotu.com"
         "tiling-assistant@leleat-on-github"
         "openweather-extension@penguin-teal.github.io"
+        "ddterm@amezin.github.com"
       ];
     };
     "org/gnome/mutter" = {
@@ -258,6 +259,12 @@
     my-loc-prov = "ipinfoio";
     geolocation-provider = "openstreetmaps";
   };
+  # ddterm
+  "org/gnome/shell/extensions/ddterm" = {
+    window-monitor = "current";
+    show-animation-duration = 0.1;
+    theme-variant = "dark";
+  };
 
   };
 
@@ -296,6 +303,7 @@
   gnomeExtensions.clipboard-indicator
   gnomeExtensions.tiling-assistant
   gnomeExtensions.openweather
+  gnomeExtensions.ddterm
   ];
 
   home.file = {
