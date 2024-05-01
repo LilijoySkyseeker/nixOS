@@ -60,6 +60,7 @@
     interactiveShellInit = ''
       set fish_greeting # Disable greeting
       tide configure --auto --style=Rainbow --prompt_colors='16 colors' --show_time='12-hour format' --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character and frame' --prompt_connection=Dotted --powerline_right_prompt_frame=Yes --prompt_spacing=Sparse --icons='Many icons' --transient=No
+      set -g fish_key_bindings fish_vi_key_bindings
       clear
     '';
     plugins = [
@@ -82,7 +83,7 @@
     enable = true;
     defaultEditor = true;
     extraConfig = ''
-      set langmap=qq,ww,fe,pr,bt,jy,lu,ui,yo,\\;p,aa,rs,sd,tf,gg,mh,nj,ek,il,o\\;,xz,cx,dc,vv,zb,kn,hm,QQ,WW,FE,PR,BT,JY,LU,UI,YO,:P,AA,RS,SD,TF,GG,MH,NJ,EK,IL,O:,XZ,CX,DC,VV,ZB,KN,HM
+"     set langmap=qq,ww,fe,pr,bt,jy,lu,ui,yo,\\;p,aa,rs,sd,tf,gg,mh,nj,ek,il,o\\;,xz,cx,dc,vv,zb,kn,hm,QQ,WW,FE,PR,BT,JY,LU,UI,YO,:P,AA,RS,SD,TF,GG,MH,NJ,EK,IL,O:,XZ,CX,DC,VV,ZB,KN,HM
 
       nmap j gj
       nmap k gk
