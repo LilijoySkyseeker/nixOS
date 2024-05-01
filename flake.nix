@@ -35,7 +35,11 @@
           };
           modules = [ 
             ./hosts/nixos-legion/configuration.nix
-            inputs.home-manager.nixosModules.default
+	          home-manager.nixosModules.home-manager {
+		          home-manager.users.lilijoy = import ./hosts/nixos-legion/home.nix;
+		          home-manager.useGlobalPkgs = true;
+		          home-manager.useUserPackages = true;
+	          }
           ];
         };
         nixos-thinkpad  = nixpkgs.lib.nixosSystem {

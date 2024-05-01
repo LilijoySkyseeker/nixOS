@@ -23,7 +23,7 @@
     FLAKE = "/home/lilijoy/dotfiles"; # for nh
   };
 
-  # gnome audo visual prop screen fix
+  # gnome audo visual properties screen fix
     nixpkgs.overlays = [(self: super: {
     gnome = super.gnome.overrideScope' (gself: gsuper: {
       nautilus = gsuper.nautilus.overrideAttrs (nsuper: {
@@ -35,6 +35,15 @@
     });
   })];
 
+  # udev 
+  services.udev = {
+    enable = true;
+    # for via keyboards INSECURE
+    extraRules = ''
+    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
+    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
+    '';
+  };
 
   # LD fix
   programs.nix-ld.enable = true;
@@ -131,6 +140,7 @@
     nvtop
     eza 
     vlc
+    tldr
 
     qpwgraph
 
