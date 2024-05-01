@@ -38,6 +38,19 @@
             inputs.home-manager.nixosModules.default
           ];
         };
+        nixos-thinkpad  = nixpkgs.lib.nixosSystem {
+          specialArgs = {
+            inherit inputs pkgs pkgs-unstable;
+          };
+          modules = [ 
+            ./hosts/nixos-thinkpad/configuration.nix
+	    home-manager.nixosModules.home-manager {
+		home-manager.users.lilijoy = import ./hosts/nixos-thinkpad/home.nix;
+		home-manager.useGlobalPkgs = true;
+		home-manager.useUserPackages = true;
+	    }
+          ];
+      	};
       };
     };
 }
