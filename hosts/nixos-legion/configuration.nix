@@ -155,6 +155,8 @@
     distrobox
     easyeffects
 
+    qalculate-gtk
+
 
     # Fixes for gnome nautilus
     #gst_all_1.gst-plugins-bad
@@ -166,6 +168,7 @@
     (with pkgs-unstable; [ # UNSTABLE installed packages
     obsidian
     nh
+    r2modman
     ]);
 
   
