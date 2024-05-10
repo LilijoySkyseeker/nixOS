@@ -16,13 +16,16 @@
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
+  # Numlock on login
+  xsession.numlock.enable = true;
+
   # Virtual-machine (also neeed nixos module)
   dconf.settings = {
-  "org/virt-manager/virt-manager/connections" = {
-    autoconnect = ["qemu:///system"];
-    uris = ["qemu:///system"];
+    "org/virt-manager/virt-manager/connections" = {
+      autoconnect = ["qemu:///system"];
+      uris = ["qemu:///system"];
+    };
   };
-};
 
   # zoxide
   programs.zoxide = {

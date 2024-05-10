@@ -44,6 +44,11 @@
   # sudo insults
   security.sudo.package = pkgs.sudo.override { withInsults = true; };
 
+  # direnv
+  programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
+  };
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -131,6 +136,8 @@
     eza 
     vlc
     tldr
+
+    xclip # for nvim clipboard
 
     qpwgraph
 
