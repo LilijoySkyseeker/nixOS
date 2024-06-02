@@ -189,7 +189,7 @@
 #    };
     "org/gnome/desktop/wm/preferences" = {
       focus-mode = "sloppy";
-      auto-raise = true;
+      auto-raise = false;
     };
 #    "org/gnome/desktop/wm/keybindings" = {
 #      close = ["<Shift><Super>q"];
@@ -240,7 +240,8 @@
     simplify-degrees = true;
     weather-provider = "openweathermap";
     own-api-translate = false;
-    use-default-own-key = true;
+    use-default-own-key = false;
+    appid = "34f3635c44f16c3c385e875bdbbfb445";
     position-in-panel = "right";
     position-index = 0;
     show-text-in-panel = true;
@@ -258,7 +259,7 @@
     show-comment-in-forecast = true;
     days-forecast = 5;
     expand-forecast = true;
-    actual-city = 0;
+    actual-city = 1;
     locs = "[(uint32 0, 'Lexington, Virginia, United States', uint32 0, '37.7840208,-79.4428157')]";
     my-loc-prov = "ipinfoio";
     geolocation-provider = "openstreetmaps";
