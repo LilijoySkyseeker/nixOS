@@ -150,7 +150,9 @@
     python3
 
     distrobox
+
     easyeffects
+    youtube-music
 
     qalculate-gtk
     libreoffice
