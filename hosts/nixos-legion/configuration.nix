@@ -153,8 +153,11 @@
     easyeffects
 
     qalculate-gtk
+    libreoffice
 
     vial
+
+    cura
 
 
     # Fixes for gnome nautilus
