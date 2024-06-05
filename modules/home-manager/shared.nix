@@ -8,6 +8,12 @@
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
+  services.kdeconnect = {
+    enable = true;
+    indicator = true;
+    package = pkgs.gnomeExtensions.gsconnect;
+  };
+
   # Numlock on login
   xsession.numlock.enable = true;
 
@@ -168,6 +174,7 @@
         "tiling-assistant@leleat-on-github"
         "openweather-extension@penguin-teal.github.io"
         "ddterm@amezin.github.com"
+        "gsconnect@andyholmes.github.io"
       ];
     };
     "org/gnome/mutter" = {

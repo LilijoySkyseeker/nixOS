@@ -20,6 +20,7 @@
     zoxide
 
     xclip # for nvim clipboard
+    gjs # for kdeconnect
 
     distrobox
 
@@ -56,6 +57,12 @@
 
   # Enable Flake Support
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # Kde Connect
+  programs.kdeconnect = {
+    enable = true;
+    package = pkgs.gnomeExtensions.gsconnect;
+  };
 
   # Enable X11 and Gnome
   services.xserver.enable = true;
@@ -205,5 +212,12 @@
   services.mullvad-vpn = {
     enable = true;
     package = pkgs.mullvad-vpn;
+  };
+
+  # Theme KDE apps like gnome
+  qt = {
+    enable = true;
+    platformTheme = "gnome";
+    style = "adwaita-dark";
   };
 }
