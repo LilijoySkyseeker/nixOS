@@ -14,30 +14,15 @@
     grc
     nvtop
     eza 
-    vlc
     tldr
-
-    xclip # for nvim clipboard
-
-    qpwgraph
-
-    zoxide
-
     bat
     ripgrep
     gitFull
-    jdk
-    python3
+    zoxide
+
+    xclip # for nvim clipboard
 
     distrobox
-
-    easyeffects
-    youtube-music
-
-    qalculate-gtk
-    libreoffice
-
-    vial
 
     gnome-extension-manager
     baobab # gnome disk usage utilty
@@ -52,7 +37,13 @@
     kdenlive
     qbittorrent
     jellyfin-media-player
-
+    easyeffects
+    qpwgraph
+    youtube-music
+    qalculate-gtk
+    libreoffice
+    vial
+    vlc
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
