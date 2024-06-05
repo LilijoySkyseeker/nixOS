@@ -16,6 +16,7 @@
     (with pkgs; [ # STABLE installed packages
 
     cura
+    nvtop
 
     ])
     ++

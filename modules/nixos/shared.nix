@@ -47,7 +47,6 @@
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
 
-    nvtop
     obsidian
     nh
     r2modman
