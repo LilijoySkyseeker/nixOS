@@ -23,6 +23,9 @@
     FLAKE = "/home/lilijoy/dotfiles"; # for nh
   };
 
+  # Intel CPU freq stuck fix
+  boot.kernelParams = [ "intel_pstate=active" ];
+
   # gnome audo visual properties screen fix
     nixpkgs.overlays = [(self: super: {
     gnome = super.gnome.overrideScope' (gself: gsuper: {
