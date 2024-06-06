@@ -157,6 +157,12 @@
       color-scheme = "prefer-dark";
       enable-hot-corners = false;
       show-battery-percentage = true;
+      clock-format = "12h";
+      clock-show-weekday = true;
+      clock-show-seconds = true;
+    };
+    "org/gtk/settings/file-chooser" = {
+      clock-format = "12h";
     };
     "org/gtk/gtk4/settings/file-chooser" = {
       show-hidden = true;
@@ -190,6 +196,7 @@
     "org/gnome/desktop/wm/preferences" = {
       focus-mode = "sloppy";
       auto-raise = false;
+      button-layout = "appmenu:minimize,maximize,close";
     };
 
     # Clipboard Indicator
