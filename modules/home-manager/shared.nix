@@ -77,6 +77,8 @@
     ];
     functions = {
       cat = "bat $argv";
+      ns = "nix-shell -p $argv";
+      nsr = "nix-shell -p $argv --run $argv";
     };
   };
 
@@ -186,6 +188,8 @@
     "org/gnome/mutter" = {
       dynamic-workspaces = true;
       workspaces-only-on-primary = true;
+      check-alive-timeout = 60000;
+      experimental-features = ["variable-refresh-rate"];
     };
     "org/gnome/settings-daemon/plugins/power" = {
       idle-dim = false;
