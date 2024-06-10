@@ -28,10 +28,10 @@
   stylix = {
     enable = true;
     base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
-    image = ~/dotfiles/files/gruvbox-dark-rainbow.png;
+    image = /home/lilijoy/Pictures/gruvbox-dark-rainbow.png;
     polarity = "dark";
-    cursor.package = pkgs.bibata-cursors;
-    cursor.name = "Bibata-Modern-Ice";
+    cursor.package = pkgs.capitaine-cursors-themed;
+    cursor.name = "Gruvbox";
     };
 
   # Fingerprint
