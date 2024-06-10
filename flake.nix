@@ -6,6 +6,8 @@
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager/release-24.05";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    stylix.url = "github:danth/stylix";
+    stylix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, ... }@inputs:
@@ -40,6 +42,7 @@
 		          home-manager.useGlobalPkgs = true;
 		          home-manager.useUserPackages = true;
 	          }
+            inputs.stylix.nixosModules.stylix
           ];
         };
         nixos-thinkpad  = nixpkgs.lib.nixosSystem {
@@ -53,6 +56,7 @@
 		          home-manager.useGlobalPkgs = true;
 		          home-manager.useUserPackages = true;
 	          }
+            inputs.stylix.nixosModules.stylix
           ];
       	};
       };

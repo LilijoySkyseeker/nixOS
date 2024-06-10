@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
@@ -8,6 +8,7 @@
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
+  # KDE Connect
   services.kdeconnect = {
     enable = true;
     indicator = true;
@@ -50,7 +51,7 @@
   programs.btop = {
     enable = true;
     settings = {
-      color_theme = "night-owl";
+      color_theme = lib.mkDefault "night-owl";
       update_ms = 1000;
       cpu_single_graph = true;
       per_core = true;
@@ -156,7 +157,7 @@
   # GNOME config: Use 'dconf watch /'
   dconf.settings = {
     "org/gnome/desktop/interface" = {
-      color-scheme = "prefer-dark";
+      color-scheme = lib.mkDefault "prefer-dark";
       enable-hot-corners = false;
       show-battery-percentage = true;
       clock-format = "12h";

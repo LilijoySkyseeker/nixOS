@@ -24,6 +24,16 @@
     FLAKE = "/home/lilijoy/dotfiles";
   };
 
+  # Stylix
+  stylix = {
+    enable = true;
+    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    image = ~/dotfiles/files/gruvbox-dark-rainbow.png;
+    polarity = "dark";
+    cursor.package = pkgs.bibata-cursors;
+    cursor.name = "Bibata-Modern-Ice";
+    };
+
   # Fingerprint
   services.fprintd.enable = true;
 
@@ -40,6 +50,7 @@
     users = {
       "lilijoy" = import ./home.nix;
     };
+    backupFileExtension = "backup";# Force backup conflicted files
   };
 
   # NVIDIA ========================================================================================
