@@ -34,9 +34,6 @@
     cursor.name = "Capitaine Cursors";
     };
 
-  # Fingerprint
-  services.fprintd.enable = true;
-
   # Define your hostname.
   networking.hostName = "nixos-thinkpad"; 
 
