@@ -2,12 +2,20 @@
   description = "Nixos config flake";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-24.05";
-    nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
-    home-manager.url = "github:nix-community/home-manager/release-24.05";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    stylix.url = "github:danth/stylix";
-    stylix.inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs = {
+      url = "nixpkgs/nixos-24.05";
+    };
+    nixpkgs-unstable = {
+      url = "nixpkgs/nixos-unstable";
+    };
+    home-manager = {
+      url = "github:nix-community/home-manager/release-24.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    stylix = {
+      url = "github:danth/stylix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, ... }@inputs:
@@ -28,8 +36,8 @@
         };
       };
 
-    in
-    {
+    in {
+
       nixosConfigurations = {
         nixos-legion = nixpkgs.lib.nixosSystem {
           specialArgs = {
@@ -45,6 +53,7 @@
             inputs.stylix.nixosModules.stylix
           ];
         };
+
         nixos-thinkpad  = nixpkgs.lib.nixosSystem {
           specialArgs = {
             inherit inputs pkgs pkgs-unstable;
