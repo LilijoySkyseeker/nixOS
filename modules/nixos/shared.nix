@@ -18,7 +18,7 @@
     ripgrep
     gitFull
     zoxide
-
+    nvtopPackages.full
     xclip # for nvim clipboard
     gjs # for kdeconnect
 
@@ -57,6 +57,16 @@
   # Enable Flake Support
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Disable uneeded GNOME apps
+  environment.gnome.excludePackages = with pkgs.gnome; [
+    totem # video player
+    geary # mail
+    seahorse # password manager
+    gnome-calculator gnome-calendar gnome-characters 
+    gnome-font-viewer gnome-logs gnome-screenshot
+    gnome-weather pkgs.gnome-connections
+  ];
+  
   # Kde Connect
   programs.kdeconnect = {
     enable = true;
