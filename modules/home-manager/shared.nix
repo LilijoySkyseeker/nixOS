@@ -77,9 +77,15 @@
       { name = "tide"; src = pkgs.fishPlugins.tide.src; }
     ];
     functions = {
-      cat = "bat $argv";
       ns = "nix-shell -p $argv";
       nsr = "nix-shell -p $argv --run $argv";
+      cat = "bat $argv";
+    };
+    shellAliases = {
+      cat = "bat $argv";
+      ls = "eza";
+      lt = "eza --tree";
+      ltl = "eza --tree --level";
     };
   };
 
@@ -87,6 +93,8 @@
   programs.eza = {
     enable = true;
     extraOptions = ["--group-directories-first" "--header" "--git" "--icons" "--all" "--long" "--mounts"];
+    enableBashIntegration = false;
+    enableFishIntegration = false;
   };
 
   # NVIM

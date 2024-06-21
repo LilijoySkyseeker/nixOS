@@ -185,6 +185,7 @@
     fi
   '';
   };
+  environment.shellAliases = lib.mkForce {}; # clear all shell aliases, using fish functions instead
 
   # steam
   programs.steam = {
