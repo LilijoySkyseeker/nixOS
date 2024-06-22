@@ -77,11 +77,21 @@
       { name = "tide"; src = pkgs.fishPlugins.tide.src; }
     ];
     functions = {
-      ns = "nix-shell -p $argv";
-      nsr = "nix-shell -p $argv --run $argv";
-      cat = "bat $argv";
+      nsr = {
+        body = "
+          nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
+        ";
+      };
+      ns = {
+        body = "
+          nix shell 'nixpkgs/nixos-unstable#'{$argv}
+        ";
+      };
+      __fish_command_not_found_handler = {
+          body = "nsr $argv";
+      };
     };
-    shellAliases = {
+    shellAliases = lib.mkForce {
       cat = "bat $argv";
       ls = "eza";
       lt = "eza --tree";
@@ -106,6 +116,8 @@
 
       nmap j gj
       nmap k gk
+      nmap H ^
+      nmap L $
 
       syntax on
 
