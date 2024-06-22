@@ -21,6 +21,7 @@
     nvtopPackages.full
     xclip # for nvim clipboard
     gjs # for kdeconnect
+    nh
 
     distrobox
 
@@ -44,13 +45,12 @@
     libreoffice
     vial
     vlc
+    r2modman
+    obsidian
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
 
-    obsidian
-    nh
-    r2modman
 
     ]);
 
