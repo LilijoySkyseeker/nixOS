@@ -87,9 +87,9 @@
           nix shell 'nixpkgs/nixos-unstable#'{$argv}
         ";
       };
-      __fish_command_not_found_handler = {
-          body = "nsr $argv";
-      };
+      #__fish_command_not_found_handler = {
+      #    body = "nsr $argv";
+      #};
     };
     shellAliases = lib.mkForce {
       cat = "bat $argv";
