@@ -102,7 +102,6 @@
   # eza
   programs.eza = {
     enable = true;
-    extraOptions = ["--group-directories-first" "--header" "--git" "--icons" "--all" "--long" "--mounts"];
     enableBashIntegration = false;
     enableFishIntegration = false;
   };
