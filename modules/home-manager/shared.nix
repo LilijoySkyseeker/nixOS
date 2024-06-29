@@ -93,9 +93,9 @@
     };
     shellAliases = lib.mkForce {
       cat = "bat $argv";
-      ls = "eza";
-      lt = "eza --tree";
-      ltl = "eza --tree --level";
+      ls = "eza --group-directories-first --header --git --icons --all --long --mounts";
+      lt = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
+      ltl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
     };
   };
 
