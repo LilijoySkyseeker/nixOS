@@ -24,18 +24,6 @@
     FLAKE = "/home/lilijoy/dotfiles";
   };
 
-  # udev rules
-  services.udev.extraRules = ''
-  KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
-  '';
-
-  # TPM
-  security.tpm2 = {
-    enable = true;
-    pkcs11.enable = true;  # expose /run/current-system/sw/lib/libtpm2_pkcs11.so
-    tctiEnvironment.enable = true;  # TPM2TOOLS_TCTI and TPM2_PKCS11_TCTI env variables
-  };
-
   # Stylix
   stylix = {
     enable = true;
