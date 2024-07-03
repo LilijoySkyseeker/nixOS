@@ -54,7 +54,8 @@
       color_theme = lib.mkDefault "night-owl";
       update_ms = 1000;
       cpu_single_graph = true;
-      per_core = true;
+      proc_per_core = true;
+      proc_sorting = "cpu direct";
     };
   };
 
@@ -92,10 +93,17 @@
       #};
     };
     shellAliases = lib.mkForce {
-      cat = "bat $argv";
       ls = "eza --group-directories-first --header --git --icons --all --long --mounts";
       lt = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
       ltl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
+    };
+  };
+
+  # bat
+  programs.bat = {
+    enable = true;
+    config = {
+      pager = "never";
     };
   };
 
@@ -208,7 +216,7 @@
     "org/gnome/mutter" = {
       dynamic-workspaces = true;
       workspaces-only-on-primary = true;
-      check-alive-timeout = 60000;
+      check-alive-timeout = "uint32 60000";
       experimental-features = ["variable-refresh-rate"];
     };
     "org/gnome/settings-daemon/plugins/power" = {
