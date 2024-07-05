@@ -17,9 +17,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, ... }@inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, ... }@inputs:
     let
       system = "x86_64-linux";
 
@@ -51,7 +55,8 @@
 		          home-manager.useGlobalPkgs = true;
 		          home-manager.useUserPackages = true;
 	          }
-            inputs.stylix.nixosModules.stylix
+            stylix.nixosModules.stylix
+            sops-nix.nixosModules.sops
           ];
         };
 
@@ -66,7 +71,8 @@
 		          home-manager.useGlobalPkgs = true;
 		          home-manager.useUserPackages = true;
 	          }
-            inputs.stylix.nixosModules.stylix
+            stylix.nixosModules.stylix
+            sops-nix.nixosModules.sops
           ];
       	};
       };

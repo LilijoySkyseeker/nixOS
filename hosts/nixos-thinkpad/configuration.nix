@@ -19,6 +19,17 @@
 
     ]);
 
+  # sops-nix support, secrete managment
+  sops = {
+    defaultSopsFile = ../../secrets/secrets.yaml;
+    defaultSopsFormat = "yaml";
+    age.keyFile = "/home/lilijoy/.config/sops/age/keys.txt";
+    secrets = {
+      example_key = {};
+      open_weather_key = {};
+    };
+  };
+
   # Enviromental Variables
   environment.sessionVariables = {
     FLAKE = "/home/lilijoy/dotfiles";

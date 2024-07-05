@@ -24,6 +24,7 @@
     nh
 
     distrobox
+    sops # secrets management
 
     gnome-extension-manager
     baobab # gnome disk usage utilty
@@ -53,6 +54,7 @@
 
 
     ]);
+
 
   # Enable Flake Support
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
