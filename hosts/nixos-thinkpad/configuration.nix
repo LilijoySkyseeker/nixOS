@@ -19,14 +19,45 @@
 
     ]);
 
-  # sops-nix support, secrete managment
+  # restic test
+  services.restic.backups = {
+    daily = {
+      initialize = true;
+      passwordFile = "${config.sops.secrets.restic.path}";
+      repository = "/home/lilijoy/backup";
+      user = "lilijoy";
+      paths = [
+      "/home/lilijoy"
+      ];
+      exclude = [
+      "/home/lilijoy/backup"
+      ];
+      pruneOpts = [
+        "--keep-daily 7"
+        "--keep-weekly 5"
+        "--keep-monthly 12"
+      ];
+    };
+  };
+#    users.users.restic = {
+#      description = "restic service user";
+#      isSystemUser = true;
+#      group = "nogroup";
+#    };
+
+  # sops-nix support, secret managment
   sops = {
     defaultSopsFile = ../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
     age.keyFile = "/home/lilijoy/.config/sops/age/keys.txt";
+    age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
     secrets = {
       example_key = {};
       open_weather_key = {};
+      restic = {
+        owner = config.users.users.lilijoy.name;
+      };
+      
     };
   };
 

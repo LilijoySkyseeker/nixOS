@@ -22,9 +22,10 @@
     xclip # for nvim clipboard
     gjs # for kdeconnect
     nh
+    sops # secrets management
+    restic # backups
 
     distrobox
-    sops # secrets management
 
     gnome-extension-manager
     baobab # gnome disk usage utilty
