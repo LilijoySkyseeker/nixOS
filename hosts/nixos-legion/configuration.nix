@@ -24,11 +24,6 @@
 
     ]);
 
-  # Enviorment variables
-  environment.sessionVariables = {
-    FLAKE = "/home/lilijoy/dotfiles"; # for nh
-  };
-
   # Define your hostname.
   networking.hostName = "nixos-legion"; 
   
