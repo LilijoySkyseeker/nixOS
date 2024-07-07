@@ -91,10 +91,10 @@
             git add --all && nh os test
       ";
       nhb.body = "
-            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os boot --ask && git push
+            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os boot && git push
       ";
       nhs.body = "
-            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch --ask && git push
+            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch && git push
       ";
     };
     shellAliases = {
