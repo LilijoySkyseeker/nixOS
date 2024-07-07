@@ -78,24 +78,26 @@
       { name = "tide"; src = pkgs.fishPlugins.tide.src; }
     ];
     functions = {
-      nsr = {
-        body = "
-          nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
-        ";
-      };
-      ns = {
-        body = "
-          nix shell 'nixpkgs/nixos-unstable#'{$argv}
-        ";
-      };
-      #__fish_command_not_found_handler = {
-      #    body = "nsr $argv";
-      #};
+      nsr.body = "
+        nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
+      ";
+      ns.body = "
+        nix shell 'nixpkgs/nixos-unstable#'{$argv}'
+      ";
+      nht.body = "
+            git add --all && nh os test
+      ";
+      nhb.body = "
+            git add --all && git diff --staged && git commit -a && nh os boot
+      ";
+      nhs.body = "
+            git add --all && git diff --staged && git commit -a && nh os switch
+      ";
     };
-    shellAliases = lib.mkForce {
-      ls = "eza --group-directories-first --header --git --icons --all --long --mounts";
-      lt = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
-      ltl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
+    shellAliases = {
+      e = "eza --group-directories-first --header --git --icons --all --long --mounts";
+      et = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
+      etl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
     };
   };
 

@@ -19,7 +19,7 @@
 
     ]);
 
-  # restic test
+  # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     daily = {
       initialize = true;
@@ -55,7 +55,6 @@
     defaultSopsFile = ../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
     age.keyFile = "/home/lilijoy/.config/sops/age/keys.txt";
-    age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
     secrets = {
       example_key = {};
       open_weather_key = {};
