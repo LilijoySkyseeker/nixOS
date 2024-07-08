@@ -37,6 +37,7 @@
         Persistent = true;
       };
       pruneOpts = [
+        "--host ${config.networking.hostName}"
         "--keep-hourly 24"
         "--keep-daily 7"
         "--keep-weekly 4"
