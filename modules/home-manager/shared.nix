@@ -82,19 +82,19 @@
         nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
       ";
       ns.body = "
-        nix shell 'nixpkgs/nixos-unstable#'{$argv}'
+        nix shell 'nixpkgs/nixos-unstable#'{$argv}
       ";
       nhu.body = "
-            git add --all && nh os build --update && git add --all
+        git add --all && nh os build --update && git add --all
       ";
       nht.body = "
-            git add --all && nh os test
+        git add --all && nh os test
       ";
       nhb.body = "
-            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os boot && git push
+        git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os boot && git push
       ";
       nhs.body = "
-            git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch && git push
+        git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch && git push
       ";
     };
     shellAliases = {
@@ -123,6 +123,9 @@
   programs.neovim = {
     enable = true;
     defaultEditor = true;
+    viAlias = true;
+    vimAlias = true;
+    vimdiffAlias = true;
     extraConfig = ''
 "     set langmap=qq,ww,fe,pr,bt,jy,lu,ui,yo,\\;p,aa,rs,sd,tf,gg,mh,nj,ek,il,o\\;,xz,cx,dc,vv,zb,kn,hm,QQ,WW,FE,PR,BT,JY,LU,UI,YO,:P,AA,RS,SD,TF,GG,MH,NJ,EK,IL,O:,XZ,CX,DC,VV,ZB,KN,HM
 
@@ -130,6 +133,8 @@
       nmap k gk
       nmap H ^
       nmap L $
+
+      xnoremap p pgvy
 
       syntax on
 
