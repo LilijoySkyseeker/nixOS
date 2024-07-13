@@ -40,7 +40,7 @@
   };
 
   # NVIDIA ========================================================================================
-  hardware.opengl = { # eanble openGL
+  hardware.opengl = { # enable openGL
     enable = true;
     driSupport = true;
     driSupport32Bit = true;
