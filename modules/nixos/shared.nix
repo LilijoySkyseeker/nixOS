@@ -2,7 +2,7 @@
 {
 
   imports = [
-    ../../modules/nixos/virtual-machines.nix #(also needs home manager config
+    ../../modules/nixos/virtual-machines.nix #(also needs home manager config)
 
   ];
 
