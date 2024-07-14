@@ -5,12 +5,6 @@
   ../../modules/home-manager/shared.nix
   ];
   
-  # GNOME config: Use 'dconf watch /'
-  dconf.settings = {
-    "org/gnome/shell" = {
-      last-selected-power-profile = "performance";
-    };
-
     # Dash to Panel
     "org/gnome/shell/extensions/dash-to-panel" = {
 #      panel-sizes = {"0":32,"1":32,"2":32};

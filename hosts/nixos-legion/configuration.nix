@@ -16,13 +16,15 @@
     (with pkgs; [ # STABLE installed packages
 
     cura
-    nvtop
 
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
 
     ]);
+
+  # allow qmk and via
+  hardware.keyboard.qmk.enable = true;
 
   # Define your hostname.
   networking.hostName = "nixos-legion"; 
