@@ -29,7 +29,6 @@
     gnome-extension-manager
     baobab # gnome disk usage utilty
     gnome.gnome-tweaks
-    discord
     bitwarden
     thunderbird
     vscode-fhs
@@ -47,7 +46,10 @@
     vial
     vlc
     r2modman
+
+    discord
     obsidian
+    spotify
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
