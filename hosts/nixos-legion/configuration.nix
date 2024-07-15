@@ -16,13 +16,15 @@
     (with pkgs; [ # STABLE installed packages
 
     cura
-    nvtop
 
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
 
     ]);
+
+  # allow qmk and via
+  hardware.keyboard.qmk.enable = true;
 
   # Define your hostname.
   networking.hostName = "nixos-legion"; 
@@ -40,7 +42,7 @@
   };
 
   # NVIDIA ========================================================================================
-  hardware.opengl = { # eanble openGL
+  hardware.opengl = { # enable openGL
     enable = true;
     driSupport = true;
     driSupport32Bit = true;

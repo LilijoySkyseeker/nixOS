@@ -2,7 +2,7 @@
 {
 
   imports = [
-    ../../modules/nixos/virtual-machines.nix #(also needs home manager config
+    ../../modules/nixos/virtual-machines.nix #(also needs home manager config)
 
   ];
 
@@ -29,7 +29,6 @@
     gnome-extension-manager
     baobab # gnome disk usage utilty
     gnome.gnome-tweaks
-    discord
     bitwarden
     thunderbird
     vscode-fhs
@@ -47,7 +46,10 @@
     vial
     vlc
     r2modman
+
+    discord
     obsidian
+    spotify
     ])
     ++
     (with pkgs-unstable; [ # UNSTABLE installed packages
@@ -55,6 +57,7 @@
 
     ]);
 
+  # nix helper
   programs.nh = {
     enable = true;
     flake = "/home/lilijoy/dotfiles";
@@ -64,6 +67,16 @@
       extraArgs = "--keep-since 7d --keep 2";
     };
   };
+
+  # Stylix
+  stylix = {
+    enable = true;
+    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
+    polarity = "dark";
+    cursor.package = pkgs.capitaine-cursors-themed;
+    cursor.name = "Capitaine Cursors";
+    };
 
   # installed packages lits in /etc/current-system-packages.text
   environment.etc."current-system-packages".text =
@@ -166,7 +179,6 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    jack.enable = true;
   };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.

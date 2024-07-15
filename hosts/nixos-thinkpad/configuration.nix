@@ -67,16 +67,6 @@
     };
   };
 
-  # Stylix
-  stylix = {
-    enable = true;
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
-    image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
-    polarity = "dark";
-    cursor.package = pkgs.capitaine-cursors-themed;
-    cursor.name = "Capitaine Cursors";
-    };
-
   # Define your hostname.
   networking.hostName = "nixos-thinkpad"; 
 
@@ -94,7 +84,7 @@
   };
 
   # NVIDIA ========================================================================================
-  hardware.opengl = { # eanble openGL
+  hardware.opengl = { # enable openGL
     enable = true;
     driSupport = true;
     driSupport32Bit = true;
