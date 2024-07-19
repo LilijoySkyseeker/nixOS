@@ -56,7 +56,6 @@
     defaultSopsFile = ../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
     age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
-    age.keyFile = "/home/lilijoy/.config/sops/age/keys.txt";
     secrets = {
       example_key = {};
       open_weather_key = {};
