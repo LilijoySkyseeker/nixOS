@@ -33,14 +33,12 @@
           allowUnfree = true;
         };
       };
-
       pkgs-unstable = import inputs.nixpkgs-unstable {
         inherit system;
         config = {
           allowUnfree = true;
         };
       };
-
     in {
 
       nixosConfigurations = {
@@ -73,6 +71,15 @@
 	          }
             stylix.nixosModules.stylix
             sops-nix.nixosModules.sops
+          ];
+      	};
+
+        isoimage = nixpkgs.lib.nixosSystem {
+          specialArgs = {
+            inherit inputs pkgs;
+          };
+          modules = [ 
+            ./hosts/isoimage/configuration.nix
           ];
       	};
       };

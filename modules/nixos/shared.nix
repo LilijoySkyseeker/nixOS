@@ -23,6 +23,7 @@
     gjs # for kdeconnect
     sops # secrets management
     restic # backups
+    fd
 
     distrobox
 

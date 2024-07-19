@@ -8,6 +8,12 @@
   # Allow Unfree
   nixpkgs.config.allowUnfree = true;
 
+  # fzf
+  programs.fzf = {
+    enable = true;
+    enableFishIntegration = true;
+  };
+
   # KDE Connect
   services.kdeconnect = {
     enable = true;
@@ -162,7 +168,7 @@
       set scrolloff=8
       set signcolumn=number
 
-      set relativenumber
+"      set relativenumber
 
       set showcmd
       set noshowmode
@@ -182,6 +188,9 @@
       set hlsearch
 
       set mouse=a
+
+      set foldmethod=indent
+      set nofoldenable
 
       if exists('g:vscode')
           " VSCode extension
