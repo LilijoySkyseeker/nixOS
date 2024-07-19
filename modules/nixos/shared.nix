@@ -94,9 +94,7 @@
   environment.gnome.excludePackages = with pkgs.gnome; [
     totem # video player
     geary # mail
-    gnome-calculator gnome-calendar gnome-characters 
-    gnome-font-viewer gnome-logs gnome-screenshot
-    gnome-weather pkgs.gnome-connections
+    gnome-calculator pkgs.gnome-connections
   ];
   
   # Kde Connect
