@@ -5,6 +5,7 @@
   ../../modules/home-manager/shared.nix
   ];
   
+  dconf.settings = {
     # Dash to Panel
     "org/gnome/shell/extensions/dash-to-panel" = {
 #      panel-sizes = {"0":32,"1":32,"2":32};

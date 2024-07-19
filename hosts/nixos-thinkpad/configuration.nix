@@ -4,9 +4,8 @@
   imports =
     [
       ./hardware-configuration.nix
-       inputs.home-manager.nixosModules.default
-
-       ../../modules/nixos/shared.nix
+      inputs.home-manager.nixosModules.default
+      ../../modules/nixos/shared.nix
     ];
 
   # System installed pkgs
@@ -56,6 +55,7 @@
   sops = {
     defaultSopsFile = ../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
+    sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
     age.keyFile = "/home/lilijoy/.config/sops/age/keys.txt";
     secrets = {
       example_key = {};
