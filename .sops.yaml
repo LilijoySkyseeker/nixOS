@@ -8,3 +8,4 @@ creation_rules:
       - age:
         - *primary
         - *nixos-thinkpad
+        - *legion
