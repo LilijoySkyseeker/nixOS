@@ -58,6 +58,14 @@
 
     ]);
 
+  # restric nix package manager to @wheel
+  nix.settings.allowed-users = [ "@wheel" ];
+
+  # firewall
+  networking.firewall = {
+    enable = true;
+  };
+
   # nix helper
   programs.nh = {
     enable = true;

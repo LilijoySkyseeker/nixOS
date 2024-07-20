@@ -102,12 +102,18 @@
       nhs.body = "
         git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch && git push
       ";
+      gds.body = "
+        git add --all && git diff --staged | bat --paging always --pager less
+      ";
     };
     shellAliases = {
       e = "eza --group-directories-first --header --git --icons --all --long --mounts";
       et = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
       etl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
       rsync = "rsync --verbose --recursive --progress --human-readable";
+    };
+    shellAbbrs = {
+      
     };
   };
 
