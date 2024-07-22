@@ -58,6 +58,9 @@
 
     ]);
 
+  # remove all defualt packages
+  environment.defaultPackages = lib.mkForce [];
+
   # restric nix package manager to @wheel
   nix.settings.allowed-users = [ "@wheel" ];
 
@@ -103,7 +106,9 @@
   environment.gnome.excludePackages = with pkgs.gnome; [
     totem # video player
     geary # mail
-    gnome-calculator pkgs.gnome-connections
+    seahorse # keyring
+    gnome-calculator
+    gnome-shell-extensions
   ];
   
   # Kde Connect
@@ -137,8 +142,11 @@
     # add any missing dynamic libraries for unpackaged programs here
   ];
 
-  # sudo insults
-  security.sudo.package = pkgs.sudo.override { withInsults = true; };
+  # sudo
+  security.sudo = {
+    execWheelOnly = true;
+    package = pkgs.sudo.override { withInsults = true; };
+  };
 
   # direnv
   programs.direnv = {

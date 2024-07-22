@@ -4,7 +4,7 @@
   imports =
     [
       ./hardware-configuration.nix
-      inputs.home-manager.nixosModules.default
+#     inputs.home-manager.nixosModules.default
       ../../modules/nixos/shared.nix
     ];
 
@@ -20,7 +20,7 @@
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
-    daily = {
+    hourly = {
       initialize = true;
       passwordFile = "${config.sops.secrets.restic.path}";
       repository = "/home/lilijoy/backup";
@@ -45,6 +45,11 @@
       ];
     };
   };
+  systemd.services.restic-backups-hourly.serviceConfig = {
+    Nice = 19;
+    CPUSchedulingPolicy = "idle";
+  };
+
 #    users.users.restic = {
 #      description = "restic service user";
 #      isSystemUser = true;
@@ -75,14 +80,16 @@
   # Home Manager
   home-manager = {
     # also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs;};
+    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable;};
+    useGlobalPkgs = true;
+    useUserPackages = true;
     users = {
-      "lilijoy" = import ./home.nix;
+      lilijoy = import ./home.nix;
     };
     backupFileExtension = "backup";# Force backup conflicted files
   };
 
-  # NVIDIA ========================================================================================
+  # NVIDIA ==============================================================================
   hardware.opengl = { # enable openGL
     enable = true;
     driSupport = true;
@@ -128,7 +135,7 @@
       enableOffloadCmd = true;
     };
   };
-  # ==============================================================================================
+  # =====================================================================================
 
   # Fix Clickpad Bug
   boot.kernelParams = [ "psmouse.synaptics_intertouch=0" ];
