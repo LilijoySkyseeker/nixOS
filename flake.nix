@@ -1,29 +1,27 @@
 {
   description = "Nixos config flake";
 
+  # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixpkgs = {
-      url = "nixpkgs/nixos-24.05";
-    };
-    nixpkgs-unstable = {
-      url = "nixpkgs/nixos-unstable";
-    };
-    home-manager = {
-      url = "github:nix-community/home-manager/release-24.05";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    stylix = {
-      url = "github:danth/stylix";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-    };
-    sops-nix = {
-      url = "github:Mic92/sops-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixkpgs.url = "nixpkgs/nixos-24.05";
+
+    nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
+
+    home-manager.url = "github:nix-community/home-manager/release-24.05";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    stylix.url = "github:danth/stylix";
+    stylix.inputs.nixpkgs.follows = "nixpkgs";
+    stylix.inputs.home-manager.follows = "home-manager";
+
+    sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, ... }@inputs:
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, disko, ... }:
     let
     system = "x86_64-linux";
   vars = { 
@@ -34,15 +32,11 @@
 
   pkgs = import inputs.nixpkgs {
     inherit system;
-    config = {
-      allowUnfree = true;
-    };
+    config.allowUnfree = true;
   };
   pkgs-unstable = import inputs.nixpkgs-unstable {
     inherit system;
-    config = {
-      allowUnfree = true;
-    };
+    config.allowUnfree = true;
   };
   in {
     nixosConfigurations = {
@@ -68,6 +62,17 @@
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
+        ];
+      };
+#==================================================
+      homelab = nixpkgs.lib.nixosSystem {
+        specialArgs = {
+          inherit inputs pkgs pkgs-unstable;
+        };
+        modules = [ 
+          ./hosts/homelab/configuration.nix
+          sops-nix.nixosModules.sops
+          disko.nixosModules.disko
         ];
       };
 #==================================================
