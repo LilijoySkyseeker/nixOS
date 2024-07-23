@@ -2,7 +2,7 @@
 
 {
   imports = [
-  ../../modules/home-manager/shared.nix
+    ../../modules/home-manager/shared.nix
   ];
   
   dconf.settings = {
