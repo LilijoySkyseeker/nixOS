@@ -56,20 +56,6 @@
 #      group = "nogroup";
 #    };
 
-  # sops-nix support, secret managment
-  sops = {
-    defaultSopsFile = ../../secrets/secrets.yaml;
-    defaultSopsFormat = "yaml";
-    age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
-    secrets = {
-      example_key = {};
-      open_weather_key = {};
-      restic = {
-        owner = config.users.users.lilijoy.name;
-      };
-      
-    };
-  };
 
   # Define your hostname.
   networking.hostName = "nixos-thinkpad"; 

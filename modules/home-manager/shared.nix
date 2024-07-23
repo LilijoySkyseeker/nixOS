@@ -1,5 +1,5 @@
 { config, pkgs, pkgs-unstable, lib, ... }:
-{
+{ 
 # Home Manager needs a bit of information about you and the paths it should
 # manage.
   home.username = "lilijoy";
@@ -271,7 +271,8 @@
       pressure-unit = "atm";
       clock-format = "12h";
       simplify-degrees = true;
-      weather-provider = "default";
+      weather-provider = "openweathermap";
+      custom-keys = [ "34f3635c44f16c3c385e875bdbbfb445" ];
       position-in-panel = "right";
       position-index = 0;
       show-text-in-panel = true;
@@ -289,7 +290,7 @@
       show-comment-in-forecast = true;
       days-forecast = 5;
       expand-forecast = true;
-      my-loc-prov = "geoclue";
+      my-loc-prov = "ipinfoio";
       geolocation-provider = "openstreetmaps";
     };
     "org/gnome/shell/extensions/tiling-assistant" = {
