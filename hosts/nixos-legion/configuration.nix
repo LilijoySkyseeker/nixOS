@@ -35,7 +35,7 @@
   # Home Manager
   home-manager = {
     # also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs;};
+    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable;};
     users = {
       "lilijoy" = import ./home.nix;
     };
