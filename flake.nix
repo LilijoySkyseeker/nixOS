@@ -25,64 +25,61 @@
 
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, ... }@inputs:
     let
-      system = "x86_64-linux";
-      vars = { 
-        publicSshKeys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+    system = "x86_64-linux";
+  vars = { 
+    publicSshKeys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+    ];
+  };
+
+  pkgs = import inputs.nixpkgs {
+    inherit system;
+    config = {
+      allowUnfree = true;
+    };
+  };
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    inherit system;
+    config = {
+      allowUnfree = true;
+    };
+  };
+  in {
+    nixosConfigurations = {
+#==================================================
+      nixos-legion = nixpkgs.lib.nixosSystem {
+        specialArgs = {
+          inherit inputs pkgs pkgs-unstable;
+        };
+        modules = [ 
+          ./hosts/nixos-legion/configuration.nix
+          home-manager.nixosModules.home-manager
+          stylix.nixosModules.stylix
+          sops-nix.nixosModules.sops
         ];
       };
-
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        config = {
-          allowUnfree = true;
+#==================================================
+      nixos-thinkpad  = nixpkgs.lib.nixosSystem {
+        specialArgs = {
+          inherit inputs pkgs pkgs-unstable vars;
         };
+        modules = [ 
+          ./hosts/nixos-thinkpad/configuration.nix
+          home-manager.nixosModules.home-manager
+          stylix.nixosModules.stylix
+          sops-nix.nixosModules.sops
+        ];
       };
-      pkgs-unstable = import inputs.nixpkgs-unstable {
-        inherit system;
-        config = {
-          allowUnfree = true;
+#==================================================
+      isoimage = nixpkgs.lib.nixosSystem {
+        specialArgs = {
+          inherit inputs pkgs vars;
         };
+        modules = [ 
+          ./hosts/isoimage/configuration.nix
+        ];
       };
-    in {
-
-      nixosConfigurations = {
-        nixos-legion = nixpkgs.lib.nixosSystem {
-          specialArgs = {
-            inherit inputs pkgs pkgs-unstable;
-          };
-          modules = [ 
-            ./hosts/nixos-legion/configuration.nix
-	          home-manager.nixosModules.home-manager {
-		          home-manager.users.lilijoy = import ./hosts/nixos-legion/home.nix;
-		          home-manager.useGlobalPkgs = true;
-		          home-manager.useUserPackages = true;
-	          }
-            stylix.nixosModules.stylix
-            sops-nix.nixosModules.sops
-          ];
-        };
-
-        nixos-thinkpad  = nixpkgs.lib.nixosSystem {
-          specialArgs = {
-            inherit inputs pkgs pkgs-unstable;
-          };
-          modules = [ 
-            ./hosts/nixos-thinkpad/configuration.nix
-	          home-manager.nixosModules.home-manager
-            stylix.nixosModules.stylix
-            sops-nix.nixosModules.sops
-          ];
-      	};
-
-        isoimage = nixpkgs.lib.nixosSystem {
-          specialArgs = {
-            inherit inputs pkgs vars;
-          };
-          modules = [ 
-            ./hosts/isoimage/configuration.nix
-          ];
-      	};
-      };
+#==================================================
     };
+  };
 }

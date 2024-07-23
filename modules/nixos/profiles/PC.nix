@@ -2,7 +2,7 @@
 {
 
   imports = [
-    ../../modules/nixos/virtual-machines.nix #(also needs home manager config)
+    ../virtual-machines.nix #(also needs home manager config)
 
   ];
 
@@ -60,7 +60,7 @@
 
   # sops-nix support, secret managment
   sops = {
-    defaultSopsFile = ../../secrets/secrets.yaml;
+    defaultSopsFile = ../../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
     age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
     secrets = {

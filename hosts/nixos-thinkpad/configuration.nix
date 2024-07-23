@@ -1,11 +1,8 @@
-{ config, pkgs, pkgs-unstable, inputs, lib, ... }:
-
+{ config, pkgs, pkgs-unstable, inputs, lib, vars, ... }:
 {
-  imports =
-    [
+  imports =[
       ./hardware-configuration.nix
-#     inputs.home-manager.nixosModules.default
-      ../../modules/nixos/shared.nix
+      ../../modules/nixos/profiles/PC.nix
     ];
 
   # System installed pkgs
@@ -17,6 +14,23 @@
     (with pkgs-unstable; [ # UNSTABLE installed packages
 
     ]);
+
+  # Home Manager
+  home-manager = {
+    # also pass inputs to home-manager modules
+    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
+    useGlobalPkgs = true;
+    useUserPackages = true;
+    backupFileExtension = "backup"; # Force backup conflicted files
+    users = {
+      lilijoy = {
+        home.stateVersion = "23.11";
+        imports = [
+          ../../modules/home-manager/profiles/PC.nix
+        ];
+      };
+    };
+  };
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
@@ -62,18 +76,6 @@
 
   # Set extra groups
   users.users.lilijoy.extraGroups = [ "docker" "tss" ]; # tss for accessing tpm
-
-  # Home Manager
-  home-manager = {
-    # also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable;};
-    useGlobalPkgs = true;
-    useUserPackages = true;
-    users = {
-      lilijoy = import ./home.nix;
-    };
-    backupFileExtension = "backup";# Force backup conflicted files
-  };
 
   # NVIDIA ==============================================================================
   hardware.opengl = { # enable openGL
