@@ -3,6 +3,7 @@
 
   imports = [
     ../virtual-machines.nix #(also needs home manager config)
+    ../shared.nix
 
   ];
 
@@ -10,14 +11,9 @@
   environment.systemPackages =
     (with pkgs; [ # STABLE installed packages
 
-    wget
-    grc
-    eza 
-    tldr
-    bat
+    grc # Text colors
     ripgrep
     gitFull
-    zoxide
     nvtopPackages.full
     xclip # for nvim clipboard
     gjs # for kdeconnect
@@ -53,12 +49,9 @@
     spotify
     ])
     ++
-    (with pkgs-unstable; [ # UNSTABLE installed packages
+    (with pkgs-unstable; [ ]); # UNSTABLE installed packages
 
-
-    ]);
-
-  # sops-nix support, secret managment
+# sops-nix support, secret managment
   sops = {
     defaultSopsFile = ../../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
@@ -69,17 +62,6 @@
         owner = config.users.users.lilijoy.name;
       };
     };
-  };
-
-  # remove all defualt packages
-  environment.defaultPackages = lib.mkForce [];
-
-  # restric nix package manager to @wheel
-  nix.settings.allowed-users = [ "@wheel" ];
-
-  # firewall
-  networking.firewall = {
-    enable = true;
   };
 
   # nix helper
@@ -103,18 +85,6 @@
     cursor.name = "Capitaine Cursors";
     };
 
-  # installed packages lits in /etc/current-system-packages.text
-  environment.etc."current-system-packages".text =
-    let
-      packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
-      sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
-      formatted = builtins.concatStringsSep "\n" sortedUnique;
-    in
-      formatted;
-
-  # Enable Flake Support
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
   # Disable uneeded GNOME apps
   environment.gnome.excludePackages = with pkgs.gnome; [
     totem # video player
@@ -134,12 +104,6 @@
   services.xserver.enable = true;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.gnome.enable = true;
-
-  # Configure keymap in X11
-  services.xserver.xkb = {
-    layout = "us";
-    variant = "colemak_dh";
-  };
 
   # Docker
   virtualisation.docker = {
@@ -161,19 +125,6 @@
     package = pkgs.sudo.override { withInsults = true; };
   };
 
-  # direnv
-  programs.direnv = {
-    enable = true;
-    nix-direnv.enable = true;
-  };
-
-  # Bootloader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-
-  # Enable networking
-  networking.networkmanager.enable = true;
-
   # Enable bluetooth
   hardware.bluetooth.enable = true;
   hardware.bluetooth.powerOnBoot = true;
@@ -181,19 +132,6 @@
   # Set your time zone.
   time.timeZone = "America/New_York";
 
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_US.UTF-8";
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_US.UTF-8";
-    LC_IDENTIFICATION = "en_US.UTF-8";
-    LC_MEASUREMENT = "en_US.UTF-8";
-    LC_MONETARY = "en_US.UTF-8";
-    LC_NAME = "en_US.UTF-8";
-    LC_NUMERIC = "en_US.UTF-8";
-    LC_PAPER = "en_US.UTF-8";
-    LC_TELEPHONE = "en_US.UTF-8";
-    LC_TIME = "en_US.UTF-8";
-  };
 
   # Enable CUPS to print documents.
   services.printing.enable = true;
@@ -214,9 +152,6 @@
     isNormalUser = true;
     description = "Lilijoy";
     extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [
-
-    ];
   };
 
   # Git

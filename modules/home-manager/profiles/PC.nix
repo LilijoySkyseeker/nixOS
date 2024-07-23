@@ -14,9 +14,6 @@
         home.homeDirectory = "/home/lilijoy";
         programs.home-manager.enable = true;
 
-# Allow Unfree
-#  nixpkgs.config.allowUnfree = true;
-
 # fzf
         programs.fzf = {
           enable = true;

@@ -3,46 +3,25 @@
 {
   imports =
     [
-      ./hardware-configuration.nix
+    ./hardware-configuration.nix
       ../../modules/nixos/shared.nix
       ../../modules/nixos/wooting.nix
+      ../../modules/home-manager/profiles/PC.nix
     ];
 
 # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [ # STABLE installed packages
-
-     cura
-
-    ])
+    (with pkgs; [ cura ]) # STABLE installed packages
     ++
-    (with pkgs-unstable; [ # UNSTABLE installed packages
-
-    ]);
+    (with pkgs-unstable; [ ]);# UNSTABLE installed packages
 
 # Home Manager
-  home-manager = {
-# also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
-    useGlobalPkgs = true;
-    useUserPackages = true;
-    backupFileExtension = "backup";# Force backup conflicted files
-    users = {
-      lilijoy = {
-        home.stateVersion = "23.11";
-        imports = [
-          ../../modules/home-manager/profiles/PC.nix
-        ];
-# GNOME config: Use 'dconf watch /'
-        dconf.settings = {
-          "org/gnome/shell/extensions/tiling-assistant" = {# Tiling Assistant
-            window-gap = 8;
-            single-screen-gap = 8;
-          };
-        };
+    home-manager.users.lilijoy.dconf.settings = {
+      "org/gnome/shell/extensions/tiling-assistant" = { # Tiling Assistant
+        window-gap = 8;
+        single-screen-gap = 8;
       };
     };
-  };
 
 # allow qmk and via
   hardware.keyboard.qmk.enable = true;

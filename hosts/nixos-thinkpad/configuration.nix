@@ -16,9 +16,6 @@
 
     ]);
 
-#test
-  home-manager.users.lilijoy.home.packages = [pkgs.sl];
-
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     hourly = {
