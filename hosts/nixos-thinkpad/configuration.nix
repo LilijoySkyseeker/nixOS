@@ -3,6 +3,7 @@
   imports =[
       ./hardware-configuration.nix
       ../../modules/nixos/profiles/PC.nix
+      ../../modules/home-manager/profiles/PC.nix
     ];
 
   # System installed pkgs
@@ -15,22 +16,8 @@
 
     ]);
 
-  # Home Manager
-  home-manager = {
-    # also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
-    useGlobalPkgs = true;
-    useUserPackages = true;
-    backupFileExtension = "backup"; # Force backup conflicted files
-    users = {
-      lilijoy = {
-        home.stateVersion = "23.11";
-        imports = [
-          ../../modules/home-manager/profiles/PC.nix
-        ];
-      };
-    };
-  };
+#test
+  home-manager.users.lilijoy.home.packages = [pkgs.sl];
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
