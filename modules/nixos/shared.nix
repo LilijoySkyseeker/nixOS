@@ -1,38 +1,44 @@
-{config, pkgs, pkgs-unstable, inputs, lib, ... }:
 {
+  config,
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  lib,
+  ...
+}: {
   environment.systemPackages =
-    (with pkgs; [ # STABLE installed packages
-    wget
-    eza 
-    tldr
-    bat
-    zoxide
-    git
-    neovim
+    (with pkgs; [
+      # STABLE installed packages
+      wget
+      eza
+      tldr
+      bat
+      zoxide
+      git
+      neovim
+      alejandra
     ])
-    ++
-    (with pkgs-unstable; [ ]); # UNSTABLE installed packages
+    ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
   # remove all defualt packages
   environment.defaultPackages = lib.mkForce [];
 
   # restric nix package manager to @wheel
-  nix.settings.allowed-users = [ "@wheel" ];
+  nix.settings.allowed-users = ["@wheel"];
 
   # firewall
   networking.firewall.enable = true;
 
   # installed packages lits in /etc/current-system-packages.text
-  environment.etc."current-system-packages".text =
-    let
-      packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
-      sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
-      formatted = builtins.concatStringsSep "\n" sortedUnique;
-    in
-      formatted;
+  environment.etc."current-system-packages".text = let
+    packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+    sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
+    formatted = builtins.concatStringsSep "\n" sortedUnique;
+  in
+    formatted;
 
   # Enable Flake Support
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = ["nix-command" "flakes"];
 
   # Configure keymap in X11
   services.xserver.xkb = {

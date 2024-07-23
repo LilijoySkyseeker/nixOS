@@ -21,70 +21,78 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, disko, ... }:
-    let
+  outputs = inputs @ {
+    self,
+    nixpkgs,
+    nixpkgs-unstable,
+    home-manager,
+    stylix,
+    sops-nix,
+    disko,
+    ...
+  }: let
     system = "x86_64-linux";
-  vars = { 
-    publicSshKeys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
-    ];
-  };
+    vars = {
+      publicSshKeys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+      ];
+    };
 
-  pkgs = import inputs.nixpkgs {
-    inherit system;
-    config.allowUnfree = true;
-  };
-  pkgs-unstable = import inputs.nixpkgs-unstable {
-    inherit system;
-    config.allowUnfree = true;
-  };
+    pkgs = import inputs.nixpkgs {
+      inherit system;
+      config.allowUnfree = true;
+    };
+    pkgs-unstable = import inputs.nixpkgs-unstable {
+      inherit system;
+      config.allowUnfree = true;
+    };
   in {
     nixosConfigurations = {
-#==================================================
+      #==================================================
       nixos-legion = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable;
         };
-        modules = [ 
+        modules = [
           ./hosts/nixos-legion/configuration.nix
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
         ];
       };
-#==================================================
-      nixos-thinkpad  = nixpkgs.lib.nixosSystem {
+      #==================================================
+      nixos-thinkpad = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
         };
-        modules = [ 
+        modules = [
           ./hosts/nixos-thinkpad/configuration.nix
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
         ];
       };
-#==================================================
+      #==================================================
       homelab = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable;
         };
-        modules = [ 
+        modules = [
           ./hosts/homelab/configuration.nix
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
         ];
       };
-#==================================================
+      #==================================================
       isoimage = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs vars;
         };
-        modules = [ 
+        modules = [
           ./hosts/isoimage/configuration.nix
         ];
       };
-#==================================================
+      #==================================================
     };
   };
 }

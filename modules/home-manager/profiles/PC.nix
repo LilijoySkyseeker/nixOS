@@ -1,36 +1,43 @@
-{ inputs, vars, config, pkgs, pkgs-unstable, lib, ... }:
-{ 
+{
+  inputs,
+  vars,
+  config,
+  pkgs,
+  pkgs-unstable,
+  lib,
+  ...
+}: {
   home-manager = {
-# also pass inputs to home-manager modules
+    # also pass inputs to home-manager modules
     extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
     users = {
       lilijoy = {
-        imports = [ ];
+        imports = [];
         home.stateVersion = "23.11";
         home.username = "lilijoy";
         home.homeDirectory = "/home/lilijoy";
         programs.home-manager.enable = true;
 
-# fzf
+        # fzf
         programs.fzf = {
           enable = true;
           enableFishIntegration = true;
         };
 
-# KDE Connect
+        # KDE Connect
         services.kdeconnect = {
           enable = true;
           indicator = true;
           package = pkgs.gnomeExtensions.gsconnect;
         };
 
-# Numlock on login
+        # Numlock on login
         xsession.numlock.enable = true;
 
-# Virtual-machine (also neeed nixos module)
+        # Virtual-machine (also neeed nixos module)
         dconf.settings = {
           "org/virt-manager/virt-manager/connections" = {
             autoconnect = ["qemu:///system"];
@@ -38,20 +45,20 @@
           };
         };
 
-# zoxide
+        # zoxide
         programs.zoxide = {
           enable = true;
           enableFishIntegration = true;
         };
 
-# Git
+        # Git
         programs.git = {
           enable = true;
           userName = "LilijoySkyseeker";
           userEmail = "lilijoyskyseeker@gmail.com";
         };
 
-# OBS Studio
+        # OBS Studio
         programs.obs-studio = {
           enable = true;
           plugins = with pkgs.obs-studio-plugins; [
@@ -59,7 +66,7 @@
           ];
         };
 
-# BTOP
+        # BTOP
         programs.btop = {
           enable = true;
           settings = {
@@ -71,12 +78,12 @@
           };
         };
 
-# Firefox
+        # Firefox
         programs.firefox = {
           enable = true;
-        };      
+        };
 
-# fish
+        # fish
         programs.fish = {
           enable = true;
           interactiveShellInit = ''
@@ -84,10 +91,16 @@
             tide configure --auto --style=Rainbow --prompt_colors='16 colors' --show_time='12-hour format' --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character and frame' --prompt_connection=Dotted --powerline_right_prompt_frame=Yes --prompt_spacing=Sparse --icons='Many icons' --transient=No
             set -g fish_key_bindings fish_vi_key_bindings
             clear
-            '';
+          '';
           plugins = [
-          { name = "grc"; src = pkgs.fishPlugins.grc.src; }
-          { name = "tide"; src = pkgs.fishPlugins.tide.src; }
+            {
+              name = "grc";
+              src = pkgs.fishPlugins.grc.src;
+            }
+            {
+              name = "tide";
+              src = pkgs.fishPlugins.tide.src;
+            }
           ];
           functions = {
             nsr.body = "
@@ -119,11 +132,10 @@
             rsync = "rsync --verbose --recursive --progress --human-readable";
           };
           shellAbbrs = {
-
           };
         };
 
-# bat
+        # bat
         programs.bat = {
           enable = true;
           config = {
@@ -131,14 +143,14 @@
           };
         };
 
-# eza
+        # eza
         programs.eza = {
           enable = true;
           enableBashIntegration = false;
           enableFishIntegration = false;
         };
 
-# NVIM
+        # NVIM
         programs.neovim = {
           enable = true;
           defaultEditor = true;
@@ -208,10 +220,10 @@
             else
               " ordinary Neovim
                 endif
-                '';
-        }; 
+          '';
+        };
 
-# GNOME config: Use 'dconf watch /'
+        # GNOME config: Use 'dconf watch /'
         dconf.settings = {
           "org/gnome/desktop/interface" = {
             color-scheme = lib.mkDefault "prefer-dark";
@@ -248,13 +260,13 @@
             button-layout = "appmenu:minimize,maximize,close";
           };
 
-# Clipboard Indicator
+          # Clipboard Indicator
           "org/gnome/shell/extensions/clipboard-indicator" = {
             enable-keybindings = false;
             history-size = 100;
           };
 
-# Dash to Panel
+          # Dash to Panel
           "org/gnome/shell/extensions/dash-to-panel" = {
             multi-monitors = false;
             animate-appicon-hover = true;
@@ -262,7 +274,7 @@
             group-apps = false;
           };
 
-# Openweather
+          # Openweather
           "org/gnome/shell/extensions/openweatherrefined" = {
             refresh-interval-current = 600;
             refresh-interval-forecast = 3600;
@@ -276,7 +288,7 @@
             clock-format = "12h";
             simplify-degrees = true;
             weather-provider = "openweathermap";
-            custom-keys = [ "34f3635c44f16c3c385e875bdbbfb445" ];
+            custom-keys = ["34f3635c44f16c3c385e875bdbbfb445"];
             position-in-panel = "right";
             position-index = 0;
             show-text-in-panel = true;
@@ -306,41 +318,41 @@
             monitor-switch-grace-period = true;
           };
 
-# ddterm
+          # ddterm
           "org/gnome/shell/extensions/ddterm" = {
             window-monitor = "current";
             show-animation-duration = 0.1;
             theme-variant = "dark";
           };
 
-# enabled extensions
+          # enabled extensions
           "org/gnome/shell" = {
             disable-user-extensions = false;
             enabled-extensions = [
               "dash-to-panel@jderose9.github.com"
-                "clipboard-indicator@tudmotu.com"
-                "openweather-extension@penguin-teal.github.io"
-                "tiling-assistant@leleat-on-github"
-                "ddterm@amezin.github.com"
-                "gsconnect@andyholmes.github.io"
+              "clipboard-indicator@tudmotu.com"
+              "openweather-extension@penguin-teal.github.io"
+              "tiling-assistant@leleat-on-github"
+              "ddterm@amezin.github.com"
+              "gsconnect@andyholmes.github.io"
             ];
           };
         };
 
-# Gnome extension packages
+        # Gnome extension packages
         home.packages =
-          (with pkgs.gnomeExtensions; [ # STABLE
-           dash-to-panel
-           clipboard-indicator
-           tiling-assistant
-           ddterm
+          (with pkgs.gnomeExtensions; [
+            # STABLE
+            dash-to-panel
+            clipboard-indicator
+            tiling-assistant
+            ddterm
           ])
-          ++
-          (with pkgs-unstable.gnomeExtensions; [ # UNSTABLE
-           openweather-refined
+          ++ (with pkgs-unstable.gnomeExtensions; [
+            # UNSTABLE
+            openweather-refined
           ]);
       };
-      };
+    };
   };
 }
-

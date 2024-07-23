@@ -1,19 +1,25 @@
-{ config, pkgs, pkgs-unstable, inputs, lib, vars, ... }:
 {
-  imports =[
-      ./hardware-configuration.nix
-      ../../modules/nixos/profiles/PC.nix
-      ../../modules/home-manager/profiles/PC.nix
-    ];
+  config,
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  lib,
+  vars,
+  ...
+}: {
+  imports = [
+    ./hardware-configuration.nix
+    ../../modules/nixos/profiles/PC.nix
+    ../../modules/home-manager/profiles/PC.nix
+  ];
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [ # STABLE installed packages
-
+    (with pkgs; [
+      # STABLE installed packages
     ])
-    ++
-    (with pkgs-unstable; [ # UNSTABLE installed packages
-
+    ++ (with pkgs-unstable; [
+      # UNSTABLE installed packages
     ]);
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
@@ -24,10 +30,10 @@
       repository = "/home/lilijoy/backup";
       user = "lilijoy";
       paths = [
-      "/home/lilijoy"
+        "/home/lilijoy"
       ];
       exclude = [
-      "/home/lilijoy/backup"
+        "/home/lilijoy/backup"
       ];
       timerConfig = {
         OnCalendar = "hourly";
@@ -48,28 +54,27 @@
     CPUSchedulingPolicy = "idle";
   };
 
-#    users.users.restic = {
-#      description = "restic service user";
-#      isSystemUser = true;
-#      group = "nogroup";
-#    };
-
+  #    users.users.restic = {
+  #      description = "restic service user";
+  #      isSystemUser = true;
+  #      group = "nogroup";
+  #    };
 
   # Define your hostname.
-  networking.hostName = "nixos-thinkpad"; 
+  networking.hostName = "nixos-thinkpad";
 
   # Set extra groups
-  users.users.lilijoy.extraGroups = [ "docker" "tss" ]; # tss for accessing tpm
+  users.users.lilijoy.extraGroups = ["docker" "tss"]; # tss for accessing tpm
 
   # NVIDIA ==============================================================================
-  hardware.opengl = { # enable openGL
+  hardware.opengl = {
+    # enable openGL
     enable = true;
     driSupport = true;
     driSupport32Bit = true;
   };
   services.xserver.videoDrivers = ["nvidia"]; # Load nvidia driver for Xorg and Wayland
   hardware.nvidia = {
-
     # Modesetting is required.
     modesetting.enable = true;
 
@@ -81,9 +86,9 @@
 
     # Use the NVidia open source kernel module (not to be confused with the
     # independent third-party "nouveau" open source driver).
-    # Support is limited to the Turing and later architectures. Full list of 
-    # supported GPUs is at: 
-    # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus 
+    # Support is limited to the Turing and later architectures. Full list of
+    # supported GPUs is at:
+    # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
     # Only available from driver 515.43.04+
     # Currently alpha-quality/buggy, so false is currently the recommended setting.
     open = true;
@@ -110,7 +115,7 @@
   # =====================================================================================
 
   # Fix Clickpad Bug
-  boot.kernelParams = [ "psmouse.synaptics_intertouch=0" ];
+  boot.kernelParams = ["psmouse.synaptics_intertouch=0"];
 
   # State Version for first install, don't touch
   system.stateVersion = "23.11";

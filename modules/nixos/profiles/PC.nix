@@ -1,61 +1,65 @@
-{config, pkgs, pkgs-unstable, inputs, lib, ... }:
 {
-
+  config,
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  lib,
+  ...
+}: {
   imports = [
     ../virtual-machines.nix #(also needs home manager config)
     ../shared.nix
-
   ];
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [ # STABLE installed packages
+    (with pkgs; [
+      # STABLE installed packages
 
-    grc # Text colors
-    ripgrep
-    gitFull
-    nvtopPackages.full
-    xclip # for nvim clipboard
-    gjs # for kdeconnect
-    sops # secrets management
-    restic # backups
-    fd
+      grc # Text colors
+      ripgrep
+      gitFull
+      nvtopPackages.full
+      xclip # for nvim clipboard
+      gjs # for kdeconnect
+      sops # secrets management
+      restic # backups
+      fd
 
-    distrobox
+      distrobox
 
-    gnome-extension-manager
-    baobab # gnome disk usage utilty
-    gnome.gnome-tweaks
-    bitwarden
-    thunderbird
-    vscode-fhs
-    nicotine-plus
-    cider
-    prismlauncher
-    kdenlive
-    qbittorrent
-    jellyfin-media-player
-    easyeffects
-    qpwgraph
-    youtube-music
-    qalculate-gtk
-    libreoffice
-    vial
-    vlc
-    r2modman
+      gnome-extension-manager
+      baobab # gnome disk usage utilty
+      gnome.gnome-tweaks
+      bitwarden
+      thunderbird
+      vscode-fhs
+      nicotine-plus
+      cider
+      prismlauncher
+      kdenlive
+      qbittorrent
+      jellyfin-media-player
+      easyeffects
+      qpwgraph
+      youtube-music
+      qalculate-gtk
+      libreoffice
+      vial
+      vlc
+      r2modman
 
-    discord
-    obsidian
-    spotify
+      discord
+      obsidian
+      spotify
     ])
-    ++
-    (with pkgs-unstable; [ ]); # UNSTABLE installed packages
+    ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
-# sops-nix support, secret managment
+  # sops-nix support, secret managment
   sops = {
     defaultSopsFile = ../../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
-    age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
+    age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519"];
     secrets = {
       open_weather_key = {};
       restic = {
@@ -83,7 +87,7 @@
     polarity = "dark";
     cursor.package = pkgs.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
-    };
+  };
 
   # Disable uneeded GNOME apps
   environment.gnome.excludePackages = with pkgs.gnome; [
@@ -93,7 +97,7 @@
     gnome-calculator
     gnome-shell-extensions
   ];
-  
+
   # Kde Connect
   programs.kdeconnect = {
     enable = true;
@@ -111,7 +115,7 @@
   };
 
   # Intel CPU freq stuck fix
-  boot.kernelParams = [ "intel_pstate=active" ];
+  boot.kernelParams = ["intel_pstate=active"];
 
   # LD fix
   programs.nix-ld.enable = true;
@@ -122,7 +126,7 @@
   # sudo
   security.sudo = {
     execWheelOnly = true;
-    package = pkgs.sudo.override { withInsults = true; };
+    package = pkgs.sudo.override {withInsults = true;};
   };
 
   # Enable bluetooth
@@ -131,7 +135,6 @@
 
   # Set your time zone.
   time.timeZone = "America/New_York";
-
 
   # Enable CUPS to print documents.
   services.printing.enable = true;
@@ -151,7 +154,7 @@
   users.users.lilijoy = {
     isNormalUser = true;
     description = "Lilijoy";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = ["networkmanager" "wheel"];
   };
 
   # Git
@@ -170,14 +173,15 @@
     enable = true;
     vendor.completions.enable = true;
   };
-    programs.bash = { # switch to fish in interactive shell
+  programs.bash = {
+    # switch to fish in interactive shell
     interactiveShellInit = ''
-    if [[ $(${pkgs.procps}/bin/ps --no-header --pid=$PPID --format=comm) != "fish" && -z ''${BASH_EXECUTION_STRING} ]]
-    then
-      shopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=""
-      exec ${pkgs.fish}/bin/fish $LOGIN_OPTION
-    fi
-  '';
+      if [[ $(${pkgs.procps}/bin/ps --no-header --pid=$PPID --format=comm) != "fish" && -z ''${BASH_EXECUTION_STRING} ]]
+      then
+        shopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=""
+        exec ${pkgs.fish}/bin/fish $LOGIN_OPTION
+      fi
+    '';
   };
   environment.shellAliases = lib.mkForce {}; # clear all shell aliases, using fish functions instead
 
@@ -185,16 +189,19 @@
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
-    package = with pkgs; steam.override { extraPkgs = pkgs: [
-    # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982
-    jq
-    cabextract
-    wget 
-    ]; };
+    package = with pkgs;
+      steam.override {
+        extraPkgs = pkgs: [
+          # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982
+          jq
+          cabextract
+          wget
+        ];
+      };
   };
 
   # feral gamemode
-  programs.gamemode ={
+  programs.gamemode = {
     enable = true;
     settings = {
       cpu = {
@@ -209,8 +216,8 @@
 
   # fonts
   fonts.packages = with pkgs; [
-    (nerdfonts.override { fonts = [ "Meslo" ]; })
-  ]; 
+    (nerdfonts.override {fonts = ["Meslo"];})
+  ];
 
   # Mullvad vpn
   services.mullvad-vpn = {
