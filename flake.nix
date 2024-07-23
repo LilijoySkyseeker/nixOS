@@ -26,6 +26,11 @@
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, stylix, sops-nix, ... }@inputs:
     let
       system = "x86_64-linux";
+      vars = { 
+        publicSshKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+        ];
+      };
 
       pkgs = import inputs.nixpkgs {
         inherit system;
@@ -72,7 +77,7 @@
 
         isoimage = nixpkgs.lib.nixosSystem {
           specialArgs = {
-            inherit inputs pkgs;
+            inherit inputs pkgs vars;
           };
           modules = [ 
             ./hosts/isoimage/configuration.nix
