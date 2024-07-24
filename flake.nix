@@ -38,6 +38,7 @@
     vars = {
       publicSshKeys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFt0LLX711yxFHBi/g9aOACefiC1H/9ZYrhlsmhNbVPJ lilijoyskyseeker@gmail.com" # thinkpad
       ];
     };
 

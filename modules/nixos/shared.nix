@@ -20,6 +20,19 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # auto gc with nh
+  programs.nh = {
+    enable = true;
+    clean = {
+      enable = true;
+      dates = "daily";
+      extraArgs = "--keep-since 7d --keep 2";
+    };
+  };
+
+  # file system trip for ssd
+  services.fstrim.enable = true;
+
   # fix for buggy fish command not found
   programs.command-not-found.enable = false;
 
@@ -39,7 +52,6 @@
 
   # Enable Flake Support
   nix.settings.experimental-features = ["nix-command" "flakes"];
-
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
@@ -72,6 +84,9 @@
     LC_TELEPHONE = "en_US.UTF-8";
     LC_TIME = "en_US.UTF-8";
   };
+
+  # x86_64
+  nixpkgs.hostPlatform = "x86_64-linux";
 
   # State Version for first install, don't touch
   system.stateVersion = "23.11";

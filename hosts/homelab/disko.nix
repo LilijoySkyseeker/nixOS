@@ -71,9 +71,12 @@
             options."com.sun:auto-snapshot" = "false";
             postCreateHook = "zfs snapshot zroot/local/root@blank";
           };
-          "local/reserved" = {
-            reservation = "50G";
-            options.mountpoint = "none";
+          "reserved" = {
+            options = {
+              mountpoint = "none";
+              reservation = "50G";
+            };
+            type = "zfs_fs";
           };
         };
       };

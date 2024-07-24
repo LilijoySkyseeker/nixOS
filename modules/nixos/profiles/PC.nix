@@ -73,13 +73,7 @@
 
   # nix helper
   programs.nh = {
-    enable = true;
     flake = "/home/lilijoy/dotfiles";
-    clean = {
-      enable = true;
-      dates = "daily";
-      extraArgs = "--keep-since 7d --keep 2";
-    };
   };
 
   # Stylix
