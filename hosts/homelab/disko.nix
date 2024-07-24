@@ -37,7 +37,7 @@
     # there are 3 datasets, /root, /nix, /state. /root gets a blank partiton
     zpool = {
       zroot = {
-        tpe = "zpool";
+        type = "zpool";
         mode = "mirror";
         rootFsOptions = {
           # https://jrs-s.net/2018/08/17/zfs-tuning-cheat-sheet/
@@ -47,7 +47,6 @@
           mountpoint = "none";
           compression = "lz4";
           "com.sun:auto-snapshot" = "false";
-          "reservation" = "50G";
         };
         options.ashift = "9"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
 
@@ -71,6 +70,10 @@
             mountpoint = "/";
             options."com.sun:auto-snapshot" = "false";
             postCreateHook = "zfs snapshot zroot/local/root@blank";
+          };
+          "local/reserved" = {
+            reservation = "50G";
+            options.mountpoint = "none";
           };
         };
       };

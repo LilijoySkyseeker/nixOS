@@ -4,10 +4,11 @@
   pkgs-unstable,
   inputs,
   lib,
+  vars,
   ...
 }: {
   imports = [
-    ./hardware-configuration.nix
+#   ./hardware-configuration.nix
     ./disko.nix
     ../../modules/nixos/shared.nix
   ];
@@ -51,42 +52,42 @@
       trim.enable = true;
     };
 
-
     # persistence config, specifics are added by the specifc services
     fileSystems."/nix/state".neededForBoot = true;
     fileSystems."/nix".neededForBoot = true;
 
     # impermanance
- boot.initrd = { # to avoid problems with `boot.initrd.postDeviceCommands
-    enable = true;
-    supportedFilesystems = [ "zfs" ];
+    boot.initrd = {
+      # to avoid problems with `boot.initrd.postDeviceCommands
+      enable = true;
+      supportedFilesystems = ["zfs"];
 
-    systemd.services.restore-root = {
-      description = "Rollback zfs zroot";
-      wantedBy = [ "initrd.target" ];
-      requires = [
-        "/dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512"
-      ];
-      after = [
-        "/dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512"
-      ];
-      before = [ "sysroot.mount" ];
-      unitConfig.DefaultDependencies = "no";
-      serviceConfig.Type = "oneshot";
-      script = ''
-        zfs rollback -r zroot/local/root@blank && echo "rollback complete"
-      '';
+      systemd.services.restore-root = {
+        description = "Rollback zfs zroot";
+        wantedBy = ["initrd.target"];
+        requires = [
+          "/dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512"
+        ];
+        after = [
+          "/dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512"
+        ];
+        before = ["sysroot.mount"];
+        unitConfig.DefaultDependencies = "no";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          zfs rollback -r zroot/local/root@blank && echo "rollback complete"
+        '';
+      };
     };
-  };
-#   boot.initrd.postDeviceCommands = lib.mkAfter '' # maybe legacy, will keep to check
-#     zfs rollback -r zroot/local/root@blank
-#   '';
+    #   boot.initrd.postDeviceCommands = lib.mkAfter '' # maybe legacy, will keep to check
+    #     zfs rollback -r zroot/local/root@blank
+    #   '';
     environment.persistence."/nix/state" = {
       # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
       enable = true;
       hideMounts = true;
       directories = [
-      "/etc/nixos"
+        "/etc/nixos"
       ];
       files = [
         "/etc/machine-id"
@@ -97,6 +98,4 @@
       ];
     };
   };
-
-
 }
