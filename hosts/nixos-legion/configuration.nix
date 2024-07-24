@@ -11,6 +11,7 @@
     ../../modules/nixos/shared.nix
     ../../modules/nixos/wooting.nix
     ../../modules/home-manager/profiles/PC.nix
+    ../../modules/nixos/profiles/PC.nix
   ];
 
   # System installed pkgs
