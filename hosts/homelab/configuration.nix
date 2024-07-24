@@ -44,13 +44,19 @@
 
     # zfs support
     boot.supportedFilesystems = ["zfs"];
-
     environment.systemPackages = with pkgs; [zfs];
-
     services.zfs = {
       autoScrub.enable = true;
       trim.enable = true;
     };
+
+  # set zfs file systems for boot
+  fileSystems."/nix/state".neededForBoot = true;
+  fileSystems."/nix".neededForBoot = true;
+  # impermanance
+  boot.initrd.postDeviceCommands = lib.mkAfter ''
+    zfs rollback -r rpool/local/root@blank
+  '';
 
     # persistence config, specifics are added by the specifc services
     environment.persistence."/nix/state" = {
