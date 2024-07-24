@@ -40,12 +40,15 @@
         type = "zpool";
         mode = "mirror";
         rootFsOptions = {
+          # https://docs.oracle.com/cd/E19120-01/open.solaris/817-2271/6mhupg6ma/index.html#gcfgr
           # https://jrs-s.net/2018/08/17/zfs-tuning-cheat-sheet/
           acltype = "posixacl";
           xattr = "sa";
           atime = "off";
           mountpoint = "none";
+          canmount = "off";
           compression = "lz4";
+          devices = "off";
           "com.sun:auto-snapshot" = "false";
         };
         options.ashift = "9"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
@@ -54,6 +57,7 @@
           "local" = {
             type = "zfs_fs";
             options.mountpoint = "none";
+            options."com.sun:auto-snapshot" = "false";
           };
           "local/state" = {
             type = "zfs_fs";

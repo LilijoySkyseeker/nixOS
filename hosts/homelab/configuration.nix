@@ -59,11 +59,10 @@
   };
   networking.hostId = "e0019fd8";
 
-  # persistence config, specifics are added by the specifc services
-  fileSystems."/nix/state".neededForBoot = true;
-  fileSystems."/nix".neededForBoot = true;
 
   # impermanance
+  fileSystems."/nix/state".neededForBoot = true;
+  fileSystems."/nix".neededForBoot = true;
   boot.initrd.systemd.services.rollback = {
     description = "Rollback ZFS datasets to a pristine state";
     wantedBy = [
