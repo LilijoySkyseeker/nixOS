@@ -34,7 +34,7 @@
         };
       };
     };
-    # there are 3 datasets, /root, /nix, /state. /root gets a blank partiton, and then rolled back by code on line 6
+    # there are 3 datasets, /root, /nix, /state. /root gets a blank partiton
     zpool = {
       zroot = {
         tpe = "zpool";

@@ -20,6 +20,9 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # overwrite all manually made users
+  users.mutableUsers = false;
+
   # fix for buggy fish command not found
   programs.command-not-found.enable = false;
 
