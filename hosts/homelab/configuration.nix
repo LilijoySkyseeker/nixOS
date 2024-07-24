@@ -26,10 +26,10 @@
   # Define your hostname.
   networking.hostName = "homelab";
 
-#security
+  #security
   # lock down nix
   nix.settings.allowed-users = ["root"];
-# disable sudo
+  # disable sudo
   security.sudo.enable = false;
 
   # ssh server
@@ -58,7 +58,6 @@
     trim.enable = true;
   };
   networking.hostId = "e0019fd8";
-
 
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;

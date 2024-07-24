@@ -20,6 +20,9 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # firmware updater daemon
+  services.fwupd.enable = true;
+
   # auto gc with nh
   programs.nh = {
     enable = true;
