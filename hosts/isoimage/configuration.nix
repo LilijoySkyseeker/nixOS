@@ -36,5 +36,4 @@
       PermitTunnel no
     '';
   };
-
 }
