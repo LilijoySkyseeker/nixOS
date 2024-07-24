@@ -20,11 +20,11 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # fix for buggy fish command not found
+  programs.command-not-found.enable = false;
+
   # remove all defualt packages
   environment.defaultPackages = lib.mkForce [];
-
-  # restric nix package manager to @wheel
-  nix.settings.allowed-users = ["@wheel"];
 
   # firewall
   networking.firewall.enable = true;
@@ -72,4 +72,7 @@
     LC_TELEPHONE = "en_US.UTF-8";
     LC_TIME = "en_US.UTF-8";
   };
+
+  # State Version for first install, don't touch
+  system.stateVersion = "23.11";
 }

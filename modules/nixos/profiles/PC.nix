@@ -55,6 +55,9 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # restric nix package manager to @wheel
+  nix.settings.allowed-users = ["@wheel"];
+
   # sops-nix support, secret managment
   sops = {
     defaultSopsFile = ../../../secrets/secrets.yaml;

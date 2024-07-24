@@ -1,7 +1,13 @@
 {
+  # set zfs file systems for boot
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
+  # impermanance
+  boot.initrd.postDeviceCommands = lib.mkAfter ''
+    zfs rollback -r rpool/local/root@blank
+  '';
 
+  # ssd has /boot 8G of swap, and then the rest is a zfs partition
   disko.devices = {
     disk = {
       boot-ssd = {
@@ -36,11 +42,13 @@
         };
       };
     };
+    # there are 3 datasets, /root, /nix, /state. /root gets a blank partiton, and then rolled back by code on line 6
     zpool = {
       zroot = {
         tpe = "zpool";
         mode = "mirror";
         rootFsOptions = {
+          # https://jrs-s.net/2018/08/17/zfs-tuning-cheat-sheet/
           acltype = "posixacl";
           xattr = "sa";
           atime = "off";
@@ -48,7 +56,7 @@
           compression = "lz4";
           "com.sun:auto-snapshot" = "false";
         };
-        options.ashift = "9";
+        options.ashift = "9"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
 
         datasets = {
           "local" = {

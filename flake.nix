@@ -19,6 +19,8 @@
 
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+
+    impermanence.url = "github:nix-community/impermanence";
   };
 
   outputs = inputs @ {
@@ -29,6 +31,7 @@
     stylix,
     sops-nix,
     disko,
+    impermanence,
     ...
   }: let
     system = "x86_64-linux";
@@ -51,7 +54,7 @@
       #==================================================
       nixos-legion = nixpkgs.lib.nixosSystem {
         specialArgs = {
-          inherit inputs pkgs pkgs-unstable;
+          inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
           ./hosts/nixos-legion/configuration.nix
@@ -75,12 +78,13 @@
       #==================================================
       homelab = nixpkgs.lib.nixosSystem {
         specialArgs = {
-          inherit inputs pkgs pkgs-unstable;
+          inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
           ./hosts/homelab/configuration.nix
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
+          impermanence.nixosModules.impermanence
         ];
       };
       #==================================================
