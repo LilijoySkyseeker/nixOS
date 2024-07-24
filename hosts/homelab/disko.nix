@@ -78,7 +78,7 @@
 
       # Backup pool disks
       hdd-c = backupHdd "ata-HUH721212ALE601_8CK6DXTF";
-      hdd-d = backupHdd "ata-HUH721212ALE601_8CK6DXTF";
+      hdd-d = backupHdd "ata-HUH721212ALE601_2AHDD1AY";
     };
 
     zpool = {

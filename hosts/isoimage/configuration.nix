@@ -19,5 +19,22 @@
 
   nix.settings.experimental-features = ["nix-command" "flakes"];
 
+  # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
+  services.openssh = {
+    allowSFTP = true;
+    enable = true;
+    settings.KbdInteractiveAuthentication = false;
+    extraConfig = ''
+      passwordAuthentication = no
+      PermitRootLogin = prohibit-password
+      AllowTcpForwarding yes
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowStreamLocalForwarding no
+      AuthenticationMethods publickey
+      PermitTunnel no
+    '';
+  };
+
 }
