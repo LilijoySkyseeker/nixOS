@@ -29,7 +29,7 @@ services.sanoid = {
   enable = true;
   interval = "minutely";
   datasets = {
-    zroot/local/root.useTemplate = [ working ];
+    "zroot/local/root.useTemplate" = [ working ];
   };
     settings = {
       template_working = {
