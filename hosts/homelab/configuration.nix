@@ -18,6 +18,9 @@
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages
+      sanoid
+      syncoid
+      findoid
       zfs
     ])
     ++ (with pkgs-unstable; [
