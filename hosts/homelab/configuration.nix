@@ -27,7 +27,6 @@
 # zfs snapshots
 services.sanoid = {
   enable = true;
-  user = "root";
   extraArgs = [ "--verbose" "--debug" ];
   interval = "minutely";
   settings = {
@@ -44,6 +43,9 @@ services.sanoid = {
           autoprune = "yes";
       };
     };
+  };
+  systemd.services.sanoid.serviceConfig = {
+    user = "root";
   };
 
 # cpu power management
