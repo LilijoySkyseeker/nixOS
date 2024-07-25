@@ -27,7 +27,7 @@
 # zfs snapshots
 services.sanoid = {
   enable = true;
-  extraArgs = [ "--verbose" "--debug" ];
+  extraArgs = [ "--verbose" ];
   interval = "minutely";
   settings = {
         "zroot/local/root".use_template = "working";
