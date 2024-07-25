@@ -45,7 +45,7 @@ services.sanoid = {
     };
   };
   systemd.services.sanoid.serviceConfig = {
-    user = "root";
+    User = "root";
   };
 
 # cpu power management
