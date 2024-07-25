@@ -67,7 +67,6 @@
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
   boot.initrd = {
-      availableKernelModules = [ "xhci_pci" "ahci" "nvme" "sd_mod" ];
       systemd = {
         enable = true;
         services.rollback = {
