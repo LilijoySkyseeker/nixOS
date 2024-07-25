@@ -33,7 +33,7 @@
     settings = {
       "zroot/local/state".use_template = "working";
       "zdata/storage/storage".use_template = "working";
-      "zdata/storaeg/storage-bulk".use_template = "working";
+      "zdata/storage/storage-bulk".use_template = "working";
       template_working = {
         frequent_period = 1;
         frequently = 59;
@@ -45,7 +45,10 @@
         autosnap = "yes";
         autoprune = "yes";
       };
-    "zbackup/backup".use_template = "backup";
+      "zbackup/backup" = {
+        use_template = "backup";
+        recursive = "yes";
+      };
       template_backup = {
         frequently = 0;
         hourly = 168;
@@ -64,18 +67,22 @@
   services.syncoid = {
     enable = true;
     interval = "hourly";
-    commonArgs = [ "--no-sync-snap" "--create-bookmark" "--force-delete" ];
+    commonArgs = ["--no-sync-snap"]; # "--create-bookmark" for mobile machines
     commands = {
-      "storage" = {
-        source = "zdata/storage";
-        target = "zbackup/backup";
-        recursive = true;
-        extraArgs = [ "--identifier=zdata-storage" ];
+      "zdata/storage/storage" = {
+        source = "zdata/storage/storage";
+        target = "zbackup/backup/homelab/storage";
+        extraArgs = ["--identifier=zdata_storage_storage"];
       };
-      "state" = {
+      "zdata/storage/storage-bulk" = {
+        source = "zdata/storage-bulk";
+        target = "zbackup/backup/homelab/storage-bulk";
+        extraArgs = ["--identifier=zdata_storage_storage-bulk"];
+      };
+      "zroot/local/state" = {
         source = "zroot/local/state";
         target = "zbackup/backup";
-        extraArgs = [ "--identifier=zroot-local-state" ];
+        extraArgs = ["--identifier=zroot_local_state"];
       };
     };
   };

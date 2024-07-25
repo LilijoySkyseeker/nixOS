@@ -134,7 +134,66 @@
         datasets = {
           "backup" = {
             type = "zfs_fs";
-            mountpoint = "/backup";
+            mountpoint = "none";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          # homelab
+          "backup/homelab" = {
+            type = "zfs_fs";
+            mountpoint = "none";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/homelab/storage" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/homelab/storage";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/homelab/storage-bulk" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/homelab/storage-bulk";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/homelab/state" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/homelab/state";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          # thinkpad
+          "backup/thinkpad" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/thinkpad";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/thinkpad/state" = {
+            type = "zfs_fs";
+            mountpoint = "backup/thinkpad/state";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/thinkpad/storage" = {
+            type = "zfs_fs";
+            mountpoint = "backup/thinkpad/storage";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          # legion
+          "backup/legion" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/legion";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/legion/state" = {
+            type = "zfs_fs";
+            mountpoint = "backup/legion/state";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup/legion/storage" = {
+            type = "zfs_fs";
+            mountpoint = "backup/legion/storage";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          # other
+          "backup/other" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/other";
             options."com.sun:auto-snapshot" = "false";
           };
         };
