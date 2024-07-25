@@ -11,7 +11,7 @@
     ./hardware-configuration.nix
     ./disko.nix
     ../../modules/nixos/shared.nix
-    ../../mdoules/nixos/profiles/server.nix
+    ../../modules/nixos/profiles/server.nix
   ];
 
   # System installed pkgs
@@ -24,7 +24,7 @@
       # UNSTABLE installed packages
     ]);
 
-# lock down users
+  # lock down users
   users.mutableUsers = false;
   #users.users.root.hashedPassword = "!";
 
@@ -68,22 +68,22 @@
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
   boot.initrd = {
-      systemd = {
-        enable = true;
-        services.rollback = {
-          description = "Rollback root filesystem to a pristine state on boot";
-          wantedBy = [ "initrd.target" ];
-          after = [ "zfs-import-zroot.service" ];
-          before = [ "sysroot.mount" ];
-          path = with pkgs; [ zfs ];
-          unitConfig.DefaultDependencies = "no";
-          serviceConfig.Type = "oneshot";
-          script = ''
-            zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
-          '';
-        };
+    systemd = {
+      enable = true;
+      services.rollback = {
+        description = "Rollback root filesystem to a pristine state on boot";
+        wantedBy = ["initrd.target"];
+        after = ["zfs-import-zroot.service"];
+        before = ["sysroot.mount"];
+        path = with pkgs; [zfs];
+        unitConfig.DefaultDependencies = "no";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
+        '';
       };
     };
+  };
 
   # persistence
   environment.persistence."/nix/state" = {

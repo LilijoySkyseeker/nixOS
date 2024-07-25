@@ -12,7 +12,6 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
-# disable laptop lid power
-services.logind.lidSwitch = "ignore";
-
+  # disable laptop lid power
+  services.logind.lidSwitch = "ignore";
 }
