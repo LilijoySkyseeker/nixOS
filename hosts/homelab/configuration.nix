@@ -13,18 +13,9 @@
     ../../modules/nixos/shared.nix
   ];
 
-  # ssh during initrd for debug
-  boot = {
-  initrd.network = {
-    enable = true;
-    ssh = {
-      enable = true;
-      port = 22; 
-      authorizedKeys = vars.publicSshKeys;
-    };
-  };
-};
-
+### REMOVE
+users.users.root.initialPassword = "qwfpbj";
+### REMOVE
 
   # System installed pkgs
   environment.systemPackages =
