@@ -36,6 +36,9 @@ services.sanoid = {
           frequent_period = 1;
         	frequently = 59;
           hourly = 24;
+          daily = 0;
+          monthly = 0;
+          yearly = 0;
           autosnap = "yes";
           autoprune = "yes";
       };
