@@ -25,7 +25,7 @@
 
 # lock down users
   users.mutableUsers = false;
-  users.users.root.hashedPassword = "!"
+  users.users.root.hashedPassword = "!";
 
   # Define your hostname.
   networking.hostName = "homelab";
