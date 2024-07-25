@@ -32,6 +32,8 @@ services.sanoid = {
     "zroot/local/root.useTemplate" = [ working ];
   };
     settings = {
+        "zroot/local/root.useTemplate".usetemplate = "working";
+
       template_working = {
           frequent_period = 1;
         	frequently = 59;
