@@ -19,7 +19,6 @@
     (with pkgs; [
       # STABLE installed packages
       sanoid
-      syncoid
       findoid
       zfs
     ])
