@@ -22,6 +22,7 @@
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
+    ports = [ 2222 ];
     allowSFTP = true;
     enable = true;
     settings.KbdInteractiveAuthentication = false;

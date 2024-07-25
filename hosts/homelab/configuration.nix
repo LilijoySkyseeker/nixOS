@@ -24,6 +24,9 @@
       # UNSTABLE installed packages
     ]);
 
+# disable emergencymode
+systemd.enableEmergencyMode = false;
+
   # lock down users
   users.mutableUsers = false;
   #users.users.root.hashedPassword = "!";
