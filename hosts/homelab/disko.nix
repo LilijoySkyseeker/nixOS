@@ -134,13 +134,13 @@
         datasets = {
           "backup" = {
             type = "zfs_fs";
-            options.mountpoint = "none";
+            options.mountpoint = "/backup";
             options."com.sun:auto-snapshot" = "false";
           };
           # homelab
           "backup/homelab" = {
             type = "zfs_fs";
-            options.mountpoint = "none";
+            options.mountpoint = "/backup/homelab";
             options."com.sun:auto-snapshot" = "false";
           };
           "backup/homelab/storage" = {
