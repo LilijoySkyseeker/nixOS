@@ -70,10 +70,12 @@
         source = "zdata/storage";
         target = "zbackup/backup";
         recursive = true;
+        extraArgs = [ "--identifier=storage" ];
       };
       "state" = {
         source = "zroot/local/state";
         target = "zbackup/backup";
+        extraArgs = [ "--identifier=state" ];
       };
     };
   };
