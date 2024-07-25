@@ -25,6 +25,7 @@
       sops # secrets management
       restic # backups
       fd
+      nixos-anywhere
 
       distrobox
 
