@@ -131,10 +131,7 @@
       };
       zroot = {
         type = "zpool";
-        mode =
-          if idx == 1
-          then ""
-          else "mirror";
+        mode = "";
         rootFsOptions = {
           acltype = "posixacl";
           xattr = "sa";
