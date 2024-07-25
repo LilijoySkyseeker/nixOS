@@ -64,7 +64,7 @@
   services.syncoid = {
     enable = true;
     interval = "hourly";
-    commonArgs = [ "--no-sync-snap" ]; # --create-bookmark for the mobile machines
+    commonArgs = [ "--no-sync-snap" "--create-bookmark" ];
     commands = {
       "storage" = {
         source = "zdata/storage";
