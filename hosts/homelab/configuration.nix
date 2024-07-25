@@ -25,28 +25,57 @@
       # UNSTABLE installed packages
     ]);
 
-  # zfs snapshots
+  # backups
   services.sanoid = {
     enable = true;
     extraArgs = ["--verbose"];
     interval = "minutely";
     settings = {
       "zroot/local/state".use_template = "working";
-      "zdata/storage".use_template = "working";
+      "zdata/storage/storage".use_template = "working";
+      "zdata/storaeg/storage-bulk".use_template = "working";
       template_working = {
         frequent_period = 1;
         frequently = 59;
         hourly = 24;
         daily = 0;
+        weekly = 0;
         monthly = 0;
         yearly = 0;
         autosnap = "yes";
+        autoprune = "yes";
+      };
+    "zbackup/backup".use_template = "backup";
+      template_backup = {
+        frequently = 0;
+        hourly = 168;
+        daily = 32;
+        weekly = 0;
+        monthly = 12;
+        yearly = 0;
+        autosnap = "no";
         autoprune = "yes";
       };
     };
   };
   systemd.services.sanoid.serviceConfig = {
     User = lib.mkForce "root";
+  };
+  services.syncoid = {
+    enable = true;
+    interval = "hourly";
+    commonArgs = [ "--no-sync-snap" ]; # --create-bookmark for the mobile machines
+    commands = {
+      "storage" = {
+        source = "zdata/storage";
+        target = "zbackup/backup";
+        recursive = true;
+      };
+      "state" = {
+        source = "zroot/local/state";
+        target = "zbackup/backup";
+      };
+    };
   };
 
   # cpu power management

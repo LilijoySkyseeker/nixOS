@@ -132,7 +132,7 @@
         };
         options.ashift = "12"; # IMPORTANT
         datasets = {
-          backup = {
+          "backup" = {
             type = "zfs_fs";
             mountpoint = "/backup";
             options."com.sun:auto-snapshot" = "false";
