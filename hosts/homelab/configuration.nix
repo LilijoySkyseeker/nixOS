@@ -27,6 +27,7 @@
 # zfs snapshots
 services.sanoid = {
   enable = true;
+  user = "root";
   extraArgs = [ "--verbose" "--debug" ];
   interval = "minutely";
   settings = {
