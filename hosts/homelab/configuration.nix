@@ -18,7 +18,7 @@
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages
-      sanoid
+      sanoid # also installs syncoid and findoid
       zfs
     ])
     ++ (with pkgs-unstable; [
@@ -32,6 +32,7 @@ services.sanoid = {
   interval = "minutely";
   settings = {
         "zroot/local/root".use_template = "working";
+        "zroot/local/state".use_template = "working";
 
       template_working = {
           frequent_period = 1;
