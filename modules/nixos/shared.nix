@@ -21,6 +21,9 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # Set your time zone.
+  time.timeZone = "America/New_York";
+
   # firmware updater daemon
   services.fwupd.enable = true;
 
