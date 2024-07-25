@@ -28,10 +28,7 @@
 services.sanoid = {
   enable = true;
   interval = "minutely";
-  datasets = {
-    "zroot/local/root.useTemplate" = [ working ];
-  };
-    settings = {
+  settings = {
         "zroot/local/root.useTemplate".usetemplate = "working";
 
       template_working = {
