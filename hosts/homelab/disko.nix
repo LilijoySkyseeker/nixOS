@@ -3,6 +3,9 @@
   # https://github.com/lovesegfault/nix-config/blob/eebebff8e682ba2deb96320afa35789537a1e58e/hosts/plato/disko.nix#L1
   # https://docs.oracle.com/cd/E19120-01/open.solaris/817-2271/6mhupg6ma/index.html#gcfgr
   # https://jrs-s.net/2018/08/17/zfs-tuning-cheat-sheet/
+  
+  # install command
+# disko-install --write-efi-boot-entries --flake '/tmp/config/etc/nixos#homelab' --disk nvme-a /dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512 --disk hdd-a /dev/disk/by-id/ata-HUH721212ALE601_8CH9J1UE --disk hdd-b /dev/disk/by-id/ata-HUH721212ALE601_8CJJUE6E --disk hdd-c /dev/disk/by-id/ata-HUH721212ALE601_8CK6DXTF  --disk hdd-d /dev/disk/by-id/ata-HUH721212ALE601_2AHDD1AY
 
   disko.devices = let
     rootSsd = idx: id: {
@@ -89,7 +92,7 @@
           acltype = "posixacl";
           xattr = "sa";
           atime = "off";
-          compresion = "lz4";
+          compression = "lz4";
           mountpoint = "none";
           canmount = "off";
           devices = "off";
@@ -97,12 +100,7 @@
         };
         options.ashift = "12"; # IMPORTANT
         datasets = {
-          "storage" = {
-            type = "zfs_fs";
-            options.mountpoint = "none";
-            options."com.sun:auto-snapshot" = "false";
-          };
-          "storage/storage" = {
+          storage = {
             type = "zfs_fs";
             mountpoint = "/storage";
             options."com.sun:auto-snapshot" = "false";
@@ -116,7 +114,7 @@
           acltype = "posixacl";
           xattr = "sa";
           atime = "off";
-          compresion = "lz4";
+          compression = "lz4";
           mountpoint = "none";
           canmount = "off";
           devices = "off";
@@ -124,12 +122,7 @@
         };
         options.ashift = "12"; # IMPORTANT
         datasets = {
-          "backup" = {
-            type = "zfs_fs";
-            options.mountpoint = "none";
-            options."com.sun:auto-snapshot" = "false";
-          };
-          "backup/backup" = {
+          backup = {
             type = "zfs_fs";
             mountpoint = "/backup";
             options."com.sun:auto-snapshot" = "false";
@@ -138,7 +131,11 @@
       };
       zroot = {
         type = "zpool";
-        mode = "mirror";
+        mode = "";
+        mode =
+          if idx == 1
+          then ""
+          else "mirror";
         rootFsOptions = {
           acltype = "posixacl";
           xattr = "sa";

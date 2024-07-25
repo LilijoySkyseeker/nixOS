@@ -92,6 +92,7 @@
     enable = true;
     hideMounts = true;
     directories = [
+      "/var/log"
       "/etc/nixos"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
     ];
