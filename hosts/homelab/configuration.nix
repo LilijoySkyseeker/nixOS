@@ -11,6 +11,7 @@
     ./hardware-configuration.nix
     ./disko.nix
     ../../modules/nixos/shared.nix
+    ../../mdoules/nixos/profiles/server.nix
   ];
 
   # System installed pkgs
@@ -25,7 +26,7 @@
 
 # lock down users
   users.mutableUsers = false;
-  users.users.root.hashedPassword = "!";
+  #users.users.root.hashedPassword = "!";
 
   # Define your hostname.
   networking.hostName = "homelab";
@@ -39,8 +40,8 @@
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
-    allowSFTP = true;
     enable = true;
+    allowSFTP = true;
     settings.KbdInteractiveAuthentication = false;
     extraConfig = ''
       passwordAuthentication = no
