@@ -31,7 +31,6 @@ services.sanoid = {
   extraArgs = [ "--verbose" ];
   interval = "minutely";
   settings = {
-        "zroot/local/root".use_template = "working";
         "zroot/local/state".use_template = "working";
 
       template_working = {
