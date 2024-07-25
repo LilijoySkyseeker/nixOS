@@ -131,7 +131,6 @@
       };
       zroot = {
         type = "zpool";
-        mode = "";
         mode =
           if idx == 1
           then ""
