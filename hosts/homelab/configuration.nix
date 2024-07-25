@@ -41,7 +41,6 @@ services.sanoid = {
       };
     };
   };
-};
 
 # cpu power management
     powerManagement.cpuFreqGovernor = "performance";
