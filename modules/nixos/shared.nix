@@ -17,6 +17,7 @@
       git
       neovim
       alejandra
+      rsync
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 

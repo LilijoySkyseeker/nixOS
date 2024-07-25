@@ -8,7 +8,7 @@
   ...
 }: {
   imports = [
-    #   ./hardware-configuration.nix
+    ./hardware-configuration.nix
     ./disko.nix
     ../../modules/nixos/shared.nix
   ];
@@ -66,26 +66,24 @@
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
-  boot.initrd.systemd.services.rollback = {
-    description = "Rollback ZFS datasets to a pristine state";
-    wantedBy = [
-      "initrd.target"
-    ];
-    after = [
-      "zfs-import-zroot.service"
-    ];
-    before = [
-      "sysroot.mount"
-    ];
-    path = with pkgs; [
-      zfs
-    ];
-    unitConfig.DefaultDependencies = "no";
-    serviceConfig.Type = "oneshot";
-    script = ''
-      zfs rollback -r zroot/local/root@blank && echo "rollback complete"
-    '';
-  };
+  boot.initrd = {
+      availableKernelModules = [ "xhci_pci" "ahci" "nvme" "sd_mod" ];
+      systemd = {
+        enable = true;
+        services.rollback = {
+          description = "Rollback root filesystem to a pristine state on boot";
+          wantedBy = [ "initrd.target" ];
+          after = [ "zfs-import-zroot.service" ];
+          before = [ "sysroot.mount" ];
+          path = with pkgs; [ zfs ];
+          unitConfig.DefaultDependencies = "no";
+          serviceConfig.Type = "oneshot";
+          script = ''
+            zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
+          '';
+        };
+      };
+    };
 
   # persistence
   environment.persistence."/nix/state" = {

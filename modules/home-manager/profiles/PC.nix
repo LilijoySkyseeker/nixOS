@@ -129,9 +129,9 @@
             e = "eza --group-directories-first --header --git --icons --all --long --mounts";
             et = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
             etl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
-            rsync = "rsync --verbose --recursive --progress --human-readable";
           };
           shellAbbrs = {
+            rsync = "rsync --verbose --recursive --progress --human-readable";
           };
         };
 
