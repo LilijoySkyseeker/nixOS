@@ -13,10 +13,6 @@
     ../../modules/nixos/shared.nix
   ];
 
-### REMOVE
-users.users.root.initialPassword = "qwfpbj";
-### REMOVE
-
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
@@ -26,6 +22,9 @@ users.users.root.initialPassword = "qwfpbj";
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
+
+# lock down users
+users.mutableUsers = false;
 
   # Define your hostname.
   networking.hostName = "homelab";
