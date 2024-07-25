@@ -166,12 +166,12 @@
           };
           "backup/thinkpad/state" = {
             type = "zfs_fs";
-            options.mountpoint = "backup/thinkpad/state";
+            options.mountpoint = "/backup/thinkpad/state";
             options."com.sun:auto-snapshot" = "false";
           };
           "backup/thinkpad/storage" = {
             type = "zfs_fs";
-            options.mountpoint = "backup/thinkpad/storage";
+            options.mountpoint = "/backup/thinkpad/storage";
             options."com.sun:auto-snapshot" = "false";
           };
           # legion
@@ -182,12 +182,12 @@
           };
           "backup/legion/state" = {
             type = "zfs_fs";
-            options.mountpoint = "backup/legion/state";
+            options.mountpoint = "/backup/legion/state";
             options."com.sun:auto-snapshot" = "false";
           };
           "backup/legion/storage" = {
             type = "zfs_fs";
-            options.mountpoint = "backup/legion/storage";
+            options.mountpoint = "/backup/legion/storage";
             options."com.sun:auto-snapshot" = "false";
           };
           # other
