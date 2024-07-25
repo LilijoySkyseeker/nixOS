@@ -24,6 +24,28 @@
       # UNSTABLE installed packages
     ]);
 
+# zfs snapshots
+services.sanoid = {
+  enable = true;
+  interval = "minutely";
+  datasets = {
+    zroot/local/root.useTemplate = [ working ];
+  };
+    settings = {
+      template_working = {
+          frequent_period = 1;
+        	frequently = 59;
+          hourly = 24;
+          autosnap = "yes";
+          autoprune = "yes";
+      };
+    };
+  };
+};
+
+# cpu power management
+    powerManagement.cpuFreqGovernor = "performance";
+
 # disable emergencymode
 systemd.enableEmergencyMode = false;
 
