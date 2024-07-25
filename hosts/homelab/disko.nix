@@ -100,9 +100,19 @@
         };
         options.ashift = "12"; # IMPORTANT
         datasets = {
-          storage = {
+          "storage" = {
+            type = "zfs_fs";
+            options.mountpoint = "none";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "storage/storage" = {
             type = "zfs_fs";
             mountpoint = "/storage";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "storage/storage-bulk" = {
+            type = "zfs_fs";
+            mountpoint = "/storage-bulk";
             options."com.sun:auto-snapshot" = "false";
           };
         };

@@ -25,35 +25,35 @@
       # UNSTABLE installed packages
     ]);
 
-# zfs snapshots
-services.sanoid = {
-  enable = true;
-  extraArgs = [ "--verbose" ];
-  interval = "minutely";
-  settings = {
-        "zroot/local/state".use_template = "working";
-
+  # zfs snapshots
+  services.sanoid = {
+    enable = true;
+    extraArgs = ["--verbose"];
+    interval = "minutely";
+    settings = {
+      "zroot/local/state".use_template = "working";
+      "zdata/storage".use_template = "working";
       template_working = {
-          frequent_period = 1;
-        	frequently = 59;
-          hourly = 24;
-          daily = 0;
-          monthly = 0;
-          yearly = 0;
-          autosnap = "yes";
-          autoprune = "yes";
+        frequent_period = 1;
+        frequently = 59;
+        hourly = 24;
+        daily = 0;
+        monthly = 0;
+        yearly = 0;
+        autosnap = "yes";
+        autoprune = "yes";
       };
     };
   };
   systemd.services.sanoid.serviceConfig = {
-     User = lib.mkForce "root";
+    User = lib.mkForce "root";
   };
 
-# cpu power management
-    powerManagement.cpuFreqGovernor = "performance";
+  # cpu power management
+  powerManagement.cpuFreqGovernor = "performance";
 
-# disable emergencymode
-systemd.enableEmergencyMode = false;
+  # disable emergencymode
+  systemd.enableEmergencyMode = false;
 
   # lock down users
   users.mutableUsers = false;
