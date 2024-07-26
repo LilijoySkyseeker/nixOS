@@ -30,6 +30,7 @@
 
   # backblaze secrets prefetcher
   systemd.services.restic-backups-backblazeDaily-startup = {
+    enable = true;
     wantedBy = ["restic-backups-backblazeDaily.service"];
     before = ["restic-backups-backblazeDaily.service"];
     script = ''
@@ -87,6 +88,7 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
+    enable = true;
     wants = ["restic-backups-backblazeDaily-startup.service"];
     after = ["restic-backups-backblazeDaily-startup.service"];
     path = [
