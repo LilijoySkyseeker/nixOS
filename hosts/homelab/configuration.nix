@@ -59,15 +59,15 @@
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
       environmentFile = "/etc/restic/resticEnv";
-      backupPrepareCommand = ''
-        zfs snapshot zbackup@restic -r
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
-      '';
-      backupCleanupCommand = ''
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
-        rm -rf /tmp/zbackup
-        zfs destroy zbackup@restic -r
-      '';
+      #     backupPrepareCommand = ''
+      #       zfs snapshot zbackup@restic -r
+      #       zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+      #     '';
+      #     backupCleanupCommand = ''
+      #       zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
+      #       rm -rf /tmp/zbackup
+      #       zfs destroy zbackup@restic -r
+      #     '';
       user = "root";
       paths = [
         "/tmp/zbackup"
@@ -88,7 +88,6 @@
   };
   systemd.services.restic-backups-backblazeDaily = {
     environment = {
-      DEBUG_FILES = "*";
     };
     path = [
       pkgs.zfs
