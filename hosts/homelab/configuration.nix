@@ -75,6 +75,7 @@
   pkgs.coreutils-full
   pkgs.mount
   pkgs.umount
+  pkgs.findutils
   ];
     serviceConfig = {
       Nice = 19;
