@@ -74,7 +74,7 @@ in {
   systemd.services.restic-backups-backblazeDaily = {
     enviornment = {
       AWS_ACCESS_KEY_ID = "${vars.AWS_ACCESS_KEY_ID}";
-      AWS_SECRET_ACCESS_KEY = "${AWS_SECRET_ACCESS_KEY}";
+      AWS_SECRET_ACCESS_KEY = "${vars.AWS_SECRET_ACCESS_KEY}";
     };
     path = [
       pkgs.zfs
