@@ -44,8 +44,6 @@
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
-        export AWS_ACCESS_KEY_ID="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})"
-        export AWS_SECRET_ACCESS_KEY="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})"
       '';
       backupCleanupCommand = ''
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
@@ -70,7 +68,15 @@
       ];
     };
   };
+  let
+  vars.AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})"
+  vars.AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})"
+inv
   systemd.services.restic-backups-backblazeDaily = {
+    enviornment = {
+        AWS_ACCESS_KEY_ID=${vars.AWS_ACCESS_KEY_ID};
+        AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY};
+        };
     path = [
       pkgs.zfs
       pkgs.coreutils-full
