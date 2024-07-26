@@ -40,7 +40,7 @@
       echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
       echo "RCLONE_CONFIG_RESTIC_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/rcloneConfig
       echo "RCLONE_CONFIG_RESTIC_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/rcloneConfig
-      echo "RCLONE_CONFIG_RESTIC_TYPE=b2" >> /etc/restic/rcloneConfig
+      echo "RCLONE_CONFIG_RESTIC_TYPE=s3" >> /etc/restic/rcloneConfig
     '';
     serviceConfig = {
       User = "root";
