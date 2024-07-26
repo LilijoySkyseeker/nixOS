@@ -72,7 +72,7 @@ in {
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    enviornment = {
+    environment = {
       AWS_ACCESS_KEY_ID = "${keys.AWS_ACCESS_KEY_ID}";
       AWS_SECRET_ACCESS_KEY = "${keys.AWS_SECRET_ACCESS_KEY}";
     };
