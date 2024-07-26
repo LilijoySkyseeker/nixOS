@@ -81,7 +81,7 @@
       };
       "zroot/local/state" = {
         source = "zroot/local/state";
-        target = "zbackup/backup";
+        target = "zbackup/backup/homelab/state";
         extraArgs = ["--identifier=zroot_local_state"];
       };
     };
