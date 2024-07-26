@@ -69,9 +69,12 @@
       ];
     };
   };
-  systemd.services.restic-backups-backblazeHourly.serviceConfig = {
-    Nice = 19;
-    CPUSchedulingPolicy = "idle";
+  systemd.services.restic-backups-backblazeHourly = {
+    path = [zfs];
+    serviceConfig = {
+      Nice = 19;
+      CPUSchedulingPolicy = "idle";
+    };
   };
 
   # zfs snapshots

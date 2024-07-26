@@ -139,13 +139,13 @@
           };
           "backup-bulk" = {
             type = "zfs_fs";
-            options.mountpoint = "none"; 
+            options.mountpoint = "none";
             options."com.sun:auto-snapshot" = "false";
           };
           # homelab
           "backup/homelab" = {
             type = "zfs_fs";
-            options.mountpoint = "none"; 
+            options.mountpoint = "none";
             options."com.sun:auto-snapshot" = "false";
           };
           "backup-bulk/homelab" = {
