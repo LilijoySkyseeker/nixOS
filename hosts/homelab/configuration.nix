@@ -75,7 +75,7 @@
         extraArgs = ["--identifier=zdata_storage_storage"];
       };
       "zdata/storage/storage-bulk" = {
-        source = "zdata/storage-bulk";
+        source = "zdata/storage/storage-bulk";
         target = "zbackup/backup/homelab/storage-bulk";
         extraArgs = ["--identifier=zdata_storage_storage-bulk"];
       };
