@@ -145,12 +145,12 @@
           # homelab
           "backup/homelab" = {
             type = "zfs_fs";
-            mountpoint = "/backup/homelab"; # sub dir are just mountpoint
+            mountpoint = "none"; # sub dir are just mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "backup-bulk/homelab" = {
             type = "zfs_fs";
-            mountpoint = "/backup/homelab/bulk";
+            mountpoint = "none";
             options."com.sun:auto-snapshot" = "false";
           };
           # thinkpad
