@@ -20,12 +20,58 @@
       # STABLE installed packages
       sanoid # also installs syncoid and findoid
       zfs
+      restic
+      backblaze-b2
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
 
-  # backups
+  # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
+  sops.secrets = {
+    homelab_backblaze_restic_env.owner = config.users.users.root.name;
+    homelab_backblaze_restic_password.owner = config.users.users.root.name;
+  };
+  services.restic.backups = {
+    backblazeHourly = {
+      initialize = true;
+      createWrapper = true;
+      passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
+      environmentFile = "${config.sops.secrets.homelab_backblaze_restic_env.path}";
+      backupPrepareCommand = ''
+        zfs snapshot zbackup@restic -r
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} sh -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+      '';
+      backupCleanupCommand = ''
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} sh -c "umount -t zfs {}"
+        rm -rf /tmp/zbackup
+        zfs destroy zbackup@restic -r
+      '';
+      user = "root";
+      paths = [
+        "/tmp/zbackup"
+      ];
+      timerConfig = {
+        OnCalendar = "04:00";
+        Persistent = true;
+      };
+      pruneOpts = [
+        "--host ${config.networking.hostName}"
+        "--retry-lock 15m"
+        "--keep-daily 30"
+      ];
+      runCheck = true;
+      checkOps = [
+        "--read-data-subset=1%"
+      ];
+    };
+  };
+  systemd.services.restic-backups-backblazeHourly.serviceConfig = {
+    Nice = 19;
+    CPUSchedulingPolicy = "idle";
+  };
+
+  # zfs snapshots
   services.sanoid = {
     enable = true;
     extraArgs = ["--verbose"];
@@ -76,7 +122,7 @@
       };
       "zdata/storage/storage-bulk" = {
         source = "zdata/storage/storage-bulk";
-        target = "zbackup/backup/homelab/storage-bulk";
+        target = "zbackup/backup-bulk/homelab/storage-bulk";
         extraArgs = ["--identifier=zdata_storage_storage-bulk"];
       };
       "zroot/local/state" = {

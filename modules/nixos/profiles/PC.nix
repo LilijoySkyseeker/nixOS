@@ -22,7 +22,6 @@
       nvtopPackages.full
       xclip # for nvim clipboard
       gjs # for kdeconnect
-      sops # secrets management
       restic # backups
       fd
       nixos-anywhere
@@ -59,16 +58,12 @@
   # restric nix package manager to @wheel
   nix.settings.allowed-users = ["@wheel"];
 
-  # sops-nix support, secret managment
-  sops = {
-    defaultSopsFile = ../../../secrets/secrets.yaml;
-    defaultSopsFormat = "yaml";
-    age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519"];
-    secrets = {
-      open_weather_key = {};
-      restic = {
-        owner = config.users.users.lilijoy.name;
-      };
+  # sops config
+  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519"];
+  sops.secrets = {
+    open_weather_key = {};
+    restic = {
+      owner = config.users.users.lilijoy.name;
     };
   };
 

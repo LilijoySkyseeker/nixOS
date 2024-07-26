@@ -18,8 +18,15 @@
       neovim
       alejandra
       rsync
+      sops # secrets management
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+
+  # sops-nix support, secret managment
+  sops = {
+    defaultSopsFile = ../../secrets/secrets.yaml;
+    defaultSopsFormat = "yaml";
+  };
 
   # Set your time zone.
   time.timeZone = "America/New_York";

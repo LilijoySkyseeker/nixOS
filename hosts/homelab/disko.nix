@@ -102,12 +102,12 @@
         datasets = {
           "storage" = {
             type = "zfs_fs";
-            options.mountpoint = "none";
+            options.mountpoint = "none"; # top dir is options.mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "storage/storage" = {
             type = "zfs_fs";
-            mountpoint = "/storage";
+            mountpoint = "/storage"; # sub dir are just mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "storage/storage-bulk" = {
@@ -134,31 +134,56 @@
         datasets = {
           "backup" = {
             type = "zfs_fs";
-            options.mountpoint = "none";
+            options.mountpoint = "none"; # top dir is options.mountpoint
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup-bulk" = {
+            type = "zfs_fs";
+            options.mountpoint = "none"; # top dir is options.mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           # homelab
           "backup/homelab" = {
             type = "zfs_fs";
-           mountpoint = "/backup/homelab";
+            mountpoint = "/backup/homelab"; # sub dir are just mountpoint
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup-bulk/homelab" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/homelab/bulk";
             options."com.sun:auto-snapshot" = "false";
           };
           # thinkpad
           "backup/thinkpad" = {
             type = "zfs_fs";
-           mountpoint = "/backup/thinkpad";
+            mountpoint = "/backup/thinkpad";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup-bulk/thinkpad" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/thinkpad/bulk";
             options."com.sun:auto-snapshot" = "false";
           };
           # legion
           "backup/legion" = {
             type = "zfs_fs";
-           mountpoint = "/backup/legion";
+            mountpoint = "/backup/legion";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup-bulk/legion" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/legion/bulk";
             options."com.sun:auto-snapshot" = "false";
           };
           # other
           "backup/other" = {
             type = "zfs_fs";
             mountpoint = "/backup/other";
+            options."com.sun:auto-snapshot" = "false";
+          };
+          "backup-bulk/other" = {
+            type = "zfs_fs";
+            mountpoint = "/backup/other/bulk";
             options."com.sun:auto-snapshot" = "false";
           };
         };
@@ -180,12 +205,12 @@
         datasets = {
           "local" = {
             type = "zfs_fs";
-            options.mountpoint = "none";
+            options.mountpoint = "none"; # top dir is options.mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "local/state" = {
             type = "zfs_fs";
-            mountpoint = "/nix/state";
+            mountpoint = "/nix/state"; # sub dir are just mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "local/nix" = {
