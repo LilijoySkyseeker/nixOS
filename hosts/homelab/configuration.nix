@@ -70,7 +70,9 @@
     };
   };
   systemd.services.restic-backups-backblazeHourly = {
-    path = [zfs];
+    path = [
+  pkgs.zfs
+  ];
     serviceConfig = {
       Nice = 19;
       CPUSchedulingPolicy = "idle";
