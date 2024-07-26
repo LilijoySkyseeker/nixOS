@@ -41,13 +41,13 @@
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
-      environmentFile = "/dev/null";
+      environmentFile = "${config.sops.secrets.homelab_backblaze_restic_env.path}";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
       backupCleanupCommand = ''
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount /tmp/{}"
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
         rm -rf /tmp/zbackup
         zfs destroy zbackup@restic -r
       '';
