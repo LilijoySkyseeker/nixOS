@@ -43,9 +43,7 @@
         "--host ${config.networking.hostName}"
         "--retry-lock 15m"
         "--keep-hourly 24"
-        "--keep-daily 7"
-        "--keep-weekly 4"
-        "--keep-monthly 12"
+        "--keep-daily 32"
       ];
     };
   };
