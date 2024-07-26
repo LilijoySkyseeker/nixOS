@@ -38,15 +38,16 @@
       mkdir /etc/restic
       echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
       echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
-      echo "RCLONE_CONFIG_RESTIC_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/rcloneConfig
-      echo "RCLONE_CONFIG_RESTIC_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/rcloneConfig
-      echo "RCLONE_CONFIG_RESTIC_TYPE=" >> /etc/restic/rcloneConfig
     '';
     serviceConfig = {
       User = "root";
       Type = "oneshot";
     };
   };
+
+  #     echo "RCLONE_CONFIG_RESTIC_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/rcloneConfig
+  #     echo "RCLONE_CONFIG_RESTIC_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/rcloneConfig
+  #     echo "RCLONE_CONFIG_RESTIC_TYPE=" >> /etc/restic/rcloneConfig
 
   # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
   sops.secrets = {
@@ -62,10 +63,10 @@
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
       environmentFile = "/etc/restic/resticEnv";
-      rcloneOptions = {
-        b2_hard_delete = false;
-      };
-      rcloneConfigFile = "/etc/restic/rcloneConfig";
+      #     rcloneOptions = {
+      #       b2_hard_delete = false;
+      #     };
+      #     rcloneConfigFile = "/etc/restic/rcloneConfig";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
