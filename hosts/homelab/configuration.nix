@@ -29,8 +29,6 @@
     ]);
 
   # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
-# export AWS_ACCESS_KEY_ID="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})"
-# export AWS_SECRET_ACCESS_KEY="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})"
   sops.secrets = {
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
@@ -45,6 +43,8 @@
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        export AWS_ACCESS_KEY_ID="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})"
+        export AWS_SECRET_ACCESS_KEY="$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})"
       '';
       backupCleanupCommand = ''
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
