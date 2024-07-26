@@ -70,7 +70,7 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    script = ''
+    preStart = ''
       mkdir /etc/restic
       echo "" > /etc/restic/resticEnv
         echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
@@ -87,6 +87,7 @@
     serviceConfig = {
       Nice = 19;
       CPUSchedulingPolicy = "idle";
+      WorkingDirectory = "/etc/restic";
     };
   };
 
