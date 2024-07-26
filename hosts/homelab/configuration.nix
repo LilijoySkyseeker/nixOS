@@ -43,10 +43,10 @@
       environmentFile = "${config.sops.secrets.homelab_backblaze_restic_env.path}";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} sh -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
       backupCleanupCommand = ''
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} sh -c "umount -t zfs {}"
         rm -rf /tmp/zbackup
         zfs destroy zbackup@restic -r
       '';
@@ -72,7 +72,6 @@
   systemd.services.restic-backups-backblazeHourly = {
     path = [
   pkgs.zfs
-  pkgs.bash
   pkgs.coreutils-full
   ];
     serviceConfig = {
