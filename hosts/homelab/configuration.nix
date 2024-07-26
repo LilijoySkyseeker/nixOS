@@ -8,8 +8,8 @@
   sops-nix,
   ...
 }: let
-  vars.AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})";
-  vars.AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})";
+  keys.AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})";
+  keys.AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})";
 in {
   imports = [
     ./hardware-configuration.nix
@@ -73,8 +73,8 @@ in {
   };
   systemd.services.restic-backups-backblazeDaily = {
     enviornment = {
-      AWS_ACCESS_KEY_ID = "${vars.AWS_ACCESS_KEY_ID}";
-      AWS_SECRET_ACCESS_KEY = "${vars.AWS_SECRET_ACCESS_KEY}";
+      AWS_ACCESS_KEY_ID = "${keys.AWS_ACCESS_KEY_ID}";
+      AWS_SECRET_ACCESS_KEY = "${keys.AWS_SECRET_ACCESS_KEY}";
     };
     path = [
       pkgs.zfs
