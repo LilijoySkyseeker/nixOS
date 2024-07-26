@@ -2,6 +2,7 @@ keys:
   - &primary age1758lfexzx4fqdnelj095nedm2h9auzvllz9v35t99vd3l64vugsq3d7cl8
   - &nixos-thinkpad age1t8cfzavzm9gw9muwpq8lfnwy3fngl8672r9qwv9yuptq8qmnrazqwe0auz
   - &legion age1t09qgr6xfs472argms06h2q3c6gzstnl8lstj5eh26z7tcclyvuq30zl32
+  - &homelab age1e4a5f20ycnck20cg6602xl5fpxapk8mclv67qurses3299tdvq9slk25fx
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
@@ -9,3 +10,4 @@ creation_rules:
         - *primary
         - *nixos-thinkpad
         - *legion
+        - *homelab
