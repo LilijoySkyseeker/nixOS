@@ -30,11 +30,13 @@
 
   # backblaze secrets prefetcher
   systemd.services.restic-backups-backblazeDaily-startup = {
+    wantedBy = ["restic-backups-backblazeDaily.service"];
+    before = ["restic-backups-backblazeDaily.service"];
     script = ''
       mkdir /etc/restic
       echo "" > /etc/restic/resticEnv
-        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
-        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
+      echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
+      echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
     '';
     serviceConfig = {
       User = "root";
@@ -85,7 +87,8 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    requires = ["restic-backups-backblazeDaily-startup.service"];
+    wants = ["restic-backups-backblazeDaily-startup.service"];
+    after = ["restic-backups-backblazeDaily-startup.service"];
     path = [
       pkgs.zfs
       pkgs.coreutils-full
