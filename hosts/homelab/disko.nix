@@ -102,12 +102,12 @@
         datasets = {
           "storage" = {
             type = "zfs_fs";
-            options.mountpoint = "none"; # top dir is options.mountpoint
+            options.mountpoint = "none"; # "none" needs option.mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "storage/storage" = {
             type = "zfs_fs";
-            mountpoint = "/storage"; # sub dir are just mountpoint
+            mountpoint = "/storage"; # "<path>" just mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "storage/storage-bulk" = {
@@ -134,29 +134,29 @@
         datasets = {
           "backup" = {
             type = "zfs_fs";
-            options.mountpoint = "none"; # top dir is options.mountpoint
+            options.mountpoint = "none"; # "none" needs option.mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "backup-bulk" = {
             type = "zfs_fs";
-            options.mountpoint = "none"; # top dir is options.mountpoint
+            options.mountpoint = "none"; 
             options."com.sun:auto-snapshot" = "false";
           };
           # homelab
           "backup/homelab" = {
             type = "zfs_fs";
-            mountpoint = "none"; # sub dir are just mountpoint
+            options.mountpoint = "none"; 
             options."com.sun:auto-snapshot" = "false";
           };
           "backup-bulk/homelab" = {
             type = "zfs_fs";
-            mountpoint = "none";
+            options.mountpoint = "none";
             options."com.sun:auto-snapshot" = "false";
           };
           # thinkpad
           "backup/thinkpad" = {
             type = "zfs_fs";
-            mountpoint = "/backup/thinkpad";
+            mountpoint = "/backup/thinkpad"; # "<path>" just mountpoint
             options."com.sun:auto-snapshot" = "false";
           };
           "backup-bulk/thinkpad" = {
