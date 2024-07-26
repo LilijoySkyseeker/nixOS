@@ -59,9 +59,9 @@
         OnCalendar = "04:00";
         Persistent = true;
       };
-      extraBackupArgs = [
-        "--verbose=2"
-      ];
+#     extraBackupArgs = [
+#       "--verbose=2"
+#     ];
       pruneOpts = [
         "--retry-lock 15m"
         "--keep-daily 30"
