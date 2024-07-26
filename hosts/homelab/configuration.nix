@@ -85,7 +85,7 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    requires = ["restic-backups-backblazeDaily-startup"];
+    requires = ["restic-backups-backblazeDaily-startup.service"];
     path = [
       pkgs.zfs
       pkgs.coreutils-full
