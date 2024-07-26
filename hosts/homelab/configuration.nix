@@ -36,7 +36,7 @@
     homelab_backblaze_restic_repository = {};
   };
   services.restic.backups = {
-    backblazeHourly = {
+    backblazeDaily = {
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
@@ -58,7 +58,6 @@
         Persistent = true;
       };
       pruneOpts = [
-        "--host ${config.networking.hostName}"
         "--retry-lock 15m"
         "--keep-daily 30"
       ];
@@ -68,7 +67,7 @@
       ];
     };
   };
-  systemd.services.restic-backups-backblazeHourly = {
+  systemd.services.restic-backups-backblazeDaily = {
     environment = {
       AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})";
       AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})";
