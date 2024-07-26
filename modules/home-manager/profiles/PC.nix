@@ -184,7 +184,7 @@
             set expandtab
 
             set list
-            set listchars=eol:.,tab:>-,trail:~,extends:>,precedes:<
+            set listchars=tab:>-,trail:~,extends:>,precedes:<
 
             set cursorline
             set number

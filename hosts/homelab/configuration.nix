@@ -30,7 +30,8 @@
 
   # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
   sops.secrets = {
-    homelab_backblaze_restic_env = {};
+    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
+    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
     homelab_backblaze_restic_password = {};
     homelab_backblaze_restic_repository = {};
   };
@@ -70,18 +71,22 @@
     };
   };
   systemd.services.restic-backups-backblazeHourly = {
+    environment = {
+      AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})";
+      AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})";
+    };
     path = [
-  pkgs.zfs
-  pkgs.coreutils-full
-  pkgs.mount
-  pkgs.umount
-  pkgs.findutils
-  pkgs.bash
-  ];
-#   serviceConfig = {
-#     Nice = 19;
-#     CPUSchedulingPolicy = "idle";
-#   };
+      pkgs.zfs
+      pkgs.coreutils-full
+      pkgs.mount
+      pkgs.umount
+      pkgs.findutils
+      pkgs.bash
+    ];
+    serviceConfig = {
+      Nice = 19;
+      CPUSchedulingPolicy = "idle";
+    };
   };
 
   # zfs snapshots
