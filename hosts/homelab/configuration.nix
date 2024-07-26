@@ -87,6 +87,9 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
+    environment = {
+      DEBUG_FILES = "*";
+    };
     path = [
       pkgs.zfs
       pkgs.coreutils-full
