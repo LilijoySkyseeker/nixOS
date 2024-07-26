@@ -48,6 +48,7 @@
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
         echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
         echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
+        export DEBUG_FILE=*
       '';
       backupCleanupCommand = ''
         rm "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
