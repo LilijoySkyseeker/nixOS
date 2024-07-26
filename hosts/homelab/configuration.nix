@@ -42,7 +42,6 @@
     serviceConfig = {
       User = "root";
       Type = "oneshot";
-      WorkingDirectory = "/etc/restic";
     };
   };
 
@@ -99,7 +98,6 @@
     serviceConfig = {
       Nice = 19;
       CPUSchedulingPolicy = "idle";
-      WorkingDirectory = "/etc/restic";
     };
   };
 
