@@ -78,10 +78,10 @@
   pkgs.findutils
   pkgs.bash
   ];
-    serviceConfig = {
-      Nice = 19;
-      CPUSchedulingPolicy = "idle";
-    };
+#   serviceConfig = {
+#     Nice = 19;
+#     CPUSchedulingPolicy = "idle";
+#   };
   };
 
   # zfs snapshots
