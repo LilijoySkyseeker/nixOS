@@ -29,9 +29,9 @@
 
   # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
   sops.secrets = {
-    homelab_backblaze_restic_env.owner = config.users.users.root.name;
-    homelab_backblaze_restic_password.owner = config.users.users.root.name;
-    homelab_backblaze_restic_repository.owner = config.users.users.root.name;
+    homelab_backblaze_restic_env = {};
+    homelab_backblaze_restic_password = {};
+    homelab_backblaze_restic_repository = {};
   };
   services.restic.backups = {
     backblazeHourly = {
