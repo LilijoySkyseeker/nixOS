@@ -28,6 +28,21 @@
       # UNSTABLE installed packages
     ]);
 
+  # backblaze secrets prefetcher
+  systemd.services.restic-backups-backblazeDaily-startup = {
+    script = ''
+      mkdir /etc/restic
+      echo "" > /etc/restic/resticEnv
+        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
+        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
+    '';
+    serviceConfig = {
+      User = "root";
+      Type = "oneshot";
+      WorkingDirectory = "/etc/restic";
+    };
+  };
+
   # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
   sops.secrets = {
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
@@ -70,12 +85,7 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    preStart = ''
-      mkdir /etc/restic
-      echo "" > /etc/restic/resticEnv
-        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
-        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
-    '';
+    requires = [restic-backups-backblazeDaily-startup];
     path = [
       pkgs.zfs
       pkgs.coreutils-full
