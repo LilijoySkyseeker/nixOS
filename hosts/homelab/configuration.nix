@@ -31,7 +31,7 @@
   # backblaze secrets prefetcher
   systemd.services.restic-backups-backblazeDaily-startup = {
     enable = true;
-    wantedBy = ["restic-backups-backblazeDaily.service"];
+    wantedBy = ["multi-user.target"];
     before = ["restic-backups-backblazeDaily.service"];
     script = ''
       mkdir /etc/restic
@@ -88,9 +88,6 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    enable = true;
-    wants = ["restic-backups-backblazeDaily-startup.service"];
-    after = ["restic-backups-backblazeDaily-startup.service"];
     path = [
       pkgs.zfs
       pkgs.coreutils-full
