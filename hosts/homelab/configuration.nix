@@ -73,6 +73,8 @@
     path = [
   pkgs.zfs
   pkgs.coreutils-full
+  pkgs.mount
+  pkgs.umount
   ];
     serviceConfig = {
       Nice = 19;
