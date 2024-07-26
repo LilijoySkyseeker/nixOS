@@ -62,10 +62,9 @@
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
       environmentFile = "/etc/restic/resticEnv";
-      #     rcloneConfig = {
-      #       hard_delete = false;
-      #       type = "b2";
-      #     };
+      rcloneConfig = {
+        hard_delete = false;
+      };
       rcloneConfigFile = "/etc/restic/rcloneConfig";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
