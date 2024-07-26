@@ -61,7 +61,7 @@
         "--keep-daily 30"
       ];
       runCheck = true;
-      checkOps = [
+      checkOpts = [
         "--read-data-subset=1%"
       ];
     };
