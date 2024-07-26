@@ -34,7 +34,6 @@
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
     homelab_backblaze_restic_password = {};
     homelab_backblaze_restic_repository = {};
-    homelab_backblaze_restic_env_path = {};
   };
   services.restic.backups = {
     backblazeDaily = {
@@ -42,16 +41,16 @@
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
-      environmentFile = "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})";
+      environmentFile = "/tmp/env";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
-        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
-        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
+        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /tmp/env
+        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /tmp/env
         export DEBUG_FILE=*
       '';
       backupCleanupCommand = ''
-        rm "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
+        rm "/tmp/env"
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
         rm -rf /tmp/zbackup
         zfs destroy zbackup@restic -r
