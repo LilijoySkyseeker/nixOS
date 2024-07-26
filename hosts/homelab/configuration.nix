@@ -31,12 +31,14 @@
   sops.secrets = {
     homelab_backblaze_restic_env.owner = config.users.users.root.name;
     homelab_backblaze_restic_password.owner = config.users.users.root.name;
+    homelab_backblaze_restic_repository.owner = config.users.users.root.name;
   };
   services.restic.backups = {
     backblazeHourly = {
       initialize = true;
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
+      repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
       environmentFile = "${config.sops.secrets.homelab_backblaze_restic_env.path}";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
