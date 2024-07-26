@@ -72,13 +72,8 @@
   systemd.services.restic-backups-backblazeHourly = {
     path = [
   pkgs.zfs
-  pkgs.grep
-  pkgs.xargs
   pkgs.bash
-  pkgs.mkdir
-  pkgs.mount
-  pkgs.umount
-  pkgs.rm
+  pkgs.coreutils-full
   ];
     serviceConfig = {
       Nice = 19;
