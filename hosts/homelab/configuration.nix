@@ -7,10 +7,7 @@
   vars,
   sops-nix,
   ...
-}: let
-  keys.AWS_ACCESS_KEY_ID = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})";
-  keys.AWS_SECRET_ACCESS_KEY = "$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})";
-in {
+}: {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
@@ -37,6 +34,7 @@ in {
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
     homelab_backblaze_restic_password = {};
     homelab_backblaze_restic_repository = {};
+    homelab_backblaze_restic_env_path = {};
   };
   services.restic.backups = {
     backblazeDaily = {
@@ -44,11 +42,15 @@ in {
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
+      environmentFile = "${config.sops.secrets.homelab_backblaze_restic_env_path.path}";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
+        echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
       '';
       backupCleanupCommand = ''
+        rm "$(cat ${config.sops.secrets.homelab_backblaze_restic_env_path.path})"
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
         rm -rf /tmp/zbackup
         zfs destroy zbackup@restic -r
@@ -72,10 +74,6 @@ in {
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    environment = {
-      AWS_ACCESS_KEY_ID = "${${keys.AWS_ACCESS_KEY_ID}}";
-      AWS_SECRET_ACCESS_KEY = "${${keys.AWS_SECRET_ACCESS_KEY}}";
-    };
     path = [
       pkgs.zfs
       pkgs.coreutils-full
