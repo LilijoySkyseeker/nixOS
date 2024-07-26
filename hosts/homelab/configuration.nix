@@ -47,7 +47,7 @@
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
       backupCleanupCommand = ''
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount /tmp/{}"
         rm -rf /tmp/zbackup
         zfs destroy zbackup@restic -r
       '';
