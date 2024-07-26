@@ -5,7 +5,7 @@
   inputs,
   lib,
   vars,
-  nix-sops,
+  sops-nix,
   ...
 }: {
   imports = [
