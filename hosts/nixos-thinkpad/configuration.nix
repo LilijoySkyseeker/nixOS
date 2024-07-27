@@ -23,14 +23,18 @@
     ]);
 
 # tpm
-security.tpm2.enable = true;
-security.tpm2.pkcs11.enable = true;
-security.tpm2.tctiEnvironment.enable = true;
+security.tpm2 = {
+  enable = true;
+  pkcs11.enable = true;
+  tctiEnvironment.enable = true;
+  tssUser = "lilijoy";
+};
 
   # tpm-fido
 services.udev.extraRules = ''
-  KERNEL=="uhid", SUBSYSTEM=="misc", OWNER="lilijoy", MODE="0660"
+  KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
 '';
+  boot.kernelModules = ["uhid"];
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
@@ -72,7 +76,7 @@ services.udev.extraRules = ''
   networking.hostName = "nixos-thinkpad";
 
   # Set extra groups
-  users.users.lilijoy.extraGroups = ["docker" "tss"]; # tss for accessing tpm
+  users.users.lilijoy.extraGroups = ["docker"];
 
   # NVIDIA ==============================================================================
   hardware.opengl = {
