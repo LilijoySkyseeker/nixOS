@@ -29,7 +29,7 @@ security.tpm2.tctiEnvironment.enable = true;
 
   # tpm-fido
 services.udev.extraRules = ''
-  KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
+  KERNEL=="uhid", SUBSYSTEM=="misc", OWNER="lilijoy", MODE="0660"
 '';
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
