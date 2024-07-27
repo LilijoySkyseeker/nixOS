@@ -22,6 +22,16 @@
       # UNSTABLE installed packages
     ]);
 
+# tpm
+security.tpm2.enable = true;
+security.tpm2.pkcs11.enable = true;
+security.tpm2.tctiEnvironment.enable = true;
+
+  # tpm-fido
+services.udev.extraRules = ''
+  KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
+'';
+
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     hourly = {
