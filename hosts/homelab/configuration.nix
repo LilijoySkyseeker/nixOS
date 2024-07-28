@@ -58,7 +58,7 @@
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       #     repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
-      repository = "s3:https://s3.us-west-000.backblazeb2.com/restic63032701754";
+      repository = "s3:s3.us-west-000.backblazeb2.com/restic63032701754";
       environmentFile = "/etc/restic/resticEnv";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
