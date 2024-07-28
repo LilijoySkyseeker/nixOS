@@ -32,7 +32,7 @@
   time.timeZone = "America/New_York";
 
   # firmware updater daemon
-  services.fwupd.enable = true;
+  # services.fwupd.enable = true;
 
   # auto gc with nh
   programs.nh = {
