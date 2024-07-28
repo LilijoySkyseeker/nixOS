@@ -28,7 +28,7 @@
       # UNSTABLE installed packages
     ]);
 
-  # backblaze secrets prefetcher
+  # backblaze secrets prefetcher for rclone
   systemd.services.restic-backups-backblazeDaily-startup = {
     enable = true;
     wantedBy = ["multi-user.target"];
@@ -47,7 +47,7 @@
     };
   };
 
-  # restic to backblaze https://restic.readthedocs.io/en/latest/050_restore.html
+  # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   sops.secrets = {
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
@@ -66,19 +66,15 @@
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
-        zfs snapshot zbackup@restic -r
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        echo "zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other" | xargs -I {} bash -c "zfs list  -t snapshot -o name -S name -r {} | head -n 2 | tail -n 1 | xargs - I [] bash -c 'mkdir -p /tmp/restic/[] && mount -t zfs [] /tmp/restic/[]'"
       '';
-
-      #       zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
-      #       rm -rf /tmp/zbackup
-
       backupCleanupCommand = ''
-        zfs destroy zbackup@restic -r -f
+        zfs list  -t snapshot -o name -S name  | tail --lines +2 | xargs -I {} bash -c "umount -t zfs {}"
+        rm -rf /tmp/restic
       '';
       user = "root";
       paths = [
-        "/tmp/zbackup"
+        "/tmp/restic"
       ];
       timerConfig = {
         OnCalendar = "04:00";
