@@ -66,13 +66,16 @@
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
-        zfs snapshot zbackup@restic -r
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        cat /etc/rclone/rcloneCfg
+          zfs snapshot zbackup@restic -r
+          zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
+
+      #       zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
+      #       rm -rf /tmp/zbackup
+
       backupCleanupCommand = ''
-        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
-        rm -rf /tmp/zbackup
-        zfs destroy zbackup@restic -r
+        zfs destroy zbackup@restic -r -f
       '';
       user = "root";
       paths = [
