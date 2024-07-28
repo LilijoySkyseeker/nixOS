@@ -66,9 +66,8 @@
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
-        cat /etc/rclone/rcloneCfg
-          zfs snapshot zbackup@restic -r
-          zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        zfs snapshot zbackup@restic -r
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
 
       #       zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
