@@ -15,9 +15,6 @@
     ../../modules/nixos/profiles/server.nix
   ];
 
-  # TEMP debug
-  systemd.extraConfig = "LogLevel=debug";
-
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
@@ -53,14 +50,15 @@
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
     homelab_backblaze_restic_password = {};
-    homelab_backblaze_restic_repository = {};
+    #   homelab_backblaze_restic_repository = {};
   };
   services.restic.backups = {
     backblazeDaily = {
       initialize = true;
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
+      #     repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
+      repository = "s3:s3.us-west-000.backblazeb2.com/restic63032701754";
       environmentFile = "/etc/restic/resticEnv";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
