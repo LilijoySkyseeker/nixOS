@@ -38,6 +38,8 @@
       mkdir /etc/restic
       echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
       echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
+      echo "RCLONE_B2_ACCOUNT=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
+      echo "RCLONE_B2_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
     '';
     serviceConfig = {
       User = "root";
@@ -50,16 +52,19 @@
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
     homelab_backblaze_restic_password = {};
-    #   homelab_backblaze_restic_repository = {};
   };
   services.restic.backups = {
     backblazeDaily = {
       initialize = true;
       createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      #     repositoryFile = "${config.sops.secrets.homelab_backblaze_restic_repository.path}";
-      repository = "s3.us-west-000.backblazeb2.com/restic63032701754";
+      repository = "rclone:backblazeDaily:restic21029709384";
       environmentFile = "/etc/restic/resticEnv";
+      rcloneOptions = {
+        b2-endpoint = "s3.us-west-000.backblazeb2.com";
+        b2-hard-delete = false;
+        transfers = "32";
+      };
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"

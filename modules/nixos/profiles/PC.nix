@@ -9,6 +9,7 @@
   imports = [
     ../virtual-machines.nix #(also needs home manager config)
     ../shared.nix
+    ../../../custom-packages/tpm-fido/package.nix
   ];
 
   # System installed pkgs
@@ -52,6 +53,9 @@
       discord
       obsidian
       spotify
+
+      # Custom Packages
+      tpm-fido
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
