@@ -39,7 +39,7 @@
       echo "[backblazeDaily]" >> /etc/rclone/rcloneCfg
       echo "type = b2" >> /etc/rclone/rcloneCfg
       echo "account = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/rclone/rcloneCfg
-      echo "key = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/rcloneCfg
+      echo "key = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/rclone/rcloneCfg
     '';
     serviceConfig = {
       User = "root";
