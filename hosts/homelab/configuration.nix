@@ -60,13 +60,16 @@
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repository = "rclone:backblazeDaily:restic21029709384";
       environmentFile = "/etc/restic/resticEnv";
-      rcloneOptions = {
+      rcloneConfig = {
         transfers = "32";
         verbose = "2";
+        hard_delete = "false";
+        endpoint = "endpoint=s3.us-west-000.backblazeb2.com";
+        type = "b2";
       };
-      rcloneConfigFile = "/etc/restic/rcloneCfg";
+      #     rcloneConfigFile = "/etc/restic/rcloneCfg";
+      #       echo "endpoint=s3.us-west-000.backblazeb2.com" >> /etc/restic/rcloneCfg
       backupPrepareCommand = ''
-        echo "endpoint=s3.us-west-000.backblazeb2.com \n hard_delete=false" >> /etc/restic/rcloneCfg
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
