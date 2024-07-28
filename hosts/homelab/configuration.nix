@@ -63,7 +63,6 @@
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
-        sleep 1m
       '';
       backupCleanupCommand = ''
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
