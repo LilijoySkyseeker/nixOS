@@ -22,18 +22,18 @@
       # UNSTABLE installed packages
     ]);
 
-# tpm
-security.tpm2 = {
-  enable = true;
-  pkcs11.enable = true;
-  tctiEnvironment.enable = true;
-  tssUser = "lilijoy";
-};
+  # tpm
+  security.tpm2 = {
+    enable = true;
+    pkcs11.enable = true;
+    tctiEnvironment.enable = true;
+    tssUser = "lilijoy";
+  };
 
   # tpm-fido
-services.udev.extraRules = ''
-  KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
-'';
+  services.udev.extraRules = ''
+    KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
+  '';
   boot.kernelModules = ["uhid"];
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html

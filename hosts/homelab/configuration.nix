@@ -15,6 +15,9 @@
     ../../modules/nixos/profiles/server.nix
   ];
 
+  # TEMP debug
+  systemd.extraConfig = "LogLevel=debug";
+
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
