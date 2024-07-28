@@ -66,10 +66,19 @@
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
-        echo "zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other" | xargs -I {} bash -c "zfs list  -t snapshot -o name -S name -r {} | head -n 2 | tail -n 1 | xargs - I [] bash -c 'mkdir -p /tmp/restic/[] && mount -t zfs [] /tmp/restic/[]'"
+        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other"
+
+        for dataset in $datasets; do
+          snapshot=$(zfs list  -t snapshot -o name -s name -r $dataset | tail -n 1)
+          if [[ -n "$snapshot" ]]; then
+            mkdir -p /tmp/restic/$snapshot
+            mount -t zfs $snapshot /tmp/restic/$snapshot
+          fi
+        done
       '';
+      # echo "zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other" | xargs -d' ' -I {} bash -c "zfs list  -t snapshot -o name -s name -r {} | tail -n 1 | xargs - I [] bash -c 'mkdir -p /tmp/restic/[] && mount -t zfs [] /tmp/restic/[]'"
       backupCleanupCommand = ''
-        zfs list  -t snapshot -o name -S name  | tail --lines +2 | xargs -I {} bash -c "umount -t zfs {}"
+        zfs list  -t snapshot -o name -S name | tail --lines +2 | xargs -I {} umount -t zfs {}
         rm -rf /tmp/restic
       '';
       user = "root";
