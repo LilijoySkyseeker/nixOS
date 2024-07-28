@@ -60,7 +60,7 @@
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       repository = "rclone:backblazeDaily:restic21029709384";
       environmentFile = "/etc/restic/resticEnv";
-      recloneOptions = {
+      rcloneOptions = {
         transfers = "32";
       };
       rcloneConfig = {
