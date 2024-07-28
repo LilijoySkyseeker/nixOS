@@ -34,8 +34,8 @@
     wantedBy = ["multi-user.target"];
     before = ["restic-backups-backblazeDaily.service"];
     script = ''
-      rm -rf /etc/rcloneCfg
-      mkdir /etc/rcloneCfg
+      rm -rf /etc/rclone
+      mkdir /etc/rclone
       echo "[backblazeDaily]" >> /etc/rclone/rcloneCfg
       echo "type = b2" >> /etc/rclone/rcloneCfg
       echo "account = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/rclone/rcloneCfg
