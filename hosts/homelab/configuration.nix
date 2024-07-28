@@ -125,7 +125,7 @@
         autosnap = "yes";
         autoprune = "yes";
       };
-      "zbackup/backup" = {
+      "zbackup" = {
         use_template = "backup";
         recursive = "yes";
       };
