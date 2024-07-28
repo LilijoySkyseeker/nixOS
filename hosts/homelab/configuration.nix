@@ -64,7 +64,7 @@
         transfers = "32";
         b2-hard-delete = "false";
       };
-      rcloneConfigFile = "/etc/restic/rcloneCfg";
+      rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
         zfs snapshot zbackup@restic -r
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
