@@ -34,11 +34,12 @@
     wantedBy = ["multi-user.target"];
     before = ["restic-backups-backblazeDaily.service"];
     script = ''
-      rm -rf /etc/restic
-      mkdir /etc/restic
-      echo "AWS_ACCESS_KEY_ID=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/restic/resticEnv
-      echo "AWS_SECRET_ACCESS_KEY=$(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/resticEnv
-      echo "[backblazeDaily:restic21029709384]\ntype = b2\naccount = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})\nkey = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" > /etc/restic/rcloneCfg
+      rm -rf /etc/rcloneCfg
+      mkdir /etc/rcloneCfg
+      echo "[backblazeDaily]" >> /etc/rclone/rcloneCfg
+      echo "type = b2" >> /etc/rclone/rcloneCfg
+      echo "account = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/rclone/rcloneCfg
+      echo "key = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/restic/rcloneCfg
     '';
     serviceConfig = {
       User = "root";
@@ -61,12 +62,12 @@
       environmentFile = "/etc/restic/resticEnv";
       rcloneOptions = {
         transfers = "32";
+        b2-hard-delete = "false";
       };
-      #     rcloneConfigFile = "/etc/restic/rcloneCfg";
+      cloneConfigFile = "/etc/restic/rcloneCfg";
       backupPrepareCommand = ''
-        cat /etc/restic/rcloneCfg
-          zfs snapshot zbackup@restic -r
-          zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
+        zfs snapshot zbackup@restic -r
+        zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "mkdir -p /tmp/{} && mount -t zfs {} /tmp/{}"
       '';
       backupCleanupCommand = ''
         zfs list -t snapshot | grep -o "zbackup.*restic" | xargs -I {} bash -c "umount -t zfs {}"
