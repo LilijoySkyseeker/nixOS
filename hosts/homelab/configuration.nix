@@ -28,7 +28,12 @@
       # UNSTABLE installed packages
     ]);
 
-  # backblaze secrets prefetcher for rclone
+  # backblaze secrets prefetcher for rclone config file
+  sops.secrets = {
+    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
+    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
+    homelab_backblaze_restic_password = {};
+  };
   systemd.services.restic-backups-backblazeDaily-startup = {
     enable = true;
     wantedBy = ["multi-user.target"];
@@ -48,22 +53,18 @@
   };
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
-  sops.secrets = {
-    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
-    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
-    homelab_backblaze_restic_password = {};
-  };
   services.restic.backups = {
     backblazeDaily = {
       initialize = true;
-      createWrapper = true;
+      createWrapper = true; # usable with restic-backblazeDaily
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repository = "rclone:backblazeDaily:restic21029709384";
+      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
+      # mount all the most recent backups in a temp folder for restic to trawl
       backupPrepareCommand = ''
         datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
 
@@ -75,7 +76,6 @@
           fi
         done
       '';
-      # echo "zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other" | xargs -d' ' -I {} bash -c "zfs list  -t snapshot -o name -s name -r {} | tail -n 1 | xargs - I [] bash -c 'mkdir -p /tmp/restic/[] && mount -t zfs [] /tmp/restic/[]'"
       backupCleanupCommand = ''
         zfs list  -t snapshot -o name -S name | tail --lines +2 | xargs -I {} umount -t zfs {}
         rm -rf /tmp/restic
@@ -100,9 +100,8 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    environment = {
-    };
     path = [
+      # necessary for pre and post scripts
       pkgs.zfs
       pkgs.coreutils-full
       pkgs.mount
@@ -111,6 +110,7 @@
       pkgs.bash
     ];
     serviceConfig = {
+      # backup is always lowest priority to not effect running processes
       Nice = 19;
       CPUSchedulingPolicy = "idle";
     };
