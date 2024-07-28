@@ -66,7 +66,7 @@
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
       backupPrepareCommand = ''
-        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk zbackup/backup/legion zbackup/backup/thinkpad zbackup/backup/other"
+        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
 
         for dataset in $datasets; do
           snapshot=$(zfs list  -t snapshot -o name -s name -r $dataset | tail -n 1)
@@ -214,6 +214,12 @@
       AuthenticationMethods publickey
       PermitTunnel no
     '';
+    hostKeys = [
+      {
+        path = "/etc/ssh/ssh_host_ed25519_key";
+        type = "ed25519";
+      }
+    ];
   };
 
   # zfs support
@@ -260,8 +266,6 @@
       "/etc/machine-id"
       "/etc/ssh/ssh_host_ed25519_key"
       "/etc/ssh/ssh_host_ed25519_key.pub"
-      "/etc/ssh/ssh_host_rsa_key"
-      "/etc/ssh/ssh_host_rsa_key.pub"
     ];
   };
 }
