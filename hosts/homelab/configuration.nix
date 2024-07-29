@@ -64,33 +64,33 @@
         b2-hard-delete = "false";
       };
       rcloneConfigFile = "/etc/rclone/rcloneCfg";
-      # mount all the most recent backups in a temp folder for restic to trawl
-      #     backupPrepareCommand = ''
-      #       datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
+      #       mount all the most recent backups in a temp folder for restic to trawl
+      backupPrepareCommand = ''
+        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
 
-      #       for dataset in $datasets; do
-      #         snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
-      #         if [[ -n "$snapshot" ]]; then
-      #           mkdir -p /tmp/restic/$snapshot
-      #           mount -t zfs $snapshot /tmp/restic/$snapshot
-      #         fi
-      #       done
-      #     '';
-      #     backupCleanupCommand = ''
-      #       zfs list  -t snapshot -o name -S name | tail --lines +2 | xargs -I {} umount -t zfs {}
-      #       rm -rf /tmp/restic
-      #     '';
-      user = "root";
-      #    paths = [
-      #        "/tmp/restic"
-      #     ];
-      dynamicFilesFrom = ''
-        paths="/nix/state /storage /storage-bulk"
-
-                for path in $paths; do
-                  echo "$path/.zfs/snapshot/$(ls $path/.zfs/snapshot/ | tail -n 1)/"
-                done
+        for dataset in $datasets; do
+          snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
+          if [[ -n "$snapshot" ]]; then
+            mkdir -p /tmp/restic/$snapshot
+            mount -t zfs $snapshot /tmp/restic/$snapshot
+          fi
+        done
       '';
+      backupCleanupCommand = ''
+        zfs list  -t snapshot -o name -S name | tail --lines +2 | xargs -I {} umount -t zfs {}
+        rm -rf /tmp/restic
+      '';
+      user = "root";
+      paths = [
+        "/tmp/restic"
+      ];
+      #     dynamicFilesFrom = ''
+      #       paths="/nix/state /storage /storage-bulk"
+
+      #               for path in $paths; do
+      #                 echo "$path/.zfs/snapshot/$(ls $path/.zfs/snapshot/ | tail -n 1)/"
+      #               done
+      #     '';
       extraBackupArgs = [
       ];
       timerConfig = {
