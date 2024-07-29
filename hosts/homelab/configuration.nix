@@ -84,15 +84,6 @@
       paths = [
         "/tmp/restic"
       ];
-      #     dynamicFilesFrom = ''
-      #       paths="/nix/state /storage /storage-bulk"
-
-      #               for path in $paths; do
-      #                 echo "$path/.zfs/snapshot/$(ls $path/.zfs/snapshot/ | tail -n 1)/"
-      #               done
-      #     '';
-      extraBackupArgs = [
-      ];
       timerConfig = {
         OnCalendar = "04:00";
         Persistent = true;
