@@ -92,7 +92,6 @@
                 done
       '';
       extraBackupArgs = [
-        "--ignore-inode"
       ];
       timerConfig = {
         OnCalendar = "04:00";
@@ -123,6 +122,7 @@
       # backup is always lowest priority to not effect running processes
       Nice = 19;
       CPUSchedulingPolicy = "idle";
+      PrivateTmp = false;
     };
   };
 
