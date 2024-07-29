@@ -91,6 +91,9 @@
                   echo "$path/.zfs/snapshot/$(ls $path/.zfs/snapshot/ | tail -n 1)/"
                 done
       '';
+      extraBackupArgs = [
+        "--ignore-inode"
+      ];
       timerConfig = {
         OnCalendar = "04:00";
         Persistent = true;
