@@ -77,9 +77,15 @@
         done
       '';
       backupCleanupCommand = ''
-        zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {}
+        for dataset in $datasets; do
+          snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
+          if [[ -n "$snapshot" ]]; then
+            umount -t zfs $snapshot /tmp/restic/$snapshot
+          fi
+        done
         rm -rf /tmp/restic
       '';
+      # zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {}
       user = "root";
       paths = [
         "/tmp/restic"
