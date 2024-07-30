@@ -40,7 +40,7 @@
       publicSshKeys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFt0LLX711yxFHBi/g9aOACefiC1H/9ZYrhlsmhNbVPJ lilijoyskyseeker@gmail.com" # thinkpad
-        "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCw/g2uYPIijbI8A1kKR+4IXkUk8qbGH6vcJ7uGbORUyYNS5yX4cHfY+C5djf7hp7GhU+a2jTC4tcktuy45BvOA=" # thinkpad tpm
+        "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBEjfX78Dy65xkJV1Kd8Q5d+zvE+/GtnQOWniIoQS7FfBlIPMd9qUNY9o3Z7n5/ILwcnZIia01277BdPlAKXYGTAAAAAEc3NoOg== lilijoy@nixos-thinkpad" # thinkpad tpm
       ];
     };
 
