@@ -130,6 +130,7 @@
           mountpoint = "none";
           canmount = "off";
           devices = "off";
+          sync = "disabled"; # remove if using datbases ##IMPORTANT##
           "com.sun:auto-snapshot" = "false";
         };
         options.ashift = "12"; # IMPORTANT
