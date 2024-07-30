@@ -6,6 +6,8 @@
 
   # install command
   # disko-install --write-efi-boot-entries --flake 'github:lilijoyskyseeker/nixos#homelab' --disk nvme-a /dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512 --disk hdd-a /dev/disk/by-id/ata-HUH721212ALE601_8CH9J1UE --disk hdd-b /dev/disk/by-id/ata-HUH721212ALE601_8CJJUE6E --disk hdd-c /dev/disk/by-id/ata-HUH721212ALE601_8CK6DXTF  --disk hdd-d /dev/disk/by-id/ata-HUH721212ALE601_2AHDD1AY && zpool export -af
+  # get hardware config command
+  # nixos-generate-config --dir <dir> --no-filesystems
 
   disko.devices = let
     rootSsd = idx: id: {
@@ -201,7 +203,7 @@
           devices = "off";
           "com.sun:auto-snapshot" = "false";
         };
-        options.ashift = "9"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
+        options.ashift = "12"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
         datasets = {
           "local" = {
             type = "zfs_fs";
