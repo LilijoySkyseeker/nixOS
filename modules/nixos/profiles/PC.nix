@@ -27,7 +27,7 @@
       fd
       nixos-anywhere
       ssh-to-age
-      python3.11-yubikey-manager
+      yubikey-manager
 
       distrobox
 
