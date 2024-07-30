@@ -62,6 +62,12 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # ssh key type order
+  programs.ssh.hostKeyAlgorithms = [
+  "ssh-ed25519"
+  "ecdsa"
+  ];
+
   # service for yubikey
   services.pcscd.enable = true;
 
