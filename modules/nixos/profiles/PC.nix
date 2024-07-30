@@ -27,6 +27,7 @@
       fd
       nixos-anywhere
       ssh-to-age
+      python3.11-yubikey-manager
 
       distrobox
 
@@ -50,6 +51,7 @@
       vial
       vlc
       r2modman
+      yubioath-flutter
 
       discord
       obsidian
