@@ -77,7 +77,7 @@
         done
       '';
       backupCleanupCommand = ''
-        zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {}
+        zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {} 2> /dev/null
           rm -rf /tmp/restic
       '';
       user = "root";

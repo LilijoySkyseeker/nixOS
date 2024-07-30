@@ -9,7 +9,7 @@
   imports = [
     ../virtual-machines.nix #(also needs home manager config)
     ../shared.nix
-    ../../../custom-packages/tpm-fido/package.nix
+    #   ../../../custom-packages/tpm-fido/package.nix
   ];
 
   # System installed pkgs
@@ -56,7 +56,7 @@
       spotify
 
       # Custom Packages
-      tpm-fido
+      #     tpm-fido
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
@@ -91,7 +91,6 @@
   environment.gnome.excludePackages = with pkgs.gnome; [
     totem # video player
     geary # mail
-    seahorse # keyring
     gnome-calculator
     gnome-shell-extensions
   ];
