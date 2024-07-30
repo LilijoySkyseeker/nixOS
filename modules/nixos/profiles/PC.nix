@@ -26,6 +26,7 @@
       restic # backups
       fd
       nixos-anywhere
+      ssh-to-age
 
       distrobox
 
