@@ -62,6 +62,9 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+# service for yubikey
+services.pcscd.enable = true;
+
   # restric nix package manager to @wheel
   nix.settings.allowed-users = ["@wheel"];
 
