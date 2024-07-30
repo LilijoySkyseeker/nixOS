@@ -75,9 +75,11 @@
             mount -t zfs $snapshot /tmp/restic/$snapshot
           fi
         done
+        echo "### Mounted Snapshots ###"
       '';
       backupCleanupCommand = ''
         zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {} 2> /dev/null
+        echo "### Unmounted Snapshots ###"
           rm -rf /tmp/restic
       '';
       user = "root";
