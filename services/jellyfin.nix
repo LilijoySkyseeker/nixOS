@@ -8,9 +8,6 @@
   # jellyfin
   services.jellyfin = {
     enable = true;
-    configDir = "/etc/jellyfin/config";
-    dataDir = "/etc/jellyfin/data";
-    logDir = "/etc/jellyfin/log";
     openFirewall = true;
   };
   networking.firewall.allowedTCPPorts = [
