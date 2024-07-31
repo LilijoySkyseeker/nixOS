@@ -38,7 +38,8 @@
 
   # caddy
   services.caddy = {
-    acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
+    acmeCA = "https://acme.zerossl.com/v2/DV90";
+    email = "lilijoyskyseeker@gmail.com";
   };
 
   # duckdns
