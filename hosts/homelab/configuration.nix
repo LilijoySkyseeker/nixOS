@@ -292,6 +292,7 @@
     directories = [
       "/etc/nixos"
       "/etc/duckdns"
+      "/etc/jellyfin"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
     ];
