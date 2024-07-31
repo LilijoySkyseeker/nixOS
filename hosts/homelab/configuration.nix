@@ -29,12 +29,16 @@
     ]);
 
   # caddy
-  # services.caddy = {
-  #   acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
-  #   virtualHosts = {
-  #
-  #   };
-  # };
+  services.caddy = {
+    acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
+    virtualHosts = {
+      "jellyfin.skyseekerhomelab.duckdns.org" = {
+        extraConfig = ''
+          reverse_proxy localhost:8096
+        '';
+      };
+    };
+  };
 
   # duckdns
   services.cron = {
