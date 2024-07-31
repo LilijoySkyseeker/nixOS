@@ -76,7 +76,7 @@
   networking.hostName = "nixos-thinkpad";
 
   # Set extra groups
-  users.users.lilijoy.extraGroups = ["docker"];
+  users.users.lilijoy.extraGroups = ["docker" "tss"];
 
   # NVIDIA ==============================================================================
   hardware.opengl = {
