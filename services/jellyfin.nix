@@ -23,13 +23,18 @@
   '';
 
   # persistence
-  environment.persistence."/nix/state" = {
-    directories = [
-      "${services.jellyfin.configDir}"
-      "${services.jellyfin.dataDir}"
-      "${services.jellyfin.logDir}"
-    ];
-    files = [
-    ];
-  };
+  environment.persistence."/nix/state".directories = with config.services.jellyfin; [
+    {
+      directory = cacheDir;
+      inherit user group;
+    }
+    {
+      directory = dataDir;
+      inherit user group;
+    }
+    {
+      directory = logDir;
+      inherit user group;
+    }
+  ];
 }
