@@ -28,6 +28,22 @@
       # UNSTABLE installed packages
     ]);
 
+  # caddy
+  # services.caddy = {
+  #   acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
+  #   virtualHosts = {
+  #
+  #   };
+  # };
+
+  # duckdns
+  services.cron = {
+    enable = true;
+    systemCronJobs = [
+      "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1"
+    ];
+  };
+
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
@@ -260,8 +276,9 @@
     enable = true;
     hideMounts = true;
     directories = [
-      "/var/log"
       "/etc/nixos"
+      "/etc/duckdns"
+      "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
     ];
     files = [
