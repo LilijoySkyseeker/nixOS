@@ -30,6 +30,12 @@
       # UNSTABLE installed packages
     ]);
 
+  # directory permissions
+  systemd.tmpfiles.rules = [
+    "d /storage 0770 - multimedia - -"
+    "d /storage-bulk 0770 - multimedia - -"
+  ];
+
   # caddy
   services.caddy = {
     acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
