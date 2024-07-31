@@ -9,6 +9,7 @@
   services.jellyfin = {
     enable = true;
     openFirewall = true;
+    user = "jellyfin";
     group = "multimedia";
   };
   systemd.tmpfiles.rules = [
