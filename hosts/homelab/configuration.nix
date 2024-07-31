@@ -13,6 +13,8 @@
     ./disko.nix
     ../../modules/nixos/shared.nix
     ../../modules/nixos/profiles/server.nix
+
+    ../../services/jellyfin.nix
   ];
 
   # System installed pkgs
@@ -28,26 +30,9 @@
       # UNSTABLE installed packages
     ]);
 
-  # jellyfin
-  services.jellyfin = {
-    enable = true;
-    cacheDir = "/etc/jellyfin/cache";
-    configDir = "/etc/jellyfin/config";
-    dataDir = "/etc/jellyfin/data";
-    logDir = "/etc/jellfin/log";
-    openFirewall = true;
-  };
-
   # caddy
   services.caddy = {
     acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
-    virtualHosts = {
-      "jellyfin.skyseekerhomelab.duckdns.org" = {
-        extraConfig = ''
-          reverse_proxy localhost:8096
-        '';
-      };
-    };
   };
 
   # duckdns
@@ -292,7 +277,6 @@
     directories = [
       "/etc/nixos"
       "/etc/duckdns"
-      "/etc/jellyfin"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
     ];
