@@ -13,7 +13,10 @@
   };
   users.groups.multimedia.members = ["jellyfin"];
   systemd.tmpfiles.rules = [
-    "d /var/lib/jellyfin/config 0770 jellyfin - - -"
+    "d ${config.services.jellyfin.configDir} 0770 jellyfin - - -"
+    "d ${config.services.jellyfin.cacheDir} 0770 jellyfin - - -"
+    "d ${config.services.jellyfin.dataDir} 0770 jellyfin - - -"
+    "d ${config.services.jellyfin.logDir} 0770 jellyfin - - -"
   ];
 
   # caddy
@@ -29,6 +32,10 @@
 
   # persistence
   environment.persistence."/nix/state".directories = with config.services.jellyfin; [
+    {
+      directory = configDir;
+      inherit user group;
+    }
     {
       directory = cacheDir;
       inherit user group;
