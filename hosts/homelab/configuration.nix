@@ -28,6 +28,16 @@
       # UNSTABLE installed packages
     ]);
 
+  # jellyfin
+  services.jellyfin = {
+    enable = true;
+    cacheDir = "/etc/jellyfin/cache";
+    configDir = "/etc/jellyfin/config";
+    dataDir = "/etc/jellyfin/data";
+    logDir = "/etc/jellfin/log";
+    openFirewall = true;
+  };
+
   # caddy
   services.caddy = {
     acmeCA = "https://acme-staging-v02.api.letsencrypt.org/directory"; # for testing
