@@ -9,9 +9,9 @@
   services.jellyfin = {
     enable = true;
     openFirewall = true;
-    user = "jellyfin";
     group = "multimedia";
   };
+  users.groups.multimedia.members = ["jellyfin"];
   systemd.tmpfiles.rules = [
     "d /var/lib/jellyfin/config 0770 jellyfin - - -"
   ];
