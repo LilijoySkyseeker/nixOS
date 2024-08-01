@@ -51,7 +51,7 @@
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
             singleton: Non-Album/$artist/$title/$title
-            comp: Compilations/$albumartist/$year - $album%aunique{}/$track $title
+            comp: Compilations/$group/$year - $album%aunique{}/$track $title
 
         albumtypes:
             types:
