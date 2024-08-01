@@ -34,7 +34,7 @@
   # beets config
   environment = {
     variables = {
-      BEETSDIR = "/etc/beets/";
+      BEETSDIR = "/etc/beets";
     };
     etc."beetsConfig" = {
       text = ''
@@ -310,6 +310,7 @@
     directories = [
       "/etc/nixos"
       "/etc/duckdns"
+      "/etc/beets"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
     ];
