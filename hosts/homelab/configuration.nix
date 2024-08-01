@@ -59,7 +59,7 @@
         ftintitle:
             format: (feat. {0})
         rewrite:
-            artist 4everfreebrony: 4EverFreeBrony
+            artist 4everfreebrony: 4EverfreeBrony
       '';
       target = "/beets/config.yaml";
     };
