@@ -17,6 +17,9 @@
     ../../services/jellyfin.nix
   ];
 
+  # networking
+  networking.networkmanager.enable = true;
+
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
