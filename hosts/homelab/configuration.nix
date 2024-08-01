@@ -56,6 +56,8 @@
         albumtypes:
             types:
                 - single: 'Singles'
+        ftintitle:
+            format: (feat. {0})
       '';
       target = "/beets/config.yaml";
     };
