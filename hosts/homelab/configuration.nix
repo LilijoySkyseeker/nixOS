@@ -26,6 +26,8 @@
       restic
       backblaze-b2
       beets # music orginization
+      python312Packages.requests # for beets
+      python312Packages.librosa # for beets
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
@@ -40,7 +42,16 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: fromfilename autobpm
+        plugins: fromfilename autobpm edit fetchart lyrics scrub albumtypes missing
+
+        paths:
+            default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
+            singleton: Non-Album/$artist%sunique{}/$title/$title
+            comp: Compilations/$albumartist/$year - $album%aunique{}/$track $title
+
+        albumtypes:
+            types:
+                - single: 'Singles'
       '';
       target = "/beets/config.yaml";
     };
