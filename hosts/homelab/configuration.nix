@@ -32,12 +32,17 @@
     ]);
 
   # beets config
-  environment.etc."beetsConfig" = {
-    text = ''
-      directory: /storage/Music
-      library: /var/lib/beets/musiclibrary.db"
-    '';
-    target = "/root/.config/beets/config.yaml";
+  environment = {
+    variables = {
+      BEETSDIR = "/etc/beets/config.yaml";
+    };
+    etc."beetsConfig" = {
+      text = ''
+        directory: /storage/Music
+        library: /var/lib/beets/musiclibrary.db"
+      '';
+      target = "/beets/config.yaml";
+    };
   };
 
   # directory permissions
