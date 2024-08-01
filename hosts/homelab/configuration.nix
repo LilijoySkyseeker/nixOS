@@ -17,12 +17,6 @@
     ../../services/jellyfin.nix
   ];
 
-  # networking
-  networking.networkmanager = {
-    enable = true;
-    insertNameservers = ["8.8.8.8" "1.1.1.1"];
-  };
-
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
@@ -37,6 +31,12 @@
       # UNSTABLE installed packages
     ]);
 
+  # networking
+  networking.networkmanager = {
+    enable = true;
+    insertNameservers = ["8.8.8.8" "1.1.1.1"];
+  };
+
   # beets config
   environment = {
     variables = {
@@ -46,7 +46,7 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: chroma fromfilename edit fetchart lyrics scrub albumtypes missing
+        plugins: ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
