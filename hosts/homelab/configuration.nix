@@ -34,7 +34,7 @@
   # beets config
   environment = {
     variables = {
-      BEETSDIR = "/etc/beets/config.yaml";
+      BEETSDIR = "/etc/beets/";
     };
     etc."beetsConfig" = {
       text = ''
