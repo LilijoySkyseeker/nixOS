@@ -40,7 +40,7 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: fromfilename edit fetchart lyrics scrub albumtypes missing
+        plugins: chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
