@@ -26,8 +26,6 @@
       restic
       backblaze-b2
       beets # music orginization
-      python311Packages.requests # for beets
-      python311Packages.librosa # for beets
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
