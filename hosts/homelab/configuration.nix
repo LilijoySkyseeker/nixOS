@@ -39,7 +39,8 @@
     etc."beetsConfig" = {
       text = ''
         directory: /storage/Music
-        library: /var/lib/beets/musiclibrary.db"
+        library: /var/lib/beets/musiclibrary.db
+        plugins: fromfilename autobpm
       '';
       target = "/beets/config.yaml";
     };

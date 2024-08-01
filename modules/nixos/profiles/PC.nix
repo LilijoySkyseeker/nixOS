@@ -167,12 +167,6 @@
     enable = true;
   };
 
-  # NVIM
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-  };
-
   # fish
   programs.fish = {
     enable = true;

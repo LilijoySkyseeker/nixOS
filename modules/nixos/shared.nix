@@ -31,8 +31,11 @@
   # Set your time zone.
   time.timeZone = "America/New_York";
 
-  # firmware updater daemon
-  # services.fwupd.enable = true;
+  # NVIM
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+  };
 
   # auto gc with nh
   programs.nh = {
