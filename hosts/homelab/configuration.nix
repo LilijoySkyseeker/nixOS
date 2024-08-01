@@ -42,7 +42,7 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: fromfilename autobpm edit fetchart lyrics scrub albumtypes missing
+        plugins: fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
