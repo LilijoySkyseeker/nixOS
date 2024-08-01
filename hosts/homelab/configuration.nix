@@ -30,6 +30,15 @@
       # UNSTABLE installed packages
     ]);
 
+  # beets
+  programs.beets = {
+    enable = true;
+    settings = {
+      directory = "/storage/Music";
+      library = "/var/lib/beets/musiclibrary.db";
+    };
+  };
+
   # directory permissions
   systemd.tmpfiles.rules = [
     "d /storage 0770 - multimedia - -"
@@ -292,6 +301,7 @@
       "/etc/machine-id"
       "/etc/ssh/ssh_host_ed25519_key"
       "/etc/ssh/ssh_host_ed25519_key.pub"
+      "/var/lib/beets/musiclibrary.db" # beets
     ];
   };
 }
