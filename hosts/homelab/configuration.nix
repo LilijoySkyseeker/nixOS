@@ -25,19 +25,11 @@
       zfs
       restic
       backblaze-b2
+      beets # music orginization
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
-
-  # beets
-  programs.beets = {
-    enable = true;
-    settings = {
-      directory = "/storage/Music";
-      library = "/var/lib/beets/musiclibrary.db";
-    };
-  };
 
   # directory permissions
   systemd.tmpfiles.rules = [
