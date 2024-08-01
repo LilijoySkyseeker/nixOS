@@ -32,7 +32,7 @@
     ]);
 
   # beets config
-  enviroment.etc."beetsConfig" = {
+  environment.etc."beetsConfig" = {
     text = ''
       directory: /storage/Music
       library: /var/lib/beets/musiclibrary.db"
