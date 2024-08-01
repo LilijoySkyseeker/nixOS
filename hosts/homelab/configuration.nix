@@ -31,6 +31,15 @@
       # UNSTABLE installed packages
     ]);
 
+  # beets config
+  enviroment.etc."beetsConfig" = {
+    text = ''
+      directory: /storage/Music
+      library: /var/lib/beets/musiclibrary.db"
+    '';
+    target = "/root/.config/beets/config.yaml";
+  };
+
   # directory permissions
   systemd.tmpfiles.rules = [
     "d /storage 0770 - multimedia - -"
