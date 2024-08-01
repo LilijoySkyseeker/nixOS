@@ -47,12 +47,12 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
+        plugins: rewrite ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
             singleton: Non-Album/$artist/$title/$title
-            comp: Compilations/$grouping/$year - $album%aunique{}/$track $title
+            comp: Compilations/$albumartist/$year - $album%aunique{}/$track $title
 
         albumtypes:
             types:
