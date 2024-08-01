@@ -46,7 +46,7 @@
       text = ''
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: rewrite ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
+        plugins: ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
@@ -58,8 +58,6 @@
                 - single: 'Singles'
         ftintitle:
             format: (feat. {0})
-        rewrite:
-            artist 4everfreebrony: 4EverfreeBrony
       '';
       target = "/beets/config.yaml";
     };
