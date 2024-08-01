@@ -18,7 +18,10 @@
   ];
 
   # networking
-  networking.networkmanager.enable = true;
+  networking.networkmanager = {
+    enable = true;
+    insertNameservers = ["8.8.8.8" "1.1.1.1"];
+  };
 
   # System installed pkgs
   environment.systemPackages =
