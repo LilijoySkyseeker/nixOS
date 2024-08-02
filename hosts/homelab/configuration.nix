@@ -50,9 +50,9 @@
         plugins: rewrite ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
+            comp: Compilations/$group/$year - $album%aunique{}/$track $title
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
             singleton: Non-Album/$artist/$title/$title
-            comp: Compilations/$albumartist/$year - $album%aunique{}/$track $title
 
         albumtypes:
             types:
