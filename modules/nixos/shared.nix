@@ -19,6 +19,7 @@
       alejandra
       rsync
       sops # secrets management
+      flac
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
