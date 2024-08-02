@@ -9,7 +9,7 @@
   imports = [
     ../virtual-machines.nix #(also needs home manager config)
     ../shared.nix
-    #   ../../../custom-packages/tpm-fido/package.nix
+    ../../../custom-packages/tpm-fido/package.nix
   ];
 
   # System installed pkgs
@@ -56,11 +56,11 @@
       discord
       obsidian
       spotify
-
-      # Custom Packages
-      #     tpm-fido
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+
+  # tpm-fido
+  tpm-fido.enable = true;
 
   # ssh key type order
   programs.ssh.hostKeyAlgorithms = [
@@ -75,7 +75,7 @@
   nix.settings.allowed-users = ["@wheel"];
 
   # sops config
-  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519"];
+  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ecdsa-sk"];
   sops.secrets = {
     open_weather_key = {};
     restic = {
