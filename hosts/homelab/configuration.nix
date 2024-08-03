@@ -57,8 +57,6 @@
         albumtypes:
             types:
                 - single: 'Singles'
-        ftintitle:
-            format: (feat. {0})
       '';
       target = "/beets/config.yaml";
     };
@@ -73,7 +71,7 @@
   # caddy
   services.caddy = {
     enable = true;
-    acmeCA = "https://acme.zerossl.com/v2/DV90";
+    #   acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
 
