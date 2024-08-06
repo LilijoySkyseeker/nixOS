@@ -45,9 +45,10 @@
     };
     etc."beetsConfig" = {
       text = ''
+        threaded: no
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: info rewrite chroma fromfilename edit fetchart scrub albumtypes missing
+        plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
             comp: Compilations/$label/$year - $album%aunique{}/$track $title
