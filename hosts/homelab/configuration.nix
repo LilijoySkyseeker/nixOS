@@ -26,11 +26,15 @@
       restic
       backblaze-b2
       btop
+      tmux
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
       beets # music orginization
     ]);
+
+  # Set your time zone.
+  time.timeZone = "America/New_York";
 
   # networking
   networking.networkmanager = {
