@@ -25,11 +25,11 @@
       zfs
       restic
       backblaze-b2
-      beets # music orginization
       btop
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
+      beets # music orginization
     ]);
 
   # networking
