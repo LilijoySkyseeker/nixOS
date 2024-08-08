@@ -26,7 +26,6 @@
       restic
       backblaze-b2
       btop
-      tmux
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
@@ -49,7 +48,6 @@
     };
     etc."beetsConfig" = {
       text = ''
-        threaded: no
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
         plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
@@ -69,8 +67,8 @@
 
   # directory permissions
   systemd.tmpfiles.rules = [
-    "d /storage 0770 - multimedia - -"
-    "d /storage-bulk 0770 - multimedia - -"
+    "d /storage 2770 - multimedia - -"
+    "d /storage-bulk 2770 - multimedia - -"
   ];
 
   # caddy
