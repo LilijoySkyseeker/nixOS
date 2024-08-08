@@ -26,6 +26,7 @@
       restic
       backblaze-b2
       btop
+      tmux
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
