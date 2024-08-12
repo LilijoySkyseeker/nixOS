@@ -214,12 +214,6 @@
 
             set foldmethod=indent
             set nofoldenable
-
-            if exists('g:vscode')
-              " VSCode extension
-            else
-              " ordinary Neovim
-                endif
           '';
         };
 
@@ -272,6 +266,12 @@
             animate-appicon-hover = true;
             show-favorites = false;
             group-apps = false;
+            group-apps-use-fixed-width = false;
+            isolate-workspaces = true;
+            appicon-padding = 0;
+            appicon-margin = 4;
+            tray-padding = 4;
+            icon-padding = 0;
           };
 
           # Openweather
