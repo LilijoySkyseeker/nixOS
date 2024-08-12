@@ -27,6 +27,7 @@
       backblaze-b2
       btop
       tmux
+      zellij
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
