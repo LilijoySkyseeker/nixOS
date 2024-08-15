@@ -43,10 +43,11 @@
           difficulty = "hard";
           level-seed = "3522075773609978693";
           enable-command-block = true;
-          level-name = "GC-world";
+          level-name = "world";
           motd = "GC+Friends Server";
-          allow-flight = "true";
+          allow-flight = true;
           force-gamemode = true;
+          spawn-protection= 0;
           white-list = false;
         };
         whitelist = {
