@@ -37,7 +37,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = pkgs.fabricServers.fabric-1_21_1;
+        package = pkgs.fabric-server;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";
