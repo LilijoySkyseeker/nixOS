@@ -71,7 +71,7 @@
   networking.firewall.enable = true;
 
   # installed packages lits in /etc/current-system-packages.text
-  environment.etc."current-system-packages".text = let
+  environment.etc."current-packages".text = let
     packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
     sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
     formatted = builtins.concatStringsSep "\n" sortedUnique;
