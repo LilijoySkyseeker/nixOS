@@ -21,6 +21,9 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
+
+    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
+    nix-minecraft.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {
@@ -32,6 +35,7 @@
     sops-nix,
     disko,
     impermanence,
+    nix-minecraft,
     ...
   }: let
     system = "x86_64-linux";
@@ -87,6 +91,7 @@
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
+          nix-minecraft.nixosModules.minecraft-servers
         ];
       };
       #==================================================

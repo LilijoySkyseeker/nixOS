@@ -10,6 +10,10 @@
     enable = true;
     openFirewall = true;
     group = "multimedia";
+    configDir = "/srv/jellyfin/config";
+    cacheDir = "/srv/jellyfin/cache";
+    dataDir = "/srv/jellyfin/data";
+    logDir = "/srv/jellyfin/log";
   };
   users.groups.multimedia.members = ["jellyfin"];
   systemd.tmpfiles.rules = [
