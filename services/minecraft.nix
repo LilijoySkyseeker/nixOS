@@ -8,8 +8,6 @@
   
 # import for some reason
   imports = [ inputs.nix-minecraft.nixosModules.minecraft-servers ];
-
-  # overlay for the built in minecraft config
   nixpkgs.overlays = [inputs.nix-minecraft.overlay];
 
   # networking
@@ -39,7 +37,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = pkgs.legacyPackages.fabricServers.fabric-1_21_1;
+        package = pkgs.fabricServers.fabric-1_21_1;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";
