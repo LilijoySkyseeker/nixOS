@@ -8,7 +8,7 @@
   
 # import for some reason
   imports = [ inputs.nix-minecraft.nixosModules.minecraft-servers ];
-  nixpkgs.overlays = [ nix-minecraft.overlay ];
+  nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
 
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
@@ -37,7 +37,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = pkgs.fabricServers.fabric-1_20_4;
+        package = pkgs.fabricServers.fabric-1_21_1;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";
