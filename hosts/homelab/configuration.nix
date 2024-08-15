@@ -276,6 +276,8 @@
       AllowStreamLocalForwarding no
       AuthenticationMethods publickey
       PermitTunnel no
+      ClientAliveInterval 200
+      ClientAliveCountMax 3
     '';
     hostKeys = [
       {
