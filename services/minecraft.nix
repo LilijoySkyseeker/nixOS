@@ -20,7 +20,7 @@
   ];
 
   # persistence
-  environment.persistence."/nix/state".directories = with config.services.minecraft; [
+  environment.persistence."/nix/state".directories = with config.services.minecraft-servers; [
     {
       directory = dataDir;
       inherit user group;
