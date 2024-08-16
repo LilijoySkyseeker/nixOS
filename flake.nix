@@ -47,6 +47,8 @@
       ];
     };
 
+    nixpkgs.overlays = [inputs.nix-minecraft.overlay];
+
     pkgs = import inputs.nixpkgs {
       inherit system;
       config.allowUnfree = true;

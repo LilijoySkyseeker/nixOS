@@ -5,10 +5,9 @@
   lib,
   ...
 }: {
-  
-# import for some reason
-  imports = [ inputs.nix-minecraft.nixosModules.minecraft-servers ];
-  pkgs.overlays = [ inputs.nix-minecraft.overlay ];
+  # import for some reason
+  imports = [inputs.nix-minecraft.nixosModules.minecraft-servers];
+  pkgs.overlays = [inputs.nix-minecraft.overlay];
 
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
@@ -47,7 +46,7 @@
           motd = "GC+Friends Server";
           allow-flight = true;
           force-gamemode = true;
-          spawn-protection= 0;
+          spawn-protection = 0;
           white-list = false;
         };
         whitelist = {
