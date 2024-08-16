@@ -5,9 +5,8 @@
   lib,
   ...
 }: {
-  # import for some reason
-  #  imports = [inputs.nix-minecraft.nixosModules.minecraft-servers];
-    nixpkgs.overlays = [inputs.nix-minecraft.overlay];
+  # add servers to nixpkgs
+  nixpkgs.overlays = [inputs.nix-minecraft.overlay];
 
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
@@ -36,7 +35,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = nixpkgs.fabric-server-1-21-1;
+        package = pkgs.fabric-server-1-21-1;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";

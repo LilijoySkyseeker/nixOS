@@ -15,7 +15,7 @@
     ../../modules/nixos/profiles/server.nix
 
     ../../services/jellyfin.nix
-    ../../services/minecraft.nix
+    #   ../../services/minecraft.nix
   ];
 
   # System installed pkgs
@@ -51,6 +51,7 @@
     };
     etc."beetsConfig" = {
       text = ''
+        threaded: no
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
         plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
