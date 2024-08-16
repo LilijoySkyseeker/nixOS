@@ -10,7 +10,7 @@
 
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
-    reverse_proxy localhost:25566
+    reverse_proxy localhost:25565
   '';
   networking.firewall.allowedTCPPorts = [
     25565
@@ -35,7 +35,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = pkgs.fabric-server;
+        package = pkgs.minecraft-server-1-12;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";
