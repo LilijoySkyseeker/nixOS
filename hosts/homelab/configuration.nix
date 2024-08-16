@@ -51,7 +51,7 @@
     };
     etc."beetsConfig" = {
       text = ''
-        threaded: no
+        threaded: yes
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
         plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing

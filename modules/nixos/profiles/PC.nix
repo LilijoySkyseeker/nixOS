@@ -75,7 +75,7 @@
   nix.settings.allowed-users = ["@wheel"];
 
   # sops config
-  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ecdsa-sk"];
+  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ed25519"];
   sops.secrets = {
     open_weather_key = {};
     restic = {

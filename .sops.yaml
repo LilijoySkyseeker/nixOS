@@ -1,6 +1,7 @@
 keys:
   - &primary age1758lfexzx4fqdnelj095nedm2h9auzvllz9v35t99vd3l64vugsq3d7cl8
   - &nixos-thinkpad age1t8cfzavzm9gw9muwpq8lfnwy3fngl8672r9qwv9yuptq8qmnrazqwe0auz
+  - &thinkpad-ssh age1zn0nrxa2pwepps9hg5jtvmj95qh7gee89ec35d3akw3gxhr0545sgakg9d
   - &legion age1t09qgr6xfs472argms06h2q3c6gzstnl8lstj5eh26z7tcclyvuq30zl32
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad 
 creation_rules:
@@ -11,3 +12,4 @@ creation_rules:
         - *nixos-thinkpad
         - *legion
         - *homelab3
+        - *thinkpad-ssh
