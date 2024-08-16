@@ -67,9 +67,9 @@
         vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
-      WHITELIST = [
-        "LilijoySkyseeker"
-      ];
+      WHITELIST = ''
+        LilijoySkyseeker
+      '';
     };
     volumes = ["/srv/minecraft/vanilla-plus:/data"];
   };
