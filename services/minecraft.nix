@@ -35,7 +35,7 @@
       survival = {
         enable = true;
         openFirewall = true;
-        package = pkgs.minecraft-server-1-12;
+        #       package = pkgs.minecraft-server-1-12;
         serverProperties = {
           gamemode = "survival";
           difficulty = "hard";
