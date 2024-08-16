@@ -15,7 +15,7 @@
     ../../modules/nixos/profiles/server.nix
 
     ../../services/jellyfin.nix
-    #   ../../services/minecraft.nix
+    ../../services/minecraft.nix
   ];
 
   # System installed pkgs
