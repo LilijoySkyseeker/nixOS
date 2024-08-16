@@ -7,7 +7,7 @@
 }: {
   # import for some reason
   #  imports = [inputs.nix-minecraft.nixosModules.minecraft-servers];
-  #  pkgs.overlays = [inputs.nix-minecraft.overlay];
+    nixpkgs.overlays = [inputs.nix-minecraft.overlay];
 
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''

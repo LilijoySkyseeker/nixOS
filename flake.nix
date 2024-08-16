@@ -46,9 +46,6 @@
         "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
       ];
     };
-
-    nixpkgs.overlays = [inputs.nix-minecraft.overlay];
-
     pkgs = import inputs.nixpkgs {
       inherit system;
       config.allowUnfree = true;
