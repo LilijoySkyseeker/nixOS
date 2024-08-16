@@ -20,7 +20,7 @@
   environment.persistence."/nix/state".directories = [
     {
       directory = "/srv/minecraft/vanilla-plus";
-      inherit user group;
+      #     inherit user group;
     }
   ];
 
