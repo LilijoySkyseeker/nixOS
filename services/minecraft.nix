@@ -5,9 +5,6 @@
   lib,
   ...
 }: {
-  # TEMP
-  virtualisation.docker.enable = true;
-
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
     reverse_proxy localhost:25565
@@ -72,13 +69,5 @@
       '';
     };
     volumes = ["/srv/minecraft/vanilla-plus:/data"];
-  };
-
-  # via proxy
-  virtualisation.oci-containers.containers.viaproxy = {
-    autoStart = true;
-    image = "ghcr.io/viaversion/viaproxy:latest";
-    ports = ["25568:25568"];
-    volumes = ["/srv/viaproxy:/app/run"];
   };
 }
