@@ -52,11 +52,8 @@
         krypton
         c2me-fabric
         vmp-fabric
-        viafabric
-        viabackwards
-        viarewind
+        servux
       '';
-      # servux
       # memoryleakfix
       # ferrite-core
       #       easy-shulker-boxes
