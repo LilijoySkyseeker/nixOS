@@ -52,6 +52,7 @@
         krypton
         c2me-fabric
         vmp-fabric
+        viafabric
       '';
       # servux
       # memoryleakfix
@@ -59,7 +60,6 @@
       #       easy-shulker-boxes
       #       carpet
       #       itemswapper
-      #       viafabric
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
