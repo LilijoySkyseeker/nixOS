@@ -24,12 +24,6 @@
     }
   ];
 
-  # rootless docker
-  virtualisation.docker.rootless = {
-    enable = true;
-    setSocketVariable = true;
-  };
-
   # mc server
   virtualisation.oci-containers.backend = "docker";
   virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
