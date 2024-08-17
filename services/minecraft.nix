@@ -31,10 +31,10 @@
     image = "itzg/minecraft-server";
     ports = ["25565:25565"];
     environment = {
-      VERSION = "1.20.6";
+      VERSION = "1.20.5";
       EULA = "TRUE";
       MEMORY = "2G";
-      USE_AIKAR_FLAGS = "TRUE";
+      #     USE_AIKAR_FLAGS = "TRUE";
       TYPE = "FABRIC";
       MOTD = "GC and Friends";
       DIFFICULTY = "hard";
