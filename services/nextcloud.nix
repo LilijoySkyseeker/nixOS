@@ -38,7 +38,7 @@
       config = {
         dbtype = "pgsql";
         adminuser = "admin";
-        adminpassFile = "/path/to/nextcloud-admin-pass";
+        adminpassFile = "${config.sops.secrets.nextcloud_admin_pass.path}";
       };
     };
   };
@@ -46,6 +46,10 @@
   # systemd.tmpfiles.rules = [
   #   "d ${config.services.nextcloud.home} 0770 nextcloud - - -"
   # ];
+
+  sops.secrets = {
+    nextcloud_admin_pass = {};
+  };
 
   networking.firewall.allowedTCPPorts = [
     443
