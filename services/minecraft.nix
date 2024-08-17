@@ -49,9 +49,9 @@
       MODRINTH_PROJECTS = ''
          lithium
          no-chat-reports
-        servux
         vmp-fabric
       '';
+      # servux
       # krypton
       # c2me-fabric
       # memoryleakfix
