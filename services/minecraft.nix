@@ -53,8 +53,8 @@
         c2me-fabric
         vmp-fabric
         servux
+        memoryleakfix
       '';
-      # memoryleakfix
       # ferrite-core
       #       easy-shulker-boxes
       #       carpet
