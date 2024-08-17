@@ -47,15 +47,15 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
-        c2me-fabric
-        memoryleakfix
-        ferrite-core
         lithium
-        krypton
         no-chat-reports
-        servux
-        vmp-fabric
       '';
+      # servux
+      # vmp-fabric
+      # krypton
+      # c2me-fabric
+      # memoryleakfix
+      # ferrite-core
       #       easy-shulker-boxes
       #       carpet
       #       itemswapper
