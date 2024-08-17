@@ -24,7 +24,6 @@
       # Increase the maximum file upload size to avoid problems uploading videos.
       maxUploadSize = "1024G";
       https = true;
-      enableBrokenCiphersForSSE = false;
 
       autoUpdateApps.enable = true;
       extraAppsEnable = true;
