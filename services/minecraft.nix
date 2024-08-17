@@ -51,8 +51,8 @@
         no-chat-reports
         krypton
         c2me-fabric
+        vmp-fabric
       '';
-      # vmp-fabric
       # servux
       # memoryleakfix
       # ferrite-core
