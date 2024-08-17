@@ -49,6 +49,7 @@
       MODRINTH_PROJECTS = ''
         lithium
         no-chat-reports
+        viafabric
       '';
       # vmp-fabric
       # servux
@@ -59,7 +60,6 @@
       #       easy-shulker-boxes
       #       carpet
       #       itemswapper
-      #       viafabric
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
