@@ -5,6 +5,9 @@
   lib,
   ...
 }: {
+  # TEMP
+  virtualisation.docker.enable = true;
+
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
     reverse_proxy localhost:25565
