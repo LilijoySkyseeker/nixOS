@@ -31,7 +31,7 @@
     image = "itzg/minecraft-server";
     ports = ["25565:25565"];
     environment = {
-      VERSION = "1.20.5";
+      VERSION = "1.20.4";
       EULA = "TRUE";
       MEMORY = "2G";
       USE_AIKAR_FLAGS = "TRUE";
