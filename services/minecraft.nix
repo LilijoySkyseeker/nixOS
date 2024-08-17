@@ -47,10 +47,10 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
-         lithium
-         no-chat-reports
-        vmp-fabric
+        lithium
+        no-chat-reports
       '';
+      # vmp-fabric
       # servux
       # krypton
       # c2me-fabric
