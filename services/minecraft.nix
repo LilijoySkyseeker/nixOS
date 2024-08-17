@@ -49,17 +49,17 @@
       MODRINTH_PROJECTS = ''
         lithium
         no-chat-reports
-        viafabric
+        krypton
       '';
       # vmp-fabric
       # servux
-      # krypton
       # c2me-fabric
       # memoryleakfix
       # ferrite-core
       #       easy-shulker-boxes
       #       carpet
       #       itemswapper
+      #       viafabric
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
