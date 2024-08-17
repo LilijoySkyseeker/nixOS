@@ -55,10 +55,11 @@
         servux
         memoryleakfix
         ferrite-core
+        easy-shulker-boxes
+        carpet
+        itemswapper
+        enchant-tweaker
       '';
-      #       easy-shulker-boxes
-      #       carpet
-      #       itemswapper
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
