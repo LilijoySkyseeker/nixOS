@@ -64,6 +64,9 @@
       WHITELIST = ''
         LilijoySkyseeker
       '';
+      OPS = ''
+        LilijoySkyseeker
+      '';
     };
     volumes = ["/srv/minecraft/vanilla-plus:/data"];
   };
