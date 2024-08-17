@@ -71,21 +71,11 @@
     volumes = ["/srv/minecraft/vanilla-plus:/data"];
   };
 
-  #         EnchantmentTweaker-config-file = pkgs.writeTextFile {
-  #           name = "config/enchant-tweaker.properties";
-  #           text = ''
-  #             mod_enabled=true
-  #             cheap_names=true
-  #             prior_work_free=true
-  #             axes_not_tools=true
-  #             axe_weapons=true
-  #             better_mending=true
-  #             bow_infinity_fix=true
-  #             god_armor=true
-  #             god_weapons=true
-  #             infinite_mending=true
-  #             loyal_void_tridents=true
-  #             multishot_piercing=true
-  #             shiny_name=true
-  #             trident_weapons=true
+  # via proxy
+  virtualisation.oci-containers.containers.viaproxy = {
+    autoStart = true;
+    image = "ghcr.io/viaversion/viaproxy:latest";
+    ports = ["25568:25568"];
+    volumes = ["/srv/viaproxy:/app/run"];
+  };
 }
