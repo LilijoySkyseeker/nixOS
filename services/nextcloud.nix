@@ -32,9 +32,10 @@
         # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
         inherit calendar contacts;
       };
-
+      settings = {
+        overwriteprotocol = "https";
+      };
       config = {
-        overwriteProtocol = "https";
         dbtype = "pgsql";
         adminuser = "admin";
         adminpassFile = "/path/to/nextcloud-admin-pass";
