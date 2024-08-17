@@ -43,9 +43,9 @@
     };
   };
 
-  # systemd.tmpfiles.rules = [
-  #   "d ${config.services.nextcloud.home} 0770 nextcloud - - -"
-  # ];
+  systemd.tmpfiles.rules = [
+    "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
+  ];
 
   sops.secrets = {
     nextcloud_admin_pass = {
