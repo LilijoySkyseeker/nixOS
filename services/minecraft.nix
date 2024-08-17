@@ -37,7 +37,7 @@
     image = "itzg/minecraft-server";
     ports = ["25565:25565"];
     environment = {
-      VERSION = "1.21";
+      VERSION = "1.20.6";
       EULA = "TRUE";
       MEMORY = "2G";
       USE_AIKAR_FLAGS = "TRUE";
@@ -52,20 +52,20 @@
       SEED = "3522075773609978693";
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
-      #     MODRINTH_PROJECTS = ''
-      #       c2me-fabric
-      #       easy-shulker-boxes
-      #       carpet
-      #       ferrite-core
-      #       itemswapper
-      #       krypton
-      #       lithium
-      #       memoryleakfix
-      #       no-chat-reports
-      #       servux
-      #       viafabric
-      #       vmp-fabric
-      #     '';
+      MODRINTH_PROJECTS = ''
+        c2me-fabric
+        easy-shulker-boxes
+        carpet
+        ferrite-core
+        itemswapper
+        krypton
+        lithium
+        memoryleakfix
+        no-chat-reports
+        servux
+        viafabric
+        vmp-fabric
+      '';
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
