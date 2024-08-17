@@ -48,7 +48,10 @@
   # ];
 
   sops.secrets = {
-    nextcloud_admin_pass = {};
+    nextcloud_admin_pass = {
+      owner = "nextcloud";
+      group = "nextcloud";
+    };
   };
 
   networking.firewall.allowedTCPPorts = [
