@@ -43,9 +43,9 @@
     };
   };
 
-  systemd.tmpfiles.rules = [
-    "d ${config.services.nextcloud.home} 0770 nextcloud - - -"
-  ];
+  # systemd.tmpfiles.rules = [
+  #   "d ${config.services.nextcloud.home} 0770 nextcloud - - -"
+  # ];
 
   networking.firewall.allowedTCPPorts = [
     443
@@ -58,7 +58,7 @@
   environment.persistence."/nix/state".directories = [
     {
       directory = config.services.nextcloud.home;
-      inherit user group;
+      #     inherit user group;
     }
   ];
 }
