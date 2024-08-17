@@ -50,10 +50,10 @@
         lithium
         no-chat-reports
         krypton
+        c2me-fabric
       '';
       # vmp-fabric
       # servux
-      # c2me-fabric
       # memoryleakfix
       # ferrite-core
       #       easy-shulker-boxes
