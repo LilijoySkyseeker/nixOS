@@ -43,6 +43,10 @@
     };
   };
 
+  systemd.tmpfiles.rules = [
+    "d ${config.services.nextcloud.home} 0770 nextcloud - - -"
+  ];
+
   networking.firewall.allowedTCPPorts = [
     443
   ];
