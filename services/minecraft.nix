@@ -54,8 +54,8 @@
         vmp-fabric
         servux
         memoryleakfix
+        ferrite-core
       '';
-      # ferrite-core
       #       easy-shulker-boxes
       #       carpet
       #       itemswapper
