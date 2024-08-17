@@ -335,6 +335,7 @@
               "tiling-assistant@leleat-on-github"
               "ddterm@amezin.github.com"
               "gsconnect@andyholmes.github.io"
+              "batterytimepercentagecompact@sagrland.de"
             ];
           };
         };
@@ -347,6 +348,7 @@
             clipboard-indicator
             tiling-assistant
             ddterm
+            battery-time-percentage-compact
           ])
           ++ (with pkgs-unstable.gnomeExtensions; [
             # UNSTABLE
