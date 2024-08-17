@@ -25,7 +25,7 @@
   ];
 
   # mc server
-  virtualisation.oci-containers.backend = "docker";
+  virtualisation.oci-containers.backend = "podman";
   virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
     autoStart = true;
     image = "itzg/minecraft-server";
