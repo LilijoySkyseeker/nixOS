@@ -16,6 +16,7 @@
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
+    ../../services/nextcloud.nix
   ];
 
   # System installed pkgs
