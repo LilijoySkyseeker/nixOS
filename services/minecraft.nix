@@ -53,6 +53,8 @@
         c2me-fabric
         vmp-fabric
         viafabric
+        viabackwards
+        viarewind
       '';
       # servux
       # memoryleakfix
