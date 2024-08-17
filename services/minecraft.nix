@@ -46,20 +46,20 @@
       SEED = "3522075773609978693";
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
-      MODRINTH_PROJECTS = ''
-        c2me-fabric
-        easy-shulker-boxes
-        carpet
-        ferrite-core
-        itemswapper
-        krypton
-        lithium
-        memoryleakfix
-        no-chat-reports
-        servux
-        viafabric
-        vmp-fabric
-      '';
+      #     MODRINTH_PROJECTS = ''
+      #       c2me-fabric
+      #       easy-shulker-boxes
+      #       carpet
+      #       ferrite-core
+      #       itemswapper
+      #       krypton
+      #       lithium
+      #       memoryleakfix
+      #       no-chat-reports
+      #       servux
+      #       viafabric
+      #       vmp-fabric
+      #     '';
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
