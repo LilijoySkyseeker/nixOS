@@ -13,7 +13,7 @@
       hostName = "nextcloud.skyseekerhomelab.duckdns.org";
 
       # Need to manually increment with every major upgrade.
-      package = pkgs.nextcloud29;
+      package = pkgs.nextcloud28;
 
       # Let NixOS install and configure the database automatically.
       database.createLocally = true;
@@ -38,7 +38,7 @@
       config = {
         dbtype = "pgsql";
         adminuser = "admin";
-        adminpassFile = "${config.sops.secrets.nextcloud_admin_pass.path}";
+        adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
       };
     };
   };
