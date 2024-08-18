@@ -14,7 +14,7 @@
     ../../modules/nixos/shared.nix
     ../../modules/nixos/profiles/server.nix
 
-    #   ../../services/jellyfin.nix
+    ../../services/jellyfin.nix
     ../../services/minecraft.nix
     #   ../../services/nextcloud.nix
   ];
