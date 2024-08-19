@@ -107,7 +107,7 @@
     environment.persistence."/nix/state".directories = [
       {
         directory = config.services.nextcloud.home;
-        inherit user group;
+        #       inherit user group;
       }
     ];
   };
