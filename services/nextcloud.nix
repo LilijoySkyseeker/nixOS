@@ -83,7 +83,7 @@
   services.caddy = {
     virtualHosts = {
       "nextcloud.skyseekerhomelab.duckdns.org" = {
-        useACMEHost = "nextcloud.skyseekerhomelab.duckdns.org";
+        #       useACMEHost = "nextcloud.skyseekerhomelab.duckdns.org";
         extraConfig = ''
           redir /.well-known/carddav /remote.php/dav 301
           redir /.well-known/caldav /remote.php/dav 301
