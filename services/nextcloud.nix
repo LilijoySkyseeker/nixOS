@@ -10,7 +10,7 @@
       enable = true;
       home = "/srv/nextcloud";
 
-      hostName = config.networking.hostname;
+      hostName = config.networking.hostName;
 
       # Need to manually increment with every major upgrade.
       package = pkgs.nextcloud28;
