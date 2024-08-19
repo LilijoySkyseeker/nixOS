@@ -95,20 +95,20 @@
         '';
       };
     };
-
-    networking.firewall.allowedTCPPorts = [
-      443
-    ];
-    networking.firewall.allowedUDPPorts = [
-      443
-    ];
-
-    # persistence
-    environment.persistence."/nix/state".directories = [
-      {
-        directory = config.services.nextcloud.home;
-        #       inherit user group;
-      }
-    ];
   };
+
+  networking.firewall.allowedTCPPorts = [
+    443
+  ];
+  networking.firewall.allowedUDPPorts = [
+    443
+  ];
+
+  # persistence
+  environment.persistence."/nix/state".directories = [
+    {
+      directory = config.services.nextcloud.home;
+      #       inherit user group;
+    }
+  ];
 }
