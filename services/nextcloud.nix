@@ -10,7 +10,7 @@
       enable = true;
       home = "/srv/nextcloud";
 
-      hostName = "nextcloud.skyseekerhomelab.duckdns.org";
+      hostName = config.networking.hostname;
 
       # Need to manually increment with every major upgrade.
       package = pkgs.nextcloud28;
@@ -37,11 +37,37 @@
       };
       config = {
         dbtype = "pgsql";
+        dbuser = "nextcloud";
+        dbhost = "/run/postgresql"; # nextcloud will add /.s.PGSQL.5432 by itself
+        dbname = "nextcloud";
         adminuser = "admin";
         adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
       };
     };
   };
+
+  services.postgresql = {
+    enable = true;
+    ensureDatabases = ["nextcloud"];
+    ensureUsers = [
+      {
+        name = "nextcloud";
+        ensurePermissions."DATABASE nextcloud" = "ALL PRIVILEGES";
+      }
+    ];
+  };
+
+  systemd.services."nextcloud-setup" = {
+    requires = ["postgresql.service"];
+    after = ["postgresql.service"];
+  };
+
+  services.nginx.virtualHosts."nix-nextcloud".listen = [
+    {
+      addr = "127.0.0.1";
+      port = 8009;
+    }
+  ];
 
   systemd.tmpfiles.rules = [
     "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
@@ -54,18 +80,35 @@
     };
   };
 
-  networking.firewall.allowedTCPPorts = [
-    443
-  ];
-  networking.firewall.allowedUDPPorts = [
-    443
-  ];
+  services.caddy = {
+    virtualHosts = {
+      "nextcloud.skyseekerhomelab.duckdns.org" = {
+        useACMEHost = "nextcloud.skyseekerhomelab.duckdns.org";
+        extraConfig = ''
+          redir /.well-known/carddav /remote.php/dav 301
+          redir /.well-known/caldav /remote.php/dav 301
+          redir /.well-known/webfinger /index.php/.well-known/webfinger 301
+          redir /.well-known/nodeinfo /index.php/.well-known/nodeinfo 301
 
-  # persistence
-  environment.persistence."/nix/state".directories = [
-    {
-      directory = config.services.nextcloud.home;
-      #     inherit user group;
-    }
-  ];
+          encode gzip
+          reverse_proxy localhost:8009
+        '';
+      };
+    };
+
+    networking.firewall.allowedTCPPorts = [
+      443
+    ];
+    networking.firewall.allowedUDPPorts = [
+      443
+    ];
+
+    # persistence
+    environment.persistence."/nix/state".directories = [
+      {
+        directory = config.services.nextcloud.home;
+        inherit user group;
+      }
+    ];
+  };
 }
