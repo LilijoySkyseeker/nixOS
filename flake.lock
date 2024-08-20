@@ -121,11 +121,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1723426710,
-        "narHash": "sha256-yrS9al6l3fYfFfvovnyBWnyELDQOdfKyai4K/jKgoBw=",
+        "lastModified": 1724163524,
+        "narHash": "sha256-3A06DYw47oSLYMalkWDLzTMHC0MKgm1mNfaca9sqUnI=",
         "owner": "nix-community",
         "repo": "disko",
-        "rev": "0d510fe40b56ed74907a021d7e1ffd0042592914",
+        "rev": "c7b14da22e302e0f9d7aa4df26b61016bcedf738",
         "type": "github"
       },
       "original": {
@@ -240,11 +240,11 @@
     },
     "impermanence": {
       "locked": {
-        "lastModified": 1719091691,
-        "narHash": "sha256-AxaLX5cBEcGtE02PeGsfscSb/fWMnyS7zMWBXQWDKbE=",
+        "lastModified": 1724146542,
+        "narHash": "sha256-MLxtqDtu+y/4UDhXX5pFypX9/qbH54TDP6Z90oFzd/A=",
         "owner": "nix-community",
         "repo": "impermanence",
-        "rev": "23c1f06316b67cb5dabdfe2973da3785cfe9c34a",
+        "rev": "03fe473c731cda2900bae9894b8dfc68e3492db5",
         "type": "github"
       },
       "original": {
@@ -257,31 +257,27 @@
       "inputs": {
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
+        "nixpkgs": "nixpkgs"
       },
       "locked": {
         "lastModified": 1723513097,
         "narHash": "sha256-j9gk5znkxUOSptlnz7CTDQkgx8Yjqb+WAftXZaJ1drM=",
-        "owner": "Infinidoge",
-        "repo": "nix-minecraft",
+        "path": "/nix/store/3l2jw0swpgbxdypvhjbs37gm10mz3lf0-source",
         "rev": "614aa8be43d222c674315a456af53c5cd319b90e",
-        "type": "github"
+        "type": "path"
       },
       "original": {
-        "owner": "Infinidoge",
-        "repo": "nix-minecraft",
-        "type": "github"
+        "id": "nix-minecraft",
+        "type": "indirect"
       }
     },
     "nixkpgs": {
       "locked": {
-        "lastModified": 1723282977,
-        "narHash": "sha256-oTK91aOlA/4IsjNAZGMEBz7Sq1zBS0Ltu4/nIQdYDOg=",
+        "lastModified": 1723938990,
+        "narHash": "sha256-9tUadhnZQbWIiYVXH8ncfGXGvkNq3Hag4RCBEMUk7MI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a781ff33ae258bbcfd4ed6e673860c3e923bf2cc",
+        "rev": "c42fcfbdfeae23e68fc520f9182dde9f38ad1890",
         "type": "github"
       },
       "original": {
@@ -291,6 +287,37 @@
       }
     },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1715266358,
+        "narHash": "sha256-doPgfj+7FFe9rfzWo1siAV2mVCasW+Bh8I1cToAXEE4=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "f1010e0469db743d14519a1efd37e23f8513d714",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-unstable": {
+      "locked": {
+        "lastModified": 1723991338,
+        "narHash": "sha256-Grh5PF0+gootJfOJFenTTxDTYPidA3V28dqJ/WV7iis=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8a3354191c0d7144db9756a74755672387b702ba",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixos-unstable",
+        "type": "indirect"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 0,
         "narHash": "sha256-7cCC8+Tdq1+3OPyc3+gVo9dzUNkNIQfwSDJ2HSi2u3o=",
@@ -302,21 +329,6 @@
         "type": "indirect"
       }
     },
-    "nixpkgs-unstable": {
-      "locked": {
-        "lastModified": 1723175592,
-        "narHash": "sha256-M0xJ3FbDUc4fRZ84dPGx5VvgFsOzds77KiBMW/mMTnI=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "5e0ca22929f3342b19569b21b2f3462f053e497b",
-        "type": "github"
-      },
-      "original": {
-        "id": "nixpkgs",
-        "ref": "nixos-unstable",
-        "type": "indirect"
-      }
-    },
     "root": {
       "inputs": {
         "disko": "disko",
@@ -324,7 +336,7 @@
         "impermanence": "impermanence",
         "nix-minecraft": "nix-minecraft",
         "nixkpgs": "nixkpgs",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sops-nix": "sops-nix",
         "stylix": "stylix"

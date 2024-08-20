@@ -21,9 +21,6 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
-
-    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
-    nix-minecraft.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {

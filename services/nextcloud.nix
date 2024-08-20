@@ -36,6 +36,7 @@
         overwriteprotocol = "https";
       };
       config = {
+        trustedProxies = ["127.0.0.1"];
         dbtype = "pgsql";
         dbuser = "nextcloud";
         dbhost = "/run/postgresql"; # nextcloud will add /.s.PGSQL.5432 by itself
@@ -62,12 +63,13 @@
     after = ["postgresql.service"];
   };
 
-  services.nginx.virtualHosts."nix-nextcloud".listen = [
-    {
-      addr = "127.0.0.1";
-      port = 8009;
-    }
-  ];
+  services.phpfpm.pools.nextcloud.settings = {
+    "listen.owner" = config.services.caddy.user;
+    "listen.group" = config.services.caddy.group;
+  };
+  users.users.caddy.extraGroups = ["nextcloud"];
+
+  services.nginx.enable = false;
 
   systemd.tmpfiles.rules = [
     "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
