@@ -214,12 +214,6 @@
 
             set foldmethod=indent
             set nofoldenable
-
-            if exists('g:vscode')
-              " VSCode extension
-            else
-              " ordinary Neovim
-                endif
           '';
         };
 
@@ -272,6 +266,12 @@
             animate-appicon-hover = true;
             show-favorites = false;
             group-apps = false;
+            group-apps-use-fixed-width = false;
+            isolate-workspaces = true;
+            appicon-padding = 0;
+            appicon-margin = 4;
+            tray-padding = 4;
+            icon-padding = 0;
           };
 
           # Openweather
@@ -335,6 +335,7 @@
               "tiling-assistant@leleat-on-github"
               "ddterm@amezin.github.com"
               "gsconnect@andyholmes.github.io"
+              "batterytimepercentagecompact@sagrland.de"
             ];
           };
         };
@@ -347,6 +348,7 @@
             clipboard-indicator
             tiling-assistant
             ddterm
+            battery-time-percentage-compact
           ])
           ++ (with pkgs-unstable.gnomeExtensions; [
             # UNSTABLE

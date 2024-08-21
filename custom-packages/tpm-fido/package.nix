@@ -38,23 +38,22 @@ in {
   };
 
   config = lib.mkIf config.tpm-fido.enable {
+    # tpm
+    security.tpm2 = {
+      enable = true;
+      pkcs11.enable = true;
+      tctiEnvironment.enable = true;
+      tssUser = "lilijoy";
+    };
+    users.users.lilijoy.extraGroups = ["tss"];
 
-  # tpm
-  security.tpm2 = {
-    enable = true;
-    pkcs11.enable = true;
-    tctiEnvironment.enable = true;
-    tssUser = "lilijoy";
-  };
-  users.users.lilijoy.extraGroups = ["tss"];
+    # udev rules for tpm-fido
+    services.udev.extraRules = ''
+      KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
+    '';
+    boot.kernelModules = ["uhid"];
 
-  # udev rules for tpm-fido
-  services.udev.extraRules = ''
-    KERNEL=="uhid", SUBSYSTEM=="misc", GROUP="tss", MODE="0660"
-  '';
-  boot.kernelModules = ["uhid"];
-
-# tpm-fido service
+    # tpm-fido service
     systemd.user.services.tpm-fido = {
       enable = true;
       wantedBy = ["default.target"];

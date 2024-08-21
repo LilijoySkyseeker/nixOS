@@ -19,17 +19,28 @@
       alejandra
       rsync
       sops # secrets management
+      flac
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+
+  # tweaks, credit: https://github.com/headblockhead/dotfiles/blob/61cf195ab5a2f81d0844108b6f242938191622cc/systems/edward-desktop-01/config.nix
+  # set each flake input as registry to make nix3 commands consistent with flake
+  nix.registry = (lib.mapAttrs (_: flake: {inherit flake;})) ((lib.filterAttrs (_: lib.isType "flake")) inputs);
+  # add inupts to legacy channels to make legacy commands consistant with flake
+  nix.nixPath = ["/etc/nix/path"];
+  environment.etc =
+    lib.mapAttrs'
+    (name: value: {
+      name = "nix/path/${name}";
+      value.source = value.flake;
+    })
+    config.nix.registry;
 
   # sops-nix support, secret managment
   sops = {
     defaultSopsFile = ../../secrets/secrets.yaml;
     defaultSopsFormat = "yaml";
   };
-
-  # Set your time zone.
-  time.timeZone = "America/New_York";
 
   # NVIM
   programs.neovim = {
@@ -60,12 +71,12 @@
   networking.firewall.enable = true;
 
   # installed packages lits in /etc/current-system-packages.text
-  environment.etc."current-system-packages".text = let
-    packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
-    sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
-    formatted = builtins.concatStringsSep "\n" sortedUnique;
-  in
-    formatted;
+  # environment.etc."current-packages".text = let
+  #   packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+  #   sortedUnique = builtins.sort builtins.lessThan (pkgs.lib.lists.unique packages);
+  #   formatted = builtins.concatStringsSep "\n" sortedUnique;
+  # in
+  #   formatted;
 
   # Enable Flake Support
   nix.settings.experimental-features = ["nix-command" "flakes"];

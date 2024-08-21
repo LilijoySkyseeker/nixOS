@@ -4,13 +4,12 @@
   # use `nix flake metadata` to see duplicated sources
   inputs = {
     nixkpgs.url = "nixpkgs/nixos-24.05";
-
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
     home-manager.url = "github:nix-community/home-manager/release-24.05";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
-    stylix.url = "github:danth/stylix";
+    stylix.url = "github:danth/stylix/release-24.05";
     stylix.inputs.nixpkgs.follows = "nixpkgs";
     stylix.inputs.home-manager.follows = "home-manager";
 
@@ -33,6 +32,7 @@
     sops-nix,
     disko,
     impermanence,
+    nix-minecraft,
     ...
   }: let
     system = "x86_64-linux";
@@ -44,7 +44,6 @@
         "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
       ];
     };
-
     pkgs = import inputs.nixpkgs {
       inherit system;
       config.allowUnfree = true;
@@ -89,6 +88,7 @@
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
+          nix-minecraft.nixosModules.minecraft-servers
         ];
       };
       #==================================================

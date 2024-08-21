@@ -22,6 +22,14 @@
       # UNSTABLE installed packages
     ]);
 
+  # caps tap as esc
+  home-manager.users.lilijoy.services.xcape = {
+    enable = true;
+    timeout = 200;
+    # mapExpression.Caps_Lock = "Escape";
+    #mapExpression.Control_L = "Escape";
+  };
+
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     hourly = {

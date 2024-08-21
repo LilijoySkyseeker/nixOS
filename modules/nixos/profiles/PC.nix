@@ -75,7 +75,7 @@
   nix.settings.allowed-users = ["@wheel"];
 
   # sops config
-  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ecdsa-sk"];
+  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ed25519"];
   sops.secrets = {
     open_weather_key = {};
     restic = {
@@ -91,6 +91,7 @@
   # Stylix
   stylix = {
     enable = true;
+    autoEnable = true;
     base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
     image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
     polarity = "dark";

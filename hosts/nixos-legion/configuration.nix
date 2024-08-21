@@ -28,6 +28,9 @@
     };
   };
 
+  # Set your time zone.
+  time.timeZone = "America/New_York";
+
   # allow qmk and via
   hardware.keyboard.qmk.enable = true;
 

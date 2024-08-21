@@ -15,6 +15,8 @@
     ../../modules/nixos/profiles/server.nix
 
     ../../services/jellyfin.nix
+    ../../services/minecraft.nix
+    #   ../../services/nextcloud.nix
   ];
 
   # System installed pkgs
@@ -25,12 +27,17 @@
       zfs
       restic
       backblaze-b2
-      beets # music orginization
       btop
+      tmux
+      zellij
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
+      beets # music orginization
     ]);
+
+  # Set your time zone.
+  time.timeZone = "America/New_York";
 
   # networking
   networking.networkmanager = {
@@ -45,20 +52,19 @@
     };
     etc."beetsConfig" = {
       text = ''
+        threaded: no
         directory: /storage/Music
         library: /var/lib/beets/musiclibrary.db
-        plugins: rewrite ftintitle chroma fromfilename edit fetchart lyrics scrub albumtypes missing
+        plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
         paths:
+            comp: Compilations/$label/$year - $album%aunique{}/$track $title
             default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
             singleton: Non-Album/$artist/$title/$title
-            comp: Compilations/$albumartist/$year - $album%aunique{}/$track $title
 
         albumtypes:
             types:
                 - single: 'Singles'
-        ftintitle:
-            format: (feat. {0})
       '';
       target = "/beets/config.yaml";
     };
@@ -66,14 +72,14 @@
 
   # directory permissions
   systemd.tmpfiles.rules = [
-    "d /storage 0770 - multimedia - -"
-    "d /storage-bulk 0770 - multimedia - -"
+    "d /storage 2770 - multimedia - -"
+    "d /storage-bulk 2770 - multimedia - -"
   ];
 
   # caddy
   services.caddy = {
     enable = true;
-    acmeCA = "https://acme.zerossl.com/v2/DV90";
+    #   acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
 
@@ -272,6 +278,8 @@
       AllowStreamLocalForwarding no
       AuthenticationMethods publickey
       PermitTunnel no
+      ClientAliveInterval 60
+      ClientAliveCountMax 5
     '';
     hostKeys = [
       {
