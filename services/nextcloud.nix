@@ -61,7 +61,7 @@
     };
   };
 
-  caddy.routes = [
+  services.caddy.routes = [
     {
       match = [{host = ["nextcloud.skyseekerhomelab.duckdns.org"];}];
       handle = [
