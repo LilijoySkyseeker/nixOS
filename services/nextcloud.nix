@@ -37,7 +37,6 @@
       "opcache.interned_strings_buffer" = "16";
       "output_buffering" = "0";
     };
-    configureRedis = true;
     settings = {
       overwriteprotocol = "https";
     };
