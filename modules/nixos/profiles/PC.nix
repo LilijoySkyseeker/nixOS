@@ -59,7 +59,7 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
-# sshfs for server
+  # sshfs for server
   fileSystems."/home/lilijoy/Server" = {
     device = "multimedia@skyseekerhomelab.duckdns.org:/storage";
     fsType = "sshfs";
