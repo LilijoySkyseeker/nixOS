@@ -79,7 +79,7 @@
   # sshfs user
   users.users.multimedia = {
     isSystemUser = true;
-    extraGroups = ["multimedia"];
+    group = "multimedia";
     openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"];
   };
 
