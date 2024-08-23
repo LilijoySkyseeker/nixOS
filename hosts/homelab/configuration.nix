@@ -76,13 +76,13 @@
     "d /storage-bulk 2770 - multimedia - -"
   ];
 
-  # sshfs user
-  users.users.multimedia = {
-    isSystemUser = true;
-    group = "multimedia";
-    openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"];
-    shell = pkgs.bashInteractive;
-  };
+  # # sshfs user
+  # users.users.multimedia = {
+  #   isSystemUser = true;
+  #   group = "multimedia";
+  #   openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"];
+  #   shell = pkgs.bashInteractive;
+  # };
 
   # caddy
   services.caddy = {
