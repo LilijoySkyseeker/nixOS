@@ -33,7 +33,7 @@
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
-      beets # music orginization
+      #     beets # music orginization
     ]);
 
   # Set your time zone.
@@ -45,30 +45,30 @@
     insertNameservers = ["8.8.8.8" "1.1.1.1"];
   };
 
-  # beets config
-  environment = {
-    variables = {
-      BEETSDIR = "/etc/beets";
-    };
-    etc."beetsConfig" = {
-      text = ''
-        threaded: no
-        directory: /storage/Music
-        library: /var/lib/beets/musiclibrary.db
-        plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
+  # # beets config
+  # environment = {
+  #   variables = {
+  #     BEETSDIR = "/etc/beets";
+  #   };
+  #   etc."beetsConfig" = {
+  #     text = ''
+  #       threaded: no
+  #       directory: /storage/Music
+  #       library: /var/lib/beets/musiclibrary.db
+  #       plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
 
-        paths:
-            comp: Compilations/$label/$year - $album%aunique{}/$track $title
-            default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
-            singleton: Non-Album/$artist/$title/$title
+  #       paths:
+  #           comp: Compilations/$label/$year - $album%aunique{}/$track $title
+  #           default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
+  #           singleton: Non-Album/$artist/$title/$title
 
-        albumtypes:
-            types:
-                - single: 'Singles'
-      '';
-      target = "/beets/config.yaml";
-    };
-  };
+  #       albumtypes:
+  #           types:
+  #               - single: 'Singles'
+  #     '';
+  #     target = "/beets/config.yaml";
+  #   };
+  # };
 
   # directory permissions
   systemd.tmpfiles.rules = [
