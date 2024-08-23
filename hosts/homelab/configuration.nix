@@ -16,7 +16,7 @@
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
-    ../../services/nextcloud.nix
+    #   ../../services/nextcloud.nix
   ];
 
   # System installed pkgs
@@ -75,6 +75,13 @@
     "d /storage 2770 - multimedia - -"
     "d /storage-bulk 2770 - multimedia - -"
   ];
+
+  # sshfs user
+  users.users.multimedia = {
+    isNormalUser = false;
+    extraGroups = ["multimedia"];
+    openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"];
+  };
 
   # caddy
   services.caddy = {

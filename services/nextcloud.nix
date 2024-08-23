@@ -59,6 +59,12 @@
       owner = "nextcloud";
       group = "nextcloud";
     };
+
+    options.caddy.routes = lib.mkOption {
+      type = lib.types.listOf lib.types.attrs;
+      description = "Caddy JSON routes for http servers";
+      default = [];
+    };
   };
 
   services.caddy.routes = [
