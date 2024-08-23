@@ -59,6 +59,28 @@
     ])
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+# sshfs for server
+  fileSystems."/home/lilijoy/Server" = {
+    device = "multimedia@skyseekerhomelab.duckdns.org:/storage";
+    fsType = "sshfs";
+    options = [
+      "nodev"
+      "noatime"
+      "allow_other"
+      "IdentityFile=/home/lilijoy/.ssh/id_ed25519"
+    ];
+  };
+  fileSystems."/home/lilijoy/Server-bulk" = {
+    device = "multimedia@skyseekerhomelab.duckdns.org:/storage-bulk";
+    fsType = "sshfs";
+    options = [
+      "nodev"
+      "noatime"
+      "allow_other"
+      "IdentityFile=/home/lilijoy/.ssh/id_ed25519"
+    ];
+  };
+
   # tpm-fido
   tpm-fido.enable = true;
 
