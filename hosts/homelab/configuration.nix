@@ -338,6 +338,7 @@
       "/etc/beets"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
+      "/var/lib/nixos"
     ];
     files = [
       "/etc/machine-id"
