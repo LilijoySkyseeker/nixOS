@@ -338,7 +338,7 @@
       "/etc/beets"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
-      "/var/lib/nixos"
+      "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
     ];
     files = [
       "/etc/machine-id"

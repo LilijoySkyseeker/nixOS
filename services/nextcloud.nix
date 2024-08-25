@@ -40,7 +40,7 @@
 
   # caddy
   services.caddy.virtualHosts."nextcloud.skyseekerhomelab.duckdns.org".extraConfig = ''
-    reverse_proxy localhost:800
+    reverse_proxy localhost:8080
   '';
   # services.nginx = {
   #   defaultHTTPListenPort = 8080;
