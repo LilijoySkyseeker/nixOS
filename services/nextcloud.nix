@@ -11,8 +11,8 @@
     configureRedis = true;
     home = "/srv/nextcloud";
     database.createLocally = true;
-    https = true;
-    hostName = "localhost";
+    #   https = true;
+    hostName = "nextcloud.skyseekerhomelab.duckdns.org";
     maxUploadSize = "128G";
     config = {
       adminuser = "admin";
@@ -27,14 +27,14 @@
       loglevel = 1; # Include all actions in the log
     };
     autoUpdateApps.enable = true;
-    extraAppsEnable = true;
-    extraApps = with config.services.nextcloud.package.packages.apps; {
-      # List of apps we want to install and are already packaged in
-      # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
-      inherit calendar contacts;
-    };
+    #   extraAppsEnable = true;
+    #   extraApps = with config.services.nextcloud.package.packages.apps; {
+    #     # List of apps we want to install and are already packaged in
+    #     # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
+    #     inherit calendar contacts;
+    #   };
     settings = {
-      overwriteprotocol = "https";
+      #     overwriteprotocol = "https";
     };
   };
 
@@ -42,9 +42,15 @@
   services.caddy.virtualHosts."nextcloud.skyseekerhomelab.duckdns.org".extraConfig = ''
     reverse_proxy localhost:800
   '';
-  services.nginx = {
-    defaultHTTPListenPort = 8080;
-  };
+  # services.nginx = {
+  #   defaultHTTPListenPort = 8080;
+  # };
+  services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [
+    {
+      addr = "localhost";
+      port = 8080;
+    }
+  ];
 
   systemd.tmpfiles.rules = [
     "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
