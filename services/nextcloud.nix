@@ -12,7 +12,7 @@
     home = "/srv/nextcloud";
     database.createLocally = true;
     #   https = true;
-    hostName = "nextcloud.skyseekerhomelab.duckdns.org";
+    hostName = "localhost";
     maxUploadSize = "128G";
     config = {
       adminuser = "admin";
@@ -27,7 +27,7 @@
       loglevel = 1; # Include all actions in the log
     };
     autoUpdateApps.enable = true;
-    #   extraAppsEnable = true;
+    extraAppsEnable = true;
     #   extraApps = with config.services.nextcloud.package.packages.apps; {
     #     # List of apps we want to install and are already packaged in
     #     # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
