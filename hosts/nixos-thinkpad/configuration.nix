@@ -22,13 +22,21 @@
       # UNSTABLE installed packages
     ]);
 
-  # caps tap as esc
-  home-manager.users.lilijoy.services.xcape = {
-    enable = true;
-    timeout = 200;
-    # mapExpression.Caps_Lock = "Escape";
-    #mapExpression.Control_L = "Escape";
+    services.keyd = {
+      enable = true;
+      keyboards.default = {
+         main = {
+    capslock = "overload(control, esc)";
+    rightalt = "layer(rightalt)";
   };
+  rightalt = {
+    h = "left";
+    j = "down";
+    k = "up";
+    l = "right";
+  };
+      };
+    };
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
