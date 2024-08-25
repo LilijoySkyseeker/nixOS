@@ -22,21 +22,21 @@
       # UNSTABLE installed packages
     ]);
 
-    services.keyd = {
-      enable = true;
-      keyboards.default = {
-         main = {
-    capslock = "overload(control, esc)";
-    rightalt = "layer(rightalt)";
-  };
-  rightalt = {
-    h = "left";
-    j = "down";
-    k = "up";
-    l = "right";
-  };
+  services.keyd = {
+    enable = true;
+    keyboards.default.settings = {
+      main = {
+        capslock = "overload(control, esc)";
+        rightalt = "layer(rightalt)";
+      };
+      rightalt = {
+        h = "left";
+        j = "down";
+        k = "up";
+        l = "right";
       };
     };
+  };
 
   # restic test https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
