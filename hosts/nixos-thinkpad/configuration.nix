@@ -27,13 +27,122 @@
     keyboards.default.settings = {
       main = {
         capslock = "overload(control, esc)";
-        rightalt = "layer(rightalt)";
+        rightalt = "overload(navigation, backspace)";
+        leftalt = "layer(navigation)";
+        leftcontrol = "leftalt";
+        esc = "layer(esc)";
       };
-      rightalt = {
+      navigation = {
         h = "left";
         j = "down";
         k = "up";
         l = "right";
+        
+        ";" = "%";
+        "," = "^";
+        "." = "$";
+
+        leftshift = "timeout(<, 200, >)";
+        z = "timeout([, 200, ])";
+        x = "timeout({, 200, })";
+        c = "timeout(\(, 200, \))";
+
+        g = "=";
+
+        w = "~";
+        e = "#";
+        r = "|";
+        u = "@";
+        i = "\\";
+        o = "`";
+
+        a = "oneshot(alt)";
+        s = "oneshot(meta)";
+        d = "oneshot(control)";
+        f = "oneshot(shift)";
+
+        leftalt = "layer(numbers)";
+        rightalt = "overload(numbers, backspace)";
+      };
+      numbers = {
+        j = "0";
+        m = "1";
+        "," = "2";
+        "." = "3";
+        k = "4";
+        l = "5";
+        "\;" = "6";
+        u = "7";
+        i = "8";
+        o = "9";
+      };
+      colemak = {
+        q = "q";
+        w = "w";
+        e = "f";
+        r = "p";
+        t = "b";
+        y = "j";
+        u = "l";
+        i = "u";
+        o = "y";
+        p = ";";
+        a = "a";
+        s = "r";
+        d = "s";
+        f = "t";
+        g = "g";
+        h = "m";
+        j = "n";
+        k = "e";
+        l = "i";
+        ";" = "o";
+        z = "x";
+        x = "c";
+        c = "d";
+        v = "v";
+        b = "z";
+        n = "k";
+        m = "h";
+      };
+      handsdown = {
+        q = "timeout(j, 200, z)";
+        w = "timeout(g, 200, q)";
+        e = "m";
+        r = "p";
+        t = "v";
+        y = "timeout(;, 200, :)";
+        u = "timeout(., 200, &)";
+        i = "timeout(\/, 200, *)";
+        o = "timeout(\", 200, ?)";
+        p = "timeout(\', 200, !)";
+        a = "r";
+        s = "s";
+        d = "n";
+        f = "d";
+        g = "b";
+        h = "timeout(\,, 200, \_)";
+        j = "a";
+        k = "e";
+        l = "i";
+        ";" = "h";
+        leftshift = "x";
+        z = "f";
+        x = "l";
+        c = "c";
+        v = "w";
+        b = "noop";
+        n = "timeout(\-, 200, \+)";
+        m = "u";
+        "," = "o";
+        "." = "y";
+        "\/" = "k";
+        leftalt = "overload(navigation, t)";
+      };
+      esc = {
+        q = "toggle(main)";
+        c = "toggle(colemak)";
+        h = "toggle(handsdown)";
       };
     };
   };
