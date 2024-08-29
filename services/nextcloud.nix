@@ -8,7 +8,7 @@
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud29;
-    datadir = "/srv/nextcloud";
+    #   home = "/srv/nextcloud";
     hostName = "nextcloud";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
@@ -63,7 +63,7 @@
   ];
 
   systemd.tmpfiles.rules = [
-    "d ${config.services.nextcloud.datadir} 0770 nextcloud nextcloud - -"
+    "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
   ];
 
   sops.secrets.nextcloud_admin_pass = {
@@ -81,7 +81,7 @@
   # persistence
   environment.persistence."/nix/state".directories = [
     {
-      directory = config.services.nextcloud.datadir;
+      directory = config.services.nextcloud.home;
       user = "nextcloud";
       group = "nextcloud";
     }
