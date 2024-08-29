@@ -8,8 +8,8 @@
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud29;
-    home = "/srv/nextcloud";
-    hostName = "localhost";
+    #   home = "/srv/nextcloud";
+    hostName = "nextcloud";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
@@ -82,7 +82,8 @@
   environment.persistence."/nix/state".directories = [
     {
       directory = config.services.nextcloud.home;
-      #       inherit user group;
+      user = "nextcloud";
+      group = "nextcloud";
     }
   ];
 }
