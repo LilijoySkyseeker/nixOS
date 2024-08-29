@@ -8,7 +8,7 @@
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud29;
-    #   home = "/srv/nextcloud";
+    home = "/srv/nextcloud";
     hostName = "nextcloud";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
