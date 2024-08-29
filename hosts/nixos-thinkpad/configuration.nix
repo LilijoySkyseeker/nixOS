@@ -24,6 +24,7 @@
 
   services.keyd = {
     enable = true;
+    keyboards.default.ids = ["0001:0001"];
     keyboards.default.settings = {
       main = {
         capslock = "overload(control, esc)";
@@ -56,8 +57,8 @@
         i = "\\";
         o = "`";
 
-        a = "oneshot(alt)";
-        s = "oneshot(meta)";
+        a = "oneshot(meta)";
+        s = "oneshot(alt)";
         d = "oneshot(control)";
         f = "oneshot(shift)";
 
