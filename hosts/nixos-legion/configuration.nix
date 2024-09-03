@@ -19,6 +19,11 @@
     (with pkgs; [cura]) # STABLE installed packages
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+    # udev rules for vial
+    services.udev.extraRules = ''
+      KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
+    '';
+
   # Home Manager
   home-manager.users.lilijoy.dconf.settings = {
     "org/gnome/shell/extensions/tiling-assistant" = {
