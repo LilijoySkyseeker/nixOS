@@ -12,6 +12,9 @@
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
+    extensions = with pkgs.freshrss-extensions; [
+      reddit-image
+    ];
   };
 
   # rss-bridge
