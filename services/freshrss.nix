@@ -5,26 +5,25 @@
   lib,
   ...
 }: {
-
   # fseshrss
   services.freshrss = {
     enable = true;
     baseUrl = "freshrss.skyseekerlabs.duckdns.org";
     dataDir = "/srv/freshrss";
-    
-    extensions = with freshrss-extensions; [
-      auto-tll 
+
+    extensions = with pkgs.freshrss-extensions; [
+      auto-tll
     ];
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
   };
 
-# directory permissions
+  # directory permissions
   systemd.tmpfiles.rules = [
     "d ${config.services.freshrss.dataDir} 0770 freshrss - - -"
   ];
 
-# admin password
+  # admin password
   sops.secrets.freshrss_admin_pass = {
     owner = "freshrss";
     group = "freshrss";
