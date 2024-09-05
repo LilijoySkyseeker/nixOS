@@ -26,7 +26,7 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."jellyfin.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."freshrss.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8081
   '';
 
