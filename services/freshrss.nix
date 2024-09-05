@@ -50,7 +50,7 @@
   environment.persistence."/nix/state".directories = with config.services.freshrss; [
     {
       directory = dataDir;
-      inherit user group;
+      inherit user;
     }
   ];
 }
