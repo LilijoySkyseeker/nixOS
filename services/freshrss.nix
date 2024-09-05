@@ -8,7 +8,7 @@
   # fseshrss
   services.freshrss = {
     enable = true;
-    baseUrl = "freshrss.skyseekerlabs.duckdns.org";
+    baseUrl = "freshrss.skyseekerhomelab.duckdns.org";
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
@@ -26,7 +26,7 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."freshrss.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."freshrss.skyseekerhomelab.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8081
   '';
 
