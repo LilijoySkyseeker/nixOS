@@ -5,7 +5,7 @@
   inputs,
   lib,
   ...
-} @ args: {
+}: {
   disabledModules = ["nixos/modules/services/web-apps/freshrss.nix"];
   imports = [
     "${args.inputs.nixpkgs-unstable}/path/to/module.nix"
