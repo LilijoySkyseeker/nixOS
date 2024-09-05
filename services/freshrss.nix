@@ -8,7 +8,7 @@
   # fseshrss
   services.freshrss = {
     enable = true;
-    #   baseUrl = "freshrss.skyseekerlabs.duckdns.org";
+    baseUrl = "";
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
