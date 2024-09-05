@@ -17,8 +17,8 @@
   # rss-bridge
   services.rss-bridge = {
     enable = true;
-    user = "rss-bridge";
-    group = "rss-bridge";
+    #   user = "rss-bridge";
+    #   group = "rss-bridge";
     dataDir = "/srv/rss-bridge";
     config = {
       system.enabled_bridges = ["*"];
