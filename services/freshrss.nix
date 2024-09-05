@@ -11,9 +11,7 @@
     baseUrl = "freshrss.skyseekerlabs.duckdns.org";
     dataDir = "/srv/freshrss";
 
-    extensions = with pkgs.freshrss-extensions; [
-      auto-tll
-    ];
+    extensions = [pkgs.freshrss-extensions.auto-tll];
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
   };
