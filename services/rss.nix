@@ -8,7 +8,7 @@
 }: {
   disabledModules = ["nixos/modules/services/web-apps/freshrss.nix"];
   imports = [
-    "${nixpkgs-unstable}/nixos/modules/services/web-apps/freshrss.nix"
+    "${pkgs-unstable}/nixos/modules/services/web-apps/freshrss.nix"
   ];
 
   # fseshrss
