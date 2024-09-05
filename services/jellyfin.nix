@@ -24,7 +24,7 @@
   ];
 
   # caddy
-  services.caddy.virtualHosts."jellyfin.skyseekerhomelab.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."jellyfin.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8096
   '';
   networking.firewall.allowedTCPPorts = [
