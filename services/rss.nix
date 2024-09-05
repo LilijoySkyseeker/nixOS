@@ -74,11 +74,13 @@
   environment.persistence."/nix/state".directories = [
     {
       directory = config.services.freshrss.dataDir;
-      inherit user;
+      user = "freshrss";
+      group = "freshrss";
     }
     {
       directory = config.services.rss-bridge.dataDir;
-      inherit user group;
+      user = "rss-bridge";
+      group = "rss-bridge";
     }
   ];
 }
