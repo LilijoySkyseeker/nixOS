@@ -28,7 +28,6 @@
       nixos-anywhere
       ssh-to-age
       rclone
-      nix-alien
 
       yubikey-manager
 

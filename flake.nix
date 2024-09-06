@@ -21,9 +21,6 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
-
-    nix-alien.url = "github:thiagokokada/nix-alien";
-    nix-alien.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {
@@ -35,7 +32,6 @@
     sops-nix,
     disko,
     impermanence,
-    nix-alien,
     ...
   }: let
     system = "x86_64-linux";
@@ -81,7 +77,6 @@
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
-          nix-alien.nixosModules.nix-alien
         ];
       };
       #==================================================
