@@ -81,6 +81,7 @@
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
+          nix-alien.nixosModules.nix-alien
         ];
       };
       #==================================================
