@@ -6,7 +6,7 @@
   lib,
   ...
 }: {
-  disabledModules = ["nixos/modules/services/web-apps/default.nix"];
+  disabledModules = ["services/web-apps/freshrss.nix"];
   imports = [
     "${inputs.nixpkgs-unstable}/nixos/modules/services/web-apps/freshrss.nix"
   ];
