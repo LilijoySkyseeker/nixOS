@@ -20,6 +20,7 @@
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
     extensions = with pkgs-unstable.freshrss-extensions; [
       reddit-image
+      youtube
     ];
   };
 
