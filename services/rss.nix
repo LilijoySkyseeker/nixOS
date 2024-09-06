@@ -6,14 +6,14 @@
   lib,
   ...
 }: {
-  disabledModules = ["nixos/modules/services/web-apps/freshrss.nix"];
+  disabledModules = ["nixos/modules/services/web-apps/default.nix"];
   imports = [
     "${inputs.nixpkgs-unstable}/nixos/modules/services/web-apps/freshrss.nix"
   ];
 
   # fseshrss
   services.freshrss = {
-    enable = lib.mkForce true;
+    enable = true;
     baseUrl = "";
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
