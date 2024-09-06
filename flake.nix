@@ -93,7 +93,6 @@
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
-          nix-minecraft.nixosModules.minecraft-servers
         ];
       };
       #==================================================
