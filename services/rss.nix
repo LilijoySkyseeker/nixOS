@@ -13,7 +13,7 @@
 
   # fseshrss
   services.freshrss = {
-    enable = true;
+    enable = lib.mkForce true;
     baseUrl = "";
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
