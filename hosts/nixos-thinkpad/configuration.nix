@@ -46,7 +46,7 @@
         leftshift = "timeout(<, 200, >)";
         z = "timeout([, 200, ])";
         x = "timeout({, 200, })";
-        c = "timeout(\(, 200, \))";
+        c = "timeout((, 200, ))";
 
         g = "=";
 
@@ -122,7 +122,7 @@
         d = "n";
         f = "d";
         g = "b";
-        h = "timeout(\,, 200, \_)";
+        h = "timeout(\,, 200, _)";
         j = "a";
         k = "e";
         l = "i";
@@ -133,7 +133,7 @@
         c = "c";
         v = "w";
         b = "noop";
-        n = "timeout(\-, 200, \+)";
+        n = "timeout(-, 200, +)";
         m = "u";
         "," = "o";
         "." = "y";
@@ -141,9 +141,8 @@
         leftalt = "overload(navigation, t)";
       };
       esc = {
-        q = "toggle(main)";
-        c = "toggle(colemak)";
-        h = "toggle(handsdown)";
+        "1" = "toggle(colemak)";
+        "2" = "toggle(handsdown)";
       };
     };
   };

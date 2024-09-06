@@ -21,6 +21,9 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
+
+    nix-alien.url = "github:thiagokokada/nix-alien";
+    nix-alien.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {
@@ -32,7 +35,7 @@
     sops-nix,
     disko,
     impermanence,
-    nix-minecraft,
+    nix-alien,
     ...
   }: let
     system = "x86_64-linux";
