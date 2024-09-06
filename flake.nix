@@ -84,6 +84,7 @@
       homelab = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
+          inputs = inputs;
         };
         modules = [
           ./hosts/homelab/configuration.nix
