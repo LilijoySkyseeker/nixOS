@@ -21,6 +21,9 @@
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
+     
+  # update microcode
+  hardware.cpu.intel.updateMicrocode = true;
 
   services.keyd = {
     enable = true;

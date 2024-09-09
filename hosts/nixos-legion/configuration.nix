@@ -19,6 +19,9 @@
     (with pkgs; [cura]) # STABLE installed packages
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # update microcode
+  hardware.cpu.intel.updateMicrocode = true;
+
   # udev rules for vial
   services.udev.extraRules = ''
     KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"

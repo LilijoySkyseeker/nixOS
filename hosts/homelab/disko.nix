@@ -98,7 +98,7 @@
           mountpoint = "none";
           canmount = "off";
           devices = "off";
-          sync = "disabled";  
+          sync = "disabled";
           "com.sun:auto-snapshot" = "false";
         };
         options.ashift = "12"; # IMPORTANT
@@ -131,7 +131,7 @@
           mountpoint = "none";
           canmount = "off";
           devices = "off";
-          sync = "disabled"; 
+          sync = "disabled";
           "com.sun:auto-snapshot" = "false";
         };
         options.ashift = "12"; # IMPORTANT
@@ -203,7 +203,7 @@
           canmount = "off";
           compression = "lz4";
           devices = "off";
-          sync = "disabled"; 
+          sync = "disabled";
           "com.sun:auto-snapshot" = "false";
         };
         options.ashift = "12"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE

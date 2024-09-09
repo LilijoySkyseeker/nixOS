@@ -37,6 +37,9 @@
       #     beets # music orginization
     ]);
 
+  # update microcode
+  hardware.cpu.intel.updateMicrocode = true;
+
   # Set your time zone.
   time.timeZone = "America/New_York";
 
