@@ -55,7 +55,7 @@
       r2modman
       yubioath-flutter
 
-      discord
+      vesktop
       obsidian
       spotify
     ])
