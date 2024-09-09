@@ -32,7 +32,6 @@
     sops-nix,
     disko,
     impermanence,
-    nix-minecraft,
     ...
   }: let
     system = "x86_64-linux";
@@ -91,7 +90,6 @@
           sops-nix.nixosModules.sops
           disko.nixosModules.disko
           impermanence.nixosModules.impermanence
-          nix-minecraft.nixosModules.minecraft-servers
         ];
       };
       #==================================================
