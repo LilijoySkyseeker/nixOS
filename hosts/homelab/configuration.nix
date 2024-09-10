@@ -207,7 +207,7 @@
         frequent_period = 1;
         frequently = 59;
         hourly = 24;
-        daily = 0;
+        daily = 1;
         weekly = 0;
         monthly = 0;
         yearly = 0;
@@ -221,9 +221,9 @@
       template_backup = {
         frequently = 0;
         hourly = 168;
-        daily = 32;
+        daily = 366;
         weekly = 0;
-        monthly = 12;
+        monthly = 0;
         yearly = 0;
         autosnap = "no";
         autoprune = "yes";
