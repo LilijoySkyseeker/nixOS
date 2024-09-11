@@ -2,8 +2,6 @@
   config,
   pkgs,
   pkgs-unstable,
-  inputs,
-  lib,
   ...
 }: {
   imports = [
@@ -81,7 +79,4 @@
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
   # ===============================================================================================
-
-  # State Version for first install, don't touch
-  system.stateVersion = "23.11";
 }

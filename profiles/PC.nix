@@ -56,8 +56,8 @@
       vlc
       r2modman
       yubioath-flutter
-
       vesktop
+
       obsidian
       spotify
     ])

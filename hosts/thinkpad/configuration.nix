@@ -2,9 +2,7 @@
   config,
   pkgs,
   pkgs-unstable,
-  inputs,
   lib,
-  vars,
   ...
 }: {
   imports = [
@@ -241,7 +239,4 @@
 
   # Fix Clickpad Bug
   boot.kernelParams = ["psmouse.synaptics_intertouch=0"];
-
-  # State Version for first install, don't touch
-  system.stateVersion = "23.11";
 }

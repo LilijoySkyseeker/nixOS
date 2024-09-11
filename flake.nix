@@ -25,6 +25,10 @@
     nixvim.url = "github:nix-community/nixvim/nixos-24.05";
     nixvim.inputs.nixpkgs.follows = "nixpkgs";
     nixvim.inputs.home-manager.follows = "home-manager";
+
+    nix-on-droid.url = "github:nix-community/nix-on-droid/release-24.05";
+    nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
+    nix-on-droid.inputs.home-manager.follows = "home-manager";
   };
 
   outputs = inputs @ {
@@ -37,6 +41,7 @@
     disko,
     impermanence,
     nixvim,
+    nix-on-droid,
     ...
   }: let
     system = "x86_64-linux";
@@ -98,6 +103,18 @@
         ];
       };
       #==================================================
+      nixOnDroidConfigurations.default = nix-on-droid.lib.nixOnDroidConfiguration {
+        modules = [
+          ./hosts/android/configuration.nix
+        ];
+        pkgs = import nixpkgs {
+          system = "aarch64-linux";
+          config.allowUnfree = true;
+          overlays = [
+            nix-on-droid.overlays.default
+          ];
+        };
+      };
     };
   };
 }
