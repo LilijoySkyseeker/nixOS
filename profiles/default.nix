@@ -8,6 +8,7 @@
 }: {
   imports = [
     inputs.sops-nix.nixosModules.sops
+    ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages =
     (with pkgs; [
@@ -46,10 +47,10 @@
   };
 
   # NVIM
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-  };
+# programs.neovim = {
+#   enable = true;
+#   defaultEditor = true;
+# };
 
   # auto gc with nh
   programs.nh = {

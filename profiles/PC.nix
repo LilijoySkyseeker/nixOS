@@ -10,7 +10,6 @@
   imports = [
     inputs.home-manager.nixosModules.home-manager
     inputs.stylix.nixosModules.stylix
-    inputs.nixvim.nixosModules.nixvim
     ../modules/nixos/virtual-machines.nix #(also needs home manager config)
     ./default.nix
     ../custom-packages/tpm-fido/package.nix
@@ -25,7 +24,6 @@
       ripgrep
       gitFull
       nvtopPackages.full
-      xclip # for nvim clipboard
       gjs # for kdeconnect
       restic # backups
       fd
@@ -209,73 +207,6 @@
           enable = true;
           enableBashIntegration = false;
           enableFishIntegration = false;
-        };
-
-        # NVIM
-        programs.neovim = {
-          enable = true;
-          defaultEditor = true;
-          viAlias = true;
-          vimAlias = true;
-          vimdiffAlias = true;
-          extraConfig = ''
-            nmap j gj
-            nmap k gk
-            nmap H ^
-            nmap L $
-
-            xnoremap p pgvy
-
-            syntax on
-
-            set fileformat=unix
-            set encoding=UTF-8
-
-            au BufNewFile,BufRead *.py
-            \ set tabstop=4 |
-            \ set softtabstop=4 |
-            \ set shiftwidth=4 |
-
-            set tabstop=2
-            set softtabstop=2
-            set shiftwidth=2
-            set autoindent
-            set smartindent
-            set smarttab
-            set expandtab
-
-            set list
-            set listchars=tab:>-,trail:~,extends:>,precedes:<
-
-            set cursorline
-            set number
-            set scrolloff=8
-            set signcolumn=number
-
-            "      set relativenumber
-
-            set showcmd
-            set noshowmode
-            set conceallevel=1
-
-            set noerrorbells visualbell t_vb=
-            set noswapfile
-            set nobackup
-            set undodir=~/.config/nvim/undodir
-            set undofile
-            set clipboard=unnamed
-            set clipboard=unnamedplus
-
-            set ignorecase
-            set smartcase
-            set incsearch
-            set hlsearch
-
-            set mouse=a
-
-            set foldmethod=indent
-            set nofoldenable
-          '';
         };
 
         # GNOME config: Use 'dconf watch /'
