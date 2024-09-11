@@ -184,9 +184,9 @@
               ";
           };
           shellAliases = {
-            e = "eza --group-directories-first --header --git --icons --all --long --mounts";
-            et = "eza --tree --group-directories-first --header --git --icons --all --long --mounts";
-            etl = "eza --tree --group-directories-first --header --git --icons --all --long --mounts --level";
+            e = "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+            et = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+            etl = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
           };
           shellAbbrs = {
             rsync = "rsync --verbose --recursive --progress --human-readable";
