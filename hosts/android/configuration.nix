@@ -4,13 +4,15 @@
   ...
 }: {
   imports = [
-    ../../profiles/default.nix
+    ../../modules/nixos/nixvim.nix
   ];
 
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages
+      git
+      neovim
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
