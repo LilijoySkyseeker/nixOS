@@ -4,6 +4,7 @@
   pkgs-unstable,
   inputs,
   lib,
+  vars,
   ...
 }: {
   imports = [
