@@ -21,6 +21,9 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
+
+    nixvim.url = "github:nix-community/nixvim/nixos-24.05";
+    nixvim.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {
@@ -32,6 +35,7 @@
     sops-nix,
     disko,
     impermanence,
+    nixvim,
     ...
   }: let
     system = "x86_64-linux";
@@ -65,6 +69,7 @@
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
+          nixvim.nixosModules.nixvim
         ];
       };
       #==================================================
@@ -77,6 +82,7 @@
           home-manager.nixosModules.home-manager
           stylix.nixosModules.stylix
           sops-nix.nixosModules.sops
+          nixvim.nixosModules.nixvim
         ];
       };
       #==================================================
