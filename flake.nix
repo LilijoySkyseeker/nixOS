@@ -24,6 +24,7 @@
 
     nixvim.url = "github:nix-community/nixvim/nixos-24.05";
     nixvim.inputs.nixpkgs.follows = "nixpkgs";
+    nixvim.inputs.home-manager.follows = "home-manager";
   };
 
   outputs = inputs @ {
