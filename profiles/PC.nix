@@ -63,7 +63,7 @@
     ])
     ++ (with pkgs-unstable; [
       feishin
-  ]); # UNSTABLE installed packages
+    ]); # UNSTABLE installed packages
 
   # home-manager
   home-manager = {

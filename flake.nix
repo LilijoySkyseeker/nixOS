@@ -102,19 +102,20 @@
           ./hosts/isoimage/configuration.nix
         ];
       };
-      #==================================================
-      nixOnDroidConfigurations.default = nix-on-droid.lib.nixOnDroidConfiguration {
-        modules = [
-          ./hosts/android/configuration.nix
+    };
+    #==================================================
+    nixOnDroidConfigurations.default = nix-on-droid.lib.nixOnDroidConfiguration {
+      modules = [
+        ./hosts/android/configuration.nix
+      ];
+      pkgs = import nixpkgs {
+        system = "aarch64-linux";
+        config.allowUnfree = true;
+        overlays = [
+          nix-on-droid.overlays.default
         ];
-        pkgs = import nixpkgs {
-          system = "aarch64-linux";
-          config.allowUnfree = true;
-          overlays = [
-            nix-on-droid.overlays.default
-          ];
-        };
       };
     };
+    #==================================================
   };
 }

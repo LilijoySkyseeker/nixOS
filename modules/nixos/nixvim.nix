@@ -1,14 +1,11 @@
-{
-  inputs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.nixvim.nixosModules.nixvim
   ];
-  
-# nixvim config
+
+  # nixvim config
   programs.nixvim = {
-  	enable = true;
+    enable = true;
     clipboard.providers.xclip.enable = true;
     clipboard.register = "unnamedplus";
     globals.mapleader = " ";

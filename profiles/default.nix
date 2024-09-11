@@ -25,21 +25,21 @@
       sops # secrets management
     ])
     ++ (with pkgs-unstable; [
-# UNSTABLE installed packages
-    ]); 
+      # UNSTABLE installed packages
+    ]);
 
-    # tweaks, credit: https://github.com/headblockhead/dotfiles/blob/61cf195ab5a2f81d0844108b6f242938191622cc/systems/edward-desktop-01/config.nix
-    # set each flake input as registry to make nix3 commands consistent with flake
-    nix.registry = (lib.mapAttrs (_: flake: {inherit flake;})) ((lib.filterAttrs (_: lib.isType "flake")) inputs);
-    # add inupts to legacy channels to make legacy commands consistant with flake
-    nix.nixPath = ["/etc/nix/path"];
-    environment.etc =
-      lib.mapAttrs'
-      (name: value: {
-        name = "nix/path/${name}";
-        value.source = value.flake;
-      })
-      config.nix.registry;
+  # tweaks, credit: https://github.com/headblockhead/dotfiles/blob/61cf195ab5a2f81d0844108b6f242938191622cc/systems/edward-desktop-01/config.nix
+  # set each flake input as registry to make nix3 commands consistent with flake
+  nix.registry = (lib.mapAttrs (_: flake: {inherit flake;})) ((lib.filterAttrs (_: lib.isType "flake")) inputs);
+  # add inupts to legacy channels to make legacy commands consistant with flake
+  nix.nixPath = ["/etc/nix/path"];
+  environment.etc =
+    lib.mapAttrs'
+    (name: value: {
+      name = "nix/path/${name}";
+      value.source = value.flake;
+    })
+    config.nix.registry;
 
   # sops-nix support, secret managment
   sops = {

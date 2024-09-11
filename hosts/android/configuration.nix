@@ -23,15 +23,11 @@
     useUserPackages = true;
     config = {
       home.stateVersion = "24.05";
-
     };
   };
-     
-  # Define your hostname.
-  networking.hostName = "Android";
-  
+
   # backup instead of fail
- environment.etcBackupExtension = ".bak";
+  environment.etcBackupExtension = ".bak";
 
   # Set your time zone
   time.timeZone = "America/New_York";
