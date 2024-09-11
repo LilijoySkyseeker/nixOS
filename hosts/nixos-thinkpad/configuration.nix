@@ -9,8 +9,7 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../modules/nixos/profiles/PC.nix
-    ../../modules/home-manager/profiles/PC.nix
+    ../../profiles/PC.nix
   ];
 
   # System installed pkgs
