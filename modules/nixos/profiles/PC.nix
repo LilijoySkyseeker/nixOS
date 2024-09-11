@@ -59,7 +59,9 @@
       obsidian
       spotify
     ])
-    ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+    ++ (with pkgs-unstable; [
+      feishin
+  ]); # UNSTABLE installed packages
 
   # tpm-fido
   tpm-fido.enable = true;
