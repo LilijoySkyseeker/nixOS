@@ -41,7 +41,7 @@
   hardware.keyboard.qmk.enable = true;
 
   # Define your hostname.
-  networking.hostName = "nixos-legion";
+  networking.hostName = "legion";
 
   # Set extra groups
   users.users.lilijoy.extraGroups = ["docker"];

@@ -186,7 +186,7 @@
   #    };
 
   # Define your hostname.
-  networking.hostName = "nixos-thinkpad";
+  networking.hostName = "thinkpad";
 
   # Set extra groups
   users.users.lilijoy.extraGroups = ["docker"];

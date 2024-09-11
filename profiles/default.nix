@@ -6,6 +6,9 @@
   lib,
   ...
 }: {
+  imports = [
+    inputs.sops-nix.nixosModules.sops
+  ];
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages

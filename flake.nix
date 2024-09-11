@@ -61,29 +61,21 @@
   in {
     nixosConfigurations = {
       #==================================================
-      nixos-legion = nixpkgs.lib.nixosSystem {
+      legion = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
-          ./hosts/nixos-legion/configuration.nix
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          sops-nix.nixosModules.sops
-          nixvim.nixosModules.nixvim
+          ./hosts/legion/configuration.nix
         ];
       };
       #==================================================
-      nixos-thinkpad = nixpkgs.lib.nixosSystem {
+      thinkpad = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
-          ./hosts/nixos-thinkpad/configuration.nix
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          sops-nix.nixosModules.sops
-          nixvim.nixosModules.nixvim
+          ./hosts/thinkpad/configuration.nix
         ];
       };
       #==================================================
@@ -94,9 +86,6 @@
         };
         modules = [
           ./hosts/homelab/configuration.nix
-          sops-nix.nixosModules.sops
-          disko.nixosModules.disko
-          impermanence.nixosModules.impermanence
         ];
       };
       #==================================================

@@ -8,6 +8,9 @@
   ...
 }: {
   imports = [
+    inputs.home-manager.nixosModules.home-manager
+    inputs.stylix.nixosModules.stylix
+    inputs.nixvim.nixosModules.nixvim
     ../modules/nixos/virtual-machines.nix #(also needs home manager config)
     ./default.nix
     ../custom-packages/tpm-fido/package.nix

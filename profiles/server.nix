@@ -6,6 +6,10 @@
   lib,
   ...
 }: {
+  imports = [
+    inputs.disko.nixosModules.disko
+    inputs.impermanence.nixosModules.impermanence
+  ];
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages
