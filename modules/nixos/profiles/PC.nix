@@ -59,7 +59,9 @@
       obsidian
       spotify
     ])
-    ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+    ++ (with pkgs-unstable; [
+      feishin # jellyfin client
+    ]); # UNSTABLE installed packages
 
   # tpm-fido
   tpm-fido.enable = true;
