@@ -11,8 +11,8 @@
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-    ../../modules/nixos/shared.nix
-    ../../modules/nixos/profiles/server.nix
+    ../../profiles/default.nix
+    ../../profiles/server.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix

@@ -2,15 +2,12 @@
   config,
   pkgs,
   pkgs-unstable,
-  inputs,
   lib,
-  vars,
   ...
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../modules/nixos/profiles/PC.nix
-    ../../modules/home-manager/profiles/PC.nix
+    ../../profiles/PC.nix
   ];
 
   # System installed pkgs
@@ -21,7 +18,7 @@
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
-     
+
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
@@ -187,7 +184,7 @@
   #    };
 
   # Define your hostname.
-  networking.hostName = "nixos-thinkpad";
+  networking.hostName = "thinkpad";
 
   # Set extra groups
   users.users.lilijoy.extraGroups = ["docker"];
@@ -242,7 +239,4 @@
 
   # Fix Clickpad Bug
   boot.kernelParams = ["psmouse.synaptics_intertouch=0"];
-
-  # State Version for first install, don't touch
-  system.stateVersion = "23.11";
 }

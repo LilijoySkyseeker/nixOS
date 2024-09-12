@@ -21,6 +21,14 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
     impermanence.url = "github:nix-community/impermanence";
+
+    nixvim.url = "github:nix-community/nixvim/nixos-24.05";
+    nixvim.inputs.nixpkgs.follows = "nixpkgs";
+    nixvim.inputs.home-manager.follows = "home-manager";
+
+    nix-on-droid.url = "github:nix-community/nix-on-droid/release-24.05";
+    nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
+    nix-on-droid.inputs.home-manager.follows = "home-manager";
   };
 
   outputs = inputs @ {
@@ -32,6 +40,8 @@
     sops-nix,
     disko,
     impermanence,
+    nixvim,
+    nix-on-droid,
     ...
   }: let
     system = "x86_64-linux";
@@ -56,27 +66,21 @@
   in {
     nixosConfigurations = {
       #==================================================
-      nixos-legion = nixpkgs.lib.nixosSystem {
+      legion = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
-          ./hosts/nixos-legion/configuration.nix
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          sops-nix.nixosModules.sops
+          ./hosts/legion/configuration.nix
         ];
       };
       #==================================================
-      nixos-thinkpad = nixpkgs.lib.nixosSystem {
+      thinkpad = nixpkgs.lib.nixosSystem {
         specialArgs = {
           inherit inputs pkgs pkgs-unstable vars;
         };
         modules = [
-          ./hosts/nixos-thinkpad/configuration.nix
-          home-manager.nixosModules.home-manager
-          stylix.nixosModules.stylix
-          sops-nix.nixosModules.sops
+          ./hosts/thinkpad/configuration.nix
         ];
       };
       #==================================================
@@ -87,9 +91,6 @@
         };
         modules = [
           ./hosts/homelab/configuration.nix
-          sops-nix.nixosModules.sops
-          disko.nixosModules.disko
-          impermanence.nixosModules.impermanence
         ];
       };
       #==================================================
@@ -101,7 +102,20 @@
           ./hosts/isoimage/configuration.nix
         ];
       };
-      #==================================================
     };
+    #==================================================
+    nixOnDroidConfigurations.default = nix-on-droid.lib.nixOnDroidConfiguration {
+      modules = [
+        ./hosts/android/configuration.nix
+      ];
+      pkgs = import nixpkgs {
+        system = "aarch64-linux";
+        config.allowUnfree = true;
+        overlays = [
+          nix-on-droid.overlays.default
+        ];
+      };
+    };
+    #==================================================
   };
 }

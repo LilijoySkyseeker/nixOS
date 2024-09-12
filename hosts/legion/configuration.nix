@@ -2,16 +2,12 @@
   config,
   pkgs,
   pkgs-unstable,
-  inputs,
-  lib,
   ...
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../modules/nixos/shared.nix
     ../../modules/nixos/wooting.nix
-    ../../modules/home-manager/profiles/PC.nix
-    ../../modules/nixos/profiles/PC.nix
+    ../../profiles/PC.nix
   ];
 
   # System installed pkgs
@@ -43,7 +39,7 @@
   hardware.keyboard.qmk.enable = true;
 
   # Define your hostname.
-  networking.hostName = "nixos-legion";
+  networking.hostName = "legion";
 
   # Set extra groups
   users.users.lilijoy.extraGroups = ["docker"];
@@ -83,7 +79,4 @@
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
   # ===============================================================================================
-
-  # State Version for first install, don't touch
-  system.stateVersion = "23.11";
 }
