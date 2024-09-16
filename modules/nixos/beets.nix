@@ -25,6 +25,10 @@
         albumtypes:
             types:
                 - single: 'Singles'
+        import:
+            copy: no
+            write: no
+            move: no
       '';
       target = "/beets/config.yaml";
     };

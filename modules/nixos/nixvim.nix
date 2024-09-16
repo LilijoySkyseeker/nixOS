@@ -11,7 +11,7 @@
     globals.mapleader = " ";
     viAlias = true;
     vimAlias = true;
-    options = {
+    opts = {
     };
     plugins = {
       nix.enable = true;
@@ -19,7 +19,7 @@
       lsp = {
         enable = true;
         servers = {
-          nil_ls.enable = true;
+          nil-ls.enable = true;
         };
       };
     };
