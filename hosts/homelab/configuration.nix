@@ -2,15 +2,14 @@
   config,
   pkgs,
   pkgs-unstable,
-  inputs,
   lib,
   vars,
-  sops-nix,
   ...
 }: {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
+
     ../../profiles/default.nix
     ../../profiles/server.nix
 
@@ -18,6 +17,8 @@
     ../../services/minecraft.nix
     #   ../../services/nextcloud.nix
     ../../services/rss.nix
+
+    ../../modules/nixos/beets.nix
   ];
 
   # System installed pkgs
@@ -34,7 +35,6 @@
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
-      #     beets # music orginization
     ]);
 
   # update microcode
@@ -49,44 +49,11 @@
     insertNameservers = ["8.8.8.8" "1.1.1.1"];
   };
 
-  # # beets config
-  # environment = {
-  #   variables = {
-  #     BEETSDIR = "/etc/beets";
-  #   };
-  #   etc."beetsConfig" = {
-  #     text = ''
-  #       threaded: no
-  #       directory: /storage/Music
-  #       library: /var/lib/beets/musiclibrary.db
-  #       plugins: info rewrite chroma fromfilename edit fetchart lyrics scrub albumtypes missing
-
-  #       paths:
-  #           comp: Compilations/$label/$year - $album%aunique{}/$track $title
-  #           default: Artists/$albumartist/$atypes/$year - $album%aunique{}/$track $title
-  #           singleton: Non-Album/$artist/$title/$title
-
-  #       albumtypes:
-  #           types:
-  #               - single: 'Singles'
-  #     '';
-  #     target = "/beets/config.yaml";
-  #   };
-  # };
-
   # directory permissions
   systemd.tmpfiles.rules = [
     "d /storage 2770 - multimedia - -"
     "d /storage-bulk 2770 - multimedia - -"
   ];
-
-  # # sshfs user
-  # users.users.multimedia = {
-  #   isSystemUser = true;
-  #   group = "multimedia";
-  #   openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"];
-  #   shell = pkgs.bashInteractive;
-  # };
 
   # caddy
   services.caddy = {
@@ -339,7 +306,6 @@
     directories = [
       "/etc/nixos"
       "/etc/duckdns"
-      "/etc/beets"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
@@ -348,7 +314,6 @@
       "/etc/machine-id"
       "/etc/ssh/ssh_host_ed25519_key"
       "/etc/ssh/ssh_host_ed25519_key.pub"
-      "/var/lib/beets/musiclibrary.db" # beets
     ];
   };
 }
