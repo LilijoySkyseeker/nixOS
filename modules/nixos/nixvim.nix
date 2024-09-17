@@ -1,11 +1,15 @@
-{inputs, ...}: {
+{
+  inputs,
+  lib,
+  ...
+}: {
   imports = [
     inputs.nixvim.nixosModules.nixvim
   ];
 
   programs.neovim = {
     enable = true;
-    defaultEditor = true;
+    defaultEditor = lib.mkForce true;
   };
 
   # nixvim config

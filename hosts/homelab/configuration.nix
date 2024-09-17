@@ -39,13 +39,31 @@
 
   # auto updates
   system.autoUpgrade = {
-      enable = true;
-      dates = "04:00";
-      flake = /etc/nixos;
-      flags = [
-          "--update-input" "nixpkgs" "--update-input" "nixpkgs-unstable" "--update-input" "home-manager" "--update-input" "stylix" "--update-input" "sops-nix" "--update-input" "disko" "--update-input" "impermanence" "--update-input" "nixvim" "--update-input" "nix-on-droid" "--commit-lock-file"
-      ];
-      allowReboot = true;
+    enable = true;
+    dates = "04:00";
+    flake = /etc/nixos;
+    flags = [
+      "--update-input"
+      "nixpkgs"
+      "--update-input"
+      "nixpkgs-unstable"
+      "--update-input"
+      "home-manager"
+      "--update-input"
+      "stylix"
+      "--update-input"
+      "sops-nix"
+      "--update-input"
+      "disko"
+      "--update-input"
+      "impermanence"
+      "--update-input"
+      "nixvim"
+      "--update-input"
+      "nix-on-droid"
+      "--commit-lock-file"
+    ];
+    allowReboot = true;
   };
 
   # update microcode
