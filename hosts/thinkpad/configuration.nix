@@ -14,6 +14,7 @@
   environment.systemPackages =
     (with pkgs; [
       # STABLE installed packages
+      drawio
     ])
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
