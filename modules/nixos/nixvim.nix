@@ -3,6 +3,11 @@
     inputs.nixvim.nixosModules.nixvim
   ];
 
+  programs.neovim = {
+    enable = true;
+    defaultEditor = true;
+  };
+
   # nixvim config
   programs.nixvim = {
     enable = true;
