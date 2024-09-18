@@ -9,7 +9,7 @@
     enable = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
-    hostName = "nextcloud";
+    hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
@@ -49,7 +49,7 @@
   # };
 
   # caddy
-  services.caddy.virtualHosts."nextcloud.skyseekerhomelab.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8080
   '';
   # services.nginx = {
