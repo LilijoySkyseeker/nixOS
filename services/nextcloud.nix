@@ -1,15 +1,13 @@
 {
   config,
   pkgs,
-  inputs,
-  lib,
   ...
 }: {
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud29;
-    #   home = "/srv/nextcloud";
-    hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
+    home = "/srv/nextcloud";
+    hostName = "";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
