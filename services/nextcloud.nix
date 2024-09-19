@@ -15,9 +15,9 @@
     settings = {
       default_phone_region = "US";
       trusted_domains = ["nextcloud.skyseekerlabs.duckdns.org"];
-      trusted_proxies = ["localhost" "127.0.0.1" "192.168.1.2"];
+      trusted_proxies = ["127.0.0.1"];
       log_type = "file";
-      loglevel = 1; # Include all actions in the log
+      loglevel = 3;
     };
   };
 
