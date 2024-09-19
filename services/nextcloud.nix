@@ -12,6 +12,13 @@
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
+    settings = {
+      default_phone_region = "US";
+      # Allow access when hitting either of these hosts or IPs
+      trusted_proxies = ["127.0.0.1"];
+      log_type = "file";
+      loglevel = 1; # Include all actions in the log
+    };
   };
 
   # services.nextcloud = {
