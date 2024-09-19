@@ -64,7 +64,7 @@
   # permissions
   systemd.tmpfiles.rules = [
     "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
-    "f ${config.services.nextcloud.home}/config/override.config.php  0770 nextcloud nextcloud - -"
+    #   "f ${config.services.nextcloud.home}/config/override.config.php  0770 nextcloud nextcloud - -"
   ];
 
   sops.secrets.nextcloud_admin_pass = {
