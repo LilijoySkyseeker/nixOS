@@ -55,7 +55,7 @@
   # nginx
   services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [
     {
-      addr = "nextcloud";
+      addr = "localhost";
       port = 8080;
     }
   ];

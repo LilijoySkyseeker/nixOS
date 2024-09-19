@@ -1,10 +1,4 @@
-{
-  config,
-  pkgs,
-  inputs,
-  lib,
-  ...
-}: {
+{config, ...}: {
   # fseshrss
   services.freshrss = {
     enable = true;

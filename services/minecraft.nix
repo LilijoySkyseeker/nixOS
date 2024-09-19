@@ -1,10 +1,4 @@
-{
-  config,
-  pkgs,
-  inputs,
-  lib,
-  ...
-}: {
+{...}: {
   # networking
   services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
     reverse_proxy localhost:25565
