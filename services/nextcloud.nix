@@ -18,7 +18,7 @@
       trusted_proxies = ["127.0.0.1"];
       log_type = "file";
     };
-    configureRedis = true;
+    #   configureRedis = true;
     database.createLocally = true;
     maxUploadSize = "128G";
     autoUpdateApps.enable = true;
@@ -26,7 +26,7 @@
     extraApps = with config.services.nextcloud.package.packages.apps; {
       # List of apps we want to install and are already packaged in
       # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
-      inherit calendar contacts;
+      #     inherit calendar contacts;
     };
   };
 
