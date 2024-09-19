@@ -14,7 +14,7 @@
     };
     settings = {
       default_phone_region = "US";
-      trusted_domains = ["skyseekerlabs.duckdns.org"];
+      trusted_domains = ["localhost"];
       log_type = "file";
       loglevel = 1; # Include all actions in the log
     };
