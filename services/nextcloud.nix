@@ -7,7 +7,7 @@
     enable = true;
     database.createLocally = true;
     package = pkgs.nextcloud29;
-    home = "/srv/nextcloud";
+    #   home = "/srv/nextcloud";
     hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
@@ -64,7 +64,7 @@
   # permissions
   systemd.tmpfiles.rules = [
     "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
-    "f ${config.services.nextcloud.home}/config/override.config.php  0770 nextcloud nextcloud - -"
+    "f ${config.services.nextcloud.home}/config/config.php  0770 nextcloud nextcloud - -"
   ];
 
   sops.secrets.nextcloud_admin_pass = {
