@@ -15,7 +15,7 @@
     settings = {
       default_phone_region = "US";
       trusted_domains = ["nextcloud.skyseekerlabs.duckdns.org"];
-      trusted_proxies = ["localhost" "127.0.0.1"];
+      trusted_proxies = ["localhost" "127.0.0.1" "192.168.1.2"];
       log_type = "file";
       loglevel = 1; # Include all actions in the log
     };
@@ -56,6 +56,8 @@
 
   # caddy
   services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig = ''
+    redir /.well-known/carddav /remote.php/dav/ 301
+    redir /.well-known/caldav /remote.php/dav/ 301
     reverse_proxy localhost:8080
   '';
 
