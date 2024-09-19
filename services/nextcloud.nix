@@ -7,7 +7,7 @@
     enable = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
-    hostName = "";
+    hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
