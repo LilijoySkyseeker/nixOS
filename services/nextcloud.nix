@@ -5,6 +5,7 @@
 }: {
   services.nextcloud = {
     enable = true;
+    database.createLocally = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
     hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
