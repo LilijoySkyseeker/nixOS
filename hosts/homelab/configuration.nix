@@ -41,7 +41,7 @@
   system.autoUpgrade = {
     enable = true;
     dates = "04:00";
-    flake = /etc/nixos;
+    flake = "/etc/nixos";
     flags = [
       "--update-input"
       "nixpkgs"
