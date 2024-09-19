@@ -87,7 +87,7 @@
   # caddy
   services.caddy = {
     enable = true;
-    #   acmeCA = "https://acme.zerossl.com/v2/DV90";
+    acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
 
