@@ -61,9 +61,11 @@
     }
   ];
 
-  # systemd.tmpfiles.rules = [
-  #   "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
-  # ];
+  # permissions
+  systemd.tmpfiles.rules = [
+    "d ${config.services.nextcloud.home} 0770 nextcloud nextcloud - -"
+    "f /srv/nextcloud/config/override.config.php  0770 nextcloud nextcloud - -"
+  ];
 
   sops.secrets.nextcloud_admin_pass = {
     owner = "nextcloud";
