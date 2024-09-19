@@ -7,8 +7,8 @@
     enable = true;
     database.createLocally = true;
     package = pkgs.nextcloud29;
-    #   home = "/srv/nextcloud";
-    hostName = "https://nextcloud.skyseekerlabs.duckdns.org";
+    home = "/srv/nextcloud";
+    hostName = "localhost";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
