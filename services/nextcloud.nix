@@ -8,7 +8,7 @@
     database.createLocally = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
-    hostName = "nextcloud.skyseekerlabs.duckdns.org";
+    hostName = "localhost";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
@@ -51,12 +51,11 @@
   services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8080
   '';
-  # services.nginx = {
-  #   defaultHTTPListenPort = 8080;
-  # };
+
+  # nginx
   services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [
     {
-      addr = "nextcloud.skyseekerlabs.duckdns.org";
+      addr = "localhost";
       port = 8080;
     }
   ];
