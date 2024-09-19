@@ -5,52 +5,30 @@
 }: {
   services.nextcloud = {
     enable = true;
-    database.createLocally = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
     hostName = "nextcloud";
     config = {
+      adminuser = "admin";
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
     settings = {
       default_phone_region = "US";
       trusted_domains = ["nextcloud.skyseekerlabs.duckdns.org"];
       trusted_proxies = ["127.0.0.1"];
+      log_type = "file";
+    };
+    configureRedis = true;
+    database.createLocally = true;
+    maxUploadSize = "128G";
+    autoUpdateApps.enable = true;
+    extraAppsEnable = true;
+    extraApps = with config.services.nextcloud.package.packages.apps; {
+      # List of apps we want to install and are already packaged in
+      # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
+      inherit calendar contacts;
     };
   };
-
-  # services.nextcloud = {
-  #   enable = true;
-  #   package = pkgs.nextcloud29; # Required to specify
-  #   configureRedis = true;
-  #   home = "/srv/nextcloud";
-  #   database.createLocally = true;
-  #   #   https = true;
-  #   hostName = "localhost";
-  #   maxUploadSize = "128G";
-  #   config = {
-  #     adminuser = "admin";
-  #     adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
-  #     dbtype = "pgsql";
-  #   };
-  #   settings = {
-  #     default_phone_region = "US";
-  #     # Allow access when hitting either of these hosts or IPs
-  #     #     trusted_proxies = ["127.0.0.1"];
-  #     log_type = "file";
-  #     loglevel = 1; # Include all actions in the log
-  #   };
-  #   autoUpdateApps.enable = true;
-  #   extraAppsEnable = true;
-  #   #   extraApps = with config.services.nextcloud.package.packages.apps; {
-  #   #     # List of apps we want to install and are already packaged in
-  #   #     # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
-  #   #     inherit calendar contacts;
-  #   #   };
-  #   settings = {
-  #     #     overwriteprotocol = "https";
-  #   };
-  # };
 
   # caddy
   services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig = ''
