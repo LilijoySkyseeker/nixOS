@@ -8,7 +8,7 @@
     database.createLocally = true;
     package = pkgs.nextcloud29;
     home = "/srv/nextcloud";
-    hostName = "localhost";
+    hostName = "nextcloud";
     config = {
       adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     };
@@ -55,7 +55,7 @@
   # nginx
   services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [
     {
-      addr = "localhost";
+      addr = "nextcloud";
       port = 8080;
     }
   ];
