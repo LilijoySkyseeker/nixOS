@@ -29,6 +29,7 @@
         enable = true;
         servers = {
           nil-ls.enable = true;
+          sqls.enable = true;
         };
       };
     };
