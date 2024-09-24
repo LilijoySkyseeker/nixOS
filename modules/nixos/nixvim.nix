@@ -28,8 +28,7 @@
       lsp = {
         enable = true;
         servers = {
-          nil-ls.enable = true;
-          sqls.enable = true;
+          nil-ls.enable = true; # nix
         };
       };
     };
