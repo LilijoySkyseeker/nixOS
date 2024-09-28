@@ -15,7 +15,7 @@
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
-#   ../../services/nextcloud.nix
+    ../../services/nextcloud.nix
     ../../services/rss.nix
 
     ../../modules/nixos/beets.nix

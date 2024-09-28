@@ -1,9 +1,7 @@
 {
   config,
-  pkgs,
   pkgs-unstable,
   inputs,
-  lib,
   ...
 }: {
   disabledModules = ["services/web-apps/freshrss.nix"];
