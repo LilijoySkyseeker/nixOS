@@ -1,5 +1,4 @@
 {
-  config,
   pkgs,
   pkgs-unstable,
   inputs,
@@ -27,6 +26,12 @@
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
+
+  # neovim
+  programs.neovim = {
+    enable = true;
+    defaultEditor = lib.mkForce true;
+  };
 
   # # tweaks, credit: https://github.com/headblockhead/dotfiles/blob/61cf195ab5a2f81d0844108b6f242938191622cc/systems/edward-desktop-01/config.nix
   # # set each flake input as registry to make nix3 commands consistent with flake
