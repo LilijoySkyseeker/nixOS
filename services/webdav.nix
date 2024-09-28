@@ -22,4 +22,9 @@
     owner = "webdav";
     group = "webdav";
   };
+
+  # caddy
+  services.caddy.virtualHosts."webdav.skyseekerlabs.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8083
+  '';
 }
