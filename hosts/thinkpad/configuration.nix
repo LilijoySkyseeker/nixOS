@@ -21,7 +21,7 @@
     ]);
 
   # power managment
-  service.auto-cpufreq = {
+  services.auto-cpufreq = {
     enable = true;
     settings = {
       battery = {
