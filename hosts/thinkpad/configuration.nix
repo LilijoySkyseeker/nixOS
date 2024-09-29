@@ -23,7 +23,7 @@
   # state change settings/buttons
   services.logind = {
     lidSwitch = "hybrid-sleep";
-    powerkey = "poweroff";
+    powerKey = "poweroff";
   };
 
   # update microcode
