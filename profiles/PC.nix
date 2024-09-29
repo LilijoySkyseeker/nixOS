@@ -328,6 +328,7 @@
               "ddterm@amezin.github.com"
               "gsconnect@andyholmes.github.io"
               "batterytimepercentagecompact@sagrland.de"
+              "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
             ];
           };
         };
@@ -341,6 +342,7 @@
             tiling-assistant
             ddterm
             battery-time-percentage-compact
+            battery-usage-wattmeter
           ])
           ++ (with pkgs-unstable.gnomeExtensions; [
             # UNSTABLE

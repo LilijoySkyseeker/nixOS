@@ -7,6 +7,7 @@
 }: {
   imports = [
     inputs.sops-nix.nixosModules.sops
+    inputs.nix-index-database.nixosModules.nix-index
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages =
@@ -26,6 +27,9 @@
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
+
+  # comma and cache
+  programs.nix-index-database.comma.enable = true;
 
   # neovim
   programs.neovim = {

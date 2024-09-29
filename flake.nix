@@ -29,6 +29,10 @@
     nix-on-droid.url = "github:nix-community/nix-on-droid/release-24.05";
     nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
     nix-on-droid.inputs.home-manager.follows = "home-manager";
+
+    # for comma index
+    nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
   outputs = inputs @ {
@@ -42,6 +46,7 @@
     impermanence,
     nixvim,
     nix-on-droid,
+    nix-index-database,
     ...
   }: let
     system = "x86_64-linux";
