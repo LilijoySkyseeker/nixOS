@@ -20,6 +20,12 @@
       # UNSTABLE installed packages
     ]);
 
+  # state change settings/buttons
+  services.logind = {
+    lidSwitch = "hybrid-sleep";
+    powerkey = "poweroff";
+  };
+
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 

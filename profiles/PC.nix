@@ -238,7 +238,7 @@
             idle-dim = false;
             sleep-inactive-battery-type = "nothing";
             sleep-inactive-ac-type = "nothing";
-            power-button-action = "interactive";
+#           power-button-action = "interactive";
           };
           "org/gnome/desktop/wm/preferences" = {
             focus-mode = "sloppy";
