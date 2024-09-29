@@ -15,6 +15,18 @@
     (with pkgs; [cura]) # STABLE installed packages
     ++ (with pkgs-unstable; []); # UNSTABLE installed packages
 
+  # disable laptop display
+  services.xserver = {
+    monitorSection = ''
+      Identifier "integrated display"
+      Option "ignore" "true"
+    '';
+    deviceSection = ''
+      Identifier "onboard"
+      Option "Monitor-DP-2" "integrated display"
+    '';
+  };
+
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 

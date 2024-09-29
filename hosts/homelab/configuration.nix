@@ -15,8 +15,9 @@
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
-#   ../../services/nextcloud.nix
+    #   ../../services/nextcloud.nix
     ../../services/rss.nix
+    #   ../../services/webdav.nix
 
     ../../modules/nixos/beets.nix
   ];
@@ -90,6 +91,12 @@
     #   acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
+  networking.firewall.allowedTCPPorts = [
+    443
+  ];
+  networking.firewall.allowedUDPPorts = [
+    443
+  ];
 
   # duckdns
   services.cron = {
