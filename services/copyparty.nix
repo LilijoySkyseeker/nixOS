@@ -9,7 +9,7 @@
     inputs.copyparty.nixosModules.default
   ];
   environment.systemPackages = [pkgs.copyparty];
-  pkgs.overlays = [inputs.copyparty.overlays.default];
+  # pkgs.overlays = [inputs.copyparty.overlays.default];
   nixpkgs.overlays = [copyparty.overlays.default];
 
   # copyparty
