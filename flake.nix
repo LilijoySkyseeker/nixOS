@@ -29,6 +29,8 @@
     nix-on-droid.url = "github:nix-community/nix-on-droid/release-24.05";
     nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
     nix-on-droid.inputs.home-manager.follows = "home-manager";
+
+    copyparty.url = "github:9001/copyparty";
   };
 
   outputs = inputs @ {
@@ -42,6 +44,7 @@
     impermanence,
     nixvim,
     nix-on-droid,
+    copyparty,
     ...
   }: let
     system = "x86_64-linux";

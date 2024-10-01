@@ -1,10 +1,4 @@
-{
-  config,
-  pkgs,
-  inputs,
-  lib,
-  ...
-}: {
+{config, ...}: {
   # jellyfin
   services.jellyfin = {
     enable = true;
