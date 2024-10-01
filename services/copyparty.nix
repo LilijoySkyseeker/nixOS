@@ -2,6 +2,7 @@
   inputs,
   pkgs,
   config,
+  copyparty,
   ...
 }: {
   imports = [
@@ -9,6 +10,7 @@
   ];
   environment.systemPackages = [pkgs.copyparty];
   pkgs.overlays = [inputs.copyparty.overlays.default];
+  nixpkgs.overlays = [copyparty.overlays.default];
 
   # copyparty
   services.copyparty = {
