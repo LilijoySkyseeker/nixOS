@@ -31,6 +31,7 @@
     nix-on-droid.inputs.home-manager.follows = "home-manager";
 
     copyparty.url = "github:9001/copyparty";
+    copyparty.inputs.nixpkgs.follows = "nixpkgs";
 
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
