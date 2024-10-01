@@ -20,7 +20,7 @@
       e2dsa = true;
       e2ts = true;
     };
-    acounts = {
+    accounts = {
       lilijoy.passwordFile = config.sops.secrets.copyparty_lilijoy.path;
     };
     volumes = {
