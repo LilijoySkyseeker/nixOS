@@ -31,6 +31,10 @@
     nix-on-droid.inputs.home-manager.follows = "home-manager";
 
     copyparty.url = "github:9001/copyparty";
+
+    # for comma index
+    nix-index-database.url = "github:nix-community/nix-index-database";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
   outputs = inputs @ {
@@ -45,6 +49,7 @@
     nixvim,
     nix-on-droid,
     copyparty,
+    nix-index-database,
     ...
   }: let
     system = "x86_64-linux";

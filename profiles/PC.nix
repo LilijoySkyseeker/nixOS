@@ -175,10 +175,10 @@
               git add --all && nh os test
               ";
             nhb.body = "
-              git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os boot && git push
+              git add --all && git commit -a && nh os boot && git diff --staged | bat --paging always --pager less && git push
               ";
             nhs.body = "
-              git add --all && git diff --staged | bat --paging always --pager less && git commit -a && nh os switch && git push
+              git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
               ";
             gds.body = "
               git add --all && git diff --staged | bat --paging always --pager less
@@ -238,7 +238,7 @@
             idle-dim = false;
             sleep-inactive-battery-type = "nothing";
             sleep-inactive-ac-type = "nothing";
-            power-button-action = "interactive";
+            #           power-button-action = "interactive";
           };
           "org/gnome/desktop/wm/preferences" = {
             focus-mode = "sloppy";
@@ -328,6 +328,7 @@
               "ddterm@amezin.github.com"
               "gsconnect@andyholmes.github.io"
               "batterytimepercentagecompact@sagrland.de"
+              "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
             ];
           };
         };
@@ -341,6 +342,7 @@
             tiling-assistant
             ddterm
             battery-time-percentage-compact
+            battery-usage-wattmeter
           ])
           ++ (with pkgs-unstable.gnomeExtensions; [
             # UNSTABLE
