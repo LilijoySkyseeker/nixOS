@@ -67,6 +67,7 @@
     pkgs = import inputs.nixpkgs {
       inherit system;
       config.allowUnfree = true;
+      nixpkgs.overlays = [copyparty.overlays.default];
     };
     pkgs-unstable = import inputs.nixpkgs-unstable {
       inherit system;

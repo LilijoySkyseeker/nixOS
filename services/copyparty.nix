@@ -6,11 +6,10 @@
   ...
 }: {
   imports = [
-    copyparty.nixosModules.default
+    inputs.copyparty.nixosModules.default
   ];
   environment.systemPackages = [pkgs.copyparty];
   # pkgs.overlays = [inputs.copyparty.overlays.default];
-  nixpkgs.overlays = [copyparty.overlays.default];
 
   # copyparty
   services.copyparty = {
