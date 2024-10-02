@@ -30,6 +30,9 @@
     nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
     nix-on-droid.inputs.home-manager.follows = "home-manager";
 
+    copyparty.url = "github:9001/copyparty";
+    copyparty.inputs.nixpkgs.follows = "nixpkgs";
+
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -46,6 +49,7 @@
     impermanence,
     nixvim,
     nix-on-droid,
+    copyparty,
     nix-index-database,
     ...
   }: let
@@ -63,6 +67,7 @@
     pkgs = import inputs.nixpkgs {
       inherit system;
       config.allowUnfree = true;
+      nixpkgs.overlays = [copyparty.overlays.default];
     };
     pkgs-unstable = import inputs.nixpkgs-unstable {
       inherit system;
