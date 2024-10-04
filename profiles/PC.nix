@@ -175,7 +175,7 @@
               git add --all && nh os test
               ";
             nhb.body = "
-              git add --all && git commit -a && nh os boot && git diff --staged | bat --paging always --pager less && git push
+              git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push
               ";
             nhs.body = "
               git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
@@ -228,8 +228,9 @@
           "org/gnome/desktop/peripherals/mouse" = {
             accel-profile = "flat";
           };
+
           "org/gnome/mutter" = {
-            dynamic-workspaces = true;
+            dynamic-workspaces = false;
             workspaces-only-on-primary = true;
             check-alive-timeout = "uint32 60000";
             experimental-features = ["variable-refresh-rate"];
@@ -241,6 +242,7 @@
             #           power-button-action = "interactive";
           };
           "org/gnome/desktop/wm/preferences" = {
+            num-workspaces = 6;
             focus-mode = "sloppy";
             auto-raise = false;
             button-layout = "appmenu:minimize,maximize,close";
@@ -329,6 +331,7 @@
               "gsconnect@andyholmes.github.io"
               "batterytimepercentagecompact@sagrland.de"
               "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
+              "smart-auto-move@khimaros.com"
             ];
           };
         };
@@ -343,6 +346,7 @@
             ddterm
             battery-time-percentage-compact
             battery-usage-wattmeter
+            smart-auto-move
           ])
           ++ (with pkgs-unstable.gnomeExtensions; [
             # UNSTABLE
