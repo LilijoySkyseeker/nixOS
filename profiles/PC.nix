@@ -508,9 +508,6 @@
     };
   };
 
-  # flatpak
-  services.flatpak.enable = true;
-
   # fonts
   fonts.packages = with pkgs; [
     (nerdfonts.override {fonts = ["Meslo"];})
