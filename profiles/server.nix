@@ -17,6 +17,11 @@
       # UNSTABLE installed packages
     ]);
 
+  # nh, nix helper
+  programs.nh = {
+    flake = "/etc/nixos";
+  };
+
   # home-manager
   home-manager.users.root = {
     imports = [

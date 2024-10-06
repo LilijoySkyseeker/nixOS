@@ -365,7 +365,7 @@
     };
   };
 
-  # nix helper
+  # nh, nix helper
   programs.nh = {
     flake = "/home/lilijoy/dotfiles";
   };
