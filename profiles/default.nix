@@ -3,11 +3,13 @@
   pkgs-unstable,
   inputs,
   lib,
+  vars,
   ...
 }: {
   imports = [
     inputs.sops-nix.nixosModules.sops
     inputs.nix-index-database.nixosModules.nix-index
+    inputs.home-manager.nixosModules.home-manager
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages =
@@ -27,6 +29,15 @@
     ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
+
+  # home-manager
+  home-manager = {
+    # also pass inputs to home-manager modules
+    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
+    useGlobalPkgs = true;
+    useUserPackages = true;
+    backupFileExtension = "backup"; # Force backup conflicted files
+  };
 
   # comma and cache
   programs.nix-index-database.comma.enable = true;

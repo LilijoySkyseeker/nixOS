@@ -61,7 +61,6 @@
       ...
     }: {
       config = lib.mkIf (config.specialisation != {}) {
-        environment.etc."specialisation".text = "gpu-disabled"; # for nh helper
         boot.extraModprobeConfig = ''
           blacklist nouveau
           options nouveau modeset=0
