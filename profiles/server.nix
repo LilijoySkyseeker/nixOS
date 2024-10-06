@@ -23,7 +23,7 @@
       ../modules/home-manager/tooling.nix
     ];
     home.stateVersion = "23.11";
-    home.username = "lilijoy";
+    home.username = "root";
     programs.home-manager.enable = true;
     home.homeDirectory = "/root";
   };
