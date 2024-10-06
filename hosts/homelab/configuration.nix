@@ -18,7 +18,7 @@
     #   ../../services/nextcloud.nix
     ../../services/rss.nix
     #   ../../services/webdav.nix
-    ../../services/copyparty.nix
+    #   ../../services/copyparty.nix
 
     ../../modules/nixos/beets.nix
   ];
