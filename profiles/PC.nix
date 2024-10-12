@@ -425,7 +425,7 @@
   hardware.bluetooth.powerOnBoot = true;
 
   # Enable CUPS to print documents.
-  services.printing.enable = true;
+  services.printing.enable = false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
 
   # Enable sound with pipewire.
   sound.enable = true;
