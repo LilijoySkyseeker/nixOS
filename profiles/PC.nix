@@ -40,7 +40,6 @@
       bitwarden
       thunderbird
       vscode-fhs
-      nicotine-plus
       cider
       prismlauncher
       kdenlive
