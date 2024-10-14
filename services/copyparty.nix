@@ -60,6 +60,11 @@
     group = "copyparty";
   };
 
+  # directory permissions
+  systemd.tmpfiles.rules = [
+    "d /srv/copyparty 0770 copyparty - - -"
+  ];
+
   # persistence
   environment.persistence."/nix/state".directories = [
     {
