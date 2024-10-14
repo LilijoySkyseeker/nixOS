@@ -12,6 +12,7 @@
   # copyparty
   services.copyparty = {
     enable = true;
+    group = "multimedia";
     settings = {
       no-robots = true;
       e2dsa = true;
