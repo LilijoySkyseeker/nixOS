@@ -48,9 +48,9 @@
         browseable = "yes";
         "read only" = "no";
         "guest ok" = "yes";
-        "force user" = "${config.user.name}";
+        "force user" = "samba-guest";
         "force group" = "multimedia";
-        "write list" = "${config.user.name}";
+        "write list" = "samba-guest";
       };
     };
   };
