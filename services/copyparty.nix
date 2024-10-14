@@ -16,7 +16,7 @@
       no-robots = true;
       e2dsa = true;
       e2ts = true;
-      shr = true;
+      shr = "/share";
     };
     accounts = {
       lilijoy.passwordFile = config.sops.secrets.copyparty_lilijoy.path;
