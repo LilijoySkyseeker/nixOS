@@ -25,18 +25,13 @@
       "/" = {
         path = "/storage";
         access = {
-          r = ["lilijoy"];
+          A = ["lilijoy"];
         };
       };
       "/bulk" = {
         path = "/storage-bulk";
         access = {
-          r = ["lilijoy"];
-        };
-      };
-      "/share" = {
-        access = {
-          r = ["*"];
+          A = ["lilijoy"];
         };
       };
     };
