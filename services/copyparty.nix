@@ -2,14 +2,12 @@
   inputs,
   pkgs,
   config,
-  copyparty,
   ...
 }: {
   imports = [
     inputs.copyparty.nixosModules.default
   ];
   environment.systemPackages = [pkgs.copyparty];
-  # pkgs.overlays = [inputs.copyparty.overlays.default];
 
   # copyparty
   services.copyparty = {

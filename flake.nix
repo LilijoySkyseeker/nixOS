@@ -96,12 +96,19 @@
       #==================================================
       homelab = nixpkgs.lib.nixosSystem {
         specialArgs = {
-          inherit pkgs pkgs-unstable vars;
+          inherit pkgs-unstable vars;
           inputs = inputs;
         };
         modules = [
           ./hosts/homelab/configuration.nix
         ];
+        pkgs = import nixpkgs {
+          system = "x86_64-linux";
+          config.allowUnfree = true;
+          overlays = [
+            copyparty.overlays.default
+          ];
+        };
       };
       #==================================================
       isoimage = nixpkgs.lib.nixosSystem {
