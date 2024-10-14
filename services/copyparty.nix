@@ -17,7 +17,7 @@
       e2dsa = true;
       shr = "/share";
       re-maxage = 60;
-      hist = "/srv/copyparty";
+      #     hist = "/srv/copyparty"; # temp disabled cuz read only weirdness for /srv
     };
     accounts = {
       lilijoy.passwordFile = config.sops.secrets.copyparty_lilijoy.path;
