@@ -15,8 +15,9 @@
     settings = {
       no-robots = true;
       e2dsa = true;
-      e2ts = true;
       shr = "/share";
+      re-maxage = 60;
+      hist = "/srv/copyparty";
     };
     accounts = {
       lilijoy.passwordFile = config.sops.secrets.copyparty_lilijoy.path;
@@ -58,4 +59,13 @@
     owner = "copyparty";
     group = "copyparty";
   };
+
+  # persistence
+  environment.persistence."/nix/state".directories = [
+    {
+      directory = "/srv/copyparty";
+      user = "copyparty";
+      group = "copyparty";
+    }
+  ];
 }
