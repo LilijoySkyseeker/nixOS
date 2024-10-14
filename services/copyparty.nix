@@ -12,7 +12,6 @@
   # copyparty
   services.copyparty = {
     enable = true;
-    group = "multimedia";
     settings = {
       no-robots = true;
       e2dsa = true;
@@ -25,17 +24,20 @@
       "/" = {
         path = "/storage";
         access = {
-          r = "*";
+          r = ["lilijoy"];
         };
       };
       "/bulk" = {
         path = "/storage-bulk";
         access = {
-          r = "*";
+          r = ["lilijoy"];
         };
       };
     };
   };
+
+  # permissions
+  users.users.copyparty.extraGroups = ["multimedia"];
 
   # caddy
   services.caddy.virtualHosts."copyparty.skyseekerlabs.duckdns.org".extraConfig = ''
