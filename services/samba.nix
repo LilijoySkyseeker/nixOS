@@ -1,4 +1,9 @@
-{...}: {
+{inputs, ...}: {
+  disabledModules = ["services/network-filesystems/samba.nix"];
+  imports = [
+    "${inputs.nixpkgs-unstable}/nixos/modules/services/network-filesystems/samba.nix"
+  ];
+
   services.samba = {
     enable = true;
     openFirewall = true;
