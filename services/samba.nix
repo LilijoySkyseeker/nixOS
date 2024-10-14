@@ -47,6 +47,7 @@
         path = "/storage";
         browseable = "yes";
         "read only" = "no";
+        "writable" = "yes";
         "guest ok" = "yes";
         "force user" = "samba-guest";
         "force group" = "multimedia";
