@@ -4,7 +4,6 @@
   pkgs-unstable,
   inputs,
   lib,
-  vars,
   ...
 }: {
   imports = [
@@ -12,6 +11,7 @@
     ../modules/nixos/virtual-machines.nix #(also needs home manager config)
     ./default.nix
     ../custom-packages/tpm-fido/package.nix
+    ../modules/nixos/copypartymount.nix
   ];
 
   # System installed pkgs
