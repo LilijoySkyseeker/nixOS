@@ -13,7 +13,7 @@
         headers = Cookie,cppwd=hunter2
         pacer_min_sleep = 0.01ms
         user = k
-        pass = "($cat ${config.sops.secrets.copyparty_lilijoy.path})"
+        pass = $cat ${config.sops.secrets.copyparty_lilijoy.path}
   '';
 
   fileSystems."/home/lilijoy/homelab" = {
