@@ -83,9 +83,9 @@
 
   # directory permissions
   systemd.tmpfiles.rules = [
-    "d /storage 2770 - multimedia - -"
-    "d /storage-bulk 2770 - multimedia - -"
     "d /srv 0770 - root root -"
+    "A /storage - - - - group::rwx"
+    "A /storage-bulk - - - - group::rwx"
   ];
 
   # caddy
