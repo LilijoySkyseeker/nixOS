@@ -41,6 +41,11 @@
       # UNSTABLE installed packages
     ]);
 
+  # podman settings
+  virtualisation.docker.daemon.settings = {
+    userland-proxy = false;
+  };
+
   # auto updates
   system.autoUpgrade = {
     enable = true;
