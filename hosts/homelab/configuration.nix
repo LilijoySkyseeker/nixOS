@@ -46,6 +46,9 @@
     userland-proxy = false;
   };
 
+  # oci containers
+  virtualisation.oci-containers.backend = "docker";
+
   # auto updates
   system.autoUpgrade = {
     enable = true;
