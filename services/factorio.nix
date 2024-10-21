@@ -18,7 +18,6 @@
   virtualisation.oci-containers.backend = "podman";
   virtualisation.oci-containers.containers.factorio-main = {
     autoStart = true;
-    userland-proxy = false;
     image = "factoriotools/factorio";
     ports = [
       "34197:34197/udp"
