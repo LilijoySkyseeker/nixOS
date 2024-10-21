@@ -4,11 +4,6 @@
   inputs,
   ...
 }: {
-  disabledModules = ["services/web-apps/freshrss.nix"];
-  imports = [
-    "${inputs.nixpkgs-unstable}/nixos/modules/services/web-apps/freshrss.nix"
-  ];
-
   # fseshrss
   services.freshrss = {
     enable = true;
@@ -16,8 +11,6 @@
     dataDir = "/srv/freshrss";
     defaultUser = "admin";
     passwordFile = config.sops.secrets.freshrss_admin_pass.path;
-    extensions = with pkgs-unstable.freshrss-extensions; [
-    ];
   };
 
   # rss-bridge
