@@ -15,7 +15,6 @@
   ];
 
   # factorio server
-  virtualisation.oci-containers.backend = "podman";
   virtualisation.oci-containers.containers.factorio-main = {
     autoStart = true;
     image = "factoriotools/factorio";
