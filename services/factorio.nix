@@ -23,7 +23,7 @@
     ];
     volumes = ["/srv/factorio/main:/factorio"];
     environment = {
-      UPDATE_MODS_ON_START = true;
+      UPDATE_MODS_ON_START = "true";
     };
   };
 }
