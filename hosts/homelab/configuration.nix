@@ -15,6 +15,7 @@
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
+    ../../services/factorio.nix
     #   ../../services/nextcloud.nix
     ../../services/rss.nix
     #   ../../services/webdav.nix
