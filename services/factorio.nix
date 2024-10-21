@@ -22,5 +22,8 @@
       "34197:34197/udp"
     ];
     volumes = ["/srv/factorio/main:/factorio"];
+    environment = {
+      UPDATE_MODS_ON_START = true;
+    };
   };
 }
