@@ -17,7 +17,7 @@
   # factorio server
   virtualisation.oci-containers.containers.factorio-main = {
     autoStart = true;
-    image = "factoriotools/factorio";
+    image = "factoriotools/factorio:stable";
     ports = [
       "34197:34197/udp"
     ];
