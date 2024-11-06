@@ -40,6 +40,7 @@
       bitwarden
       thunderbird
       vscode-fhs
+      python3
       cider
       prismlauncher
       kdenlive
