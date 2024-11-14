@@ -38,101 +38,71 @@
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = inputs @ {
-    self,
-    nixpkgs,
-    nixpkgs-unstable,
-    home-manager,
-    stylix,
-    sops-nix,
-    disko,
-    impermanence,
-    nixvim,
-    nix-on-droid,
-    copyparty,
-    nix-index-database,
-    ...
-  }: let
-    system = "x86_64-linux";
-    vars = {
-      # root access ssh keys
-      publicSshKeys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
-        "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBOMWwCahxhLGbypUW77xlIkIGpvknKvWZKPinnIULANbtcttspjkYvGc/n1IJICvOUg7qIWXKMEBrQZQT3dTeywAAAAEc3NoOg== lilijoy@nixos-legion" # legion flipper
-        "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBEjfX78Dy65xkJV1Kd8Q5d+zvE+/GtnQOWniIoQS7FfBlIPMd9qUNY9o3Z7n5/ILwcnZIia01277BdPlAKXYGTAAAAAEc3NoOg== lilijoy@nixos-thinkpad" # thinkpad tpm
-        "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
-      ];
-      username = "";
-    };
-    pkgs = import inputs.nixpkgs {
-      inherit system;
-      config.allowUnfree = true;
-      nixpkgs.overlays = [copyparty.overlays.default];
-    };
-    pkgs-unstable = import inputs.nixpkgs-unstable {
-      inherit system;
-      config.allowUnfree = true;
-    };
-  in {
-    nixosConfigurations = {
-      #==================================================
-      legion = nixpkgs.lib.nixosSystem {
-        specialArgs = {
-          inherit inputs pkgs pkgs-unstable vars;
-        };
-        modules = [
-          ./hosts/legion/configuration.nix
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, stylix
+    , sops-nix, disko, impermanence, nixvim, nix-on-droid, copyparty
+    , nix-index-database, ... }:
+    let
+      system = "x86_64-linux";
+      vars = {
+        # root access ssh keys
+        publicSshKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPDTrihTKFWJxIMkK1lPqf5RnydYCO8PuKZZq6tiuDED lilijoy@nixos" # legion-laptop
+          "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBOMWwCahxhLGbypUW77xlIkIGpvknKvWZKPinnIULANbtcttspjkYvGc/n1IJICvOUg7qIWXKMEBrQZQT3dTeywAAAAEc3NoOg== lilijoy@nixos-legion" # legion flipper
+          "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBEjfX78Dy65xkJV1Kd8Q5d+zvE+/GtnQOWniIoQS7FfBlIPMd9qUNY9o3Z7n5/ILwcnZIia01277BdPlAKXYGTAAAAAEc3NoOg== lilijoy@nixos-thinkpad" # thinkpad tpm
+          "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
         ];
+        username = "";
       };
-      #==================================================
-      thinkpad = nixpkgs.lib.nixosSystem {
-        specialArgs = {
-          inherit inputs pkgs pkgs-unstable vars;
-        };
-        modules = [
-          ./hosts/thinkpad/configuration.nix
-        ];
-      };
-      #==================================================
-      homelab = nixpkgs.lib.nixosSystem {
-        specialArgs = {
-          inherit pkgs-unstable vars;
-          inputs = inputs;
-        };
-        modules = [
-          ./hosts/homelab/configuration.nix
-        ];
-        pkgs = import nixpkgs {
-          system = "x86_64-linux";
-          config.allowUnfree = true;
-          overlays = [
-            copyparty.overlays.default
-          ];
-        };
-      };
-      #==================================================
-      isoimage = nixpkgs.lib.nixosSystem {
-        specialArgs = {
-          inherit inputs pkgs vars;
-        };
-        modules = [
-          ./hosts/isoimage/configuration.nix
-        ];
-      };
-    };
-    #==================================================
-    nixOnDroidConfigurations.default = nix-on-droid.lib.nixOnDroidConfiguration {
-      modules = [
-        ./hosts/android/configuration.nix
-      ];
-      pkgs = import nixpkgs {
-        system = "aarch64-linux";
+      pkgs = import inputs.nixpkgs {
+        inherit system;
         config.allowUnfree = true;
-        overlays = [
-          nix-on-droid.overlays.default
-        ];
+        nixpkgs.overlays = [ copyparty.overlays.default ];
       };
+      pkgs-unstable = import inputs.nixpkgs-unstable {
+        inherit system;
+        config.allowUnfree = true;
+      };
+    in {
+      nixosConfigurations = {
+        #==================================================
+        legion = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs pkgs pkgs-unstable vars; };
+          modules = [ ./hosts/legion/configuration.nix ];
+        };
+        #==================================================
+        thinkpad = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs pkgs pkgs-unstable vars; };
+          modules = [ ./hosts/thinkpad/configuration.nix ];
+        };
+        #==================================================
+        homelab = nixpkgs.lib.nixosSystem {
+          specialArgs = {
+            inherit pkgs-unstable vars;
+            inputs = inputs;
+          };
+          modules = [ ./hosts/homelab/configuration.nix ];
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            config.allowUnfree = true;
+            overlays = [ copyparty.overlays.default ];
+          };
+        };
+        #==================================================
+        isoimage = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs pkgs vars; };
+          modules = [ ./hosts/isoimage/configuration.nix ];
+        };
+      };
+      #==================================================
+      nixOnDroidConfigurations.default =
+        nix-on-droid.lib.nixOnDroidConfiguration {
+          modules = [ ./hosts/android/configuration.nix ];
+          pkgs = import nixpkgs {
+            system = "aarch64-linux";
+            config.allowUnfree = true;
+            overlays = [ nix-on-droid.overlays.default ];
+          };
+        };
+      #==================================================
     };
-    #==================================================
-  };
 }

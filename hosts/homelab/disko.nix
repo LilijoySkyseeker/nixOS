@@ -23,16 +23,12 @@
               type = "filesystem";
               format = "vfat";
               mountpoint =
-                if idx == 1
-                then "/boot"
-                else "/boot-${builtins.toString idx}";
+                if idx == 1 then "/boot" else "/boot-${builtins.toString idx}";
             };
           };
           swap = {
             size = "8G";
-            content = {
-              type = "swap";
-            };
+            content = { type = "swap"; };
           };
           zfs = {
             size = "100%";

@@ -1,24 +1,15 @@
-{
-  config,
-  pkgs,
-  pkgs-unstable,
-  ...
-}: {
-  imports = [
-    ./hardware-configuration.nix
-    ./nvidia.nix
-    ../../profiles/PC.nix
-  ];
+{ config, pkgs, pkgs-unstable, ... }: {
+  imports = [ ./hardware-configuration.nix ./nvidia.nix ../../profiles/PC.nix ];
 
   # System installed pkgs
-  environment.systemPackages =
-    (with pkgs; [
+  environment.systemPackages = (with pkgs;
+    [
       # STABLE installed packages
       drawio
-    ])
-    ++ (with pkgs-unstable; [
-      # UNSTABLE installed packages
-    ]);
+    ]) ++ (with pkgs-unstable;
+      [
+        # UNSTABLE installed packages
+      ]);
 
   # state change settings/buttons
   services.logind = {
@@ -31,7 +22,7 @@
 
   services.keyd = {
     enable = true;
-    keyboards.default.ids = ["0001:0001"];
+    keyboards.default.ids = [ "0001:0001" ];
     keyboards.default.settings = {
       main = {
         capslock = "overload(control, esc)";
@@ -76,7 +67,7 @@
         j = "0";
         k = "1";
         l = "2";
-        "\;" = "3";
+        ";" = "3";
         m = "4";
         "," = "5";
         "." = "6";
@@ -121,15 +112,15 @@
         t = "v";
         y = "timeout(;, 200, :)";
         u = "timeout(., 200, &)";
-        i = "timeout(\/, 200, *)";
-        o = "timeout(\", 200, ?)";
-        p = "timeout(\', 200, !)";
+        i = "timeout(/, 200, *)";
+        o = ''timeout(", 200, ?)'';
+        p = "timeout(', 200, !)";
         a = "r";
         s = "s";
         d = "n";
         f = "d";
         g = "b";
-        h = "timeout(\,, 200, _)";
+        h = "timeout(,, 200, _)";
         j = "a";
         k = "e";
         l = "i";
@@ -144,7 +135,7 @@
         m = "u";
         "," = "o";
         "." = "y";
-        "\/" = "k";
+        "/" = "k";
         leftalt = "overload(navigation, t)";
       };
       esc = {
@@ -161,12 +152,8 @@
       passwordFile = "${config.sops.secrets.restic.path}";
       repository = "/home/lilijoy/backup";
       user = "lilijoy";
-      paths = [
-        "/home/lilijoy"
-      ];
-      exclude = [
-        "/home/lilijoy/backup"
-      ];
+      paths = [ "/home/lilijoy" ];
+      exclude = [ "/home/lilijoy/backup" ];
       timerConfig = {
         OnCalendar = "hourly";
         Persistent = true;
@@ -194,8 +181,8 @@
   networking.hostName = "thinkpad";
 
   # Set extra groups
-  users.users.lilijoy.extraGroups = ["docker"];
+  users.users.lilijoy.extraGroups = [ "docker" ];
 
   # Fix Clickpad Bug
-  boot.kernelParams = ["psmouse.synaptics_intertouch=0"];
+  boot.kernelParams = [ "psmouse.synaptics_intertouch=0" ];
 }

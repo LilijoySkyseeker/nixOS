@@ -1,8 +1,4 @@
-{
-  config,
-  lib,
-  ...
-}: {
+{ config, lib, ... }: {
   config.specialisation.gpu-enabled.configuration = {
     environment.etc."specialisation".text = "gpu-enabled"; # for nh helper
     # NVIDIA ==============================================================================
@@ -12,7 +8,8 @@
       driSupport = true;
       driSupport32Bit = true;
     };
-    services.xserver.videoDrivers = ["nvidia"]; # Load nvidia driver for Xorg and Wayland
+    services.xserver.videoDrivers =
+      [ "nvidia" ]; # Load nvidia driver for Xorg and Wayland
     hardware.nvidia = {
       modesetting.enable = true;
 
@@ -36,7 +33,8 @@
       nvidiaSettings = true;
 
       # Optionally, you may need to select the appropriate driver version for your specific GPU.
-      package = config.boot.kernelPackages.nvidiaPackages.stable; # info for beta/specific drivers https://github.com/NixOS/nixpkgs/pull/322963/commits/10ed11d6856a7b67b9b2cef5e52af5c7de34b93f and reddit post https://www.reddit.com/r/NixOS/comments/1dqipyx/updating_nvidia_driver_from_5554202_to_the_latest/
+      package =
+        config.boot.kernelPackages.nvidiaPackages.stable; # info for beta/specific drivers https://github.com/NixOS/nixpkgs/pull/322963/commits/10ed11d6856a7b67b9b2cef5e52af5c7de34b93f and reddit post https://www.reddit.com/r/NixOS/comments/1dqipyx/updating_nvidia_driver_from_5554202_to_the_latest/
     };
 
     hardware.nvidia.prime = {
@@ -55,17 +53,14 @@
 
   # default gpu-disabled
   imports = [
-    ({
-      lib,
-      config,
-      ...
-    }: {
-      config = lib.mkIf (config.specialisation != {}) {
+    ({ lib, config, ... }: {
+      config = lib.mkIf (config.specialisation != { }) {
         boot.extraModprobeConfig = ''
           blacklist nouveau
           options nouveau modeset=0
         '';
-        boot.blacklistedKernelModules = ["nouveau" "nvidia" "nvidia_drm" "nvidia_modeset"];
+        boot.blacklistedKernelModules =
+          [ "nouveau" "nvidia" "nvidia_drm" "nvidia_modeset" ];
 
         services.udev.extraRules = ''
           # Remove NVIDIA USB xHCI Host Controller devices, if present

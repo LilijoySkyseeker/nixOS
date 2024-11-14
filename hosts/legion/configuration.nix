@@ -1,9 +1,4 @@
-{
-  config,
-  pkgs,
-  pkgs-unstable,
-  ...
-}: {
+{ config, pkgs, pkgs-unstable, ... }: {
   imports = [
     ./hardware-configuration.nix
     ../../modules/nixos/wooting.nix
@@ -12,11 +7,8 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
-      cura
-      nicotine-plus
-    ]) # STABLE installed packages
-    ++ (with pkgs-unstable; []); # UNSTABLE installed packages
+    (with pkgs; [ cura nicotine-plus ]) # STABLE installed packages
+    ++ (with pkgs-unstable; [ ]); # UNSTABLE installed packages
 
   # disable laptop display
   services.xserver = {
@@ -57,7 +49,7 @@
   networking.hostName = "legion";
 
   # Set extra groups
-  users.users.lilijoy.extraGroups = ["docker"];
+  users.users.lilijoy.extraGroups = [ "docker" ];
 
   # NVIDIA ========================================================================================
   hardware.opengl = {
@@ -66,7 +58,8 @@
     driSupport = true;
     driSupport32Bit = true;
   };
-  services.xserver.videoDrivers = ["nvidia"]; # Load nvidia driver for Xorg and Wayland
+  services.xserver.videoDrivers =
+    [ "nvidia" ]; # Load nvidia driver for Xorg and Wayland
   hardware.nvidia = {
     # Modesetting is required.
     modesetting.enable = true;

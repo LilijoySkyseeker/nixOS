@@ -1,4 +1,4 @@
-{config, ...}: {
+{ config, ... }: {
   # webdav
   services.webdav = {
     enable = true;
@@ -7,13 +7,11 @@
       port = 8083;
       directory = "/";
       permisions = "none";
-      users = [
-        {
-          username = "lilijoy";
-          password = "$cat ${config.sops.secrets.webdav_lilijoy.path})";
-          permissions = "CRUD";
-        }
-      ];
+      users = [{
+        username = "lilijoy";
+        password = "$cat ${config.sops.secrets.webdav_lilijoy.path})";
+        permissions = "CRUD";
+      }];
     };
   };
 
@@ -24,7 +22,8 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."webdav.skyseekerlabs.duckdns.org".extraConfig = ''
-    reverse_proxy localhost:8083
-  '';
+  services.caddy.virtualHosts."webdav.skyseekerlabs.duckdns.org".extraConfig =
+    ''
+      reverse_proxy localhost:8083
+    '';
 }

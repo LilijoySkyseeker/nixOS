@@ -1,14 +1,10 @@
-{pkgs-unstable, ...}: {
+{ pkgs-unstable, ... }: {
   # System installed pkgs
-  environment.systemPackages = with pkgs-unstable; [
-    beets
-  ];
+  environment.systemPackages = with pkgs-unstable; [ beets ];
 
   # beets config
   environment = {
-    variables = {
-      BEETSDIR = "/etc/beets";
-    };
+    variables = { BEETSDIR = "/etc/beets"; };
     etc."beetsConfig" = {
       text = ''
         threaded: yes

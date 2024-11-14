@@ -1,11 +1,4 @@
-{
-  config,
-  pkgs,
-  pkgs-unstable,
-  lib,
-  vars,
-  ...
-}: {
+{ config, pkgs, pkgs-unstable, lib, vars, ... }: {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
@@ -26,25 +19,27 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    (with pkgs; [
-      # STABLE installed packages
-      sanoid # also installs syncoid and findoid
-      zfs
-      restic
-      backblaze-b2
-      btop
-      tmux
-      zellij
-    ])
-    ++ (with pkgs-unstable; [
+  environment.systemPackages = (with pkgs; [
+    # STABLE installed packages
+    sanoid # also installs syncoid and findoid
+    zfs
+    restic
+    backblaze-b2
+    btop
+    tmux
+    zellij
+  ]) ++ (with pkgs-unstable;
+    [
       # UNSTABLE installed packages
     ]);
 
-  # podman settings
-  virtualisation.docker.daemon.settings = {
-    userland-proxy = false;
-  };
+  # disable staggered hdd spin up
+boot.extraModprobeConfig = ''
+  options libahci ignore_sss=1
+'';
+
+  # docker settings
+  virtualisation.docker.daemon.settings = { userland-proxy = false; };
 
   # oci containers
   virtualisation.oci-containers.backend = "docker";
@@ -87,7 +82,7 @@
   # networking
   networking.networkmanager = {
     enable = true;
-    insertNameservers = ["8.8.8.8" "1.1.1.1"];
+    insertNameservers = [ "8.8.8.8" "1.1.1.1" ];
   };
 
   # directory permissions
@@ -103,31 +98,25 @@
     #   acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
-  networking.firewall.allowedTCPPorts = [
-    443
-  ];
-  networking.firewall.allowedUDPPorts = [
-    443
-  ];
+  networking.firewall.allowedTCPPorts = [ 443 ];
+  networking.firewall.allowedUDPPorts = [ 443 ];
 
   # duckdns
   services.cron = {
     enable = true;
-    systemCronJobs = [
-      "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1"
-    ];
+    systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
   };
 
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {
-    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = {};
-    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = {};
-    homelab_backblaze_restic_password = {};
+    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = { };
+    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = { };
+    homelab_backblaze_restic_password = { };
   };
   systemd.services.restic-backups-backblazeDaily-startup = {
     enable = true;
-    wantedBy = ["multi-user.target"];
-    before = ["restic-backups-backblazeDaily.service"];
+    wantedBy = [ "multi-user.target" ];
+    before = [ "restic-backups-backblazeDaily.service" ];
     script = ''
       rm -rf /etc/rclone
       mkdir /etc/rclone
@@ -147,8 +136,10 @@
     backblazeDaily = {
       initialize = true;
       createWrapper = true; # usable with restic-backblazeDaily
-      passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
+      passwordFile =
+        "${config.sops.secrets.homelab_backblaze_restic_password.path}";
+      repository =
+        "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
@@ -173,22 +164,14 @@
           rm -rf /tmp/restic
       '';
       user = "root";
-      paths = [
-        "/tmp/restic"
-      ];
+      paths = [ "/tmp/restic" ];
       timerConfig = {
         OnCalendar = "04:00";
         Persistent = true;
       };
-      pruneOpts = [
-        "--retry-lock 15m"
-        "--keep-daily 30"
-      ];
+      pruneOpts = [ "--retry-lock 15m" "--keep-daily 30" ];
       runCheck = true;
-      checkOpts = [
-        "--retry-lock 15m"
-        "--read-data-subset=1%"
-      ];
+      checkOpts = [ "--retry-lock 15m" "--read-data-subset=1%" ];
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
@@ -212,7 +195,7 @@
   # zfs snapshots
   services.sanoid = {
     enable = true;
-    extraArgs = ["--verbose"];
+    extraArgs = [ "--verbose" ];
     interval = "minutely";
     settings = {
       "zroot/local/state".use_template = "working";
@@ -245,28 +228,26 @@
       };
     };
   };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
-  };
+  systemd.services.sanoid.serviceConfig = { User = lib.mkForce "root"; };
   services.syncoid = {
     enable = true;
     interval = "hourly";
-    commonArgs = ["--no-sync-snap"]; # "--create-bookmark" for mobile machines
+    commonArgs = [ "--no-sync-snap" ]; # "--create-bookmark" for mobile machines
     commands = {
       "zdata/storage/storage" = {
         source = "zdata/storage/storage";
         target = "zbackup/backup/homelab/storage";
-        extraArgs = ["--identifier=zdata_storage_storage"];
+        extraArgs = [ "--identifier=zdata_storage_storage" ];
       };
       "zdata/storage/storage-bulk" = {
         source = "zdata/storage/storage-bulk";
         target = "zbackup/backup-bulk/homelab/storage-bulk";
-        extraArgs = ["--identifier=zdata_storage_storage-bulk"];
+        extraArgs = [ "--identifier=zdata_storage_storage-bulk" ];
       };
       "zroot/local/state" = {
         source = "zroot/local/state";
         target = "zbackup/backup/homelab/state";
-        extraArgs = ["--identifier=zroot_local_state"];
+        extraArgs = [ "--identifier=zroot_local_state" ];
       };
     };
   };
@@ -286,7 +267,7 @@
 
   #security
   # lock down nix
-  nix.settings.allowed-users = ["root"];
+  nix.settings.allowed-users = [ "root" ];
   # disable sudo
   security.sudo.enable = false;
 
@@ -308,16 +289,14 @@
       ClientAliveInterval 60
       ClientAliveCountMax 5
     '';
-    hostKeys = [
-      {
-        path = "/etc/ssh/ssh_host_ed25519_key";
-        type = "ed25519";
-      }
-    ];
+    hostKeys = [{
+      path = "/etc/ssh/ssh_host_ed25519_key";
+      type = "ed25519";
+    }];
   };
 
   # zfs support
-  boot.supportedFilesystems = ["zfs"];
+  boot.supportedFilesystems = [ "zfs" ];
   ##   environment.systemPackages = with pkgs; [zfs];
   services.zfs = {
     autoScrub.enable = true;
@@ -333,10 +312,10 @@
       enable = true;
       services.rollback = {
         description = "Rollback root filesystem to a pristine state on boot";
-        wantedBy = ["initrd.target"];
-        after = ["zfs-import-zroot.service"];
-        before = ["sysroot.mount"];
-        path = with pkgs; [zfs];
+        wantedBy = [ "initrd.target" ];
+        after = [ "zfs-import-zroot.service" ];
+        before = [ "sysroot.mount" ];
+        path = with pkgs; [ zfs ];
         unitConfig.DefaultDependencies = "no";
         serviceConfig.Type = "oneshot";
         script = ''

@@ -1,13 +1,6 @@
-{
-  inputs,
-  pkgs,
-  config,
-  ...
-}: {
-  imports = [
-    inputs.copyparty.nixosModules.default
-  ];
-  environment.systemPackages = [pkgs.copyparty];
+{ inputs, pkgs, config, ... }: {
+  imports = [ inputs.copyparty.nixosModules.default ];
+  environment.systemPackages = [ pkgs.copyparty ];
 
   # copyparty
   services.copyparty = {
@@ -26,34 +19,27 @@
     volumes = {
       "/" = {
         path = "/storage";
-        access = {
-          A = ["lilijoy"];
-        };
+        access = { A = [ "lilijoy" ]; };
       };
       "/bulk" = {
         path = "/storage-bulk";
-        access = {
-          A = ["lilijoy"];
-        };
+        access = { A = [ "lilijoy" ]; };
       };
     };
   };
 
   # permissions
-  users.users.copyparty.extraGroups = ["multimedia"];
+  users.users.copyparty.extraGroups = [ "multimedia" ];
 
   # caddy
-  services.caddy.virtualHosts."copyparty.skyseekerlabs.duckdns.org".extraConfig = ''
-    reverse_proxy localhost:3923
-  '';
+  services.caddy.virtualHosts."copyparty.skyseekerlabs.duckdns.org".extraConfig =
+    ''
+      reverse_proxy localhost:3923
+    '';
 
   # firewall
-  networking.firewall.allowedTCPPorts = [
-    443
-  ];
-  networking.firewall.allowedUDPPorts = [
-    443
-  ];
+  networking.firewall.allowedTCPPorts = [ 443 ];
+  networking.firewall.allowedUDPPorts = [ 443 ];
 
   # passwords
   sops.secrets.copyparty_lilijoy = {
@@ -62,16 +48,12 @@
   };
 
   # directory permissions
-  systemd.tmpfiles.rules = [
-    "d /srv/copyparty 0770 copyparty - - -"
-  ];
+  systemd.tmpfiles.rules = [ "d /srv/copyparty 0770 copyparty - - -" ];
 
   # persistence
-  environment.persistence."/nix/state".directories = [
-    {
-      directory = "/srv/copyparty";
-      user = "copyparty";
-      group = "copyparty";
-    }
-  ];
+  environment.persistence."/nix/state".directories = [{
+    directory = "/srv/copyparty";
+    user = "copyparty";
+    group = "copyparty";
+  }];
 }

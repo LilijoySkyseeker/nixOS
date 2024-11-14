@@ -1,9 +1,5 @@
-{
-  pkgs,
-  config,
-  ...
-}: {
-  environment.systemPackages = with pkgs; [rclone];
+{ pkgs, config, ... }: {
+  environment.systemPackages = with pkgs; [ rclone ];
 
   environment.etc."rclone-mnt.conf".text = ''
     [homelab-dav]

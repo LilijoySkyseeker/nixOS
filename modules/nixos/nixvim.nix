@@ -1,11 +1,5 @@
-{
-  inputs,
-  lib,
-  ...
-}: {
-  imports = [
-    inputs.nixvim.nixosModules.nixvim
-  ];
+{ inputs, lib, ... }: {
+  imports = [ inputs.nixvim.nixosModules.nixvim ];
 
   programs.neovim = {
     enable = true;
@@ -20,15 +14,25 @@
     globals.mapleader = " ";
     viAlias = true;
     vimAlias = true;
-    opts = {
-    };
+    opts = { };
     plugins = {
       nix.enable = true;
       lualine.enable = true;
       lsp = {
         enable = true;
         servers = {
-          nil-ls.enable = true; # nix
+          nil-ls.enable = false; # nix
+          nixd = { 
+            enable = true;
+            extraOptions = {
+              nixpkgs.expr = "import <nixpkgs> { }";
+              formatting.command = "nixfmt";
+              options = {
+                nixos.expr = "(builtins.getFlake \"/home/lilijoy/dotfiles\").nixosConfigurations.CONFIGNAME.options";
+                home_manager.expr = "(builtins.getFlake \"/home/lilijoy/dotfiles\").homeConfigurations.CONFIGNAME.options";
+              };
+            };
+          };
         };
       };
     };
@@ -82,6 +86,126 @@
 
       set foldmethod=indent
       set nofoldenable
+    '';
+  extraConfigLua =
+    # lua
+    ''
+      -- Extra nvim-lspconfig configuration
+      -- Common LSP key mappings
+      local function set_cmn_lsp_keybinds()
+      	local lsp_keybinds = {
+      		{
+      			key = "K",
+      			action = vim.lsp.buf.hover,
+      			options = {
+      				buffer = 0,
+      				desc = "hover [K]noledge with LSP",
+      			},
+      		},
+      		{
+      			key = "gd",
+      			action = vim.lsp.buf.definition,
+      			options = {
+      				buffer = 0,
+      				desc = "[g]o to [d]efinition with LSP",
+      			},
+      		},
+      		{
+      			key = "gy",
+      			action = vim.lsp.buf.type_definition,
+      			options = {
+      				buffer = 0,
+      				desc = "[g]o to t[y]pe definition with LSP",
+      			},
+      		},
+      		{
+      			key = "gi",
+      			action = vim.lsp.buf.implementation,
+      			options = {
+      				buffer = 0,
+      				desc = "[g]o to [i]mplementation with LSP",
+      			},
+      		},
+      		{
+      			key = "<leader>dj",
+      			action = vim.diagnostic.goto_next,
+      			options = {
+      				buffer = 0,
+      				desc = "Go to next [d]iagnostic with LSP",
+      			},
+      		},
+      		{
+      			key = "<leader>dk",
+      			action = vim.diagnostic.goto_prev,
+      			options = {
+      				buffer = 0,
+      				desc = "Go to previous [d]iagnostic with LSP",
+      			},
+      		},
+      		{
+      			key = "<leader>r",
+      			action = vim.lsp.buf.rename,
+      			options = {
+      				buffer = 0,
+      				desc = "[r]ename variable with LSP",
+      			},
+      		},
+      	}
+
+      	for _, bind in ipairs(lsp_keybinds) do
+      		vim.keymap.set("n", bind.key, bind.action, bind.options)
+      	end
+      end
+
+      -- Additional lsp-config
+      capabilities.textDocument.completion.completionItem.snippetSupport = true
+
+      -- Individual LSP configs
+
+      -- Markdown LSP
+      require("lspconfig").marksman.setup({
+      	on_attach = function()
+      		set_cmn_lsp_keybinds()
+      	end,
+      })
+
+      -- Nix LSP
+      require("lspconfig").nixd.setup({
+      	on_attach = function()
+      		set_cmn_lsp_keybinds()
+      	end,
+      	settings = {
+      		nixd = {
+      			formatting = {
+      				command = { "nixfmt" },
+      			},
+      		},
+      	},
+      })
+
+      -- Python LSP
+      require("lspconfig").ruff_lsp.setup({
+      	on_attach = function()
+      		set_cmn_lsp_keybinds()
+      	end,
+      })
+
+      -- Rust LSP
+      require("lspconfig").rust_analyzer.setup({
+      	root_dir = function(fname)
+      		return vim.loop.cwd()
+      	end,
+      	settings = {
+      		['rust-analyzer'] = {
+      			cargo = {
+      				allFeatures = true,
+      			},
+      		},
+      	},
+      	on_attach = function()
+      		set_cmn_lsp_keybinds()
+      	end,
+      })
     '';
   };
 }

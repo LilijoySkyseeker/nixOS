@@ -1,74 +1,61 @@
-{
-  config,
-  pkgs,
-  pkgs-unstable,
-  inputs,
-  lib,
-  ...
-}: {
+{ config, pkgs, pkgs-unstable, inputs, lib, ... }: {
   imports = [
     inputs.stylix.nixosModules.stylix
-    ../modules/nixos/virtual-machines.nix #(also needs home manager config)
+    ../modules/nixos/virtual-machines.nix # (also needs home manager config)
     ./default.nix
     ../custom-packages/tpm-fido/package.nix
-    ../modules/nixos/copypartymount.nix
+    #../modules/nixos/copypartymount.nix
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    (with pkgs; [
-      # STABLE installed packages
+  environment.systemPackages = (with pkgs; [
+    # STABLE installed packages
 
-      grc # Text colors
-      ripgrep
-      gitFull
-      nvtopPackages.full
-      gjs # for kdeconnect
-      restic # backups
-      fd
-      nixos-anywhere
-      ssh-to-age
-      rclone
+    grc # Text colors
+    ripgrep
+    gitFull
+    nvtopPackages.full
+    gjs # for kdeconnect
+    restic # backups
+    fd
+    nixos-anywhere
+    ssh-to-age
+    rclone
 
-      yubikey-manager
+    yubikey-manager
 
-      distrobox
+    distrobox
 
-      gnome-extension-manager
-      baobab # gnome disk usage utilty
-      gnome.gnome-tweaks
-      bitwarden
-      thunderbird
-      vscode-fhs
-      python3
-      cider
-      prismlauncher
-      kdenlive
-      qbittorrent
-      jellyfin-media-player
-      easyeffects
-      qpwgraph
-      youtube-music
-      qalculate-gtk
-      libreoffice
-      vial
-      vlc
-      r2modman
-      yubioath-flutter
-      vesktop
+    gnome-extension-manager
+    baobab # gnome disk usage utilty
+    gnome.gnome-tweaks
+    bitwarden
+    thunderbird
+    vscode-fhs
+    python3
+    cider
+    prismlauncher
+    kdenlive
+    qbittorrent
+    jellyfin-media-player
+    easyeffects
+    qpwgraph
+    youtube-music
+    qalculate-gtk
+    libreoffice
+    vial
+    vlc
+    r2modman
+    yubioath-flutter
+    vesktop
 
-      obsidian
-      spotify
-    ])
-    ++ (with pkgs-unstable; [
-      feishin
-    ]); # UNSTABLE installed packages
+    obsidian
+    spotify
+  ]) ++ (with pkgs-unstable; [ feishin ]); # UNSTABLE installed packages
 
   # home-manager
   home-manager.users.lilijoy = {
-    imports = [
-      ../modules/home-manager/tooling.nix
-    ];
+    imports = [ ../modules/home-manager/tooling.nix ];
     home.stateVersion = "23.11";
     home.username = "lilijoy";
     home.homeDirectory = "/home/lilijoy";
@@ -93,8 +80,8 @@
     # Virtual-machine (also neeed nixos module)
     dconf.settings = {
       "org/virt-manager/virt-manager/connections" = {
-        autoconnect = ["qemu:///system"];
-        uris = ["qemu:///system"];
+        autoconnect = [ "qemu:///system" ];
+        uris = [ "qemu:///system" ];
       };
     };
 
@@ -107,9 +94,7 @@
     # OBS Studio
     programs.obs-studio = {
       enable = true;
-      plugins = with pkgs.obs-studio-plugins; [
-        obs-pipewire-audio-capture
-      ];
+      plugins = with pkgs.obs-studio-plugins; [ obs-pipewire-audio-capture ];
     };
 
     # BTOP
@@ -125,9 +110,7 @@
     };
 
     # Firefox
-    programs.firefox = {
-      enable = true;
-    };
+    programs.firefox = { enable = true; };
 
     # fish
     programs.fish = {
@@ -149,32 +132,28 @@
         }
       ];
       functions = {
-        nsr.body = "
-              nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
-              ";
-        ns.body = "
-              nix shell 'nixpkgs/nixos-unstable#'{$argv}
-            ";
-        nhu.body = "
-              git add --all && nh os build --update && git add --all
-              ";
-        nht.body = "
-              git add --all && nh os test
-              ";
-        nhb.body = "
-              git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push
-              ";
-        nhs.body = "
-              git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
-              ";
-        gds.body = "
-              git add --all && git diff --staged | bat --paging always --pager less
-              ";
+        nsr.body =
+          "\n              nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv\n              ";
+        ns.body =
+          "\n              nix shell 'nixpkgs/nixos-unstable#'{$argv}\n            ";
+        nhu.body =
+          "\n              git add --all && nh os build --update && git add --all\n              ";
+        nht.body =
+          "\n              git add --all && nh os test\n              ";
+        nhb.body =
+          "\n              git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push\n              ";
+        nhs.body =
+          "\n              git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push\n              ";
+        gds.body =
+          "\n              git add --all && git diff --staged | bat --paging always --pager less\n              ";
       };
       shellAliases = {
-        e = "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
-        et = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
-        etl = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
+        e =
+          "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+        et =
+          "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+        etl =
+          "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
       };
       shellAbbrs = {
         rsync = "rsync --verbose --recursive --progress --human-readable";
@@ -184,9 +163,7 @@
     # bat
     programs.bat = {
       enable = true;
-      config = {
-        pager = "never";
-      };
+      config = { pager = "never"; };
     };
 
     # eza
@@ -206,21 +183,15 @@
         clock-show-weekday = true;
         clock-show-seconds = true;
       };
-      "org/gtk/settings/file-chooser" = {
-        clock-format = "12h";
-      };
-      "org/gtk/gtk4/settings/file-chooser" = {
-        show-hidden = true;
-      };
-      "org/gnome/desktop/peripherals/mouse" = {
-        accel-profile = "flat";
-      };
+      "org/gtk/settings/file-chooser" = { clock-format = "12h"; };
+      "org/gtk/gtk4/settings/file-chooser" = { show-hidden = true; };
+      "org/gnome/desktop/peripherals/mouse" = { accel-profile = "flat"; };
 
       "org/gnome/mutter" = {
         dynamic-workspaces = false;
         workspaces-only-on-primary = true;
         check-alive-timeout = "uint32 60000";
-        experimental-features = ["variable-refresh-rate"];
+        experimental-features = [ "variable-refresh-rate" ];
       };
       "org/gnome/settings-daemon/plugins/power" = {
         idle-dim = false;
@@ -269,7 +240,7 @@
         clock-format = "12h";
         simplify-degrees = true;
         weather-provider = "openweathermap";
-        custom-keys = ["34f3635c44f16c3c385e875bdbbfb445"];
+        custom-keys = [ "34f3635c44f16c3c385e875bdbbfb445" ];
         position-in-panel = "right";
         position-index = 0;
         show-text-in-panel = true;
@@ -324,18 +295,17 @@
     };
 
     # Gnome extension packages
-    home.packages =
-      (with pkgs.gnomeExtensions; [
-        # STABLE
-        dash-to-panel
-        clipboard-indicator
-        tiling-assistant
-        ddterm
-        battery-time-percentage-compact
-        battery-usage-wattmeter
-        smart-auto-move
-      ])
-      ++ (with pkgs-unstable.gnomeExtensions; [
+    home.packages = (with pkgs.gnomeExtensions; [
+      # STABLE
+      dash-to-panel
+      clipboard-indicator
+      tiling-assistant
+      ddterm
+      battery-time-percentage-compact
+      battery-usage-wattmeter
+      smart-auto-move
+    ]) ++ (with pkgs-unstable.gnomeExtensions;
+      [
         # UNSTABLE
         openweather-refined
       ]);
@@ -345,36 +315,31 @@
   tpm-fido.enable = true;
 
   # ssh key type order
-  programs.ssh.hostKeyAlgorithms = [
-    "ssh-ed25519"
-    "ecdsa"
-  ];
+  programs.ssh.hostKeyAlgorithms = [ "ssh-ed25519" "ecdsa" ];
 
   # service for yubikey
   services.pcscd.enable = true;
 
   # restric nix package manager to @wheel
-  nix.settings.allowed-users = ["@wheel"];
+  nix.settings.allowed-users = [ "@wheel" ];
 
   # sops config
-  sops.age.sshKeyPaths = ["/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ed25519"];
+  sops.age.sshKeyPaths =
+    [ "/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ed25519" ];
   sops.secrets = {
-    open_weather_key = {};
-    restic = {
-      owner = config.users.users.lilijoy.name;
-    };
+    open_weather_key = { };
+    restic = { owner = config.users.users.lilijoy.name; };
   };
 
   # nh, nix helper
-  programs.nh = {
-    flake = "/home/lilijoy/dotfiles";
-  };
+  programs.nh.flake = "/home/lilijoy/dotfiles";
 
   # Stylix
   stylix = {
     enable = true;
     autoEnable = true;
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    base16Scheme =
+      "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
     image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
     polarity = "dark";
     cursor.package = pkgs.capitaine-cursors-themed;
@@ -401,23 +366,22 @@
   services.xserver.desktopManager.gnome.enable = true;
 
   # Docker
-  virtualisation.docker = {
-    enable = true;
-  };
+  virtualisation.docker = { enable = true; };
 
   # Intel CPU freq stuck fix
-  boot.kernelParams = ["intel_pstate=active"];
+  boot.kernelParams = [ "intel_pstate=active" ];
 
   # LD fix
   programs.nix-ld.enable = true;
-  programs.nix-ld.libraries = with pkgs; [
-    # add any missing dynamic libraries for unpackaged programs here
-  ];
+  programs.nix-ld.libraries = with pkgs;
+    [
+      # add any missing dynamic libraries for unpackaged programs here
+    ];
 
   # sudo
   security.sudo = {
     execWheelOnly = true;
-    package = pkgs.sudo.override {withInsults = true;};
+    package = pkgs.sudo.override { withInsults = true; };
   };
 
   # Enable bluetooth
@@ -425,7 +389,8 @@
   hardware.bluetooth.powerOnBoot = true;
 
   # Enable CUPS to print documents.
-  services.printing.enable = false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
+  services.printing.enable =
+    false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
 
   # Enable sound with pipewire.
   sound.enable = true;
@@ -442,13 +407,11 @@
   users.users.lilijoy = {
     isNormalUser = true;
     description = "Lilijoy";
-    extraGroups = ["networkmanager" "wheel"];
+    extraGroups = [ "networkmanager" "wheel" ];
   };
 
   # Git
-  programs.git = {
-    enable = true;
-  };
+  programs.git = { enable = true; };
 
   # fish
   programs.fish = {
@@ -465,7 +428,8 @@
       fi
     '';
   };
-  environment.shellAliases = lib.mkForce {}; # clear all shell aliases, using fish functions instead
+  environment.shellAliases =
+    lib.mkForce { }; # clear all shell aliases, using fish functions instead
 
   # steam
   programs.steam = {
@@ -494,9 +458,7 @@
   };
 
   # fonts
-  fonts.packages = with pkgs; [
-    (nerdfonts.override {fonts = ["Meslo"];})
-  ];
+  fonts.packages = with pkgs; [ (nerdfonts.override { fonts = [ "Meslo" ]; }) ];
 
   # Mullvad vpn
   services.mullvad-vpn = {

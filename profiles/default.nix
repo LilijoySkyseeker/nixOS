@@ -1,39 +1,34 @@
-{
-  pkgs,
-  pkgs-unstable,
-  inputs,
-  lib,
-  vars,
-  ...
-}: {
+{ pkgs, pkgs-unstable, inputs, lib, vars, ... }: {
   imports = [
     inputs.sops-nix.nixosModules.sops
     inputs.nix-index-database.nixosModules.nix-index
     inputs.home-manager.nixosModules.home-manager
     ../modules/nixos/nixvim.nix
   ];
-  environment.systemPackages =
-    (with pkgs; [
-      # STABLE installed packages
-      wget
-      eza
-      tldr
-      bat
-      zoxide
-      git
-      neovim
-      alejandra
-      rsync
-      sops # secrets management
-    ])
-    ++ (with pkgs-unstable; [
+  environment.systemPackages = (with pkgs; [
+    # STABLE installed packages
+    wget
+    eza
+    tldr
+    bat
+    zoxide
+    git
+    neovim
+    nixfmt
+    rsync
+    sops # secrets management
+  ]) ++ (with pkgs-unstable;
+    [
       # UNSTABLE installed packages
     ]);
+
+  # make sure <nixpkgs> sources from the flake
+  nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
 
   # home-manager
   home-manager = {
     # also pass inputs to home-manager modules
-    extraSpecialArgs = {inherit inputs pkgs pkgs-unstable vars;};
+    extraSpecialArgs = { inherit inputs pkgs pkgs-unstable vars; };
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
@@ -47,19 +42,6 @@
     enable = true;
     defaultEditor = lib.mkForce true;
   };
-
-  # # tweaks, credit: https://github.com/headblockhead/dotfiles/blob/61cf195ab5a2f81d0844108b6f242938191622cc/systems/edward-desktop-01/config.nix
-  # # set each flake input as registry to make nix3 commands consistent with flake
-  # nix.registry = (lib.mapAttrs (_: flake: {inherit flake;})) ((lib.filterAttrs (_: lib.isType "flake")) inputs);
-  # # add inupts to legacy channels to make legacy commands consistant with flake
-  # nix.nixPath = ["/etc/nix/path"];
-  # environment.etc =
-  #   lib.mapAttrs'
-  #   (name: value: {
-  #     name = "nix/path/${name}";
-  #     value.source = value.flake;
-  #   })
-  #   config.nix.registry;
 
   # sops-nix support, secret managment
   sops = {
@@ -84,13 +66,13 @@
   programs.command-not-found.enable = false;
 
   # remove all defualt packages
-  environment.defaultPackages = lib.mkForce [];
+  environment.defaultPackages = lib.mkForce [ ];
 
   # firewall
   networking.firewall.enable = true;
 
   # Enable Flake Support
-  nix.settings.experimental-features = ["nix-command" "flakes"];
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   # direnv
   programs.direnv = {

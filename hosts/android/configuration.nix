@@ -1,20 +1,13 @@
-{
-  pkgs,
-  pkgs-unstable,
-  ...
-}: {
-  imports = [
-    ../../modules/nixos/nixvim.nix
-  ];
+{ pkgs, pkgs-unstable, ... }: {
+  imports = [ ../../modules/nixos/nixvim.nix ];
 
   # System installed pkgs
-  environment.systemPackages =
-    (with pkgs; [
-      # STABLE installed packages
-      git
-      neovim
-    ])
-    ++ (with pkgs-unstable; [
+  environment.systemPackages = (with pkgs; [
+    # STABLE installed packages
+    git
+    neovim
+  ]) ++ (with pkgs-unstable;
+    [
       # UNSTABLE installed packages
     ]);
 
@@ -23,9 +16,7 @@
     backupFileExtension = "hm-bak";
     useGlobalPkgs = true;
     useUserPackages = true;
-    config = {
-      home.stateVersion = "24.05";
-    };
+    config = { home.stateVersion = "24.05"; };
   };
 
   # backup instead of fail
