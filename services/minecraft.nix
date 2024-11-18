@@ -8,8 +8,8 @@
     ''
       reverse_proxy localhost:8100
     '';
-  networking.firewall.allowedTCPPorts = [ 25565 ];
-  networking.firewall.allowedUDPPorts = [ 25565 ];
+  networking.firewall.allowedTCPPorts = [ 25565 8100 ];
+  networking.firewall.allowedUDPPorts = [ 25565 8100 ];
 
   # persistence
   environment.persistence."/nix/state".directories = [{

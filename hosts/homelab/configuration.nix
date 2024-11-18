@@ -34,9 +34,9 @@
     ]);
 
   # disable staggered hdd spin up
-boot.extraModprobeConfig = ''
-  options libahci ignore_sss=1
-'';
+  boot.extraModprobeConfig = ''
+    options libahci ignore_sss=1
+  '';
 
   # docker settings
   virtualisation.docker.daemon.settings = { userland-proxy = false; };
