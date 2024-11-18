@@ -45,8 +45,8 @@
         ferrite-core
         easy-shulker-boxes
         carpet
-        itemswapper
         enchant-tweaker
+        bluemap
       '';
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
