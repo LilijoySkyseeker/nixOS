@@ -4,6 +4,10 @@
     ''
       reverse_proxy localhost:25565
     '';
+  services.caddy.virtualHosts."minecraft-map.skyseekerhomelab.duckdns.org".extraConfig =
+    ''
+      reverse_proxy localhost:8100
+    '';
   networking.firewall.allowedTCPPorts = [ 25565 ];
   networking.firewall.allowedUDPPorts = [ 25565 ];
 
