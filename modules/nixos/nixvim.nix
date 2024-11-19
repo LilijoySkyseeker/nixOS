@@ -26,7 +26,7 @@
             enable = true;
             extraOptions = {
               nixpkgs.expr = "import <nixpkgs> { }";
-              formatting.command = "nixfmt";
+              formatting.command = "nixfmt-rfc-style";
               options = {
                 nixos.expr = ''
                   (builtins.getFlake "/home/lilijoy/dotfiles").nixosConfigurations.CONFIGNAME.options'';

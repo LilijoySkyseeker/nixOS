@@ -14,7 +14,7 @@
     zoxide
     git
     neovim
-    nixfmt
+    nixfmt-rfc-style
     rsync
     sops # secrets management
   ]) ++ (with pkgs-unstable;

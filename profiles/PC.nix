@@ -261,6 +261,8 @@
         my-loc-prov = "ipinfoio";
         geolocation-provider = "openstreetmaps";
       };
+
+      # Tiling Assistant
       "org/gnome/shell/extensions/tiling-assistant" = {
         maximize-with-gap = true;
         enable-tiling-popup = false;
@@ -277,6 +279,13 @@
         theme-variant = "dark";
       };
 
+      # Tiling Shell
+      "org/gnome/shell/extensions/tilingshell" = {
+        overridden-settings = ''
+          "{\"org.gnome.mutter.keybindings\":{\"toggle-tiled-right\":\"['<Super>Right']\",\"toggle-tiled-left\":\"['<Super>Left']\"},\"org.gnome.desktop.wm.keybindings\":{\"maximize\":\"['<Super>Up']\",\"unmaximize\":\"['<Super>Down', '<Alt>F5']\"},\"org.gnome.mutter\":{\"edge-tiling\":\"false\"}}"
+        '';
+      };
+
       # enabled extensions
       "org/gnome/shell" = {
         disable-user-extensions = false;
@@ -284,12 +293,13 @@
           "dash-to-panel@jderose9.github.com"
           "clipboard-indicator@tudmotu.com"
           "openweather-extension@penguin-teal.github.io"
-          "tiling-assistant@leleat-on-github"
+#         "tiling-assistant@leleat-on-github"
           "ddterm@amezin.github.com"
           "gsconnect@andyholmes.github.io"
           "batterytimepercentagecompact@sagrland.de"
           "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
           "smart-auto-move@khimaros.com"
+          "tilingshell@ferrarodomenico.com"
         ];
       };
     };
@@ -308,6 +318,7 @@
       [
         # UNSTABLE
         openweather-refined
+        tiling-shell
       ]);
   };
 

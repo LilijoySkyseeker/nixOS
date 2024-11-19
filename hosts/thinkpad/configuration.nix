@@ -162,7 +162,7 @@
         "--host ${config.networking.hostName}"
         "--retry-lock 15m"
         "--keep-hourly 24"
-        "--keep-daily 32"
+        "--keep-daily 7"
       ];
     };
   };
