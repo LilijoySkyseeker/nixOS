@@ -13,7 +13,7 @@
   # factorio server
   virtualisation.oci-containers.containers.factorio-main = {
     autoStart = true;
-    image = "factoriotools/factorio:2.0.13";
+    image = "factoriotools/factorio:stable";
     ports = [ "34197:34197/udp" ];
     volumes = [ "/srv/factorio/main:/factorio" ];
     environment = { UPDATE_MODS_ON_START = "true"; };
