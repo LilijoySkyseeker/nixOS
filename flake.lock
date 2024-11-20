@@ -122,11 +122,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1731872384,
-        "narHash": "sha256-9RFmlCHuZOZBDuLFb+ayJigzc+R14fVZZZzZ2T6lOP8=",
+        "lastModified": 1732041580,
+        "narHash": "sha256-cH72lnO1AmyYekuiOjdgJzOEIu1Gx0oGnDE3sfHIH8I=",
         "owner": "9001",
         "repo": "copyparty",
-        "rev": "9c8507a0fd469eee5612ed4ed764f604c555a016",
+        "rev": "8f7ffcf3503410900aa46c16e050b5bd19b8765a",
         "type": "github"
       },
       "original": {
@@ -163,11 +163,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1731895210,
-        "narHash": "sha256-z76Q/OXLxO/RxMII3fIt/TG665DANiE2lVvnolK2lXk=",
+        "lastModified": 1732030699,
+        "narHash": "sha256-SBosboLvLqDv+7mNgRTIYDQbHE61rDDkXTJWiRX3PPo=",
         "owner": "nix-community",
         "repo": "disko",
-        "rev": "639d1520df9417ca2761536c3072688569e83c80",
+        "rev": "da52cf40206d7d1a419d07640eb47b2fb9ac2c21",
         "type": "github"
       },
       "original": {
@@ -558,11 +558,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1730550779,
-        "narHash": "sha256-2stntmqw/GBOVEoPV4oCLHZljpeSBfZn8wkcJpei+ng=",
+        "lastModified": 1731959181,
+        "narHash": "sha256-RryrMTaCvmXzhl0lYm/jAG8bAxsAhEcNq1JRtkCL4wI=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "91c06026075f08a3c865fdc46cc6db8e2af35a1e",
+        "rev": "8d29728abfcc2e4207afb3fd8606feff17c15cec",
         "type": "github"
       },
       "original": {
@@ -665,11 +665,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1731862312,
-        "narHash": "sha256-NVUTFxKrJp/hjehlF1IvkPnlRYg/O9HFVutbxOM8zNM=",
+        "lastModified": 1731954233,
+        "narHash": "sha256-vvXx1m2Rsw7MkbKJdpcICzz4YPgZPApGKQGhNZfkhOI=",
         "owner": "Mic92",
         "repo": "sops-nix",
-        "rev": "472741cf3fee089241ac9ea705bb2b9e0bfa2978",
+        "rev": "e39947d0ee8e341fa7108bd02a33cdfa24a1360e",
         "type": "github"
       },
       "original": {
