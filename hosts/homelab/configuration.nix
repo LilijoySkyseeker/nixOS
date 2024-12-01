@@ -1,4 +1,12 @@
-{ config, pkgs, pkgs-unstable, lib, vars, ... }: {
+{
+  config,
+  pkgs,
+  pkgs-unstable,
+  lib,
+  vars,
+  ...
+}:
+{
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
@@ -19,17 +27,18 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages = (with pkgs; [
-    # STABLE installed packages
-    sanoid # also installs syncoid and findoid
-    zfs
-    restic
-    backblaze-b2
-    btop
-    tmux
-    zellij
-  ]) ++ (with pkgs-unstable;
-    [
+  environment.systemPackages =
+    (with pkgs; [
+      # STABLE installed packages
+      sanoid # also installs syncoid and findoid
+      zfs
+      restic
+      backblaze-b2
+      btop
+      tmux
+      zellij
+    ])
+    ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
 
@@ -39,7 +48,9 @@
   '';
 
   # docker settings
-  virtualisation.docker.daemon.settings = { userland-proxy = false; };
+  virtualisation.docker.daemon.settings = {
+    userland-proxy = false;
+  };
 
   # oci containers
   virtualisation.oci-containers.backend = "docker";
@@ -82,7 +93,10 @@
   # networking
   networking.networkmanager = {
     enable = true;
-    insertNameservers = [ "8.8.8.8" "1.1.1.1" ];
+    insertNameservers = [
+      "8.8.8.8"
+      "1.1.1.1"
+    ];
   };
 
   # directory permissions
@@ -136,10 +150,8 @@
     backblazeDaily = {
       initialize = true;
       createWrapper = true; # usable with restic-backblazeDaily
-      passwordFile =
-        "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repository =
-        "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
+      passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
+      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
@@ -169,9 +181,15 @@
         OnCalendar = "04:00";
         Persistent = true;
       };
-      pruneOpts = [ "--retry-lock 15m" "--keep-daily 30" ];
+      pruneOpts = [
+        "--retry-lock 15m"
+        "--keep-daily 30"
+      ];
       runCheck = true;
-      checkOpts = [ "--retry-lock 15m" "--read-data-subset=1%" ];
+      checkOpts = [
+        "--retry-lock 15m"
+        "--read-data-subset=1%"
+      ];
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
@@ -228,7 +246,9 @@
       };
     };
   };
-  systemd.services.sanoid.serviceConfig = { User = lib.mkForce "root"; };
+  systemd.services.sanoid.serviceConfig = {
+    User = lib.mkForce "root";
+  };
   services.syncoid = {
     enable = true;
     interval = "hourly";
@@ -289,10 +309,12 @@
       ClientAliveInterval 60
       ClientAliveCountMax 5
     '';
-    hostKeys = [{
-      path = "/etc/ssh/ssh_host_ed25519_key";
-      type = "ed25519";
-    }];
+    hostKeys = [
+      {
+        path = "/etc/ssh/ssh_host_ed25519_key";
+        type = "ed25519";
+      }
+    ];
   };
 
   # zfs support

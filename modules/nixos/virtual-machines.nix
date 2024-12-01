@@ -1,4 +1,11 @@
-{ config, pkgs, inputs, lib, ... }: {
+{
+  config,
+  pkgs,
+  inputs,
+  lib,
+  ...
+}:
+{
   # Virt-manager (also needs home manager config)
   # Adtional manual config required, read wiki
   # https://nixos.wiki/wiki/Virt-manager

@@ -1,19 +1,27 @@
-{ pkgs, pkgs-unstable, inputs, ... }: {
+{
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  ...
+}:
+{
   imports = [
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
   ];
-  environment.systemPackages = (with pkgs;
-    [
+  environment.systemPackages =
+    (with pkgs; [
       # STABLE installed packages
       flac
-    ]) ++ (with pkgs-unstable;
-      [
-        # UNSTABLE installed packages
-      ]);
+    ])
+    ++ (with pkgs-unstable; [
+      # UNSTABLE installed packages
+    ]);
 
   # nh, nix helper
-  programs.nh = { flake = "/etc/nixos"; };
+  programs.nh = {
+    flake = "/etc/nixos";
+  };
 
   # home-manager
   home-manager.users.root = {

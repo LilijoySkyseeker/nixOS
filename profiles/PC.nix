@@ -1,4 +1,12 @@
-{ config, pkgs, pkgs-unstable, inputs, lib, ... }: {
+{
+  config,
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  lib,
+  ...
+}:
+{
   imports = [
     inputs.stylix.nixosModules.stylix
     ../modules/nixos/virtual-machines.nix # (also needs home manager config)
@@ -8,52 +16,54 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages = (with pkgs; [
-    # STABLE installed packages
+  environment.systemPackages =
+    (with pkgs; [
+      # STABLE installed packages
 
-    grc # Text colors
-    ripgrep
-    gitFull
-    nvtopPackages.full
-    gjs # for kdeconnect
-    restic # backups
-    fd
-    nixos-anywhere
-    ssh-to-age
-    rclone
+      grc # Text colors
+      ripgrep
+      gitFull
+      nvtopPackages.full
+      gjs # for kdeconnect
+      restic # backups
+      fd
+      nixos-anywhere
+      ssh-to-age
+      rclone
 
-    yubikey-manager
+      yubikey-manager
 
-    distrobox
+      distrobox
 
-    gnome-extension-manager
-    baobab # gnome disk usage utilty
-    gnome.gnome-tweaks
-    bitwarden
-    thunderbird
-    vscode-fhs
-    python3
-    cider
-    kdenlive
-    qbittorrent
-    jellyfin-media-player
-    easyeffects
-    qpwgraph
-    youtube-music
-    qalculate-gtk
-    libreoffice
-    vial
-    vlc
-    r2modman
-    yubioath-flutter
-    vesktop
+      gnome-extension-manager
+      baobab # gnome disk usage utilty
+      gnome.gnome-tweaks
+      bitwarden
+      thunderbird
+      vscode-fhs
+      python3
+      cider
+      kdenlive
+      qbittorrent
+      jellyfin-media-player
+      easyeffects
+      qpwgraph
+      youtube-music
+      qalculate-gtk
+      libreoffice
+      vial
+      vlc
+      r2modman
+      yubioath-flutter
+      vesktop
 
-    obsidian
-    spotify
-  ]) ++ (with pkgs-unstable; [ 
-    feishin
-    prismlauncher
-  ]); # UNSTABLE installed packages
+      obsidian
+      spotify
+    ])
+    ++ (with pkgs-unstable; [
+      feishin
+      prismlauncher
+    ]); # UNSTABLE installed packages
 
   # home-manager
   home-manager.users.lilijoy = {
@@ -112,7 +122,9 @@
     };
 
     # Firefox
-    programs.firefox = { enable = true; };
+    programs.firefox = {
+      enable = true;
+    };
 
     # fish
     programs.fish = {
@@ -134,28 +146,18 @@
         }
       ];
       functions = {
-        nsr.body =
-          "\n              nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv\n              ";
-        ns.body =
-          "\n              nix shell 'nixpkgs/nixos-unstable#'{$argv}\n            ";
-        nhu.body =
-          "\n              git add --all && nh os build --update && git add --all\n              ";
-        nht.body =
-          "\n              git add --all && nh os test\n              ";
-        nhb.body =
-          "\n              git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push\n              ";
-        nhs.body =
-          "\n              git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push\n              ";
-        gds.body =
-          "\n              git add --all && git diff --staged | bat --paging always --pager less\n              ";
+        nsr.body = "\nnix shell nixpkgs/nixos-unstable#$argv[1] --command $argv\n";
+        ns.body = "\nnix shell 'nixpkgs/nixos-unstable#'{$argv}\n";
+        nhu.body = "\ngit add --all && nh os build --update && git add --all\n";
+        nht.body = "\ngit add --all && nh os test\n";
+        nhb.body = "\ngit add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push\n";
+        nhs.body = "\ngit add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push\n";
+        gds.body = "\ngit add --all && git diff --staged | bat --paging always --pager less\n";
       };
       shellAliases = {
-        e =
-          "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
-        et =
-          "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
-        etl =
-          "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
+        e = "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+        et = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
+        etl = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
       };
       shellAbbrs = {
         rsync = "rsync --verbose --recursive --progress --human-readable";
@@ -165,7 +167,9 @@
     # bat
     programs.bat = {
       enable = true;
-      config = { pager = "never"; };
+      config = {
+        pager = "never";
+      };
     };
 
     # eza
@@ -185,9 +189,15 @@
         clock-show-weekday = true;
         clock-show-seconds = true;
       };
-      "org/gtk/settings/file-chooser" = { clock-format = "12h"; };
-      "org/gtk/gtk4/settings/file-chooser" = { show-hidden = true; };
-      "org/gnome/desktop/peripherals/mouse" = { accel-profile = "flat"; };
+      "org/gtk/settings/file-chooser" = {
+        clock-format = "12h";
+      };
+      "org/gtk/gtk4/settings/file-chooser" = {
+        show-hidden = true;
+      };
+      "org/gnome/desktop/peripherals/mouse" = {
+        accel-profile = "flat";
+      };
 
       "org/gnome/mutter" = {
         dynamic-workspaces = false;
@@ -281,13 +291,6 @@
         theme-variant = "dark";
       };
 
-      # Tiling Shell
-#     "org/gnome/shell/extensions/tilingshell" = {
-#       overridden-settings = ''
-#         "{\"org.gnome.mutter.keybindings\":{\"toggle-tiled-right\":\"['<Super>Right']\",\"toggle-tiled-left\":\"['<Super>Left']\"},\"org.gnome.desktop.wm.keybindings\":{\"maximize\":\"['<Super>Up']\",\"unmaximize\":\"['<Super>Down', '<Alt>F5']\"},\"org.gnome.mutter\":{\"edge-tiling\":\"false\"}}"
-#       '';
-      };
-
       # enabled extensions
       "org/gnome/shell" = {
         disable-user-extensions = false;
@@ -301,23 +304,24 @@
           "batterytimepercentagecompact@sagrland.de"
           "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
           "smart-auto-move@khimaros.com"
-#         "tilingshell@ferrarodomenico.com"
+          #         "tilingshell@ferrarodomenico.com"
         ];
       };
     };
 
     # Gnome extension packages
-    home.packages = (with pkgs.gnomeExtensions; [
-      # STABLE
-      dash-to-panel
-      clipboard-indicator
-      tiling-assistant
-      ddterm
-      battery-time-percentage-compact
-      battery-usage-wattmeter
-      smart-auto-move
-    ]) ++ (with pkgs-unstable.gnomeExtensions;
-      [
+    home.packages =
+      (with pkgs.gnomeExtensions; [
+        # STABLE
+        dash-to-panel
+        clipboard-indicator
+        tiling-assistant
+        ddterm
+        battery-time-percentage-compact
+        battery-usage-wattmeter
+        smart-auto-move
+      ])
+      ++ (with pkgs-unstable.gnomeExtensions; [
         # UNSTABLE
         openweather-refined
         tiling-shell
@@ -328,7 +332,10 @@
   tpm-fido.enable = true;
 
   # ssh key type order
-  programs.ssh.hostKeyAlgorithms = [ "ssh-ed25519" "ecdsa" ];
+  programs.ssh.hostKeyAlgorithms = [
+    "ssh-ed25519"
+    "ecdsa"
+  ];
 
   # service for yubikey
   services.pcscd.enable = true;
@@ -337,11 +344,15 @@
   nix.settings.allowed-users = [ "@wheel" ];
 
   # sops config
-  sops.age.sshKeyPaths =
-    [ "/home/lilijoy/.ssh/id_ed25519" "/home/lilijoy/.ssh/id_ed25519" ];
+  sops.age.sshKeyPaths = [
+    "/home/lilijoy/.ssh/id_ed25519"
+    "/home/lilijoy/.ssh/id_ed25519"
+  ];
   sops.secrets = {
     open_weather_key = { };
-    restic = { owner = config.users.users.lilijoy.name; };
+    restic = {
+      owner = config.users.users.lilijoy.name;
+    };
   };
 
   # nh, nix helper
@@ -351,12 +362,14 @@
   stylix = {
     enable = true;
     autoEnable = true;
-    base16Scheme =
-      "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
     image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
     polarity = "dark";
     cursor.package = pkgs.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
+    targets = { 
+#     nixvim.transparentBackground.main = true;
+    };
   };
 
   # Disable uneeded GNOME apps
@@ -379,17 +392,18 @@
   services.xserver.desktopManager.gnome.enable = true;
 
   # Docker
-  virtualisation.docker = { enable = true; };
+  virtualisation.docker = {
+    enable = true;
+  };
 
   # Intel CPU freq stuck fix
   boot.kernelParams = [ "intel_pstate=active" ];
 
   # LD fix
   programs.nix-ld.enable = true;
-  programs.nix-ld.libraries = with pkgs;
-    [
-      # add any missing dynamic libraries for unpackaged programs here
-    ];
+  programs.nix-ld.libraries = with pkgs; [
+    # add any missing dynamic libraries for unpackaged programs here
+  ];
 
   # sudo
   security.sudo = {
@@ -402,8 +416,7 @@
   hardware.bluetooth.powerOnBoot = true;
 
   # Enable CUPS to print documents.
-  services.printing.enable =
-    false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
+  services.printing.enable = false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
 
   # Enable sound with pipewire.
   sound.enable = true;
@@ -420,11 +433,16 @@
   users.users.lilijoy = {
     isNormalUser = true;
     description = "Lilijoy";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+    ];
   };
 
   # Git
-  programs.git = { enable = true; };
+  programs.git = {
+    enable = true;
+  };
 
   # fish
   programs.fish = {
@@ -441,14 +459,14 @@
       fi
     '';
   };
-  environment.shellAliases =
-    lib.mkForce { }; # clear all shell aliases, using fish functions instead
+  environment.shellAliases = lib.mkForce { }; # clear all shell aliases, using fish functions instead
 
   # steam
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
-    package = with pkgs;
+    package =
+      with pkgs;
       steam.override {
         extraPkgs = pkgs: [
           # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982

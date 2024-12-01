@@ -1,14 +1,13 @@
-{ ... }: {
+{ ... }:
+{
   # networking
-  services.caddy.virtualHosts."factorio.skyseekerhomelab.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:34197
-    '';
+  services.caddy.virtualHosts."factorio.skyseekerhomelab.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:34197
+  '';
   networking.firewall.allowedUDPPorts = [ 34197 ];
 
   # persistence
-  environment.persistence."/nix/state".directories =
-    [{ directory = "/srv/factorio/main"; }];
+  environment.persistence."/nix/state".directories = [ { directory = "/srv/factorio/main"; } ];
 
   # factorio server
   virtualisation.oci-containers.containers.factorio-main = {
@@ -16,6 +15,8 @@
     image = "factoriotools/factorio:latest";
     ports = [ "34197:34197/udp" ];
     volumes = [ "/srv/factorio/main:/factorio" ];
-    environment = { UPDATE_MODS_ON_START = "true"; };
+    environment = {
+      UPDATE_MODS_ON_START = "true";
+    };
   };
 }

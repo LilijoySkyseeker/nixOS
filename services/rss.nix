@@ -1,4 +1,10 @@
-{ config, pkgs-unstable, inputs, ... }: {
+{
+  config,
+  pkgs-unstable,
+  inputs,
+  ...
+}:
+{
   # fseshrss
   services.freshrss = {
     enable = true;
@@ -36,24 +42,26 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."freshrss.skyseekerlabs.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:8081
-    '';
-  services.caddy.virtualHosts."rss-bridge.skyseekerlabs.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:8082
-    '';
+  services.caddy.virtualHosts."freshrss.skyseekerlabs.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8081
+  '';
+  services.caddy.virtualHosts."rss-bridge.skyseekerlabs.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8082
+  '';
 
   # nginx virtual host
-  services.nginx.virtualHosts.freshrss.listen = [{
-    addr = "localhost";
-    port = 8081;
-  }];
-  services.nginx.virtualHosts.rss-bridge.listen = [{
-    addr = "localhost";
-    port = 8082;
-  }];
+  services.nginx.virtualHosts.freshrss.listen = [
+    {
+      addr = "localhost";
+      port = 8081;
+    }
+  ];
+  services.nginx.virtualHosts.rss-bridge.listen = [
+    {
+      addr = "localhost";
+      port = 8082;
+    }
+  ];
   # firewall
   networking.firewall.allowedTCPPorts = [ 443 ];
   networking.firewall.allowedUDPPorts = [ 443 ];

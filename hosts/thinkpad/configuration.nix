@@ -1,15 +1,25 @@
-{ config, pkgs, pkgs-unstable, ... }: {
-  imports = [ ./hardware-configuration.nix ./nvidia.nix ../../profiles/PC.nix ];
+{
+  config,
+  pkgs,
+  pkgs-unstable,
+  ...
+}:
+{
+  imports = [
+    ./hardware-configuration.nix
+    ./nvidia.nix
+    ../../profiles/PC.nix
+  ];
 
   # System installed pkgs
-  environment.systemPackages = (with pkgs;
-    [
+  environment.systemPackages =
+    (with pkgs; [
       # STABLE installed packages
       drawio
-    ]) ++ (with pkgs-unstable;
-      [
-        # UNSTABLE installed packages
-      ]);
+    ])
+    ++ (with pkgs-unstable; [
+      # UNSTABLE installed packages
+    ]);
 
   # state change settings/buttons
   services.logind = {

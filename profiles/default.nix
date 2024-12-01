@@ -1,24 +1,33 @@
-{ pkgs, pkgs-unstable, inputs, lib, vars, ... }: {
+{
+  pkgs,
+  pkgs-unstable,
+  inputs,
+  lib,
+  vars,
+  ...
+}:
+{
   imports = [
     inputs.sops-nix.nixosModules.sops
     inputs.nix-index-database.nixosModules.nix-index
     inputs.home-manager.nixosModules.home-manager
     ../modules/nixos/nixvim.nix
   ];
-  environment.systemPackages = (with pkgs; [
-    # STABLE installed packages
-    wget
-    eza
-    tldr
-    bat
-    zoxide
-    git
-    neovim
-    nixfmt-rfc-style
-    rsync
-    sops # secrets management
-  ]) ++ (with pkgs-unstable;
-    [
+  environment.systemPackages =
+    (with pkgs; [
+      # STABLE installed packages
+      wget
+      eza
+      tldr
+      bat
+      zoxide
+      git
+      neovim
+      nixfmt-rfc-style
+      rsync
+      sops # secrets management
+    ])
+    ++ (with pkgs-unstable; [
       # UNSTABLE installed packages
     ]);
 
@@ -28,7 +37,14 @@
   # home-manager
   home-manager = {
     # also pass inputs to home-manager modules
-    extraSpecialArgs = { inherit inputs pkgs pkgs-unstable vars; };
+    extraSpecialArgs = {
+      inherit
+        inputs
+        pkgs
+        pkgs-unstable
+        vars
+        ;
+    };
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
@@ -72,7 +88,10 @@
   networking.firewall.enable = true;
 
   # Enable Flake Support
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # direnv
   programs.direnv = {

@@ -1,4 +1,5 @@
-{ inputs, lib, ... }: {
+{ inputs, lib, ... }:
+{
   imports = [ inputs.nixvim.nixosModules.nixvim ];
 
   programs.neovim = {
@@ -28,10 +29,8 @@
               nixpkgs.expr = "import <nixpkgs> { }";
               formatting.command = "nixfmt-rfc-style";
               options = {
-                nixos.expr = ''
-                  (builtins.getFlake "/home/lilijoy/dotfiles").nixosConfigurations.CONFIGNAME.options'';
-                home_manager.expr = ''
-                  (builtins.getFlake "/home/lilijoy/dotfiles").homeConfigurations.CONFIGNAME.options'';
+                nixos.expr = ''(builtins.getFlake "/home/lilijoy/dotfiles").nixosConfigurations.CONFIGNAME.options'';
+                home_manager.expr = ''(builtins.getFlake "/home/lilijoy/dotfiles").homeConfigurations.CONFIGNAME.options'';
               };
             };
           };

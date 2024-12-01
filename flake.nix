@@ -3,13 +3,17 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixkpgs.url = "nixpkgs/nixos-24.05";
+    nixkpgs.url = "nixpkgs/nixos-24.11";
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
-    home-manager.url = "github:nix-community/home-manager/release-24.05";
+    home-manager.url = "github:nix-community/home-manager/release-24.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager-unstable.url = "github:nix-community/home-manager";
+    home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
-    stylix.url = "github:danth/stylix/release-24.05";
+
+#   stylix.url = "github:danth/stylix/cf8b6e2d4e8aca8ef14b839a906ab5eb98b08561"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
+    stylix.url = "github:danth/stylix/release-24.05"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
     stylix.inputs.nixpkgs.follows = "nixpkgs";
     stylix.inputs.home-manager.follows = "home-manager";
 
@@ -21,13 +25,9 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    nixvim.url = "github:nix-community/nixvim/nixos-24.05";
+    nixvim.url = "github:nix-community/nixvim/nixos-24.11";
     nixvim.inputs.nixpkgs.follows = "nixpkgs";
     nixvim.inputs.home-manager.follows = "home-manager";
-
-    nix-on-droid.url = "github:nix-community/nix-on-droid/release-24.05";
-    nix-on-droid.inputs.nixpkgs.follows = "nixpkgs";
-    nix-on-droid.inputs.home-manager.follows = "home-manager";
 
     copyparty.url = "github:9001/copyparty";
     copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -37,9 +37,22 @@
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, stylix
-    , sops-nix, disko, impermanence, nixvim, nix-on-droid, copyparty
-    , nix-index-database, ... }:
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      home-manager,
+      home-manager-unstable,
+      stylix,
+      sops-nix,
+      disko,
+      impermanence,
+      nixvim,
+      copyparty,
+      nix-index-database,
+      ...
+    }:
     let
       system = "x86_64-linux";
       vars = {
@@ -61,16 +74,31 @@
         inherit system;
         config.allowUnfree = true;
       };
-    in {
+    in
+    {
       nixosConfigurations = {
         #==================================================
         legion = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs pkgs-unstable vars; };
+          specialArgs = {
+            inherit
+              inputs
+              pkgs
+              pkgs-unstable
+              vars
+              ;
+          };
           modules = [ ./hosts/legion/configuration.nix ];
         };
         #==================================================
         thinkpad = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs pkgs-unstable vars; };
+          specialArgs = {
+            inherit
+              inputs
+              pkgs
+              pkgs-unstable
+              vars
+              ;
+          };
           modules = [ ./hosts/thinkpad/configuration.nix ];
         };
         #==================================================
@@ -88,20 +116,16 @@
         };
         #==================================================
         isoimage = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs vars; };
+          specialArgs = {
+            inherit
+              inputs
+              pkgs
+              vars
+              pkgs-unstable
+              ;
+          };
           modules = [ ./hosts/isoimage/configuration.nix ];
         };
       };
-      #==================================================
-      nixOnDroidConfigurations.default =
-        nix-on-droid.lib.nixOnDroidConfiguration {
-          modules = [ ./hosts/android/configuration.nix ];
-          pkgs = import nixpkgs {
-            system = "aarch64-linux";
-            config.allowUnfree = true;
-            overlays = [ nix-on-droid.overlays.default ];
-          };
-        };
-      #==================================================
     };
 }

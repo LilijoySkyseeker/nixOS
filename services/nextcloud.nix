@@ -1,4 +1,5 @@
-{ config, pkgs, ... }: {
+{ config, pkgs, ... }:
+{
   # nextcloud
   services.nextcloud = {
     enable = true;
@@ -20,27 +21,27 @@
     maxUploadSize = "128G";
     autoUpdateApps.enable = true;
     extraAppsEnable = true;
-    extraApps = with config.services.nextcloud.package.packages.apps;
-      {
-        # List of apps we want to install and are already packaged in
-        # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
-        #     inherit calendar contacts;
-      };
+    extraApps = with config.services.nextcloud.package.packages.apps; {
+      # List of apps we want to install and are already packaged in
+      # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
+      #     inherit calendar contacts;
+    };
   };
 
   # caddy
-  services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig =
-    ''
-      redir /.well-known/carddav /remote.php/dav/ 301
-      redir /.well-known/caldav /remote.php/dav/ 301
-      reverse_proxy localhost:8080
-    '';
+  services.caddy.virtualHosts."nextcloud.skyseekerlabs.duckdns.org".extraConfig = ''
+    redir /.well-known/carddav /remote.php/dav/ 301
+    redir /.well-known/caldav /remote.php/dav/ 301
+    reverse_proxy localhost:8080
+  '';
 
   # nginx
-  services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [{
-    addr = "localhost";
-    port = 8080;
-  }];
+  services.nginx.virtualHosts.${config.services.nextcloud.hostName}.listen = [
+    {
+      addr = "localhost";
+      port = 8080;
+    }
+  ];
 
   # permissions
   systemd.tmpfiles.rules = [
@@ -58,9 +59,11 @@
   networking.firewall.allowedUDPPorts = [ 443 ];
 
   # persistence
-  environment.persistence."/nix/state".directories = [{
-    directory = config.services.nextcloud.home;
-    user = "nextcloud";
-    group = "nextcloud";
-  }];
+  environment.persistence."/nix/state".directories = [
+    {
+      directory = config.services.nextcloud.home;
+      user = "nextcloud";
+      group = "nextcloud";
+    }
+  ];
 }

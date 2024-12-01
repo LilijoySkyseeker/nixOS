@@ -1,29 +1,36 @@
-{ ... }: {
+{ ... }:
+{
   # networking
-  services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:25565
-    '';
-  services.caddy.virtualHosts."minecraft-map.skyseekerhomelab.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:8100
-    '';
-  networking.firewall.allowedTCPPorts = [ 25565 8100 ];
-  networking.firewall.allowedUDPPorts = [ 25565 8100 ];
+  services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:25565
+  '';
+  services.caddy.virtualHosts."minecraft-map.skyseekerhomelab.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8100
+  '';
+  networking.firewall.allowedTCPPorts = [
+    25565
+    8100
+  ];
+  networking.firewall.allowedUDPPorts = [
+    25565
+    8100
+  ];
 
   # persistence
-  environment.persistence."/nix/state".directories = [{
-    directory = "/srv/minecraft/vanilla-plus";
-    #     inherit user group;
-  }];
+  environment.persistence."/nix/state".directories = [
+    {
+      directory = "/srv/minecraft/vanilla-plus";
+      #     inherit user group;
+    }
+  ];
 
   # mc server
   virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
     autoStart = true;
     image = "itzg/minecraft-server";
-    ports = [ 
-    "25565:25565" 
-    "8100:8100" 
+    ports = [
+      "25565:25565"
+      "8100:8100"
     ];
     environment = {
       VERSION = "1.20.4";

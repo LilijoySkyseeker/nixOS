@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 let
   tpm-fido = pkgs.buildGoModule rec {
     pname = "tpm-fido";
@@ -13,22 +18,25 @@ let
 
     vendorHash = "sha256-qm/iDc9tnphQ4qooufpzzX7s4dbnUbR9J5L770qXw8Y=";
 
-    nativeBuildInputs = [ pkgs.installShellFiles pkgs.makeWrapper ];
+    nativeBuildInputs = [
+      pkgs.installShellFiles
+      pkgs.makeWrapper
+    ];
 
     postInstall = ''
       wrapProgram $out/bin/tpm-fido --prefix PATH : '${pkgs.pinentry}/bin'
     '';
 
     meta = {
-      description =
-        "A FIDO token implementation for Linux that protects the token keys by using your system's TPM";
+      description = "A FIDO token implementation for Linux that protects the token keys by using your system's TPM";
       homepage = "https://github.com/psanford/tpm-fido";
       license = lib.licenses.mit;
       mainProgram = "tpm-fido";
       maintainers = with lib.maintainers; [ lilijoyskyseeker ];
     };
   };
-in {
+in
+{
   options = {
     tpm-fido.enable = lib.mkEnableOption "enables tpm-fido service";
   };

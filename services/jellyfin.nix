@@ -1,4 +1,5 @@
-{ config, ... }: {
+{ config, ... }:
+{
   # jellyfin
   services.jellyfin = {
     enable = true;
@@ -18,35 +19,32 @@
   ];
 
   # caddy
-  services.caddy.virtualHosts."jellyfin.skyseekerlabs.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:8096
-    '';
-  services.caddy.virtualHosts."jellyfin.skyseekerhomelab.duckdns.org".extraConfig =
-    ''
-      reverse_proxy localhost:8096
-    '';
+  services.caddy.virtualHosts."jellyfin.skyseekerlabs.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8096
+  '';
+  services.caddy.virtualHosts."jellyfin.skyseekerhomelab.duckdns.org".extraConfig = ''
+    reverse_proxy localhost:8096
+  '';
   networking.firewall.allowedTCPPorts = [ 443 ];
   networking.firewall.allowedUDPPorts = [ 443 ];
 
   # persistence
-  environment.persistence."/nix/state".directories =
-    with config.services.jellyfin; [
-      {
-        directory = configDir;
-        inherit user group;
-      }
-      {
-        directory = cacheDir;
-        inherit user group;
-      }
-      {
-        directory = dataDir;
-        inherit user group;
-      }
-      {
-        directory = logDir;
-        inherit user group;
-      }
-    ];
+  environment.persistence."/nix/state".directories = with config.services.jellyfin; [
+    {
+      directory = configDir;
+      inherit user group;
+    }
+    {
+      directory = cacheDir;
+      inherit user group;
+    }
+    {
+      directory = dataDir;
+      inherit user group;
+    }
+    {
+      directory = logDir;
+      inherit user group;
+    }
+  ];
 }

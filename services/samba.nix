@@ -1,6 +1,10 @@
-{ config,
-#  inputs,
-pkgs, ... }: {
+{
+  config,
+  #  inputs,
+  pkgs,
+  ...
+}:
+{
   # disabledModules = ["services/network-filesystems/samba.nix"];
   # imports = [
   #   "${inputs.nixpkgs-unstable}/nixos/modules/services/network-filesystems/samba.nix"
