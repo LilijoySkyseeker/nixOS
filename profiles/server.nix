@@ -8,11 +8,9 @@
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
   ];
-  environment.systemPackages =
-    with pkgs; [
-      # STABLE installed packages
-      flac
-    ];
+  environment.systemPackages = with pkgs; [
+    flac
+  ];
 
   # nh, nix helper
   programs.nh = {

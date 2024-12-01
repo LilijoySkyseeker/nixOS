@@ -3,12 +3,11 @@
   config.specialisation.gpu-enabled.configuration = {
     environment.etc."specialisation".text = "gpu-enabled"; # for nh helper
     # NVIDIA ==============================================================================
-    hardware.opengl = {
-      # enable openGL
-      enable = true;
-      driSupport = true;
-      driSupport32Bit = true;
+    hardware = {
+      graphics.enable = true;
+      graphics.enable32Bit = true;
     };
+
     services.xserver.videoDrivers = [ "nvidia" ]; # Load nvidia driver for Xorg and Wayland
     hardware.nvidia = {
       modesetting.enable = true;

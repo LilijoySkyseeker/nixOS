@@ -15,53 +15,50 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    with pkgs; [
-      # STABLE installed packages
+  environment.systemPackages = with pkgs; [
+    grc # Text colors
+    ripgrep
+    gitFull
+    nvtopPackages.full
+    gjs # for kdeconnect
+    restic # backups
+    fd
+    nixos-anywhere
+    ssh-to-age
+    rclone
 
-      grc # Text colors
-      ripgrep
-      gitFull
-      nvtopPackages.full
-      gjs # for kdeconnect
-      restic # backups
-      fd
-      nixos-anywhere
-      ssh-to-age
-      rclone
+    yubikey-manager
 
-      yubikey-manager
+    distrobox
 
-      distrobox
+    gnome-extension-manager
+    baobab # gnome disk usage utilty
+    gnome-tweaks
+    bitwarden
+    thunderbird
+    vscode-fhs
+    python3
+    cider
+    kdenlive
+    qbittorrent
+    jellyfin-media-player
+    easyeffects
+    qpwgraph
+    youtube-music
+    qalculate-gtk
+    libreoffice
+    vial
+    vlc
+    r2modman
+    yubioath-flutter
+    feishin
+    prismlauncher
 
-      gnome-extension-manager
-      baobab # gnome disk usage utilty
-      gnome.gnome-tweaks
-      bitwarden
-      thunderbird
-      vscode-fhs
-      python3
-      cider
-      kdenlive
-      qbittorrent
-      jellyfin-media-player
-      easyeffects
-      qpwgraph
-      youtube-music
-      qalculate-gtk
-      libreoffice
-      vial
-      vlc
-      r2modman
-      yubioath-flutter
-      vesktop
-
-      obsidian
-      spotify
-
-      feishin
-      prismlauncher
-    ];
+    # closed source
+    obsidian
+    spotify
+    vesktop
+  ];
 
   # home-manager
   home-manager.users.lilijoy = {
@@ -302,25 +299,21 @@
           "batterytimepercentagecompact@sagrland.de"
           "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
           "smart-auto-move@khimaros.com"
-          #         "tilingshell@ferrarodomenico.com"
         ];
       };
     };
 
     # Gnome extension packages
-    home.packages =
-      with pkgs.gnomeExtensions; [
-        # STABLE
-        dash-to-panel
-        clipboard-indicator
-        tiling-assistant
-        ddterm
-        battery-time-percentage-compact
-        battery-usage-wattmeter
-        smart-auto-move
-        openweather-refined
-        tiling-shell
-      ];
+    home.packages = with pkgs.gnomeExtensions; [
+      dash-to-panel
+      clipboard-indicator
+      tiling-assistant
+      ddterm
+      battery-time-percentage-compact
+      battery-usage-wattmeter
+      smart-auto-move
+      openweather-refined
+    ];
   };
 
   # tpm-fido
@@ -351,24 +344,24 @@
   };
 
   # nh, nix helper
-  programs.nh.flake = "/home/lilijoy/dotfiles";
+  programs.nh.flake = ../.;
 
   # Stylix
   stylix = {
-    enable = true;
+    enable = true; # TESTING
     autoEnable = true;
     base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
-    image = /home/lilijoy/dotfiles/files/gruvbox-dark-rainbow.png;
+    image = ../files/gruvbox-dark-rainbow.png;
     polarity = "dark";
     cursor.package = pkgs.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
-    targets = { 
-#     nixvim.transparentBackground.main = true;
+    targets = {
+      nixvim.transparentBackground.main = true;
     };
   };
 
   # Disable uneeded GNOME apps
-  environment.gnome.excludePackages = with pkgs.gnome; [
+  environment.gnome.excludePackages = with pkgs; [
     totem # video player
     geary # mail
     gnome-calculator
@@ -414,7 +407,6 @@
   services.printing.enable = false; # DISABLED DUE TO VULNERABILITY https://www.evilsocket.net/2024/09/26/Attacking-UNIX-systems-via-CUPS-Part-I/
 
   # Enable sound with pipewire.
-  sound.enable = true;
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
@@ -437,6 +429,9 @@
   # Git
   programs.git = {
     enable = true;
+    config = {
+      push.autoSetupRemote = true;
+    };
   };
 
   # fish
@@ -482,9 +477,6 @@
       };
     };
   };
-
-  # fonts
-  fonts.packages = with pkgs; [ (nerdfonts.override { fonts = [ "Meslo" ]; }) ];
 
   # Mullvad vpn
   services.mullvad-vpn = {

@@ -12,20 +12,19 @@
     inputs.home-manager.nixosModules.home-manager
     ../modules/nixos/nixvim.nix
   ];
-  environment.systemPackages =
-    with pkgs; [
-      # STABLE installed packages
-      wget
-      eza
-      tldr
-      bat
-      zoxide
-      git
-      neovim
-      nixfmt-rfc-style
-      rsync
-      sops # secrets management
-    ];
+  environment.systemPackages = with pkgs; [
+    wget
+    eza
+    tldr
+    bat
+    zoxide
+    git
+    neovim
+    nixfmt-rfc-style
+    treefmt
+    rsync
+    sops # secrets management
+  ];
 
   # make sure <nixpkgs> sources from the flake
   nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];

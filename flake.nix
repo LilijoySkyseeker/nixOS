@@ -3,11 +3,10 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixkpgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "nixpkgs/nixos-unstable";
 
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-
 
     stylix.url = "github:danth/stylix"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
     stylix.inputs.nixpkgs.follows = "nixpkgs";

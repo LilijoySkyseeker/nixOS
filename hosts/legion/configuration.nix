@@ -11,11 +11,10 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    with pkgs; [
-      cura
-      nicotine-plus
-    ];
+  environment.systemPackages = with pkgs; [
+    cura
+    nicotine-plus
+  ];
 
   # disable laptop display
   services.xserver = {
@@ -59,11 +58,9 @@
   users.users.lilijoy.extraGroups = [ "docker" ];
 
   # NVIDIA ========================================================================================
-  hardware.opengl = {
-    # enable openGL
-    enable = true;
-    driSupport = true;
-    driSupport32Bit = true;
+  hardware = {
+    graphics.enable = true;
+    graphics.enable32Bit = true;
   };
   services.xserver.videoDrivers = [ "nvidia" ]; # Load nvidia driver for Xorg and Wayland
   hardware.nvidia = {

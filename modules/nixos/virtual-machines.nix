@@ -14,5 +14,5 @@
   users.users.lilijoy.extraGroups = [ "libvirtd" ];
 
   # gnome-boxes
-  environment.systemPackages = with pkgs; [ gnome.gnome-boxes ];
+  environment.systemPackages = with pkgs; [ gnome-boxes ];
 }

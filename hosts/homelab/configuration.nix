@@ -26,17 +26,15 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    with pkgs; [
-      # STABLE installed packages
-      sanoid # also installs syncoid and findoid
-      zfs
-      restic
-      backblaze-b2
-      btop
-      tmux
-      zellij
-    ];
+  environment.systemPackages = with pkgs; [
+    sanoid # also installs syncoid and findoid
+    zfs
+    restic
+    backblaze-b2
+    btop
+    tmux
+    zellij
+  ];
 
   # disable staggered hdd spin up
   boot.extraModprobeConfig = ''

@@ -11,11 +11,9 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    with pkgs; [
-      # STABLE installed packages
-      drawio
-    ];
+  environment.systemPackages = with pkgs; [
+    drawio
+  ];
 
   # state change settings/buttons
   services.logind = {
