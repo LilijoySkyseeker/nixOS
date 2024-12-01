@@ -34,7 +34,6 @@
     vscode-fhs
     python3
     cider
-    prismlauncher
     kdenlive
     qbittorrent
     jellyfin-media-player
@@ -51,7 +50,10 @@
 
     obsidian
     spotify
-  ]) ++ (with pkgs-unstable; [ feishin ]); # UNSTABLE installed packages
+  ]) ++ (with pkgs-unstable; [ 
+    feishin
+    prismlauncher
+  ]); # UNSTABLE installed packages
 
   # home-manager
   home-manager.users.lilijoy = {
