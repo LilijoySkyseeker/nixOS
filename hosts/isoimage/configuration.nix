@@ -26,6 +26,10 @@
 
   # drivers
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
+  boot.kernelModules = [ "r8125" ];
+
+  # TEMP BYPASS FOR 'r8125' driver
+  nixpkgs.config.allowBroken = true;
 
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
