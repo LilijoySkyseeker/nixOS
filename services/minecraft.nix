@@ -21,7 +21,10 @@
   virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
     autoStart = true;
     image = "itzg/minecraft-server";
-    ports = [ "25565:25565" ];
+    ports = [ 
+    "25565:25565" 
+    "8100:8100" 
+    ];
     environment = {
       VERSION = "1.20.4";
       EULA = "TRUE";

@@ -1,4 +1,4 @@
-{ pkgs, modulesPath, vars, ... }: {
+{ pkgs, pkgs-unstable, modulesPath, vars, config, ... }: {
   imports = [
     "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
     "${modulesPath}/installer/cd-dvd/channel.nix"
@@ -8,6 +8,9 @@
   environment.systemPackages = with pkgs; [ neovim disko parted git ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # drivers
+  boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
 
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
