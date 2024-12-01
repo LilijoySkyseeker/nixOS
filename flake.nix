@@ -3,17 +3,13 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixkpgs.url = "nixpkgs/nixos-24.11";
-    nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
+    nixkpgs.url = "nixpkgs/nixos-unstable";
 
-    home-manager.url = "github:nix-community/home-manager/release-24.11";
+    home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    home-manager-unstable.url = "github:nix-community/home-manager";
-    home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
 
-#   stylix.url = "github:danth/stylix/cf8b6e2d4e8aca8ef14b839a906ab5eb98b08561"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
-    stylix.url = "github:danth/stylix/release-24.05"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
+    stylix.url = "github:danth/stylix"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
     stylix.inputs.nixpkgs.follows = "nixpkgs";
     stylix.inputs.home-manager.follows = "home-manager";
 
@@ -25,25 +21,23 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    nixvim.url = "github:nix-community/nixvim/nixos-24.11";
+    nixvim.url = "github:nix-community/nixvim";
     nixvim.inputs.nixpkgs.follows = "nixpkgs";
     nixvim.inputs.home-manager.follows = "home-manager";
 
     copyparty.url = "github:9001/copyparty";
-    copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    copyparty.inputs.nixpkgs.follows = "nixpkgs";
 
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
-    nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
     inputs@{
       self,
       nixpkgs,
-      nixpkgs-unstable,
       home-manager,
-      home-manager-unstable,
       stylix,
       sops-nix,
       disko,
@@ -70,10 +64,6 @@
         config.allowUnfree = true;
         nixpkgs.overlays = [ copyparty.overlays.default ];
       };
-      pkgs-unstable = import inputs.nixpkgs-unstable {
-        inherit system;
-        config.allowUnfree = true;
-      };
     in
     {
       nixosConfigurations = {
@@ -83,7 +73,6 @@
             inherit
               inputs
               pkgs
-              pkgs-unstable
               vars
               ;
           };
@@ -95,7 +84,6 @@
             inherit
               inputs
               pkgs
-              pkgs-unstable
               vars
               ;
           };
@@ -104,7 +92,7 @@
         #==================================================
         homelab = nixpkgs.lib.nixosSystem {
           specialArgs = {
-            inherit pkgs-unstable vars;
+            inherit vars;
             inputs = inputs;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
@@ -121,7 +109,6 @@
               inputs
               pkgs
               vars
-              pkgs-unstable
               ;
           };
           modules = [ ./hosts/isoimage/configuration.nix ];

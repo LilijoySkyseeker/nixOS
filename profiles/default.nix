@@ -1,6 +1,5 @@
 {
   pkgs,
-  pkgs-unstable,
   inputs,
   lib,
   vars,
@@ -14,7 +13,7 @@
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       # STABLE installed packages
       wget
       eza
@@ -26,10 +25,7 @@
       nixfmt-rfc-style
       rsync
       sops # secrets management
-    ])
-    ++ (with pkgs-unstable; [
-      # UNSTABLE installed packages
-    ]);
+    ];
 
   # make sure <nixpkgs> sources from the flake
   nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
@@ -41,7 +37,6 @@
       inherit
         inputs
         pkgs
-        pkgs-unstable
         vars
         ;
     };

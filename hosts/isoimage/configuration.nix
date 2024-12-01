@@ -1,6 +1,5 @@
 {
   pkgs,
-  pkgs-unstable,
   modulesPath,
   vars,
   config,
@@ -24,9 +23,6 @@
     "nix-command"
     "flakes"
   ];
-
-  # set newer kernel for drivers
-  boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
 
   # drivers
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];

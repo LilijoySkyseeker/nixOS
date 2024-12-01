@@ -1,7 +1,7 @@
-{ pkgs-unstable, ... }:
+{ pkgs, ... }:
 {
   # System installed pkgs
-  environment.systemPackages = with pkgs-unstable; [ beets ];
+  environment.systemPackages = with pkgs; [ beets ];
 
   # beets config
   environment = {

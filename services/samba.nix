@@ -1,14 +1,9 @@
 {
   config,
-  #  inputs,
   pkgs,
   ...
 }:
 {
-  # disabledModules = ["services/network-filesystems/samba.nix"];
-  # imports = [
-  #   "${inputs.nixpkgs-unstable}/nixos/modules/services/network-filesystems/samba.nix"
-  # ];
   users = {
     groups.samba-guest = { };
     users.samba-guest = {

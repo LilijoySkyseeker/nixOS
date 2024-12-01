@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pkgs-unstable,
   lib,
   vars,
   ...
@@ -28,7 +27,7 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       # STABLE installed packages
       sanoid # also installs syncoid and findoid
       zfs
@@ -37,10 +36,7 @@
       btop
       tmux
       zellij
-    ])
-    ++ (with pkgs-unstable; [
-      # UNSTABLE installed packages
-    ]);
+    ];
 
   # disable staggered hdd spin up
   boot.extraModprobeConfig = ''

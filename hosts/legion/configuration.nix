@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pkgs-unstable,
   ...
 }:
 {
@@ -13,11 +12,10 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       cura
       nicotine-plus
-    ]) # STABLE installed packages
-    ++ (with pkgs-unstable; [ ]); # UNSTABLE installed packages
+    ];
 
   # disable laptop display
   services.xserver = {

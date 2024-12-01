@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pkgs-unstable,
   ...
 }:
 {
@@ -13,13 +12,10 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       # STABLE installed packages
       drawio
-    ])
-    ++ (with pkgs-unstable; [
-      # UNSTABLE installed packages
-    ]);
+    ];
 
   # state change settings/buttons
   services.logind = {

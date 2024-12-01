@@ -1,7 +1,6 @@
 {
   config,
   pkgs,
-  pkgs-unstable,
   inputs,
   lib,
   ...
@@ -17,7 +16,7 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       # STABLE installed packages
 
       grc # Text colors
@@ -59,11 +58,10 @@
 
       obsidian
       spotify
-    ])
-    ++ (with pkgs-unstable; [
+
       feishin
       prismlauncher
-    ]); # UNSTABLE installed packages
+    ];
 
   # home-manager
   home-manager.users.lilijoy = {
@@ -311,7 +309,7 @@
 
     # Gnome extension packages
     home.packages =
-      (with pkgs.gnomeExtensions; [
+      with pkgs.gnomeExtensions; [
         # STABLE
         dash-to-panel
         clipboard-indicator
@@ -320,12 +318,9 @@
         battery-time-percentage-compact
         battery-usage-wattmeter
         smart-auto-move
-      ])
-      ++ (with pkgs-unstable.gnomeExtensions; [
-        # UNSTABLE
         openweather-refined
         tiling-shell
-      ]);
+      ];
   };
 
   # tpm-fido

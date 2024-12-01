@@ -1,6 +1,5 @@
 {
   pkgs,
-  pkgs-unstable,
   inputs,
   ...
 }:
@@ -10,13 +9,10 @@
     inputs.impermanence.nixosModules.impermanence
   ];
   environment.systemPackages =
-    (with pkgs; [
+    with pkgs; [
       # STABLE installed packages
       flac
-    ])
-    ++ (with pkgs-unstable; [
-      # UNSTABLE installed packages
-    ]);
+    ];
 
   # nh, nix helper
   programs.nh = {
