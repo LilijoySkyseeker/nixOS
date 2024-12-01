@@ -321,7 +321,7 @@
 
   # ssh key type order
   programs.ssh.hostKeyAlgorithms = [
-    "ssh-ed25519"
+    "ed25519"
     "ecdsa"
   ];
 
