@@ -319,12 +319,6 @@
   # tpm-fido
   tpm-fido.enable = true;
 
-  # ssh key type order
-  programs.ssh.hostKeyAlgorithms = [
-    "ed25519"
-    "ecdsa"
-  ];
-
   # service for yubikey
   services.pcscd.enable = true;
 
