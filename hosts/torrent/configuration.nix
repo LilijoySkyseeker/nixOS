@@ -49,7 +49,7 @@
 
   # home manager
   home-manager.users.lilijoy = {
-    imports = [ ../../../modules/home-manager/kde.nix ];
+    imports = [ ../../modules/home-manager/kde.nix ];
     home = {
       persistence."/nix/state/home/lilijoy" = {
         directories = [
