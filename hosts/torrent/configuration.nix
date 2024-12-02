@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  config,
   ...
 }:
 {
@@ -16,6 +17,13 @@
     with pkgs;
     [
     ];
+
+# # drivers
+# boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
+# boot.kernelModules = [ "r8125" ];
+
+# # TEMP BYPASS FOR 'r8125' driver
+# nixpkgs.config.allowBroken = true;
 
   # lock down users
   users.mutableUsers = false;
@@ -47,21 +55,21 @@
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
 
-  # home manager
-  home-manager.users.lilijoy = {
-    imports = [ ../../modules/home-manager/kde.nix ];
-    home = {
-      persistence."/nix/state/home/lilijoy" = {
-        directories = [
-          "Documents"
-          "Pictures"
-          ".ssh"
-        ];
-        files = [ ];
-        allowOther = true;
-      };
-    };
-  };
+# # home manager
+# home-manager.users.lilijoy = {
+#   imports = [ ../../modules/home-manager/kde.nix ];
+#   home = {
+#     persistence."/nix/state/home/lilijoy" = {
+#       directories = [
+#         "Documents"
+#         "Pictures"
+#         ".ssh"
+#       ];
+#       files = [ ];
+#       allowOther = true;
+#     };
+#   };
+# };
 
   # persistence
   programs.fuse.userAllowOther = true; # allow home-manager to use persistance
