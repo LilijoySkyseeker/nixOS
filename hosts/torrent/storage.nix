@@ -29,24 +29,7 @@
     };
   };
 
-  # persistence
-  environment.persistence."/nix/state" = {
-    # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
-    enable = true;
-    hideMounts = true;
-    directories = [
-      "/etc/nixos"
-      "/var/log"
-      "/var/lib/systemd/timers" # for systemd persistant timers during off time
-      "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
-    ];
-    files = [
-      "/etc/machine-id"
-      "/etc/ssh/ssh_host_ed25519_key"
-      "/etc/ssh/ssh_host_ed25519_key.pub"
-    ];
-  };
-
+  # disko
   disko.devices =
     let
       rootSsd = idx: id: {

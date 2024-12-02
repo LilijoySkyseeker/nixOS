@@ -54,12 +54,6 @@
     vesktop
   ];
 
-  # ssh key type order
-  programs.ssh.hostKeyAlgorithms = [
-    "ssh-ed25519"
-    "ecdsa"
-  ];
-
   # home-manager
   home-manager.users.lilijoy = {
     imports = [ ../modules/home-manager/tooling.nix ];
@@ -140,6 +134,7 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.lilijoy = {
     isNormalUser = true;
+    initialPassword = "123456";
     description = "Lilijoy";
     extraGroups = [
       "networkmanager"
