@@ -92,9 +92,6 @@
   # Set your time zone.
   time.timeZone = "America/New_York";
 
-  # update microcode
-  hardware.amd.intel.updateMicrocode = true;
-
   # Define your hostname.
   networking.hostName = "torrent";
 
