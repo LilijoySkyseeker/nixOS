@@ -10,6 +10,8 @@
     inputs.sops-nix.nixosModules.sops
     inputs.nix-index-database.nixosModules.nix-index
     inputs.home-manager.nixosModules.home-manager
+    inputs.disko.nixosModules.disko
+    inputs.impermanence.nixosModules.impermanence
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages = with pkgs; [
