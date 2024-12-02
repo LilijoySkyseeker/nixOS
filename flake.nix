@@ -8,7 +8,7 @@
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
-    stylix.url = "github:danth/stylix"; # pinned to commit beacause of: https://github.com/danth/stylix/issues/577
+    stylix.url = "github:danth/stylix";
     stylix.inputs.nixpkgs.follows = "nixpkgs";
     stylix.inputs.home-manager.follows = "home-manager";
 
@@ -30,6 +30,10 @@
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
+
+    plasma-manager.url = "github:nix-community/plasma-manager";
+    plasma-manager.inputs.nixpkgs.follows = "nixpkgs";
+    plasma-manager.inputs.home-manager.follows = "home-manager";
   };
 
   outputs =
@@ -44,6 +48,7 @@
       nixvim,
       copyparty,
       nix-index-database,
+      plasma-manager,
       ...
     }:
     let
@@ -56,12 +61,12 @@
           "sk-ecdsa-sha2-nistp256@openssh.com AAAAInNrLWVjZHNhLXNoYTItbmlzdHAyNTZAb3BlbnNzaC5jb20AAAAIbmlzdHAyNTYAAABBBEjfX78Dy65xkJV1Kd8Q5d+zvE+/GtnQOWniIoQS7FfBlIPMd9qUNY9o3Z7n5/ILwcnZIia01277BdPlAKXYGTAAAAAEc3NoOg== lilijoy@nixos-thinkpad" # thinkpad tpm
           "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
         ];
-        username = "";
+        username = "lilijoy";
       };
       pkgs = import inputs.nixpkgs {
         inherit system;
         config.allowUnfree = true;
-        nixpkgs.overlays = [ copyparty.overlays.default ];
+#       nixpkgs.overlays = [ copyparty.overlays.default ];
       };
     in
     {
@@ -87,6 +92,17 @@
               ;
           };
           modules = [ ./hosts/thinkpad/configuration.nix ];
+        };
+        #==================================================
+        torrent = nixpkgs.lib.nixosSystem {
+          specialArgs = {
+            inherit
+              inputs
+              pkgs
+              vars
+              ;
+          };
+          modules = [ ./hosts/torrent/configuration.nix ];
         };
         #==================================================
         homelab = nixpkgs.lib.nixosSystem {

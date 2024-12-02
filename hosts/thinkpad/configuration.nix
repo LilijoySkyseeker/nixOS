@@ -8,7 +8,25 @@
     ./hardware-configuration.nix
     ./nvidia.nix
     ../../profiles/PC.nix
+    ../../custom-packages/tpm-fido/package.nix
+    ../../modules/nixos/gnome.nix
   ];
+
+  # sops secrets
+  sops.secrets = {
+    restic = {
+      owner = config.users.users.lilijoy.name;
+    };
+  };
+
+  # home manager
+  home-manager.users.lilijoy.imports = [ ../../../modules/home-manager/gnome.nix ];
+
+  # GS Connect
+  services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
+
+  # tpm-fido
+  tpm-fido.enable = true;
 
   # System installed pkgs
   environment.systemPackages = with pkgs; [
@@ -187,6 +205,9 @@
   # Set extra groups
   users.users.lilijoy.extraGroups = [ "docker" ];
 
-  # Fix Clickpad Bug
-  boot.kernelParams = [ "psmouse.synaptics_intertouch=0" ];
+  # Fix Clickpad Bug and Intel CPU freq stuck fix
+  boot.kernelParams = [
+    "psmouse.synaptics_intertouch=0"
+    "intel_pstate=active"
+  ];
 }

@@ -8,7 +8,14 @@
     ./hardware-configuration.nix
     ../../modules/nixos/wooting.nix
     ../../profiles/PC.nix
+    ../../modules/nixos/gnome.nix
   ];
+
+  # Intel CPU freq stuck fix
+  boot.kernelParams = [ "intel_pstate=active" ];
+
+  # GS Connect
+  services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
 
   # System installed pkgs
   environment.systemPackages = with pkgs; [
@@ -44,6 +51,7 @@
       single-screen-gap = 8;
     };
   };
+  home-manager.users.lilijoy.imports = [ ../../../modules/home-manager/gnome.nix ];
 
   # Set your time zone.
   time.timeZone = "America/New_York";
