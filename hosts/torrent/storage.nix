@@ -1,34 +1,4 @@
-{ pkgs, ... }:
 {
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
-  };
-  networking.hostId = "0376f9ae";
-
-  # impermanance
-  fileSystems."/nix/state".neededForBoot = true;
-  fileSystems."/nix".neededForBoot = true;
-  boot.initrd = {
-    systemd = {
-      enable = true;
-      services.rollback = {
-        description = "Rollback root filesystem to a pristine state on boot";
-        wantedBy = [ "initrd.target" ];
-        after = [ "zfs-import-zroot.service" ];
-        before = [ "sysroot.mount" ];
-        path = with pkgs; [ zfs ];
-        unitConfig.DefaultDependencies = "no";
-        serviceConfig.Type = "oneshot";
-        script = ''
-          zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
-        '';
-      };
-    };
-  };
-
   # disko
   disko.devices =
     let
