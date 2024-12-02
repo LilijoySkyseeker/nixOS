@@ -7,7 +7,7 @@
   imports = [
     ./hardware-configuration.nix
     ../../profiles/PC.nix
-    ./storage.nix
+    ./disko.nix
     ../../modules/nixos/wooting.nix
   ];
 
