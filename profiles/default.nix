@@ -26,6 +26,9 @@
     sops # secrets management
   ];
 
+  # enable a firmware regardless of licence
+  hardware.enableAllFirmware = true;
+
   # make sure <nixpkgs> sources from the flake
   nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
 

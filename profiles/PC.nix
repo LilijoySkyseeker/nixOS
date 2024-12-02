@@ -54,6 +54,12 @@
     vesktop
   ];
 
+  # ssh key type order
+  programs.ssh.hostKeyAlgorithms = [
+    "ed25519"
+    "ecdsa"
+  ];
+
   # home-manager
   home-manager.users.lilijoy = {
     imports = [ ../modules/home-manager/tooling.nix ];
