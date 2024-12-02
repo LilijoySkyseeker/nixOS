@@ -48,7 +48,7 @@
   powerManagement.cpuFreqGovernor = "performance";
 
   # home manager
-  home-manager.users.lilijoy = { 
+  home-manager.users.lilijoy = {
     imports = [ ../../../modules/home-manager/kde.nix ];
     home = {
       persistence."/nix/state/home" = {
@@ -57,7 +57,7 @@
           "Pictures"
           ".ssh"
         ];
-        files = [];
+        files = [ ];
         allowOther = true;
       };
     };
