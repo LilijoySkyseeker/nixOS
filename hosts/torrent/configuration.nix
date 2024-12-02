@@ -6,8 +6,8 @@
 {
   imports = [
     ./hardware-configuration.nix
-    ../../profiles/PC.nix
     ./disko.nix
+    ../../profiles/PC.nix
     ../../modules/nixos/wooting.nix
   ];
 

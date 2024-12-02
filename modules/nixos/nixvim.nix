@@ -161,13 +161,6 @@
 
       -- Individual LSP configs
 
-      -- Markdown LSP
-      require("lspconfig").marksman.setup({
-      	on_attach = function()
-      		set_cmn_lsp_keybinds()
-      	end,
-      })
-
       -- Nix LSP
       require("lspconfig").nixd.setup({
       	on_attach = function()
