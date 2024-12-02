@@ -18,6 +18,15 @@
     [
     ];
 
+  # networking
+  networking.networkmanager = {
+    enable = true;
+    insertNameservers = [
+      "8.8.8.8"
+      "1.1.1.1"
+    ];
+  };
+
 # # drivers
 # boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
 # boot.kernelModules = [ "r8125" ];
