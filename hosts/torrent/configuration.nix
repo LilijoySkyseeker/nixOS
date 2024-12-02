@@ -51,7 +51,7 @@
   home-manager.users.lilijoy = {
     imports = [ ../../../modules/home-manager/kde.nix ];
     home = {
-      persistence."/nix/state/home" = {
+      persistence."/nix/state/home/lilijoy" = {
         directories = [
           "Documents"
           "Pictures"
