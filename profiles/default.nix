@@ -12,7 +12,6 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
-#   inputs.impermanence.homeManagerModules.impermanence
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages = with pkgs; [

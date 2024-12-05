@@ -54,15 +54,24 @@
     vesktop
   ];
 
+  # udev rules for vial
+  services.udev.extraRules = ''
+    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
+  '';
+
   # ssh key type order
   programs.ssh.hostKeyAlgorithms = [
-    "ed25519"
-    "ecdsa"
+#   "ed25519"
+#   "ecdsa"
   ];
 
   # home-manager
   home-manager.users.lilijoy = {
-    imports = [ ../modules/home-manager/tooling.nix ];
+    imports = [ 
+      ../modules/home-manager/tooling.nix
+   inputs.impermanence.homeManagerModules.impermanence
+   inputs.plasma-manager.homeManagerModules.plasma-manager
+    ];
     home.stateVersion = "23.11";
     home.username = "lilijoy";
     home.homeDirectory = "/home/lilijoy";
