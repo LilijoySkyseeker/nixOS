@@ -91,7 +91,7 @@
   ];
 
   # nh, nix helper
-  programs.nh.flake = ../.;
+  programs.nh.flake = ./.;
 
   # Stylix
   stylix = {
