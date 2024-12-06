@@ -37,7 +37,7 @@
     {
       disk = {
         # Root pool disks
-        nvme-a = rootSsd 1 "nvme-Samsung_SSD_990_EVO_Plus_4TB_S7U8NJ0XA12061N";
+        nvme-a = rootSsd 1 "nvme-Samsung_SSD_990_PRO_4TB_S7KGNU0XA02842B";
       };
       zpool = {
         zroot = {
@@ -56,26 +56,15 @@
           };
           options.ashift = "13"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
           datasets = {
-            "local" = {
-              type = "zfs_fs";
-              options.mountpoint = "none"; # top dir is options.mountpoint
-              options."com.sun:auto-snapshot" = "false";
-            };
-            "local/state" = {
-              type = "zfs_fs";
-              mountpoint = "/nix/state"; # sub dir are just mountpoint
-              options."com.sun:auto-snapshot" = "false";
-            };
-            "local/nix" = {
-              type = "zfs_fs";
-              mountpoint = "/nix";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            "local/root" = {
+            "root" = {
               type = "zfs_fs";
               mountpoint = "/";
               options."com.sun:auto-snapshot" = "false";
-              postCreateHook = "zfs snapshot zroot/local/root@blank";
+            };
+            "home" = {
+              type = "zfs_fs";
+              mountpoint = "/home";
+              options."com.sun:auto-snapshot" = "false";
             };
           };
         };

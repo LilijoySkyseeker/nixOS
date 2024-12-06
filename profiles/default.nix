@@ -12,6 +12,8 @@
     inputs.home-manager.nixosModules.home-manager
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
+    inputs.nix-flatpak.nixosModules.nix-flatpak
+    inputs.stylix.nixosModules.stylix
     ../modules/nixos/nixvim.nix
   ];
   environment.systemPackages = with pkgs; [
@@ -23,7 +25,6 @@
     git
     neovim
     nixfmt-rfc-style
-    treefmt
     rsync
     sops # secrets management
   ];

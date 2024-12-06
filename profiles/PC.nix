@@ -5,7 +5,6 @@
 }:
 {
   imports = [
-    inputs.stylix.nixosModules.stylix
     ../modules/nixos/virtual-machines.nix # (also needs home manager config)
     ../modules/nixos/tooling.nix
     ./default.nix
@@ -54,6 +53,15 @@
     vesktop
   ];
 
+  #flatpak
+  services.flatpak = {
+    enable = true;
+    uninstallUnmanaged = true;
+    packages = [
+      "info.beyondallreason.bar"
+    ];
+  };
+
   # udev rules for vial
   services.udev.extraRules = ''
     KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
@@ -91,7 +99,10 @@
   ];
 
   # nh, nix helper
-  programs.nh.flake = ./.;
+# programs.nh.flake = ./.;
+environment.variables = {
+  FLAKE = "/home/liljoy/dotfiles";
+};
 
   # Stylix
   stylix = {
