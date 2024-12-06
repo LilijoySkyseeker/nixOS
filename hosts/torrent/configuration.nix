@@ -35,6 +35,7 @@
     interval = "minutely";
     settings = {
       "zroot/root".use_template = "working";
+      "zroot/home".use_template = "working";
       template_working = {
         frequent_period = 1;
         frequently = 59;
