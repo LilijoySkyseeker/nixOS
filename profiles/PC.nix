@@ -26,7 +26,6 @@
     yubikey-manager
     distrobox
     gnome-extension-manager
-    baobab # gnome disk usage utilty
     gnome-tweaks
     bitwarden
     thunderbird

@@ -1,5 +1,11 @@
 { pkgs, ... }:
 {
+
+  # System installed pkgs
+  environment.systemPackages = with pkgs; [
+    baobab # gnome disk usage utilty
+  ];
+
   # Enable X11 and Gnome
   services.xserver.enable = true;
   services.xserver.displayManager.gdm.enable = true;

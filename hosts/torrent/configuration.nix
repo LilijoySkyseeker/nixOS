@@ -15,6 +15,8 @@
   environment.systemPackages =
     with pkgs;
     [
+      filelight # kde disk ussage
+      partitionmanager
     ];
 
   # networking
