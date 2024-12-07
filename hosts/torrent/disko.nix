@@ -56,12 +56,22 @@
           };
           options.ashift = "13"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
           datasets = {
-            "root" = {
+            "local" = {
+              type = "zfs_fs";
+              options.mountpoint = "none"; # top dir is options.mountpoint
+              options."com.sun:auto-snapshot" = "false";
+            };
+            "local/nix" = {
+              type = "zfs_fs";
+              mountpoint = "/nix";
+              options."com.sun:auto-snapshot" = "false";
+            };
+            "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
               options."com.sun:auto-snapshot" = "false";
             };
-            "home" = {
+            "local/home" = {
               type = "zfs_fs";
               mountpoint = "/home";
               options."com.sun:auto-snapshot" = "false";

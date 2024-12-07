@@ -14,7 +14,7 @@
   # System installed pkgs
   environment.systemPackages = with pkgs; [
     filelight # kde disk ussage
-    partitionmanager
+#   partitionmanager
   ];
 
   # networking
@@ -32,8 +32,8 @@
     extraArgs = [ "--verbose" ];
     interval = "minutely";
     settings = {
-      "zroot/root".use_template = "working";
-      "zroot/home".use_template = "working";
+      "zroot/local/root".use_template = "working";
+      "zroot/local/home".use_template = "working";
       template_working = {
         frequent_period = 1;
         frequently = 59;
@@ -83,4 +83,5 @@
     trim.enable = true;
   };
   networking.hostId = "0376f9ae";
+  fileSystems."/nix".neededForBoot = true;
 }
