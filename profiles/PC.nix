@@ -68,16 +68,16 @@
 
   # ssh key type order
   programs.ssh.hostKeyAlgorithms = [
-#   "ed25519"
-#   "ecdsa"
+    #   "ed25519"
+    #   "ecdsa"
   ];
 
   # home-manager
   home-manager.users.lilijoy = {
-    imports = [ 
+    imports = [
       ../modules/home-manager/tooling.nix
-   inputs.impermanence.homeManagerModules.impermanence
-   inputs.plasma-manager.homeManagerModules.plasma-manager
+      inputs.impermanence.homeManagerModules.impermanence
+      inputs.plasma-manager.homeManagerModules.plasma-manager
     ];
     home.stateVersion = "23.11";
     home.username = "lilijoy";
@@ -98,10 +98,10 @@
   ];
 
   # nh, nix helper
-# programs.nh.flake = ./.;
-environment.variables = {
-  FLAKE = "/home/liljoy/dotfiles";
-};
+  # programs.nh.flake = ./.;
+  environment.variables = {
+    FLAKE = "/home/liljoy/dotfiles";
+  };
 
   # Stylix
   stylix = {

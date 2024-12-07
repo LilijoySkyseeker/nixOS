@@ -2,7 +2,7 @@
 {
   # Packages
   home.packages = with pkgs; [
-#   rc2nix
+    #   rc2nix
   ];
 
   # fix for stupid home manager bug:  https://github.com/nix-community/home-manager/issues/4199#issuecomment-1620657055
@@ -20,17 +20,32 @@
       "kaccess"."Toggle Screen Reader On and Off" = "Meta+Alt+S";
       "kcm_touchpad"."Disable Touchpad" = "Touchpad Off";
       "kcm_touchpad"."Enable Touchpad" = "Touchpad On";
-      "kcm_touchpad"."Toggle Touchpad" = ["Touchpad Toggle" "" "Meta+Ctrl+Zenkaku Hankaku,Touchpad Toggle" "Meta+Ctrl+Zenkaku Hankaku"];
+      "kcm_touchpad"."Toggle Touchpad" = [
+        "Touchpad Toggle"
+        ""
+        "Meta+Ctrl+Zenkaku Hankaku,Touchpad Toggle"
+        "Meta+Ctrl+Zenkaku Hankaku"
+      ];
       "kmix"."decrease_microphone_volume" = "Microphone Volume Down";
       "kmix"."decrease_volume" = "Volume Down";
       "kmix"."decrease_volume_small" = "Shift+Volume Down";
       "kmix"."increase_microphone_volume" = "Microphone Volume Up";
       "kmix"."increase_volume" = "Volume Up";
       "kmix"."increase_volume_small" = "Shift+Volume Up";
-      "kmix"."mic_mute" = ["Microphone Mute" "" "Meta+Volume Mute\\, ,Microphone Mute" "Meta+Volume Mute,Mute Microphone"];
+      "kmix"."mic_mute" = [
+        "Microphone Mute"
+        ""
+        "Meta+Volume Mute\\, ,Microphone Mute"
+        "Meta+Volume Mute,Mute Microphone"
+      ];
       "kmix"."mute" = "Volume Mute";
       "ksmserver"."Halt Without Confirmation" = "\\, ,,Shut Down Without Confirmation";
-      "ksmserver"."Lock Session" = ["Meta+L" "" "Screensaver\\, ,Meta+L" "Screensaver,Lock Session"];
+      "ksmserver"."Lock Session" = [
+        "Meta+L"
+        ""
+        "Screensaver\\, ,Meta+L"
+        "Screensaver,Lock Session"
+      ];
       "ksmserver"."Log Out" = "Ctrl+Alt+Del";
       "ksmserver"."Log Out Without Confirmation" = [ ];
       "ksmserver"."LogOut" = [ ];
@@ -43,7 +58,12 @@
       "kwin"."Decrease Opacity" = [ ];
       "kwin"."Edit Tiles" = "Meta+T";
       "kwin"."Expose" = "Ctrl+F9";
-      "kwin"."ExposeAll" = ["Ctrl+F10" "" "Launch (C)\\, ,Ctrl+F10" "Launch (C),Toggle Present Windows (All desktops)"];
+      "kwin"."ExposeAll" = [
+        "Ctrl+F10"
+        ""
+        "Launch (C)\\, ,Ctrl+F10"
+        "Launch (C),Toggle Present Windows (All desktops)"
+      ];
       "kwin"."ExposeClass" = "Ctrl+F7";
       "kwin"."ExposeClassCurrentDesktop" = [ ];
       "kwin"."Grid View" = "Meta+G";
@@ -56,7 +76,11 @@
       "kwin"."MoveZoomLeft" = [ ];
       "kwin"."MoveZoomRight" = [ ];
       "kwin"."MoveZoomUp" = [ ];
-      "kwin"."Overview" = ["Meta" "Alt+F1" "Meta+W,Meta+W,Toggle Overview"];
+      "kwin"."Overview" = [
+        "Meta"
+        "Alt+F1"
+        "Meta+W,Meta+W,Toggle Overview"
+      ];
       "kwin"."Setup Window Shortcut" = [ ];
       "kwin"."Show Desktop" = "Meta+D";
       "kwin"."Switch One Desktop Down" = "Meta+Ctrl+Down";
@@ -115,7 +139,10 @@
       "kwin"."Walk Through Windows of Current Application Alternative (Reverse)" = [ ];
       "kwin"."Window Above Other Windows" = [ ];
       "kwin"."Window Below Other Windows" = [ ];
-      "kwin"."Window Close" = ["Meta+Q" "Alt+F4\\, Alt+F4\\, ,Alt+F4,Close Window"];
+      "kwin"."Window Close" = [
+        "Meta+Q"
+        "Alt+F4\\, Alt+F4\\, ,Alt+F4,Close Window"
+      ];
       "kwin"."Window Fullscreen" = [ ];
       "kwin"."Window Grow Horizontal" = [ ];
       "kwin"."Window Grow Vertical" = [ ];
@@ -187,7 +214,12 @@
       "kwin"."Window to Screen 6" = [ ];
       "kwin"."Window to Screen 7" = [ ];
       "kwin"."view_actual_size" = "Meta+0";
-      "kwin"."view_zoom_in" = ["Meta++" "" "Meta+=\\, Zoom In,Meta++" "Meta+=,Zoom In"];
+      "kwin"."view_zoom_in" = [
+        "Meta++"
+        ""
+        "Meta+=\\, Zoom In,Meta++"
+        "Meta+=,Zoom In"
+      ];
       "kwin"."view_zoom_out" = "Meta+-";
       "mediacontrol"."mediavolumedown" = [ ];
       "mediacontrol"."mediavolumeup" = [ ];
@@ -209,8 +241,16 @@
       "org_kde_powerdevil"."Sleep" = "Sleep";
       "org_kde_powerdevil"."Toggle Keyboard Backlight" = "Keyboard Light On/Off";
       "org_kde_powerdevil"."Turn Off Screen" = [ ];
-      "org_kde_powerdevil"."powerProfile" = ["Battery" "" "Meta+B\\, ,Battery" "Meta+B,Switch Power Profile"];
-      "plasmashell"."activate application launcher" = ["none,Meta" "Alt+F1,Activate Application Launcher"];
+      "org_kde_powerdevil"."powerProfile" = [
+        "Battery"
+        ""
+        "Meta+B\\, ,Battery"
+        "Meta+B,Switch Power Profile"
+      ];
+      "plasmashell"."activate application launcher" = [
+        "none,Meta"
+        "Alt+F1,Activate Application Launcher"
+      ];
       "plasmashell"."activate task manager entry 1" = "Meta+1";
       "plasmashell"."activate task manager entry 10" = ",Meta+0,Activate Task Manager Entry 10";
       "plasmashell"."activate task manager entry 2" = "Meta+2";
@@ -251,7 +291,8 @@
       "kactivitymanagerdrc"."main"."currentActivity" = "6bb29d64-4a53-48df-9e22-ad1363fdf2d6";
       "kcminputrc"."Keyboard"."NumLock" = 1;
       "kcminputrc"."Keyboard"."RepeatDelay" = 250;
-      "kcminputrc"."Libinput/9494/303/Cooler Master Technology Inc. MM710 Gaming Mouse"."PointerAccelerationProfile" = 1;
+      "kcminputrc"."Libinput/9494/303/Cooler Master Technology Inc. MM710 Gaming Mouse"."PointerAccelerationProfile" =
+        1;
       "kded5rc"."Module-device_automounter"."autoload" = false;
       "kdeglobals"."KFileDialog Settings"."Allow Expansion" = false;
       "kdeglobals"."KFileDialog Settings"."Automatically select filename extension" = true;

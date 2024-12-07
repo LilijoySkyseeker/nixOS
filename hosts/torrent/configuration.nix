@@ -12,12 +12,10 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages =
-    with pkgs;
-    [
-      filelight # kde disk ussage
-      partitionmanager
-    ];
+  environment.systemPackages = with pkgs; [
+    filelight # kde disk ussage
+    partitionmanager
+  ];
 
   # networking
   networking.networkmanager = {
@@ -59,8 +57,9 @@
   # home manager
   home-manager.users.lilijoy = {
     imports = [ ../../modules/home-manager/kde.nix ];
-    home = {
-    };
+    home =
+      {
+      };
   };
 
   # KDE Plasma
