@@ -57,9 +57,6 @@
   # home manager
   home-manager.users.lilijoy = {
     imports = [ ../../modules/home-manager/kde.nix ];
-    home =
-      {
-      };
   };
 
   # KDE Plasma
