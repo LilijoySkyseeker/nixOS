@@ -12,6 +12,12 @@
     ../../modules/nixos/gnome.nix
   ];
 
+  # System installed pkgs
+  environment.systemPackages = with pkgs; [
+    drawio
+    qalculate-gtk
+  ];
+
   # sops secrets
   sops.secrets = {
     restic = {
@@ -28,10 +34,6 @@
   # tpm-fido
   tpm-fido.enable = true;
 
-  # System installed pkgs
-  environment.systemPackages = with pkgs; [
-    drawio
-  ];
 
   # state change settings/buttons
   services.logind = {

@@ -14,8 +14,12 @@
   # System installed pkgs
   environment.systemPackages = with pkgs; [
     filelight # kde disk ussage
-#   partitionmanager
+    ckan # ksp mod manager
+    qalculate-qt
   ];
+
+  # kde partition manager
+  programs.partition-manager.enable = true;
 
   # networking
   networking.networkmanager = {

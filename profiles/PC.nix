@@ -37,7 +37,6 @@
     easyeffects
     qpwgraph
     youtube-music
-    qalculate-gtk
     libreoffice
     vial
     vlc
