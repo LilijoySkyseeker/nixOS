@@ -12,7 +12,7 @@
   services.xserver.desktopManager.gnome.enable = true;
 
   # GS connect
-  programs.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
+# programs.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
 
   # Disable uneeded GNOME apps
   environment.gnome.excludePackages = with pkgs; [

@@ -29,7 +29,7 @@
   home-manager.users.lilijoy.imports = [ ../../../modules/home-manager/gnome.nix ];
 
   # GS Connect
-  services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
+# services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
 
   # tpm-fido
   tpm-fido.enable = true;
