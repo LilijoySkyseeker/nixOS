@@ -5,7 +5,7 @@
 
   # Plasma Manager: `nix run github:nix-community/plasma-manager`
   programs.plasma = {
-    enable = true;
+    enable = false; # DISABLED
     shortcuts = {
       "KDE Keyboard Layout Switcher"."Switch to Next Keyboard Layout" = "Meta+Space\\, Meta+Alt+K\\, ,Meta+Alt+K,Switch to Next Keyboard Layout";
       "kwin"."Overview" = [
