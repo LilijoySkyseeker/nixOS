@@ -4,6 +4,7 @@ keys:
   - &thinkpad-ssh age1zn0nrxa2pwepps9hg5jtvmj95qh7gee89ec35d3akw3gxhr0545sgakg9d
   - &legion age1t09qgr6xfs472argms06h2q3c6gzstnl8lstj5eh26z7tcclyvuq30zl32
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad 
+  - &torrent age1gsmfmtvd97d9x52d2hpgx5qppna5admpf6ch5l0hcn58cv7dp5ws9fhu2t
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
