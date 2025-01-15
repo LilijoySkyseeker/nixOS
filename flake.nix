@@ -5,6 +5,8 @@
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
 
+    nixpkgs-stable.url = "nixpkgs/nixos-24.11";
+
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -42,6 +44,7 @@
     inputs@{
       self,
       nixpkgs,
+      nixpkgs-stable,
       home-manager,
       stylix,
       sops-nix,
@@ -72,6 +75,10 @@
         inherit system;
         config.allowUnfree = true;
       };
+      pkgs-stable = import inputs.nixpkgs-stable {
+        inherit system;
+        config.allowUnfree = true;
+      };
     in
     {
       nixosConfigurations = {
@@ -81,6 +88,7 @@
             inherit
               inputs
               pkgs
+              pkgs-stable
               vars
               ;
           };
@@ -92,6 +100,7 @@
             inherit
               inputs
               pkgs
+              pkgs-stable
               vars
               ;
           };
@@ -103,6 +112,7 @@
             inherit
               inputs
               pkgs
+              pkgs-stable
               vars
               ;
           };

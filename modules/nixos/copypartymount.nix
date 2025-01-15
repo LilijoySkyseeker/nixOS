@@ -1,33 +1,31 @@
 { pkgs, config, ... }:
+let
+  pass = "$(cat ${config.sops.secrets.copyparty_lilijoy.path})";
+in
 {
   environment.systemPackages = with pkgs; [ rclone ];
 
   environment.etc."rclone-mnt.conf".text = ''
-    [homelab-dav]
+    [cpp-rw]
         type = webdav
-        url = https://copyparty.skyseekerlabs.duckdns.org
         vendor = owncloud
-        headers = Cookie,cppwd=hunter2
-        pacer_min_sleep = 0.01ms
-        user = k
-        pass = $cat ${config.sops.secrets.copyparty_lilijoy.path}
+        url = https://copyparty.skyseekerlabs.duckdns.org
+        headers = Cookie,cppwd=${pass}
+        pacer_min_sleep = 0.01m
   '';
 
-  fileSystems."/home/lilijoy/homelab" = {
-    device = "homelab-dav:";
-    fsType = "rclone";
-    options = [
-      "nodev"
-      "nofail"
-      "allow_other"
-      "args2env"
-      "config=/etc/rclone-mnt.conf"
-    ];
-  };
+  # fileSystems."/home/lilijoy/Storage" = {
+  #   device = "cpp-rw";
+  #   fsType = "rclone";
+  #   options = [
+  #     "vfs-cache-mode = writes"
+  #     "vfs-cache-max-age = 5s"
+  #     "attr-timeout = 5s"
+  #     "dir-cache-time = 5s"
+  #   ];
+  # };
 
   # passwords
   sops.secrets.copyparty_lilijoy = {
-    owner = "copyparty";
-    group = "copyparty";
   };
 }

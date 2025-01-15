@@ -4,6 +4,8 @@
   # System installed pkgs
   environment.systemPackages = with pkgs; [
     baobab # gnome disk usage utilty
+    gnome-extension-manager
+    gnome-tweaks
   ];
 
   # Enable X11 and Gnome
@@ -12,7 +14,7 @@
   services.xserver.desktopManager.gnome.enable = true;
 
   # GS connect
-# programs.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
+  # programs.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
 
   # Disable uneeded GNOME apps
   environment.gnome.excludePackages = with pkgs; [

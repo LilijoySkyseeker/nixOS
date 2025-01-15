@@ -9,6 +9,7 @@
     ./disko.nix
     ../../profiles/PC.nix
     ../../modules/nixos/wooting.nix
+    ../../modules/nixos/copypartymount.nix
   ];
 
   # System installed pkgs

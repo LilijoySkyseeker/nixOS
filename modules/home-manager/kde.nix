@@ -7,7 +7,8 @@
   programs.plasma = {
     enable = false; # DISABLED
     shortcuts = {
-      "KDE Keyboard Layout Switcher"."Switch to Next Keyboard Layout" = "Meta+Space\\, Meta+Alt+K\\, ,Meta+Alt+K,Switch to Next Keyboard Layout";
+      "KDE Keyboard Layout Switcher"."Switch to Next Keyboard Layout" =
+        "Meta+Space\\, Meta+Alt+K\\, ,Meta+Alt+K,Switch to Next Keyboard Layout";
       "kwin"."Overview" = [
         "Meta"
         "Alt+F1"
@@ -56,4 +57,3 @@
     };
   };
 }
-

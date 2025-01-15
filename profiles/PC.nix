@@ -1,5 +1,6 @@
 {
   pkgs,
+  pkgs-stable,
   inputs,
   ...
 }:
@@ -11,45 +12,47 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages = with pkgs; [
-    grc # Text colors
-    ripgrep
-    gitFull
-    nvtopPackages.full
-    gjs # for kdeconnect
-    restic # backups
-    fd
-    nixos-anywhere
-    ssh-to-age
-    rclone
+  environment.systemPackages =
+    (with pkgs; [
+      grc # Text colors
+      ripgrep
+      gitFull
+      nvtopPackages.full
+      gjs # for kdeconnect
+      restic # backups
+      fd
+      nixos-anywhere
+      ssh-to-age
+      rclone
 
-    yubikey-manager
-    distrobox
-    gnome-extension-manager
-    gnome-tweaks
-    bitwarden
-    thunderbird
-    vscode-fhs
-    cider
-    kdenlive
-    qbittorrent
-    jellyfin-media-player
-    easyeffects
-    qpwgraph
-    youtube-music
-    libreoffice
-    vial
-    vlc
-    r2modman
-    yubioath-flutter
-    feishin
-    prismlauncher
+      yubikey-manager
+      distrobox
+      bitwarden
+      thunderbird
+      vscode-fhs
+      cider
+      kdenlive
+      qbittorrent
+      jellyfin-media-player
+      easyeffects
+      qpwgraph
+      youtube-music
+      libreoffice
+      vial
+      vlc
+      r2modman
+      yubioath-flutter
+      prismlauncher
 
-    # closed source
-    obsidian
-    spotify
-    vesktop
-  ];
+      # closed source
+      obsidian
+      spotify
+      vesktop
+
+    ])
+    ++ (with pkgs-stable; [
+      feishin
+    ]);
 
   #flatpak
   services.flatpak = {
@@ -146,7 +149,7 @@
   services.printing.enable = true;
 
   # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
