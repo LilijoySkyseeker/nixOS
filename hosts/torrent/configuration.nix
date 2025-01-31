@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  config,
   ...
 }:
 {
@@ -11,6 +12,10 @@
     ../../modules/nixos/wooting.nix
     ../../modules/nixos/copypartymount.nix
   ];
+
+  # drivers
+  boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
+  boot.kernelModules = [ "r8125" ];
 
   # System installed pkgs
   environment.systemPackages = with pkgs; [
