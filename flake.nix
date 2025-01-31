@@ -125,7 +125,7 @@
             inputs = inputs;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
-          pkgs = import nixpkgs-stable {
+          pkgs = import nixpkgs {
             system = "x86_64-linux";
             config.allowUnfree = true;
             overlays = [ copyparty.overlays.default ];
