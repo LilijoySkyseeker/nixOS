@@ -117,6 +117,20 @@
     polarity = "dark";
     cursor.package = pkgs.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
+    fonts = {
+      monospace = {
+        package = pkgs.nerdfonts.override {fonts = ["JetBrainsMono"];};
+        name = "JetBrainsMono Nerd Font Mono";
+      };
+      sansSerif = {
+        package = pkgs.dejavu_fonts;
+        name = "DejaVu Sans";
+      };
+      Serif = {
+        package = pkgs.dejavu_fonts;
+        name = "DejaVu Serif";
+      };
+    };
     targets = {
       nixvim.transparentBackground.main = true;
     };
