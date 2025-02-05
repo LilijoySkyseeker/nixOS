@@ -48,6 +48,7 @@
       obsidian
       spotify
       vesktop
+      discord
 
     ])
     ++ (with pkgs-stable; [

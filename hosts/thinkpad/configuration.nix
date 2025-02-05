@@ -26,7 +26,7 @@
   };
 
   # home manager
-  home-manager.users.lilijoy.imports = [ ../../../modules/home-manager/gnome.nix ];
+  home-manager.users.lilijoy.imports = [ ../../modules/home-manager/gnome.nix ];
 
   # GS Connect
   # services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
@@ -49,7 +49,7 @@
     keyboards.default.settings = {
       main = {
         capslock = "overload(control, esc)";
-        rightalt = "overload(navigation, backspace)";
+        rightalt = "layer(navigation)";
         leftalt = "layer(navigation)";
         leftcontrol = "leftalt";
         esc = "layer(esc)";
@@ -84,7 +84,7 @@
         f = "oneshot(shift)";
 
         leftalt = "layer(numbers)";
-        rightalt = "overload(numbers, backspace)";
+        rightalt = "layer(numbers)";
       };
       numbers = {
         j = "0";
@@ -127,43 +127,8 @@
         n = "k";
         m = "h";
       };
-      handsdown = {
-        q = "timeout(j, 200, z)";
-        w = "timeout(g, 200, q)";
-        e = "m";
-        r = "p";
-        t = "v";
-        y = "timeout(;, 200, :)";
-        u = "timeout(., 200, &)";
-        i = "timeout(/, 200, *)";
-        o = ''timeout(", 200, ?)'';
-        p = "timeout(', 200, !)";
-        a = "r";
-        s = "s";
-        d = "n";
-        f = "d";
-        g = "b";
-        h = "timeout(,, 200, _)";
-        j = "a";
-        k = "e";
-        l = "i";
-        ";" = "h";
-        leftshift = "x";
-        z = "f";
-        x = "l";
-        c = "c";
-        v = "w";
-        b = "noop";
-        n = "timeout(-, 200, +)";
-        m = "u";
-        "," = "o";
-        "." = "y";
-        "/" = "k";
-        leftalt = "overload(navigation, t)";
-      };
       esc = {
         "1" = "toggle(colemak)";
-        "2" = "toggle(handsdown)";
       };
     };
   };

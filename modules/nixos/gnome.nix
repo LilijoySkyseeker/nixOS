@@ -1,12 +1,15 @@
-{ pkgs, ... }:
+{ pkgs, pkgs-stable, ... }:
 {
 
   # System installed pkgs
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages =
+    (with pkgs; [
     baobab # gnome disk usage utilty
-    gnome-extension-manager
     gnome-tweaks
-  ];
+    ])
+    ++ (with pkgs-stable; [
+    gnome-extension-manager
+    ]);
 
   # Enable X11 and Gnome
   services.xserver.enable = true;
