@@ -43,7 +43,6 @@
       r2modman
       yubioath-flutter
       prismlauncher
-      cura
       nicotine-plus
 
       # closed source
@@ -119,14 +118,14 @@
     cursor.name = "Capitaine Cursors";
     fonts = {
       monospace = {
-        package = pkgs.nerdfonts.override {fonts = ["JetBrainsMono"];};
+        package = pkgs.nerd-fonts.jetbrains-mono;
         name = "JetBrainsMono Nerd Font Mono";
       };
       sansSerif = {
         package = pkgs.dejavu_fonts;
         name = "DejaVu Sans";
       };
-      Serif = {
+      serif = {
         package = pkgs.dejavu_fonts;
         name = "DejaVu Serif";
       };
