@@ -19,8 +19,6 @@
 
   # System installed pkgs
   environment.systemPackages = with pkgs; [
-    cura
-    nicotine-plus
   ];
 
   # disable laptop display

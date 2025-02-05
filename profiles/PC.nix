@@ -43,12 +43,14 @@
       r2modman
       yubioath-flutter
       prismlauncher
+      cura
+      nicotine-plus
 
       # closed source
       obsidian
       spotify
       vesktop
-      discord
+      zoom
 
     ])
     ++ (with pkgs-stable; [
