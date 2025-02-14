@@ -140,11 +140,6 @@
     enable = true;
   };
 
-  # Docker
-  virtualisation.docker = {
-    enable = true;
-  };
-
   # LD fix
   programs.nix-ld.enable = true;
   programs.nix-ld.libraries = with pkgs; [
