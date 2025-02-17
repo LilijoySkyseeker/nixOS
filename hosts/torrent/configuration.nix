@@ -1,5 +1,5 @@
 {
-  pkgs,
+  pkgs-unstable,
   lib,
   config,
   ...
@@ -18,7 +18,7 @@
 # boot.kernelModules = [ "r8125" ];
 
   # System installed pkgs
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-unstable; [
     filelight # kde disk ussage
     ckan # ksp mod manager
     qalculate-qt
@@ -72,6 +72,7 @@
   # KDE Plasma
   services.xserver.enable = true;
   services.displayManager.sddm.enable = true;
+  services.displayManager.sddm.wayland.enable = true;
   services.desktopManager.plasma6.enable = true;
 
   # Set your time zone.

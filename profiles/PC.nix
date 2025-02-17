@@ -1,5 +1,5 @@
 {
-  pkgs,
+  pkgs-unstable,
   pkgs-stable,
   inputs,
   ...
@@ -13,7 +13,7 @@
 
   # System installed pkgs
   environment.systemPackages =
-    (with pkgs; [
+    (with pkgs-unstable; [
       grc # Text colors
       ripgrep
       gitFull
@@ -111,22 +111,22 @@
   stylix = {
     enable = true; # TESTING
     autoEnable = true;
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    base16Scheme = "${pkgs-unstable.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
     image = ../files/gruvbox-dark-rainbow.png;
     polarity = "dark";
-    cursor.package = pkgs.capitaine-cursors-themed;
+    cursor.package = pkgs-unstable.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
     fonts = {
       monospace = {
-        package = pkgs.nerd-fonts.jetbrains-mono;
+        package = pkgs-unstable.nerd-fonts.jetbrains-mono;
         name = "JetBrainsMono Nerd Font Mono";
       };
       sansSerif = {
-        package = pkgs.dejavu_fonts;
+        package = pkgs-unstable.dejavu_fonts;
         name = "DejaVu Sans";
       };
       serif = {
-        package = pkgs.dejavu_fonts;
+        package = pkgs-unstable.dejavu_fonts;
         name = "DejaVu Serif";
       };
     };
@@ -142,14 +142,14 @@
 
   # LD fix
   programs.nix-ld.enable = true;
-  programs.nix-ld.libraries = with pkgs; [
+  programs.nix-ld.libraries = with pkgs-unstable; [
     # add any missing dynamic libraries for unpackaged programs here
   ];
 
   # sudo
   security.sudo = {
     execWheelOnly = true;
-    package = pkgs.sudo.override { withInsults = true; };
+    package = pkgs-unstable.sudo.override { withInsults = true; };
   };
 
   # Enable bluetooth
@@ -160,7 +160,8 @@
   services.printing.enable = true;
 
   # Enable sound with pipewire.
-  services.pulseaudio.enable = false;
+  hardware.pulseaudio.enable = false;
+  hardware.pulseaudio.support32Bit = true;
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
@@ -185,7 +186,7 @@
     enable = true;
     remotePlay.openFirewall = true;
     package =
-      with pkgs;
+      with pkgs-unstable;
       steam.override {
         extraPkgs = pkgs: [
           # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982
@@ -210,7 +211,7 @@
   # Mullvad vpn
   services.mullvad-vpn = {
     enable = true;
-    package = pkgs.mullvad-vpn;
+    package = pkgs-unstable.mullvad-vpn;
   };
 
 }

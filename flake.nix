@@ -3,38 +3,39 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-
     nixpkgs-stable.url = "nixpkgs/nixos-24.11";
 
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
-    stylix.url = "github:danth/stylix";
-    stylix.inputs.nixpkgs.follows = "nixpkgs";
+#   home-manager.url = "github:nix-community/home-manager/release-24.11";
+    home-manager.url = "github:nix-community/home-manager";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
+    stylix.url = "github:danth/stylix/release-24.11";
+    stylix.inputs.nixpkgs.follows = "nixpkgs-stable";
     stylix.inputs.home-manager.follows = "home-manager";
 
     sops-nix.url = "github:Mic92/sops-nix";
-    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
+    disko.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     impermanence.url = "github:nix-community/impermanence";
 
     nixvim.url = "github:nix-community/nixvim";
-    nixvim.inputs.nixpkgs.follows = "nixpkgs";
+    nixvim.inputs.nixpkgs.follows = "nixpkgs-unstable";
     nixvim.inputs.home-manager.follows = "home-manager";
 
     copyparty.url = "github:9001/copyparty";
-    copyparty.inputs.nixpkgs.follows = "nixpkgs";
+    copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
-    nix-index-database.inputs.nixpkgs.follows = "nixpkgs";
+    nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     plasma-manager.url = "github:nix-community/plasma-manager";
-    plasma-manager.inputs.nixpkgs.follows = "nixpkgs";
+    plasma-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
     plasma-manager.inputs.home-manager.follows = "home-manager";
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
@@ -43,7 +44,7 @@
   outputs =
     inputs@{
       self,
-      nixpkgs,
+      nixpkgs-unstable,
       nixpkgs-stable,
       home-manager,
       stylix,
@@ -58,7 +59,6 @@
       ...
     }:
     let
-      system = "x86_64-linux";
       vars = {
         # root access ssh keys
         publicSshKeys = [
@@ -71,23 +71,23 @@
         ];
         username = "lilijoy";
       };
-      pkgs = import inputs.nixpkgs {
-        inherit system;
+      pkgs-unstable = import inputs.nixpkgs-unstable {
+        system = "x86_64-linux";
         config.allowUnfree = true;
       };
       pkgs-stable = import inputs.nixpkgs-stable {
-        inherit system;
+        system = "x86_64-linux";
         config.allowUnfree = true;
       };
     in
     {
       nixosConfigurations = {
         #==================================================
-        legion = nixpkgs.lib.nixosSystem {
+        legion = nixpkgs-unstable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
-              pkgs
+              pkgs-unstable
               pkgs-stable
               vars
               ;
@@ -95,11 +95,11 @@
           modules = [ ./hosts/legion/configuration.nix ];
         };
         #==================================================
-        thinkpad = nixpkgs.lib.nixosSystem {
+        thinkpad = nixpkgs-unstable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
-              pkgs
+              pkgs-unstable
               pkgs-stable
               vars
               ;
@@ -107,11 +107,11 @@
           modules = [ ./hosts/thinkpad/configuration.nix ];
         };
         #==================================================
-        torrent = nixpkgs.lib.nixosSystem {
+        torrent = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
-              pkgs
+              pkgs-unstable
               pkgs-stable
               vars
               ;
@@ -119,24 +119,24 @@
           modules = [ ./hosts/torrent/configuration.nix ];
         };
         #==================================================
-        homelab = nixpkgs.lib.nixosSystem {
+        homelab = nixpkgs-unstable.lib.nixosSystem {
           specialArgs = {
             inherit vars;
             inputs = inputs;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
-          pkgs = import nixpkgs {
+          pkgs = import nixpkgs-unstable {
             system = "x86_64-linux";
             config.allowUnfree = true;
             overlays = [ copyparty.overlays.default ];
           };
         };
         #==================================================
-        isoimage = nixpkgs.lib.nixosSystem {
+        isoimage = nixpkgs-unstable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
-              pkgs
+              pkgs-unstable
               vars
               ;
           };

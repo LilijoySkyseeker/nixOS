@@ -1,5 +1,6 @@
 {
-  pkgs,
+  pkgs-unstable,
+  pkgs-stable,
   inputs,
   lib,
   vars,
@@ -16,7 +17,7 @@
     inputs.stylix.nixosModules.stylix
     ../modules/nixos/nixvim.nix
   ];
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-unstable; [
     wget
     eza
     tldr
@@ -29,11 +30,14 @@
     sops # secrets management
   ];
 
+  # allow unfree
+  nixpkgs.config.allowUnfree = true;
+
   # enable a firmware regardless of licence
   hardware.enableAllFirmware = true;
 
   # make sure <nixpkgs> sources from the flake
-  nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+  nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable}" ];
 
   # home-manager
   home-manager = {
@@ -41,7 +45,8 @@
     extraSpecialArgs = {
       inherit
         inputs
-        pkgs
+        pkgs-unstable
+        pkgs-stable
         vars
         ;
     };
@@ -71,7 +76,7 @@
     clean = {
       enable = true;
       dates = "daily";
-      extraArgs = "--keep-since 7d --keep 3";
+      extraArgs = "--keep-since 7d --keep 7";
     };
   };
 
