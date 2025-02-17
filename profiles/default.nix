@@ -45,7 +45,7 @@
         vars
         ;
     };
-    useGlobalPkgs = true;
+#   useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
   };
@@ -71,7 +71,7 @@
     clean = {
       enable = true;
       dates = "daily";
-      extraArgs = "--keep-since 7d --keep 2";
+      extraArgs = "--keep-since 7d --keep 3";
     };
   };
 
