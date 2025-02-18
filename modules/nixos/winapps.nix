@@ -1,9 +1,14 @@
 # Auto-generated using compose2nix v0.3.1.
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 {
   # sops secrets
   sops.secrets = {
-    winapps_password = {};
+    winapps_password = { };
   };
 
   # Runtime

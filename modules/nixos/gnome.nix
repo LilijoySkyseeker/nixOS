@@ -4,11 +4,11 @@
   # System installed pkgs
   environment.systemPackages =
     (with pkgs; [
-    baobab # gnome disk usage utilty
-    gnome-tweaks
+      baobab # gnome disk usage utilty
+      gnome-tweaks
     ])
     ++ (with pkgs-stable; [
-    gnome-extension-manager
+      gnome-extension-manager
     ]);
 
   # Enable X11 and Gnome

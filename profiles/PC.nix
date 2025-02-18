@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   inputs,
+  lib,
   ...
 }:
 {
@@ -102,9 +103,9 @@
   ];
 
   # nh, nix helper
-  # programs.nh.flake = ./.;
   environment.variables = {
-    FLAKE = "/home/liljoy/dotfiles";
+    FLAKE = "/home/lilijoy/dotfiles";
+    NH_FLAKE = "/home/lilijoy/dotfiles";
   };
 
   # Stylix
@@ -129,9 +130,6 @@
         package = pkgs-unstable.dejavu_fonts;
         name = "DejaVu Serif";
       };
-    };
-    targets = {
-      nixvim.transparentBackground.main = true;
     };
   };
 
