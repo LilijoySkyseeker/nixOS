@@ -7,9 +7,9 @@
 
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
-#   home-manager.url = "github:nix-community/home-manager/release-24.11";
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    home-manager.url = "github:nix-community/home-manager/release-24.11";
+    #   home-manager.url = "github:nix-community/home-manager";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs-stable";
 
     stylix.url = "github:danth/stylix/release-24.11";
     stylix.inputs.nixpkgs.follows = "nixpkgs-stable";
@@ -23,9 +23,8 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
-    nixvim.url = "github:nix-community/nixvim";
-    nixvim.inputs.nixpkgs.follows = "nixpkgs-unstable";
-    nixvim.inputs.home-manager.follows = "home-manager";
+    nvf.url = "github:notashelf/nvf";
+    nvf.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     copyparty.url = "github:9001/copyparty";
     copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -51,11 +50,11 @@
       sops-nix,
       disko,
       impermanence,
-      nixvim,
       copyparty,
       nix-index-database,
       plasma-manager,
       nix-flatpak,
+      nvf,
       ...
     }:
     let
@@ -83,7 +82,7 @@
     {
       nixosConfigurations = {
         #==================================================
-        legion = nixpkgs-unstable.lib.nixosSystem {
+        legion = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
@@ -95,7 +94,7 @@
           modules = [ ./hosts/legion/configuration.nix ];
         };
         #==================================================
-        thinkpad = nixpkgs-unstable.lib.nixosSystem {
+        thinkpad = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs

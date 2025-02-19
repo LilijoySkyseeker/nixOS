@@ -25,4 +25,77 @@
   };
   environment.shellAliases = lib.mkForce { }; # clear all shell aliases, using fish functions instead
 
+  # neovim
+  programs.neovim = {
+    enable = true;
+    defaultEditor = lib.mkForce true;
+  };
+  programs.nvf = {
+    enable = true;
+    settings = {
+      vim = {
+        viAlias = true;
+        vimAlias = true;
+        useSystemClipboard = true;
+        scrollOffset = 8; # DEBUG TO MAKE WORK
+        undoFile = {
+          enable = true;
+        };
+        binds.whichKey.enable = true;
+        searchCase = "smart";
+        languages = {
+          enableDAP = true;
+          enableExtraDiagnostics = true;
+          enableFormat = true;
+          enableLSP = true;
+          enableTreesitter = true;
+          nix = {
+            enable = true;
+            format.type = "nixfmt";
+            extraDiagnostics.enable = false;
+          };
+          markdown.enable = true;
+          bash.enable = true;
+        };
+        lsp.formatOnSave = true;
+        maps = {
+          normal = {
+            "j".action = "gj";
+            "k".action = "gk";
+            "p".action = "pgvy";
+          };
+        };
+        options = {
+          shiftwidth = 2;
+          tabstop = 2;
+        };
+        statusline.lualine = {
+          enable = true;
+          theme = "gruvbox_dark";
+        };
+        visuals = {
+          highlight-undo = {
+            enable = true;
+            setupOpts.duration = 1000;
+          };
+        };
+        git = {
+          enable = true;
+        };
+        telescope.enable = true;
+        autocomplete.nvim-cmp.enable = true;
+        autopairs.nvim-autopairs.enable = true;
+        spellcheck = {
+          enable = true;
+          programmingWordlist.enable = true;
+        };
+        theme = {
+          enable = true;
+          name = "gruvbox";
+          style = "dark";
+          transparent = true;
+        };
+      };
+    };
+  };
 }

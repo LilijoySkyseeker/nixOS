@@ -1,6 +1,7 @@
 {
   config,
-  pkgs,
+  pkgs-unstable,
+  pkgs-stable,
   ...
 }:
 {
@@ -13,10 +14,12 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages = with pkgs; [
-    drawio
-    qalculate-gtk
-  ];
+  environment.systemPackages =
+    (with pkgs-unstable; [
+    ])
+    ++ (with pkgs-stable; [
+      qalculate-gtk
+    ]);
 
   # sops secrets
   sops.secrets = {
@@ -27,9 +30,6 @@
 
   # home manager
   home-manager.users.lilijoy.imports = [ ../../modules/home-manager/gnome.nix ];
-
-  # GS Connect
-  # services.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
 
   # tpm-fido
   tpm-fido.enable = true;
@@ -43,6 +43,7 @@
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
+  # keyboard
   services.keyd = {
     enable = true;
     keyboards.default.ids = [ "0001:0001" ];
@@ -55,9 +56,9 @@
         esc = "layer(esc)";
       };
       navigation = {
-        h = "left";
-        j = "down";
-        k = "up";
+        j = "left";
+        k = "down";
+        i = "up";
         l = "right";
 
         ";" = "%";
@@ -69,14 +70,13 @@
         x = "timeout({, 200, })";
         c = "timeout((, 200, ))";
 
-        g = "=";
-
-        w = "~";
-        e = "#";
-        r = "|";
-        u = "@";
-        i = "\\";
-        o = "`";
+        #       g = "=";
+        #       w = "~";
+        #       e = "#";
+        #       r = "|";
+        #       u = "@";
+        #       i = "\\";
+        #       o = "`";
 
         a = "oneshot(meta)";
         s = "oneshot(alt)";
@@ -87,16 +87,19 @@
         rightalt = "layer(numbers)";
       };
       numbers = {
-        j = "0";
-        k = "1";
-        l = "2";
-        ";" = "3";
-        m = "4";
-        "," = "5";
-        "." = "6";
-        u = "";
-        i = "8";
-        o = "9";
+        "/" = "0";
+        ";" = "0";
+        "p" = "0";
+
+        "m" = "1";
+        "," = "2";
+        "." = "3";
+        "j" = "4";
+        "k" = "5";
+        "l" = "6";
+        "u" = "7";
+        "i" = "8";
+        "o" = "9";
       };
       colemak = {
         q = "q";

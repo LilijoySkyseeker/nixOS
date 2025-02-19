@@ -15,7 +15,7 @@
     inputs.impermanence.nixosModules.impermanence
     inputs.nix-flatpak.nixosModules.nix-flatpak
     inputs.stylix.nixosModules.stylix
-    ../modules/nixos/nixvim.nix
+    inputs.nvf.nixosModules.default
   ];
   environment.systemPackages = with pkgs-unstable; [
     wget
@@ -50,7 +50,7 @@
         vars
         ;
     };
-#   useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
+    #   useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
   };
