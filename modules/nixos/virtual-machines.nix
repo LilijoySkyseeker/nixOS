@@ -1,8 +1,5 @@
 {
-  config,
-  pkgs,
-  inputs,
-  lib,
+  pkgs-unstable,
   ...
 }:
 {
@@ -14,5 +11,5 @@
   users.users.lilijoy.extraGroups = [ "libvirtd" ];
 
   # gnome-boxes
-  environment.systemPackages = with pkgs; [ gnome-boxes ];
+  environment.systemPackages = with pkgs-unstable; [ gnome-boxes ];
 }

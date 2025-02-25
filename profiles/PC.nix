@@ -110,7 +110,7 @@
 
   # Stylix
   stylix = {
-    enable = true; # TESTING
+    enable = true;
     autoEnable = true;
     base16Scheme = "${pkgs-unstable.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
     image = ../files/gruvbox-dark-rainbow.png;
