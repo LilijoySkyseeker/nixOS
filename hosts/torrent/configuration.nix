@@ -1,5 +1,6 @@
 {
   pkgs-unstable,
+  pkgs-stable,
   lib,
   config,
   ...
@@ -18,11 +19,14 @@
   # boot.kernelModules = [ "r8125" ];
 
   # System installed pkgs
-  environment.systemPackages = with pkgs-unstable; [
-    filelight # kde disk ussage
+  environment.systemPackages =
+    (with pkgs-unstable; [
     ckan # ksp mod manager
+    ])
+    ++ (with pkgs-stable; [
+    filelight # kde disk ussage
     qalculate-qt
-  ];
+    ]);
 
   # kde partition manager
   programs.partition-manager.enable = true;
