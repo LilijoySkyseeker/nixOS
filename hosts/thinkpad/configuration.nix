@@ -60,6 +60,8 @@
         k = "down";
         i = "up";
         l = "right";
+        u = "pageup";
+        o = "pagedown";
 
         ";" = "%";
         "," = "^";
