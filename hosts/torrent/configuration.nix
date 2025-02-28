@@ -2,7 +2,6 @@
   pkgs-unstable,
   pkgs-stable,
   lib,
-  config,
   ...
 }:
 {
@@ -12,20 +11,19 @@
     ../../profiles/PC.nix
     ../../modules/nixos/wooting.nix
     ../../modules/nixos/copypartymount.nix
+    ../../modules/nixos/kde.nix
   ];
-
-  # # drivers
-  # boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
-  # boot.kernelModules = [ "r8125" ];
 
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [
-    ckan # ksp mod manager
+      ckan # ksp mod manager
     ])
     ++ (with pkgs-stable; [
-    filelight # kde disk ussage
-    qalculate-qt
+      filelight # kde disk ussage
+      qalculate-qt
+      kile
+      texlive.combined.scheme-full
     ]);
 
   # kde partition manager
@@ -72,12 +70,6 @@
   home-manager.users.lilijoy = {
     imports = [ ../../modules/home-manager/kde.nix ];
   };
-
-  # KDE Plasma
-  services.xserver.enable = true;
-  services.displayManager.sddm.enable = true;
-  services.displayManager.sddm.wayland.enable = true;
-  services.desktopManager.plasma6.enable = true;
 
   # Set your time zone.
   time.timeZone = "America/New_York";

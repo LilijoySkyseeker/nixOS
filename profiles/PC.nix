@@ -43,18 +43,19 @@
       vlc
       r2modman
       yubioath-flutter
-      prismlauncher
       nicotine-plus
 
       # closed source
       obsidian
       spotify
-      vesktop
       zoom
 
     ])
     ++ (with pkgs-stable; [
       feishin
+      prismlauncher
+      vesktop
+      discord
     ]);
 
   #flatpak

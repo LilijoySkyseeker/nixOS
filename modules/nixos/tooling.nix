@@ -85,10 +85,6 @@
         telescope.enable = true;
         autocomplete.nvim-cmp.enable = true;
         autopairs.nvim-autopairs.enable = true;
-        spellcheck = {
-          enable = true;
-          programmingWordlist.enable = true;
-        };
         theme = {
           enable = true;
           name = "gruvbox";
