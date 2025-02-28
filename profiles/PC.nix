@@ -32,7 +32,6 @@
       thunderbird
       vscode-fhs
       cider
-      kdenlive
       qbittorrent
       jellyfin-media-player
       easyeffects
@@ -56,6 +55,7 @@
       prismlauncher
       vesktop
       discord
+      kdePackages.kdenlive
     ]);
 
   #flatpak
