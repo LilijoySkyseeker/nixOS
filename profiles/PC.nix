@@ -187,11 +187,7 @@
     package =
       with pkgs-unstable;
       steam.override {
-        extraPkgs = pkgs: [
-          # for FAF, https://discord.com/channels/197033481883222026/1228471001633914950/1228506126900006982
-          jq
-          cabextract
-          wget
+        extraPkgs = pkgs-stable: [
         ];
       };
   };
