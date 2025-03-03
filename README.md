@@ -58,9 +58,9 @@ NixOS
 
 ## Hosts
 
-### **homelab** (Main Server)
+### [homelab] (Main Server)
 
-### **thinkpad** (Main Laptop)
+### [thinkpad] (Main Laptop)
 
 #### Hardware
 
@@ -72,7 +72,7 @@ NixOS
 - SSD2: 256 GB M.2, INTEL SSDPEKKW256G8L
 - Display: 15" 1080p 60Hz
 
-### **torrent** (Main Desktop)
+### [torrent] (Main Desktop)
 
 #### Hardware
 
@@ -94,7 +94,7 @@ NixOS
 - Microphone: AT2020, Audio-Technica
 - Interface: RC-505MKII, BOSS
 
-### **legion** (Secondary Laptop/Desktop)
+### [legion] (Secondary Laptop/Desktop)
 
 #### Hardware
 
@@ -107,4 +107,4 @@ NixOS
 - Display: 17" 1080p 144Hz
 - Mouse: MM710 PMW3389, Cooler Master
 
-### **isoimage** (USB Installer)
+### [isoimage] (USB Installer)
