@@ -2,7 +2,7 @@
 
 ## Structure Guide
 
-All configuration starts with [flake.nix](./flake.nix#L22)
+All configuration starts with [flake.nix](./flake.nix)
 
 ```bash
 NixOS
@@ -116,3 +116,6 @@ NixOS
 ## Hosts
 
 ## Iteresting Stuff
+
+- [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
+  [Impermanence](https://github.com/nix-community/impermanence)
