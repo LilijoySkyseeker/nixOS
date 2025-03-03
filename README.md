@@ -5,18 +5,62 @@
 All configuration starts with [flake.nix](./flake.nix)
 
 ```bash
-./dotfiles
+NixOS
 └── flake.nix
 ```
 
-where the inputs of the system, the diffrent host configurations, and universal
+where the inputs of the system, the different host configurations, and universal
 variables are defined.
+
+Then it progresses to each host with its base
+[configuration.nix](./hosts/homelab/configuration.nix) (homelab as the example)
+
+```bash
+NixOS
+└── hosts
+    └── homelab
+        └── configuration.nix
+```
+
+where the host specific configuration is held. Things like hostname, timezone,
+system services, etc. Anything that only this hosts needs and is not shared is
+defined here.
+
+Some specific configuration is split into seperate files to make orginzation
+easier and imported in the main
+[configuration.nix](./hosts/homelab/configuration.nix) file.
+
+```bash
+NixOS
+└── hosts
+    └── homelab
+        ├── configuration.nix
+        ├── disko.nix
+        └── hardware-configuration.nix
+```
+
+In this case, the
+[hardware-configuration.nix](./hosts/homelab/hardware-configuration.nix) which
+is auto generated during system installation is left alone. Alongside that is
+[disko.nix](./hosts/homelab/disko.nix) which manages disk partitioning and
+formatting.
+
+Then it progresses to the shared profiles by importing
+[default.nix](./profiles/default.nix) or others
+
+```bash
+NixOS
+└── profiles
+    ├── default.nix
+    ├── PC.nix
+    └── server.nix
+```
 
 ## Hosts
 
-### homelab (Main Server)
+### **homelab** (Main Server)
 
-### thinkpad (Main Laptop)
+### **thinkpad** (Main Laptop)
 
 #### Hardware
 
@@ -28,7 +72,7 @@ variables are defined.
 - SSD2: 256 GB M.2, INTEL SSDPEKKW256G8L
 - Display: 15" 1080p 60Hz
 
-### torrent (Main Desktop)
+### **torrent** (Main Desktop)
 
 #### Hardware
 
@@ -41,18 +85,16 @@ variables are defined.
 - Thermal Paste: PTM 7950
 - Power Supply: 1000W ATX 80 PLUS PLATINUM, Super Flower Leadex VI
 - Case: Torrent Black Solid, Fractal Design
-
 - Monitors: 3x 27" 4K 60Hz, Dell S2721QS
 - Keyboard (Gaming): WOOTING TWO HE
 - Keyboard (Work): faux fox keyboard v4, fingerpunch
 - Mouse: MM710 PMW3389, Cooler Master
-
 - Headphones: WH-1000XM4 (Wired), Sony
 - Speakers: A5+, Audioengine
 - Microphone: AT2020, Audio-Technica
 - Interface: RC-505MKII, BOSS
 
-### legion (Secondary Laptop/Desktop)
+### **legion** (Secondary Laptop/Desktop)
 
 #### Hardware
 
@@ -63,69 +105,6 @@ variables are defined.
 - SSD1: 512 GB M.2
 - HHD1: 1 TB 2.5" SATA
 - Display: 17" 1080p 144Hz
-
 - Mouse: MM710 PMW3389, Cooler Master
 
-### isoimage (USB Installer)
-
-```bash
-./dotfiles
-├── custom-packages
-│   └── tpm-fido
-│       └── package.nix
-├── files
-│   ├── ffkbV4.vil
-│   ├── gruvbox-dark-rainbow.png
-│   └── S2721Q.icm
-├── hosts
-│   ├── homelab
-│   │   ├── configuration.nix
-│   │   ├── disko.nix
-│   │   └── hardware-configuration.nix
-│   ├── isoimage
-│   │   └── configuration.nix
-│   ├── legion
-│   │   ├── configuration.nix
-│   │   └── hardware-configuration.nix
-│   ├── thinkpad
-│   │   ├── configuration.nix
-│   │   ├── hardware-configuration.nix
-│   │   └── nvidia.nix
-│   └── torrent
-│       ├── configuration.nix
-│       ├── disko.nix
-│       └── hardware-configuration.nix
-├── modules
-│   ├── home-manager
-│   │   ├── gnome.nix
-│   │   ├── kde.nix
-│   │   └── tooling.nix
-│   └── nixos
-│       ├── beets.nix
-│       ├── copypartymount.nix
-│       ├── gnome.nix
-│       ├── kde.nix
-│       ├── tooling.nix
-│       ├── virtual-machines.nix
-│       ├── winapps.nix
-│       └── wooting.nix
-├── profiles
-│   ├── default.nix
-│   ├── PC.nix
-│   └── server.nix
-├── secrets
-│   └── secrets.yaml
-├── services
-│   ├── copyparty.nix
-│   ├── factorio.nix
-│   ├── jellyfin.nix
-│   ├── minecraft.nix
-│   ├── nextcloud.nix
-│   ├── rss.nix
-│   ├── samba.nix
-│   └── webdav.nix
-├── flake.lock
-├── flake.nix
-├── LICENSE.md
-└── README.md
-```
+### **isoimage** (USB Installer)
