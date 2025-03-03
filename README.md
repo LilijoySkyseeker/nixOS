@@ -2,7 +2,7 @@
 
 ## Structure Guide
 
-All configuration starts with [flake.nix](./flake.nix)
+All configuration starts with [flake.nix](./flake.nix#L22)
 
 ```bash
 NixOS
@@ -112,3 +112,7 @@ NixOS
 │   └── secrets.yaml
 └── .sops.yaml
 ```
+
+## Hosts
+
+## Iteresting Stuff
