@@ -42,19 +42,9 @@
 
   outputs =
     inputs@{
-      self,
       nixpkgs-unstable,
       nixpkgs-stable,
-      home-manager,
-      stylix,
-      sops-nix,
-      disko,
-      impermanence,
       copyparty,
-      nix-index-database,
-      plasma-manager,
-      nix-flatpak,
-      nvf,
       ...
     }:
     let

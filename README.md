@@ -26,7 +26,7 @@ where the host specific configuration is held. Things like hostname, timezone,
 system services, etc. Anything that only this hosts needs and is not shared is
 defined here.
 
-Some specific configuration is split into seperate files to make orginzation
+Some specific configuration is split into separate files to make organization
 easier and is imported in the main
 [configuration.nix](./hosts/homelab/configuration.nix).
 
@@ -61,9 +61,9 @@ These profiles contain the configuration that is shared with other hosts,
 is shared universally amongst all hosts. The other profiles are based on the
 role the host is taking.
 
-These profiles and the individiul host
+These profiles and the individual host
 [configuration.nix](./hosts/homelab/configuration.nix) import modules and
-services that have been split appart for orginzation.
+services that have been split apart for organization.
 
 ```bash
 NixOS
@@ -97,7 +97,7 @@ task. The [modules](./modules) are for local configuration. While
 [services](./services) are for anything being served to LAN or WAN.
 
 What's left is a section for custom packages, standalone files, and encrypted
-secret managment with [sops-nix](https://github.com/Mic92/sops-nix).
+secret management with [sops-nix](https://github.com/Mic92/sops-nix).
 
 ```bash
 NixOS
@@ -115,7 +115,7 @@ NixOS
 
 ## Hosts
 
-## Iteresting Stuff
+## Interesting Stuff
 
 - [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
   [Impermanence](https://github.com/nix-community/impermanence)
