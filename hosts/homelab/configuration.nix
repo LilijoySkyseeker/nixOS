@@ -1,6 +1,7 @@
 {
   config,
-  pkgs,
+  pkgs-stable,
+  pkgs-unstable,
   lib,
   vars,
   ...
@@ -26,7 +27,7 @@
   ];
 
   # System installed pkgs
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-stable; [
     sanoid # also installs syncoid and findoid
     zfs
     restic
@@ -48,35 +49,6 @@
 
   # oci containers
   virtualisation.oci-containers.backend = "docker";
-
-  # auto updates
-  system.autoUpgrade = {
-    enable = true;
-    dates = "04:00";
-    flake = "/etc/nixos";
-    flags = [
-      "--update-input"
-      "nixpkgs"
-      "--update-input"
-      "nixpkgs-unstable"
-      "--update-input"
-      "home-manager"
-      "--update-input"
-      "stylix"
-      "--update-input"
-      "sops-nix"
-      "--update-input"
-      "disko"
-      "--update-input"
-      "impermanence"
-      "--update-input"
-      "nixvim"
-      "--update-input"
-      "nix-on-droid"
-      "--commit-lock-file"
-    ];
-    allowReboot = true;
-  };
 
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
@@ -187,14 +159,14 @@
     };
   };
   systemd.services.restic-backups-backblazeDaily = {
-    path = [
+    path = with pkgs-stable; [
       # necessary for pre and post scripts
-      pkgs.zfs
-      pkgs.coreutils-full
-      pkgs.mount
-      pkgs.umount
-      pkgs.findutils
-      pkgs.bash
+      zfs
+      coreutils-full
+      mount
+      umount
+      findutils
+      bash
     ];
     serviceConfig = {
       # backup is always lowest priority to not effect running processes
@@ -313,7 +285,6 @@
 
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];
-  ##   environment.systemPackages = with pkgs; [zfs];
   services.zfs = {
     autoScrub.enable = true;
     trim.enable = true;

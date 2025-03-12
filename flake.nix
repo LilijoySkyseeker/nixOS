@@ -108,13 +108,13 @@
           modules = [ ./hosts/torrent/configuration.nix ];
         };
         #==================================================
-        homelab = nixpkgs-unstable.lib.nixosSystem {
+        homelab = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
             inherit vars;
             inputs = inputs;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
-          pkgs = import nixpkgs-unstable {
+          pkgs = import nixpkgs-stable {
             system = "x86_64-linux";
             config.allowUnfree = true;
             overlays = [ copyparty.overlays.default ];
