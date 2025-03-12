@@ -61,6 +61,7 @@
         carpet
         enchant-tweaker
         bluemap
+        distanthorizons
       '';
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
