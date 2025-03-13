@@ -26,8 +26,8 @@
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
-    copyparty.url = "github:9001/copyparty";
-    copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    #   copyparty.url = "github:9001/copyparty";
+    #   copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
@@ -44,7 +44,7 @@
     inputs@{
       nixpkgs-unstable,
       nixpkgs-stable,
-      copyparty,
+      #     copyparty,
       ...
     }:
     let
@@ -110,15 +110,27 @@
         #==================================================
         homelab = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
-            inherit vars;
-            inputs = inputs;
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
-          pkgs = import nixpkgs-stable {
-            system = "x86_64-linux";
-            config.allowUnfree = true;
-            overlays = [ copyparty.overlays.default ];
-          };
+          #         specialArgs = {
+          #           inherit
+          #             pkgs-unstable
+          #             vars
+          #             ;
+          #           inputs = inputs;
+          #         };
+          #         modules = [ ./hosts/homelab/configuration.nix ];
+          #         pkgs-stable = import nixpkgs-stable {
+          #           system = "x86_64-linux";
+          #           config.allowUnfree = true;
+          #           overlays = [ copyparty.overlays.default ];
+          #         };
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {

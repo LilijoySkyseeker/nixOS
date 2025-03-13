@@ -1,7 +1,6 @@
 {
   config,
   pkgs-stable,
-  pkgs-unstable,
   lib,
   vars,
   ...
@@ -20,7 +19,7 @@
     #   ../../services/nextcloud.nix
     ../../services/rss.nix
     #   ../../services/webdav.nix
-    ../../services/copyparty.nix
+    #   ../../services/copyparty.nix
     #   ../../services/samba.nix
 
     ../../modules/nixos/beets.nix
@@ -302,7 +301,7 @@
         wantedBy = [ "initrd.target" ];
         after = [ "zfs-import-zroot.service" ];
         before = [ "sysroot.mount" ];
-        path = with pkgs; [ zfs ];
+        path = with pkgs-stable; [ zfs ];
         unitConfig.DefaultDependencies = "no";
         serviceConfig.Type = "oneshot";
         script = ''
