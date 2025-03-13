@@ -61,6 +61,9 @@
         no-chat-reports
         scalablelux
         servux
+        viabackwards
+        viafabric
+        viarewind
         vmp-fabric
       '';
       # enchant-tweaker
