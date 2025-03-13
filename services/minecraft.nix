@@ -36,7 +36,7 @@
       TYPE = "FABRIC";
       VERSION = "1.21.4";
       EULA = "TRUE";
-      MEMORY = "2G";
+      MEMORY = "4G";
       USE_AIKAR_FLAGS = "TRUE";
       MOTD = "GC and Friends";
       DIFFICULTY = "hard";
