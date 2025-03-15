@@ -33,11 +33,11 @@
       "8100:8100"
     ];
     environment = {
-      VERSION = "1.20.4";
-      EULA = "TRUE";
-      MEMORY = "2G";
-      USE_AIKAR_FLAGS = "TRUE";
       TYPE = "FABRIC";
+      VERSION = "1.21.4";
+      EULA = "TRUE";
+      MEMORY = "4G";
+      USE_AIKAR_FLAGS = "TRUE";
       MOTD = "GC and Friends";
       DIFFICULTY = "hard";
       MODE = "survival";
@@ -49,20 +49,25 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
+        bluemap
+        c2me-fabric
+        carpet
+        distanthorizons
+        easy-shulker-boxes
+        ferrite-core
+        infinitymendingbows
+        krypton
         lithium
         no-chat-reports
-        krypton
-        c2me-fabric
-        vmp-fabric
+        scalablelux
         servux
-        memoryleakfix
-        ferrite-core
-        easy-shulker-boxes
-        carpet
-        enchant-tweaker
-        bluemap
-        distanthorizons
+        viabackwards
+        viafabric
+        viarewind
+        vmp-fabric
       '';
+      # enchant-tweaker
+      # memoryleakfix
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker
