@@ -42,9 +42,9 @@
 
   outputs =
     inputs@{
+      self,
       nixpkgs-unstable,
       nixpkgs-stable,
-      #     copyparty,
       ...
     }:
     let

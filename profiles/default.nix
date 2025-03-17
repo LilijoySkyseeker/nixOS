@@ -30,6 +30,11 @@
     sops # secrets management
   ];
 
+  # allow cross compilation
+  boot.binfmt.emulatedSystems = [
+    "aarch64-linux"
+  ];
+
   # allow unfree
   nixpkgs.config.allowUnfree = true;
 
