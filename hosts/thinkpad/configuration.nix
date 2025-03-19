@@ -54,6 +54,8 @@
         leftalt = "layer(navigation)";
         leftcontrol = "leftalt";
         esc = "layer(esc)";
+        "\\" = "backspace";
+        "backspace" = "\\";
       };
       navigation = {
         j = "left";
