@@ -16,11 +16,7 @@
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
-    #   ../../services/nextcloud.nix
     ../../services/rss.nix
-    #   ../../services/webdav.nix
-    #   ../../services/copyparty.nix
-    #   ../../services/samba.nix
 
     ../../modules/nixos/beets.nix
   ];

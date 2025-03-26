@@ -31,7 +31,6 @@
       bitwarden
       thunderbird
       vscode-fhs
-      cider
       qbittorrent
       jellyfin-media-player
       easyeffects
@@ -61,7 +60,7 @@
   #flatpak
   services.flatpak = {
     enable = true;
-    uninstallUnmanaged = true;
+    uninstallUnmanaged = false;
     packages = [
       "info.beyondallreason.bar"
     ];
