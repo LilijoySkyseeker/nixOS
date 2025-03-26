@@ -36,6 +36,11 @@
     zellij
   ];
 
+  # forward to pie
+  services.caddy.virtualHosts."pie.skyseekerhomelab.duckdns.org".extraConfig = ''
+    reverse_proxy 192.168.1.3:8787
+  '';
+
   # disable staggered hdd spin up
   boot.extraModprobeConfig = ''
     options libahci ignore_sss=1
@@ -249,12 +254,6 @@
 
   # Define your hostname.
   networking.hostName = "homelab";
-
-  #security
-  # lock down nix
-  nix.settings.allowed-users = [ "root" ];
-  # disable sudo
-  security.sudo.enable = false;
 
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;

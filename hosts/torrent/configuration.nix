@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   lib,
+  config,
   ...
 }:
 {
@@ -25,6 +26,11 @@
       kile
       texlive.combined.scheme-full
     ]);
+
+  # drivers
+  boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
+  boot.kernelModules = [ "r8125" ];
+  nixpkgs.config.allowBroken = true;
 
   # kde partition manager
   programs.partition-manager.enable = true;

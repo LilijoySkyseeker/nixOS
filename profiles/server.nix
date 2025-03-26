@@ -7,6 +7,12 @@
     flac
   ];
 
+  #security
+  # lock down nix
+  nix.settings.allowed-users = [ "root" ];
+  # disable sudo
+  security.sudo.enable = false;
+
   # nh, nix helper
   programs.nh = {
     flake = "/etc/nixos";
