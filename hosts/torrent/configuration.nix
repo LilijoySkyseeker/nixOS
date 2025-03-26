@@ -27,10 +27,10 @@
       texlive.combined.scheme-full
     ]);
 
-  # drivers
+  # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
   boot.kernelModules = [ "r8125" ];
-  nixpkgs.config.allowBroken = true;
+  nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
 
   # kde partition manager
   programs.partition-manager.enable = true;
