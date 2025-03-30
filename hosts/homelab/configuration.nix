@@ -33,8 +33,8 @@
   ];
 
   # forward to pie
-  services.caddy.virtualHosts."pie.skyseekerhomelab.duckdns.org".extraConfig = ''
-    reverse_proxy 192.168.1.3:8787
+  services.caddy.virtualHosts."pie.skyseekerlabs.duckdns.org".extraConfig = ''
+    reverse_proxy 192.168.1.3:80
   '';
 
   # disable staggered hdd spin up
