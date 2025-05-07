@@ -12,7 +12,7 @@
     hardware.nvidia = {
       modesetting.enable = true;
       powerManagement.enable = false;
-      powerManagement.finegrained = true;
+      powerManagement.finegrained = false;
       open = true;
       nvidiaSettings = true;
       package = config.boot.kernelPackages.nvidiaPackages.stable; # info for beta/specific drivers https://github.com/NixOS/nixpkgs/pull/322963/commits/10ed11d6856a7b67b9b2cef5e52af5c7de34b93f and reddit post https://www.reddit.com/r/NixOS/comments/1dqipyx/updating_nvidia_driver_from_5554202_to_the_latest/
@@ -23,7 +23,7 @@
       # Bus ID of the NVIDIA GPU.
       nvidiaBusId = lib.mkDefault "PCI:1:0:0";
       # set primary render to NVIDIA gpu, but use intel gpu display outputs
-      reverseSync.enable = true;
+      sync.enable = true;
     };
     # =====================================================================================
   };
