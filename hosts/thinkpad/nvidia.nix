@@ -1,8 +1,8 @@
 { config, lib, ... }:
 {
+  # alternate gpu-enabled
   config.specialisation.gpu-enabled.configuration = {
     environment.etc."specialisation".text = "gpu-enabled"; # for nh helper
-    # NVIDIA ==============================================================================
     hardware = {
       graphics.enable = true;
       graphics.enable32Bit = true;
@@ -25,7 +25,6 @@
       # set primary render to NVIDIA gpu, but use intel gpu display outputs
       sync.enable = true;
     };
-    # =====================================================================================
   };
 
   # default gpu-disabled

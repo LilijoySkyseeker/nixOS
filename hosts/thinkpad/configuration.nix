@@ -18,6 +18,7 @@
     (with pkgs-unstable; [
     ])
     ++ (with pkgs-stable; [
+      openscad
       qalculate-gtk
     ]);
 

@@ -10,7 +10,6 @@
     ./hardware-configuration.nix
     ./disko.nix
     ../../profiles/PC.nix
-    ../../modules/nixos/wooting.nix
     ../../modules/nixos/copypartymount.nix
     ../../modules/nixos/kde.nix
   ];
@@ -21,7 +20,6 @@
       ckan # ksp mod manager
     ])
     ++ (with pkgs-stable; [
-      filelight # kde disk ussage
       qalculate-qt
       kile
       texlive.combined.scheme-full
@@ -31,9 +29,6 @@
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
   boot.kernelModules = [ "r8125" ];
   nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
-
-  # kde partition manager
-  programs.partition-manager.enable = true;
 
   # networking
   networking.networkmanager = {

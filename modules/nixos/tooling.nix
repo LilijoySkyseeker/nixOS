@@ -43,11 +43,11 @@
         };
         binds.whichKey.enable = true;
         searchCase = "smart";
+        lsp.enable = true;
         languages = {
           enableDAP = true;
           enableExtraDiagnostics = true;
           enableFormat = true;
-          enableLSP = true;
           enableTreesitter = true;
           nix = {
             enable = true;

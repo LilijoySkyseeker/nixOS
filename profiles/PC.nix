@@ -10,6 +10,7 @@
     ../modules/nixos/virtual-machines.nix # (also needs home manager config)
     ../modules/nixos/tooling.nix
     ./default.nix
+    ../modules/nixos/wooting.nix
   ];
 
   # System installed pkgs
