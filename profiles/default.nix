@@ -30,6 +30,11 @@
     sops # secrets management
   ];
 
+  # # temp allow EOL package
+  # inputs.nixpkgs-stable.config.permittedInsecurePackages = [
+  #   "electron-33.4.11"
+  # ];
+
   # allow cross compilation
   boot.binfmt.emulatedSystems = [
     "aarch64-linux"
@@ -55,7 +60,7 @@
         vars
         ;
     };
-    #   useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
+    useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
   };

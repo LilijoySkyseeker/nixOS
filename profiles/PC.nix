@@ -25,6 +25,7 @@
       nixos-anywhere
       ssh-to-age
       rclone
+      distrobox
 
       yubikey-manager
       distrobox
@@ -58,6 +59,15 @@
       discord
       kdePackages.kdenlive
     ]);
+
+  # distrobox and other docker
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
+  };
+
+  #qmk, allow udev rules
+  hardware.keyboard.qmk.enable = true;
 
   #flatpak
   services.flatpak = {

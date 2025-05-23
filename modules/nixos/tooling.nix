@@ -34,10 +34,20 @@
     enable = true;
     settings = {
       vim = {
+        clipboard = {
+          enable = true;
+          providers = {
+            wl-copy.enable = true;
+            xclip.enable = true;
+            xsel.enable = true;
+          };
+          registers = [
+            "unnamed"
+            "unnamedplus"
+          ];
+        };
         viAlias = true;
         vimAlias = true;
-        useSystemClipboard = true;
-        scrollOffset = 8; # DEBUG TO MAKE WORK
         undoFile = {
           enable = true;
         };
@@ -68,6 +78,7 @@
         options = {
           shiftwidth = 2;
           tabstop = 2;
+          scrolloff = 8;
         };
         statusline.lualine = {
           enable = true;
