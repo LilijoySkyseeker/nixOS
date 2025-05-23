@@ -2,7 +2,6 @@
   pkgs-unstable,
   pkgs-stable,
   inputs,
-  lib,
   ...
 }:
 {
@@ -43,6 +42,8 @@
       r2modman
       yubioath-flutter
       nicotine-plus
+
+      texliveFull
 
       # closed source
       obsidian

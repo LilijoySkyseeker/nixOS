@@ -56,7 +56,6 @@
           };
           markdown.enable = true;
           bash.enable = true;
-          openscad.enable = true;
         };
         lsp.formatOnSave = true;
         maps = {
