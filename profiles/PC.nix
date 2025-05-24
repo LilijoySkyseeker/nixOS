@@ -129,6 +129,7 @@
     polarity = "dark";
     cursor.package = pkgs-unstable.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
+    cursor.size = 24;
     fonts = {
       monospace = {
         package = pkgs-unstable.nerd-fonts.jetbrains-mono;

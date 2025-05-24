@@ -82,7 +82,7 @@
         };
         statusline.lualine = {
           enable = true;
-          theme = "gruvbox_dark";
+          theme = lib.mkForce "gruvbox_dark"; # TEMP
         };
         visuals = {
           highlight-undo = {
@@ -98,9 +98,9 @@
         autopairs.nvim-autopairs.enable = true;
         theme = {
           enable = true;
-          name = "gruvbox";
+           name = lib.mkForce "gruvbox";
           style = "dark";
-          transparent = true;
+          transparent = lib.mkForce true;
         };
       };
     };

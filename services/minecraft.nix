@@ -61,13 +61,13 @@
         no-chat-reports
         scalablelux
         servux
-        viabackwards
-        viafabric
-        viarewind
         vmp-fabric
       '';
       # enchant-tweaker
       # memoryleakfix
+      # viabackwards
+      # viafabric
+      # viarewind
       ENABLE_WHITELIST = "TRUE";
       WHITELIST = ''
         LilijoySkyseeker

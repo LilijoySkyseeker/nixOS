@@ -11,7 +11,7 @@
     (with pkgs-unstable; [
     ])
     ++ (with pkgs-stable; [
-      filelight # kde disk usage
+      kdePackages.filelight # kde disk usage
     ]);
 
   # kde partition manager
