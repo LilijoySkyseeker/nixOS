@@ -38,7 +38,6 @@
       qpwgraph
       youtube-music
       libreoffice
-      vial
       vlc
       r2modman
       yubioath-flutter
@@ -53,6 +52,7 @@
 
     ])
     ++ (with pkgs-stable; [
+      vial
       feishin
       prismlauncher
       vesktop
