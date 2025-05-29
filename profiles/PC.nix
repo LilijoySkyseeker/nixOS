@@ -42,6 +42,7 @@
       r2modman
       yubioath-flutter
       nicotine-plus
+      vial
 
       texliveFull
 
@@ -52,13 +53,18 @@
 
     ])
     ++ (with pkgs-stable; [
-      vial
       feishin
       prismlauncher
       vesktop
       discord
       kdePackages.kdenlive
     ]);
+
+	# Appimage
+	programs.appimage = {
+		enable = true;
+		binfmt = true;
+	};
 
   # distrobox and other docker
   virtualisation.podman = {
