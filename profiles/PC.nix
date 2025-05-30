@@ -38,11 +38,11 @@
       qpwgraph
       youtube-music
       libreoffice
-      vial
       vlc
       r2modman
       yubioath-flutter
       nicotine-plus
+      vial
 
       texliveFull
 
@@ -59,6 +59,12 @@
       discord
       kdePackages.kdenlive
     ]);
+
+	# Appimage
+	programs.appimage = {
+		enable = true;
+		binfmt = true;
+	};
 
   # distrobox and other docker
   virtualisation.podman = {
@@ -129,6 +135,7 @@
     polarity = "dark";
     cursor.package = pkgs-unstable.capitaine-cursors-themed;
     cursor.name = "Capitaine Cursors";
+    cursor.size = 24;
     fonts = {
       monospace = {
         package = pkgs-unstable.nerd-fonts.jetbrains-mono;

@@ -73,7 +73,7 @@
   };
 
   # Set your time zone.
-  time.timeZone = "America/New_York";
+  time.timeZone = "America/Los_Angeles";
 
   # Define your hostname.
   networking.hostName = "torrent";
