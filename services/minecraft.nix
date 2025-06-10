@@ -38,6 +38,7 @@
       EULA = "TRUE";
       MEMORY = "4G";
       USE_AIKAR_FLAGS = "TRUE";
+      JVM_OPTS = "-java.net.preferIPv4Stack=false -java.net.preferIPv6Stack=true";
       MOTD = "GC and Friends";
       DIFFICULTY = "hard";
       MODE = "survival";
