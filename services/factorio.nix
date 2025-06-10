@@ -1,7 +1,7 @@
 { ... }:
 {
   # networking
-  services.caddy.virtualHosts."factorio.skyseekerhomelab.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."factorio.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:34197
   '';
   networking.firewall.allowedUDPPorts = [ 34197 ];

@@ -81,11 +81,11 @@
   networking.firewall.allowedTCPPorts = [ 443 ];
   networking.firewall.allowedUDPPorts = [ 443 ];
 
-  # duckdns
-  services.cron = {
-    enable = true;
-    systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
-  };
+# # duckdns
+# services.cron = {
+#   enable = true;
+#   systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
+# };
 
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {
