@@ -2,7 +2,7 @@ keys:
   - &nixos-thinkpad age1758lfexzx4fqdnelj095nedm2h9auzvllz9v35t99vd3l64vugsq3d7cl8
   - &thinkpad-ssh age1zn0nrxa2pwepps9hg5jtvmj95qh7gee89ec35d3akw3gxhr0545sgakg9d
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad 
-  - &torrent-age 
+  - &torrent-age age1gsmfmtvd97d9x52d2hpgx5qppna5admpf6ch5l0hcn58cv7dp5ws9fhu2t 
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
