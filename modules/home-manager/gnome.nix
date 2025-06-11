@@ -119,12 +119,12 @@
         "dash-to-panel@jderose9.github.com"
         "clipboard-indicator@tudmotu.com"
         "openweather-extension@penguin-teal.github.io"
-        "tiling-assistant@leleat-on-github"
+#        "tiling-assistant@leleat-on-github"
         "ddterm@amezin.github.com"
         "gsconnect@andyholmes.github.io"
         "batterytimepercentagecompact@sagrland.de"
         "battery-usage-wattmeter@halfmexicanhalfamazing.gmail.com"
-        "smart-auto-move@khimaros.com"
+	"paperwm@paperwm.github.com"
       ];
     };
   };
@@ -133,11 +133,11 @@
   home.packages = with pkgs.gnomeExtensions; [
     dash-to-panel
     clipboard-indicator
-    tiling-assistant
+#   tiling-assistant
     ddterm
     battery-time-percentage-compact
     battery-usage-wattmeter
-    smart-auto-move
     openweather-refined
+    paperwm
   ];
 }
