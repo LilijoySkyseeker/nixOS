@@ -1,10 +1,10 @@
 { ... }:
 {
   # networking
-  services.caddy.virtualHosts."minecraft.skyseekerhomelab.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."minecraft.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:25565
   '';
-  services.caddy.virtualHosts."minecraft-map.skyseekerhomelab.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."minecraft-map.skyseekerlabs.duckdns.org".extraConfig = ''
     reverse_proxy localhost:8100
   '';
   networking.firewall.allowedTCPPorts = [
@@ -37,7 +37,7 @@
       VERSION = "1.21.4";
       EULA = "TRUE";
       MEMORY = "4G";
-      USE_AIKAR_FLAGS = "TRUE";
+      USE_MEOWICE_FLAGS = "TRUE";
       MOTD = "GC and Friends";
       DIFFICULTY = "hard";
       MODE = "survival";
