@@ -13,6 +13,7 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
+    ../../services/cloudflared.nix
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
@@ -32,10 +33,11 @@
     zellij
   ];
 
-  # forward to pie
-  services.caddy.virtualHosts."pie.skyseekerlabs.duckdns.org".extraConfig = ''
-    reverse_proxy 192.168.1.3:80
-  '';
+	# SMART disk health tool
+  services.smartd = {
+    enable = true;
+    autodetect = true;
+  };
 
   # disable staggered hdd spin up
   boot.extraModprobeConfig = ''
