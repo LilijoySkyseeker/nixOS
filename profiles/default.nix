@@ -35,6 +35,17 @@
   #   "electron-33.4.11"
   # ];
 
+# SMART disk health tool
+  services.smartd = {
+    enable = true;
+    autodetect = true;
+    notifications = {
+	systembus-notify.enable = true;
+	wall.enable = true;
+	x11.enable = true;
+    };
+  };
+
   # allow cross compilation
   boot.binfmt.emulatedSystems = [
     "aarch64-linux"

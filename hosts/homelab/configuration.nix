@@ -33,12 +33,6 @@
     zellij
   ];
 
-	# SMART disk health tool
-  services.smartd = {
-    enable = true;
-    autodetect = true;
-  };
-
   # disable staggered hdd spin up
   boot.extraModprobeConfig = ''
     options libahci ignore_sss=1
