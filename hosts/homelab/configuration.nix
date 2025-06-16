@@ -50,7 +50,7 @@
   hardware.cpu.intel.updateMicrocode = true;
 
   # Set your time zone.
-  time.timeZone = "America/New_York";
+  time.timeZone = "America/Los_Angeles";
 
   # networking
   networking.networkmanager = {

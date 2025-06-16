@@ -58,13 +58,17 @@
       vesktop
       discord
       kdePackages.kdenlive
+      wl-clipboard # for waydroid
     ]);
 
-	# Appimage
-	programs.appimage = {
-		enable = true;
-		binfmt = true;
-	};
+    # Waydroid
+      virtualisation.waydroid.enable = true;
+
+# Appimage
+programs.appimage = {
+	enable = true;
+	binfmt = true;
+};
 
   # distrobox and other docker
   virtualisation.podman = {
