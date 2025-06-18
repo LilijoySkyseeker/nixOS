@@ -22,6 +22,9 @@
       qalculate-gtk
     ]);
 
+  # fingerprint reader
+  services.fprintd.enable = true;
+
   # sops secrets
   sops.secrets = {
     restic = {

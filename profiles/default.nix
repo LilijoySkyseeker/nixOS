@@ -30,10 +30,8 @@
     sops # secrets management
   ];
 
-  # # temp allow EOL package
-  # inputs.nixpkgs-stable.config.permittedInsecurePackages = [
-  #   "electron-33.4.11"
-  # ];
+# firmware updates
+services.fwupd.enable = true;
 
 # SMART disk health tool
   services.smartd = {
