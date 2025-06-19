@@ -28,6 +28,7 @@
     nixfmt-rfc-style
     rsync
     sops # secrets management
+    smartctl
   ];
 
   # # temp allow EOL package

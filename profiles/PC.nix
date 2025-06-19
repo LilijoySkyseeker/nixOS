@@ -26,6 +26,7 @@
       ssh-to-age
       rclone
       distrobox
+      scrcpy
 
       yubikey-manager
       distrobox
