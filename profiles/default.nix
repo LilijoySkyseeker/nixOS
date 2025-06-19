@@ -28,7 +28,7 @@
     nixfmt-rfc-style
     rsync
     sops # secrets management
-    smartctl
+    smartmontools
   ];
 
 # firmware updates
