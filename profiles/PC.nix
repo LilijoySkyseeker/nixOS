@@ -27,6 +27,9 @@
       rclone
       distrobox
       quickemu
+      caligula # cli burning tool
+      scrcpy
+      QtScrcpy
 
       yubikey-manager
       distrobox
@@ -61,6 +64,9 @@
       kdePackages.kdenlive
       wl-clipboard # for waydroid
     ]);
+
+# android
+programs.adb.enable = true;
 
     # Waydroid
       virtualisation.waydroid.enable = true;
