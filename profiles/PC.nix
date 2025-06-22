@@ -29,7 +29,6 @@
       quickemu
       caligula # cli burning tool
       scrcpy
-      QtScrcpy
 
       yubikey-manager
       distrobox
@@ -92,6 +91,7 @@ programs.appimage = {
     uninstallUnmanaged = false;
     packages = [
       "info.beyondallreason.bar"
+      "com.authy.Authy"
     ];
   };
 
