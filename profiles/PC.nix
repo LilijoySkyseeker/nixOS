@@ -27,6 +27,8 @@
       rclone
       distrobox
       quickemu
+      caligula # cli burning tool
+      scrcpy
 
       yubikey-manager
       distrobox
@@ -62,8 +64,8 @@
       wl-clipboard # for waydroid
     ]);
 
-    # spice usb redirection for VMs
-    virtualisation.spiceUSBRedirection.enable = true;
+# android
+programs.adb.enable = true;
 
     # Waydroid
       virtualisation.waydroid.enable = true;
@@ -89,6 +91,7 @@ programs.appimage = {
     uninstallUnmanaged = false;
     packages = [
       "info.beyondallreason.bar"
+      "com.authy.Authy"
     ];
   };
 
