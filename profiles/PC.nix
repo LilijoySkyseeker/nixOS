@@ -62,6 +62,9 @@
       wl-clipboard # for waydroid
     ]);
 
+    # spice usb redirection for VMs
+    virtualisation.spiceUSBRedirection.enable = true;
+
     # Waydroid
       virtualisation.waydroid.enable = true;
 
