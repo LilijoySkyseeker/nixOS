@@ -45,6 +45,7 @@
       yubioath-flutter
       nicotine-plus
       vial
+      element-desktop
 
       texliveFull
 
