@@ -12,7 +12,9 @@
     ])
     ++ (with pkgs-stable; [
       kdePackages.filelight # kde disk usage
-    ]);
+      xdg-desktop-portal 
+kdePackages.xdg-desktop-portal-kde    
+]);
 
   # kde partition manager
   programs.partition-manager.enable = true;
