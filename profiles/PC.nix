@@ -26,7 +26,6 @@
       ssh-to-age
       rclone
       distrobox
-      quickemu
       caligula # cli burning tool
       scrcpy
 
@@ -62,6 +61,7 @@
       discord
       kdePackages.kdenlive
       wl-clipboard # for waydroid
+      quickemu
     ]);
 
 # android
