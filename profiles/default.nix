@@ -29,19 +29,20 @@
     rsync
     sops # secrets management
     smartmontools
+    helix
   ];
 
-# firmware updates
-services.fwupd.enable = true;
+  # firmware updates
+  services.fwupd.enable = true;
 
-# SMART disk health tool
+  # SMART disk health tool
   services.smartd = {
     enable = true;
     autodetect = true;
     notifications = {
-	systembus-notify.enable = true;
-	wall.enable = true;
-	x11.enable = true;
+      systembus-notify.enable = true;
+      wall.enable = true;
+      x11.enable = true;
     };
   };
 
@@ -70,7 +71,7 @@ services.fwupd.enable = true;
         vars
         ;
     };
-    useGlobalPkgs = true; # TEMP DISABLED FOR CONFLICT
+    useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
   };

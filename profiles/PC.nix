@@ -65,17 +65,17 @@
       quickemu
     ]);
 
-# android
-programs.adb.enable = true;
+  # android
+  programs.adb.enable = true;
 
-    # Waydroid
-      virtualisation.waydroid.enable = true;
+  # Waydroid
+  virtualisation.waydroid.enable = true;
 
-# Appimage
-programs.appimage = {
-	enable = true;
-	binfmt = true;
-};
+  # Appimage
+  programs.appimage = {
+    enable = true;
+    binfmt = true;
+  };
 
   # distrobox and other docker
   virtualisation.podman = {
@@ -90,9 +90,7 @@ programs.appimage = {
   services.flatpak = {
     enable = true;
     uninstallUnmanaged = false;
-    packages = [
-      "info.beyondallreason.bar"
-    ];
+    packages = [ "info.beyondallreason.bar" ];
   };
 
   # udev rules for vial
@@ -117,6 +115,7 @@ programs.appimage = {
     home.username = "lilijoy";
     home.homeDirectory = "/home/lilijoy";
     programs.home-manager.enable = true;
+
   };
 
   # service for yubikey
@@ -141,7 +140,7 @@ programs.appimage = {
   stylix = {
     enable = true;
     autoEnable = true;
-    base16Scheme = "${pkgs-unstable.base16-schemes}/share/themes/gruvbox-dark-medium.yaml";
+    base16Scheme = "${pkgs-stable.base16-schemes}/share/themes/gruvbox-dark-soft.yaml";
     image = ../files/gruvbox-dark-rainbow.png;
     polarity = "dark";
     cursor.package = pkgs-unstable.capitaine-cursors-themed;
@@ -213,12 +212,7 @@ programs.appimage = {
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
-    package =
-      with pkgs-unstable;
-      steam.override {
-        extraPkgs = pkgs-stable: [
-        ];
-      };
+    package = with pkgs-unstable; steam.override { extraPkgs = pkgs-stable: [ ]; };
   };
 
   # feral gamemode

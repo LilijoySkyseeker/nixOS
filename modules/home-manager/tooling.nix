@@ -1,5 +1,31 @@
-{ pkgs, lib, ... }:
 {
+  pkgs-stable,
+  pkgs-unstable,
+  lib,
+  ...
+}:
+{
+
+  # Helix text editor
+  programs.helix = {
+    enable = true;
+    settings = {
+      theme = lib.mkForce "gruvbox_dark_soft";
+      editor.cursor-shape = {
+        normal = "block";
+        insert = "bar";
+        select = "underline";
+      };
+    };
+    languages.language = [
+      {
+        name = "nix";
+        auto-format = true;
+        formatter.command = "${pkgs-stable.nixfmt-rfc-style}/bin/nixfmt";
+      }
+    ];
+  };
+
   # Git
   programs.git = {
     enable = true;
@@ -36,7 +62,7 @@
   # OBS Studio
   programs.obs-studio = {
     enable = true;
-    plugins = with pkgs.obs-studio-plugins; [ obs-pipewire-audio-capture ];
+    plugins = with pkgs-stable.obs-studio-plugins; [ obs-pipewire-audio-capture ];
   };
 
   # BTOP
@@ -68,21 +94,42 @@
     plugins = [
       {
         name = "grc";
-        src = pkgs.fishPlugins.grc.src;
+        src = pkgs-stable.fishPlugins.grc.src;
       }
       {
         name = "tide";
-        src = pkgs.fishPlugins.tide.src;
+        src = pkgs-stable.fishPlugins.tide.src;
       }
     ];
     functions = {
-      nsr.body = "\nnix shell nixpkgs/nixos-unstable#$argv[1] --command $argv\n";
-      ns.body = "\nnix shell 'nixpkgs/nixos-unstable#'{$argv}\n";
-      nhu.body = "\ngit add --all && nh os build --update && git add --all\n";
-      nht.body = "\ngit add --all && nh os test\n";
-      nhb.body = "\ngit add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push\n";
-      nhs.body = "\ngit add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push\n";
-      gds.body = "\ngit add --all && git diff --staged | bat --paging always --pager less\n";
+      nsr.body = ''
+
+        nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
+      '';
+      ns.body = ''
+
+        nix shell 'nixpkgs/nixos-unstable#'{$argv}
+      '';
+      nhu.body = ''
+
+        git add --all && nh os build --update && git add --all
+      '';
+      nht.body = ''
+
+        git add --all && nh os test
+      '';
+      nhb.body = ''
+
+        git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push
+      '';
+      nhs.body = ''
+
+        git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
+      '';
+      gds.body = ''
+
+        git add --all && git diff --staged | bat --paging always --pager less
+      '';
     };
     shellAliases = {
       e = "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";

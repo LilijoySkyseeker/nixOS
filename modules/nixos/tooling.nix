@@ -44,8 +44,6 @@
           };
           registers = "unnamed,unnamedplus";
         };
-        viAlias = true;
-        vimAlias = true;
         undoFile = {
           enable = true;
         };
