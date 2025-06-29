@@ -14,7 +14,7 @@
     vendor.completions.enable = true;
   };
   programs.bash = {
-    # switch to fish in interactive shell
+    # switch to fish in interactive shell, otherwise bash
     interactiveShellInit = ''
       if [[ $(${pkgs.procps}/bin/ps --no-header --pid=$PPID --format=comm) != "fish" && -z ''${BASH_EXECUTION_STRING} ]]
       then
@@ -32,6 +32,7 @@
   };
   programs.nvf = {
     enable = true;
+    enableManpages = true;
     settings = {
       vim = {
         clipboard = {
@@ -41,10 +42,7 @@
             xclip.enable = true;
             xsel.enable = true;
           };
-          registers = [
-            "unnamed"
-            "unnamedplus"
-          ];
+          registers = "unnamed,unnamedplus";
         };
         viAlias = true;
         vimAlias = true;
@@ -98,7 +96,7 @@
         autopairs.nvim-autopairs.enable = true;
         theme = {
           enable = true;
-           name = lib.mkForce "gruvbox";
+          name = lib.mkForce "gruvbox";
           style = "dark";
           transparent = lib.mkForce true;
         };
