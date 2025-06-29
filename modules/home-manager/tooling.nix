@@ -1,6 +1,5 @@
 {
   pkgs-stable,
-  pkgs-unstable,
   lib,
   ...
 }:
@@ -9,21 +8,76 @@
   # Helix text editor
   programs.helix = {
     enable = true;
+    defaultEditor = true;
     settings = {
       theme = lib.mkForce "gruvbox_dark_soft";
-      editor.cursor-shape = {
-        normal = "block";
-        insert = "bar";
-        select = "underline";
+      editor = {
+        inline-diagnostics = {
+          cursor-line = "error";
+        };
+        end-of-line-diagnostics = "hint";
+        statusline = {
+          left = [
+            "mode"
+            "spinner"
+            "version-control"
+            "file-absolute-path"
+          ];
+        };
+        lsp = {
+          display-inlay-hints = true;
+        };
+        indent-guides = {
+          character = "╎";
+          render = true;
+        };
+        cursor-shape = {
+          normal = "block";
+          insert = "bar";
+          select = "underline";
+        };
+        bufferline = "multiple";
+        cursorline = true;
+      };
+      keys = {
+        normal = {
+          A-x = "extend_to_line_bounds";
+          X = "select_line_above";
+        };
+        select = {
+          A-x = "extend_to_line_bounds";
+          X = "select_line_above";
+        };
       };
     };
-    languages.language = [
-      {
-        name = "nix";
-        auto-format = true;
-        formatter.command = "${pkgs-stable.nixfmt-rfc-style}/bin/nixfmt";
-      }
-    ];
+    languages = {
+      language = [
+        {
+          name = "nix";
+          scope = "source.nix";
+          injection-regex = "nix";
+          file-types = [ "nix" ];
+          shebangs = [ ];
+          roots = [ "flake.lock" ];
+          auto-format = true;
+          comment-token = "#";
+          language-servers = [
+            "nil"
+            "nixd"
+          ];
+          formatter.command = "${pkgs-stable.nixfmt-rfc-style}/bin/nixfmt";
+        }
+      ];
+      language-server = {
+        nil = {
+          command = "${pkgs-stable.nil}/bin/nil";
+          args = [ "--stdio" ];
+        };
+        nixd = {
+          command = "${pkgs-stable.nixd}/bin/nixd";
+        };
+      };
+    };
   };
 
   # Git
