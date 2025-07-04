@@ -136,7 +136,7 @@
   i18n.defaultLocale = "en_US.UTF-8";
   i18n.supportedLocales = [
     "en_US.UTF-8/UTF-8"
-    "es_MX.UTF-8/UTF-8"
+    "es_US.UTF-8/UTF-8"
   ];
   i18n.extraLocaleSettings = {
     LC_ALL = "en_US.UTF-8";
