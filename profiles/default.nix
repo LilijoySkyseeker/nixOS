@@ -137,9 +137,9 @@
   i18n.supportedLocales = [
     "all"
   ];
-  # i18n.extraLocaleSettings = {
-  #   LC_ALL = "en_US.UTF-8";
-  # };
+  i18n.extraLocaleSettings = {
+    LC_ALL = "es_US.UTF-8";
+  };
 
   # x86_64
   nixpkgs.hostPlatform = "x86_64-linux";
