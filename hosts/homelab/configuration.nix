@@ -13,13 +13,11 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
-    ../../services/cloudflared.nix
+    # ../../services/cloudflared.nix
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
     ../../services/rss.nix
-
-    ../../modules/nixos/beets.nix
   ];
 
   # System installed pkgs
@@ -77,11 +75,11 @@
   networking.firewall.allowedTCPPorts = [ 443 ];
   networking.firewall.allowedUDPPorts = [ 443 ];
 
-# # duckdns
-# services.cron = {
-#   enable = true;
-#   systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
-# };
+  # # duckdns
+  # services.cron = {
+  #   enable = true;
+  #   systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
+  # };
 
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {

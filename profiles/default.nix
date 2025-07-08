@@ -30,6 +30,7 @@
     sops # secrets management
     smartmontools
     helix
+    trippy # ping+traceroute tool
   ];
 
   # firmware updates

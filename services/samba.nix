@@ -19,24 +19,23 @@
   services.samba = {
     enable = true;
     openFirewall = true;
-    extraConfig = ''
-      server string = ${config.networking.hostName}
-      netbios name = ${config.networking.hostName}
-      workgroup = WORKGROUP
-      security = user
+    settings = {
+      "server string" = "${config.networking.hostName}";
+      "netbios name" = "${config.networking.hostName}";
+      "workgroup" = "WORKGROUP";
+      "security" = "user";
 
-      create mask = 0664
-      force create mode = 0664
-      directory mask = 0775
-      force directory mode = 0775
-      follow symlinks = yes
+      "create mask" = 664;
+      "force create mode" = 664;
+      "directory mask" = 775;
+      "force directory mode" = 775;
+      "follow symlinks" = "yes";
 
-      # :NOTE| localhost is the ipv6 localhost ::1
       #hosts allow = 192.168.0.0/16 localhost
       #hosts deny = 0.0.0.0/0
-      guest account = nobody
-      map to guest = bad user
-    '';
+      "guest account" = "nobody";
+      "map to guest" = "bad user";
+    };
     # :NOTE| set sudo smbpasswd -a samba-guest -n
     shares = {
       Storage = {
