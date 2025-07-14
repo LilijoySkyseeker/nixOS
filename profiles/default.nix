@@ -24,6 +24,7 @@
     bat
     zoxide
     git
+    lazygit
     neovim
     nixfmt-rfc-style
     rsync

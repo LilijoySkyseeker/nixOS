@@ -66,10 +66,6 @@
       wl-clipboard # for waydroid
       quickemu
 
-      delta # for forgit
-      bat # for forgit
-      tree # for forgit
-
     ]);
 
   # android

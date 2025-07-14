@@ -155,10 +155,6 @@
         name = "tide";
         src = pkgs-stable.fishPlugins.tide.src;
       }
-      {
-        name = "forgit";
-        src = pkgs-stable.fishPlugins.forgit.src;
-      }
     ];
     functions = {
       nsr.body = ''
