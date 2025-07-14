@@ -12,4 +12,8 @@
 
   # gnome-boxes
   environment.systemPackages = with pkgs-unstable; [ gnome-boxes ];
+
+  # usb passthrough
+  virtualisation.spiceUSBRedirection.enable = true;
+  security.polkit.enable = true;
 }

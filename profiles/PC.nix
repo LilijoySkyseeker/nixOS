@@ -47,6 +47,7 @@
       nicotine-plus
       vial
       element-desktop
+      chromium-browser
 
       texliveFull
 
