@@ -25,13 +25,6 @@
   # fingerprint reader
   services.fprintd.enable = true;
 
-  # sops secrets
-  sops.secrets = {
-    restic = {
-      owner = config.users.users.lilijoy.name;
-    };
-  };
-
   # home manager
   home-manager.users.lilijoy.imports = [ ../../modules/home-manager/gnome.nix ];
 
@@ -141,38 +134,6 @@
       };
     };
   };
-
-  # restic test https://restic.readthedocs.io/en/latest/050_restore.html
-  services.restic.backups = {
-    hourly = {
-      initialize = true;
-      passwordFile = "${config.sops.secrets.restic.path}";
-      repository = "/home/lilijoy/backup";
-      user = "lilijoy";
-      paths = [ "/home/lilijoy" ];
-      exclude = [ "/home/lilijoy/backup" ];
-      timerConfig = {
-        OnCalendar = "hourly";
-        Persistent = true;
-      };
-      pruneOpts = [
-        "--host ${config.networking.hostName}"
-        "--retry-lock 15m"
-        "--keep-hourly 24"
-        "--keep-daily 7"
-      ];
-    };
-  };
-  systemd.services.restic-backups-hourly.serviceConfig = {
-    Nice = 19;
-    CPUSchedulingPolicy = "idle";
-  };
-
-  #    users.users.restic = {
-  #      description = "restic service user";
-  #      isSystemUser = true;
-  #      group = "nogroup";
-  #    };
 
   # Define your hostname.
   networking.hostName = "thinkpad";
