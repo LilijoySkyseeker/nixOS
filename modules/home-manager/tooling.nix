@@ -167,7 +167,7 @@
       '';
       nhu.body = ''
 
-        git add --all && nh os build --update && git add --all
+        git add --all && nix flake update && nh os build && git add --all
       '';
       nht.body = ''
 
