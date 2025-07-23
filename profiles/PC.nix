@@ -72,11 +72,6 @@
       qbittorrent
     ]);
 
-  # firewall
-  networking.firewall.allowedUDPPorts = [
-    4242 # reticulum
-  ];
-
   # android
   programs.adb.enable = true;
 
