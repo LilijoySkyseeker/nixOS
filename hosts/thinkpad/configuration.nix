@@ -60,23 +60,6 @@
         u = "pageup";
         o = "pagedown";
 
-        ";" = "%";
-        "," = "^";
-        "." = "$";
-
-        leftshift = "timeout(<, 200, >)";
-        z = "timeout([, 200, ])";
-        x = "timeout({, 200, })";
-        c = "timeout((, 200, ))";
-
-        #       g = "=";
-        #       w = "~";
-        #       e = "#";
-        #       r = "|";
-        #       u = "@";
-        #       i = "\\";
-        #       o = "`";
-
         a = "oneshot(meta)";
         s = "oneshot(alt)";
         d = "oneshot(control)";
@@ -129,8 +112,12 @@
         n = "k";
         m = "h";
       };
+      hd-gold = {
+        "q" = ""
+      };
       esc = {
         "1" = "toggle(colemak)";
+        "2" = "toggle(hd-gold)";
       };
     };
   };
