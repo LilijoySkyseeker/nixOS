@@ -113,7 +113,7 @@
         m = "h";
       };
       hd-gold = {
-        "q" = ""
+        "q" = "q";
       };
       esc = {
         "1" = "toggle(colemak)";
