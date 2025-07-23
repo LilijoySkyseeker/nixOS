@@ -35,7 +35,6 @@
       bitwarden
       thunderbird
       vscode-fhs
-      qbittorrent
       jellyfin-media-player
       easyeffects
       qpwgraph
@@ -48,8 +47,13 @@
       vial
       element-desktop
       ungoogled-chromium
+      python313Packages.nomadnet
+      rns
 
       texliveFull
+
+      atkinson-hyperlegible-next
+      atkinson-hyperlegible-mono
 
       # closed source
       obsidian
@@ -65,7 +69,7 @@
       kdePackages.kdenlive
       wl-clipboard # for waydroid
       quickemu
-
+      qbittorrent
     ]);
 
   # android
