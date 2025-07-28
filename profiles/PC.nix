@@ -58,8 +58,7 @@
       # closed source
       obsidian
       spotify
-      zoom
-
+      bambu-studio
     ])
     ++ (with pkgs-stable; [
       feishin
