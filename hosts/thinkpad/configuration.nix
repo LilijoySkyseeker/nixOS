@@ -9,7 +9,7 @@
     ./hardware-configuration.nix
     ./nvidia.nix
     ../../profiles/PC.nix
-    ../../custom-packages/tpm-fido/package.nix
+    #    ../../custom-packages/tpm-fido/package.nix
     ../../modules/nixos/gnome.nix
   ];
 
@@ -29,7 +29,7 @@
   home-manager.users.lilijoy.imports = [ ../../modules/home-manager/gnome.nix ];
 
   # tpm-fido
-  tpm-fido.enable = true;
+  # tpm-fido.enable = true;
 
   # state change settings/buttons
   services.logind = {
