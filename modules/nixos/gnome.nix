@@ -32,10 +32,10 @@
     open_weather_key = { };
   };
 
-  # Theme KDE apps like gnome
-  qt = {
-    enable = true;
-    platformTheme = "gnome";
-    style = "adwaita-dark";
-  };
+  # # Theme KDE apps like gnome
+  # qt = {
+  #   enable = true;
+  #   platformTheme = "gnome";
+  #   style = "adwaita-dark";
+  # };
 }
