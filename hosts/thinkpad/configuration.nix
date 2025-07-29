@@ -47,8 +47,8 @@
     keyboards.default.settings = {
       main = {
         capslock = "overload(control, esc)";
-        rightalt = "layer(navigation)";
-        leftalt = "layer(navigation)";
+        rightalt = "overload(navigation, backspace)";
+        leftalt = "overload(navigation, t)";
         leftcontrol = "leftalt";
         esc = "layer(esc)";
       };
@@ -113,7 +113,49 @@
         m = "h";
       };
       hd-gold = {
-        "q" = "q";
+        q = "j";
+        w = "g";
+        e = "m";
+        r = "p";
+        t = "v";
+        y = ";";
+        u = ".";
+        i = "/";
+        o = "!";
+        p = "'";
+        a = "r";
+        s = "s";
+        d = "n";
+        f = "d";
+        g = "b";
+        h = ",";
+        j = "a";
+        k = "e";
+        l = "i";
+        ";" = "h";
+        z = "f";
+        x = "l";
+        c = "c";
+        v = "w";
+        b = "x";
+        n = "-";
+        m = "u";
+        "," = "o";
+        "." = "y";
+        "/" = "k";
+
+        "[" = "z";
+        "\'" = "q";
+      };
+
+      "hd-gold+shift" = {
+        y = ":";
+        u = "*";
+        i = "\\";
+        o = "?";
+        p = "\"";
+        h = "#";
+        n = "_";
       };
       esc = {
         "1" = "toggle(colemak)";
