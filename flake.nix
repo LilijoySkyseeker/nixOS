@@ -57,11 +57,18 @@
       };
       pkgs-unstable = import inputs.nixpkgs-unstable {
         system = "x86_64-linux";
-        config.allowUnfree = true;
+        config = {
+          allowUnfree = true;
+          permittedInsecurePackages = [
+            "libsoup-2.74.3"
+          ];
+        };
       };
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
-        config.allowUnfree = true;
+        config = {
+          allowUnfree = true;
+        };
       };
     in
     {

@@ -157,32 +157,22 @@
       }
     ];
     functions = {
-      nsr.body = ''
-
-        nix shell nixpkgs/nixos-unstable#$argv[1] --command $argv
-      '';
       ns.body = ''
-
-        nix shell 'nixpkgs/nixos-unstable#'{$argv}
+        export NIXPKGS_ALLOW_UNFREE=1 && nix shell 'nixpkgs/nixos-unstable#'{$argv} --impure
       '';
       nhu.body = ''
-
         git add --all && nix flake update && nh os build && git add --all
       '';
       nht.body = ''
-
         git add --all && nh os test
       '';
       nhb.body = ''
-
         git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push
       '';
       nhs.body = ''
-
         git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
       '';
       gds.body = ''
-
         git add --all && git diff --staged | bat --paging always --pager less
       '';
     };
