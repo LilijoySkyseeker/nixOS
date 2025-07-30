@@ -68,7 +68,6 @@
           normal = {
             "j".action = "gj";
             "k".action = "gk";
-            "p".action = "pgvy";
           };
         };
         options = {
