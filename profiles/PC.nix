@@ -59,6 +59,9 @@
       obsidian
       spotify
       bambu-studio
+
+      # restrictive licences
+      grayjay
     ])
     ++ (with pkgs-stable; [
       feishin
@@ -98,7 +101,6 @@
     uninstallUnmanaged = false;
     packages = [
       "info.beyondallreason.bar"
-      "app.grayjay.Grayjay"
     ];
   };
 
