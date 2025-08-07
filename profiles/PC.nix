@@ -96,7 +96,10 @@
   services.flatpak = {
     enable = true;
     uninstallUnmanaged = false;
-    packages = [ "info.beyondallreason.bar" ];
+    packages = [
+      "info.beyondallreason.bar"
+      "app.grayjay.Grayjay"
+    ];
   };
 
   # udev rules for vial
