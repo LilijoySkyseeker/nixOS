@@ -32,6 +32,7 @@
     smartmontools
     helix
     trippy # ping+traceroute tool
+    ffmpeg
   ];
 
   # firmware updates
