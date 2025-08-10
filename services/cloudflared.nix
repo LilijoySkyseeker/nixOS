@@ -1,13 +1,13 @@
-{config, ... }:
+{ config, ... }:
 {
-# cloudflared tunnel
-services.cloudflared = {
+  # cloudflared tunnel
+  services.cloudflared = {
     enable = true;
     tunnels = {
-      "d74010ef-332c-44dc-8216-8131b2825f43" = {
+      "homelab-skyseekerlabs" = {
         credentialsFile = "${config.sops.secrets.cloudflare_tunnel_token_01.path}";
         ingress = {
-          "*.skyseekerlabs.duckdns.org" = {
+          "*.skyseekerlabs.xyz" = {
             service = "http://localhost:80";
           };
         };
@@ -16,6 +16,9 @@ services.cloudflared = {
     };
   };
   sops.secrets = {
-    cloudflare_tunnel_token_01 = { };
+    cloudflare_tunnel_token_01 = {
+      owner = "cloudflared";
+      group = "cloudflared";
+    };
   };
 }

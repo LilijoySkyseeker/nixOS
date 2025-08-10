@@ -11,7 +11,6 @@
   # fish
   programs.fish = {
     enable = true;
-    vendor.completions.enable = true;
   };
   programs.bash = {
     # switch to fish in interactive shell, otherwise bash

@@ -72,6 +72,7 @@
       wl-clipboard # for waydroid
       quickemu
       qbittorrent
+      texlive.combined.scheme-full
     ]);
 
   # android

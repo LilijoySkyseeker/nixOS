@@ -13,7 +13,7 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
-    # ../../services/cloudflared.nix
+    ../../services/cloudflared.nix
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
@@ -29,6 +29,7 @@
     btop
     tmux
     zellij
+    cloudflared
   ];
 
   # disable staggered hdd spin up
@@ -72,14 +73,14 @@
     #   acmeCA = "https://acme.zerossl.com/v2/DV90";
     email = "lilijoyskyseeker@gmail.com";
   };
-  networking.firewall.allowedTCPPorts = [ 443 ];
-  networking.firewall.allowedUDPPorts = [ 443 ];
-
-  # # duckdns
-  # services.cron = {
-  #   enable = true;
-  #   systemCronJobs = [ "*/5 * * * * /etc/duckdns/duck.sh >/dev/null 2>&1" ];
-  # };
+  networking.firewall.allowedTCPPorts = [
+    80
+    443
+  ];
+  networking.firewall.allowedUDPPorts = [
+    80
+    443
+  ];
 
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {

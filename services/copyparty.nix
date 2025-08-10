@@ -42,7 +42,7 @@
   users.users.copyparty.extraGroups = [ "multimedia" ];
 
   # caddy
-  services.caddy.virtualHosts."copyparty.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."copyparty.skyseekerlabs.xyz".extraConfig = ''
     reverse_proxy localhost:3923
   '';
 
