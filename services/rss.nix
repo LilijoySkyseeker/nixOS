@@ -40,10 +40,10 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."freshrss.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."freshrss.skyseekerlabs.xyz".extraConfig = ''
     reverse_proxy localhost:8081
   '';
-  services.caddy.virtualHosts."rss-bridge.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."rss-bridge.skyseekerlabs.xyz".extraConfig = ''
     reverse_proxy localhost:8082
   '';
 

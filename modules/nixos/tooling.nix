@@ -11,7 +11,6 @@
   # fish
   programs.fish = {
     enable = true;
-    vendor.completions.enable = true;
   };
   programs.bash = {
     # switch to fish in interactive shell, otherwise bash
@@ -68,7 +67,6 @@
           normal = {
             "j".action = "gj";
             "k".action = "gk";
-            "p".action = "pgvy";
           };
         };
         options = {

@@ -10,19 +10,15 @@
     ./hardware-configuration.nix
     ./disko.nix
     ../../profiles/PC.nix
-    ../../modules/nixos/copypartymount.nix
     ../../modules/nixos/kde.nix
   ];
+  home-manager.users.lilijoy.imports = [ ../../modules/home-manager/kde.nix ];
 
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [
-      ckan # ksp mod manager
     ])
     ++ (with pkgs-stable; [
-      qalculate-qt
-      kile
-      texlive.combined.scheme-full
     ]);
 
   # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
@@ -66,11 +62,6 @@
 
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
-
-  # home manager
-  home-manager.users.lilijoy = {
-    imports = [ ../../modules/home-manager/kde.nix ];
-  };
 
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";

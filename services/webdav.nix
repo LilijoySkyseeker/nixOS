@@ -25,7 +25,7 @@
   };
 
   # caddy
-  services.caddy.virtualHosts."webdav.skyseekerlabs.duckdns.org".extraConfig = ''
+  services.caddy.virtualHosts."webdav.skyseekerlabs.xyz".extraConfig = ''
     reverse_proxy localhost:8083
   '';
 }

@@ -9,7 +9,7 @@
   # Helix text editor
   programs.helix = {
     enable = true;
-    defaultEditor = true;
+    defaultEditor = false;
     settings = {
       theme = lib.mkForce "gruvbox_dark_soft";
       editor = {

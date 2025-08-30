@@ -59,6 +59,9 @@
       obsidian
       spotify
       bambu-studio
+
+      # restrictive licences
+      grayjay
     ])
     ++ (with pkgs-stable; [
       feishin
@@ -69,6 +72,7 @@
       wl-clipboard # for waydroid
       quickemu
       qbittorrent
+      texlive.combined.scheme-full
     ]);
 
   # android
@@ -96,7 +100,9 @@
   services.flatpak = {
     enable = true;
     uninstallUnmanaged = false;
-    packages = [ "info.beyondallreason.bar" ];
+    packages = [
+      "info.beyondallreason.bar"
+    ];
   };
 
   # udev rules for vial

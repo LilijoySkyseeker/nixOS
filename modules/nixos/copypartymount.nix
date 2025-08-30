@@ -9,7 +9,7 @@ in
     [cpp-rw]
         type = webdav
         vendor = owncloud
-        url = https://copyparty.skyseekerlabs.duckdns.org
+        url = https://copyparty.skyseekerlabs.xyz
         headers = Cookie,cppwd=${pass}
         pacer_min_sleep = 0.01m
   '';
