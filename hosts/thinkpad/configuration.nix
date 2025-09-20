@@ -53,13 +53,19 @@
         u = "pageup";
         o = "pagedown";
 
-        a = "oneshot(meta)";
-        s = "oneshot(alt)";
-        d = "oneshot(control)";
-        f = "oneshot(shift)";
+        a = "<";
+        s = "{";
+        d = "[";
+        f = "(";
 
         leftalt = "layer(numbers)";
         rightalt = "layer(numbers)";
+      };
+      "navigation+shift" = {
+        a = ">";
+        s = "}";
+        d = "]";
+        f = ")";
       };
       numbers = {
         "/" = "0";
