@@ -49,6 +49,7 @@
       ungoogled-chromium
       python313Packages.nomadnet
       rns
+      signal-desktop
 
       texliveFull
 
@@ -58,7 +59,6 @@
       # closed source
       obsidian
       spotify
-      bambu-studio
 
       # restrictive licences
       grayjay
@@ -73,6 +73,9 @@
       quickemu
       qbittorrent
       texlive.combined.scheme-full
+
+      # closed source
+      bambu-studio
     ]);
 
   # android
@@ -105,9 +108,16 @@
     ];
   };
 
-  # udev rules for vial
+  # udev rules
   services.udev.extraRules = ''
+    # vial
     KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
+
+    # 8bitdo 2.4 GHz / Wired
+    KERNEL=="hidraw*", ATTRS{idVendor}=="2dc8", MODE="0660", TAG+="uaccess"
+
+    # 8bitdo Bluetooth
+    KERNEL=="hidraw*", KERNELS=="*2DC8:*", MODE="0660", TAG+="uaccess"
   '';
 
   # ssh key type order

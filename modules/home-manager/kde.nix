@@ -1,7 +1,7 @@
 { ... }:
 {
   # fix for stupid home manager bug:  https://github.com/nix-community/home-manager/issues/4199#issuecomment-1620657055
-  home.file."/home/lilijoy/.gtkrc-2.0".force = true;
+  # home.file."/home/lilijoy/.tkrc-2.0".force = true;
 
   # Plasma Manager: `nix run github:nix-community/plasma-manager`
   programs.plasma = {
