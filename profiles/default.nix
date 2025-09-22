@@ -136,12 +136,12 @@
   networking.networkmanager.enable = true;
 
   # Select internationalisation properties.
-  i18n.defaultLocale = "es_US.UTF-8";
+  i18n.defaultLocale = "en_US.UTF-8";
   i18n.supportedLocales = [
     "all"
   ];
   i18n.extraLocaleSettings = {
-    LC_ALL = "es_US.UTF-8";
+    LC_ALL = "en_US.UTF-8";
   };
 
   # x86_64
