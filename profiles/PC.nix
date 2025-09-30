@@ -109,10 +109,11 @@
   };
 
   # udev rules
+  services.udev.packages = [
+    pkgs-unstable.via
+    pkgs-unstable.vial
+  ];
   services.udev.extraRules = ''
-    # vial
-    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{serial}=="*vial:f64c2b3c*", MODE="0660", GROUP="users", TAG+="uaccess", TAG+="udev-acl"
-
     # 8bitdo 2.4 GHz / Wired
     KERNEL=="hidraw*", ATTRS{idVendor}=="2dc8", MODE="0660", TAG+="uaccess"
 
