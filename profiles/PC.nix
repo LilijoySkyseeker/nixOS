@@ -239,8 +239,8 @@
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
-    package = with pkgs-unstable; steam.override { extraPkgs = pkgs-stable: [ ]; };
   };
+  hardware.steam-hardware.enable = true;
 
   # feral gamemode
   programs.gamemode = {
