@@ -12,7 +12,7 @@
     ../../profiles/PC.nix
     ../../modules/nixos/kde.nix
   ];
-  home-manager.users.lilijoy.imports = [ # ../../modules/home-manager/kde.nix ];
+  home-manager.users.lilijoy.imports = [ ];
 
   # System installed pkgs
   environment.systemPackages =
