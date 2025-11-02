@@ -50,6 +50,7 @@
       python313Packages.nomadnet
       rns
       signal-desktop
+      plover.dev
 
       texliveFull
 
