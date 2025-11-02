@@ -50,7 +50,6 @@
       python313Packages.nomadnet
       rns
       signal-desktop
-      plover.dev
 
       texliveFull
 
@@ -74,6 +73,7 @@
       quickemu
       qbittorrent
       texlive.combined.scheme-full
+      plover.dev
 
       # closed source
       bambu-studio
