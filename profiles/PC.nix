@@ -73,7 +73,6 @@
       quickemu
       qbittorrent
       texlive.combined.scheme-full
-      plover.dev
 
       # closed source
       bambu-studio
@@ -120,6 +119,9 @@
 
     # 8bitdo Bluetooth
     KERNEL=="hidraw*", KERNELS=="*2DC8:*", MODE="0660", TAG+="uaccess"
+
+    # plover
+    KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
   '';
 
   # ssh key type order
@@ -134,12 +136,17 @@
       ../modules/home-manager/tooling.nix
       inputs.impermanence.homeManagerModules.impermanence
       inputs.plasma-manager.homeManagerModules.plasma-manager
+      inputs.plover-flake.homeManagerModules.plover
     ];
     home.stateVersion = "23.11";
     home.username = "lilijoy";
     home.homeDirectory = "/home/lilijoy";
     programs.home-manager.enable = true;
 
+    programs.plover = {
+      enable = true;
+      package = inputs.plover-flake.packages.${pkgs-unstable.system}.plover-full;
+    };
   };
 
   # service for yubikey
@@ -234,6 +241,8 @@
     extraGroups = [
       "networkmanager"
       "wheel"
+      "dialout" # for plover
+      "input" # for plover
     ];
   };
 

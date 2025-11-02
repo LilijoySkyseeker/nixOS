@@ -8,7 +8,6 @@
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
     home-manager.url = "github:nix-community/home-manager/release-25.05";
-    #   home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs-stable";
 
     stylix.url = "github:danth/stylix/release-25.05";
@@ -34,6 +33,8 @@
     plasma-manager.inputs.home-manager.follows = "home-manager";
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
+
+    plover-flake.url = "github:openstenoproject/plover-flake";
   };
 
   outputs =
