@@ -18,7 +18,6 @@
       grc # Text colors
       ripgrep
       gitFull
-      nvtopPackages.full
       gjs # for kdeconnect
       restic # backups
       fd
@@ -32,13 +31,12 @@
 
       yubikey-manager
       distrobox
-      bitwarden
+      bitwarden-desktop
       thunderbird
       vscode-fhs
       jellyfin-media-player
       easyeffects
       qpwgraph
-      youtube-music
       libreoffice
       vlc
       r2modman
@@ -53,15 +51,9 @@
 
       texliveFull
 
-      atkinson-hyperlegible-next
-      atkinson-hyperlegible-mono
-
       # closed source
       obsidian
       spotify
-
-      # restrictive licences
-      grayjay
     ])
     ++ (with pkgs-stable; [
       feishin
