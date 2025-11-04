@@ -138,6 +138,12 @@
     programs.plover = {
       enable = true;
       package = inputs.plover-flake.packages.${pkgs-unstable.system}.plover-full;
+      settings = {
+        "Machine Configuration" = {
+          machine_type = "Gemini PR";
+          auto_start = true;
+        };
+      };
     };
   };
 
