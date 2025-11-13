@@ -43,48 +43,8 @@
       main = {
         capslock = "overload(control, esc)";
         rightalt = "overload(navigation, backspace)";
-        leftalt = "overload(navigation, t)";
+        leftalt = "layer(navigation)";
         leftcontrol = "leftalt";
-        esc = "layer(esc)";
-      };
-      navigation = {
-        j = "left";
-        k = "down";
-        i = "up";
-        l = "right";
-        u = "pageup";
-        o = "pagedown";
-
-        a = "<";
-        s = "{";
-        d = "[";
-        f = "(";
-
-        leftalt = "layer(numbers)";
-        rightalt = "layer(numbers)";
-      };
-      "navigation+shift" = {
-        a = ">";
-        s = "}";
-        d = "]";
-        f = ")";
-      };
-      numbers = {
-        "/" = "0";
-        ";" = "0";
-        "p" = "0";
-
-        "m" = "1";
-        "," = "2";
-        "." = "3";
-        "j" = "4";
-        "k" = "5";
-        "l" = "6";
-        "u" = "7";
-        "i" = "8";
-        "o" = "9";
-      };
-      colemak = {
         q = "q";
         w = "w";
         e = "f";
@@ -113,54 +73,13 @@
         n = "k";
         m = "h";
       };
-      hd-gold = {
-        q = "j";
-        w = "g";
-        e = "m";
-        r = "p";
-        t = "v";
-        y = ";";
-        u = ".";
-        i = "/";
-        o = "!";
-        p = "'";
-        a = "r";
-        s = "s";
-        d = "n";
-        f = "d";
-        g = "b";
-        h = ",";
-        j = "a";
-        k = "e";
-        l = "i";
-        ";" = "h";
-        z = "f";
-        x = "l";
-        c = "c";
-        v = "w";
-        b = "x";
-        n = "-";
-        m = "u";
-        "," = "o";
-        "." = "y";
-        "/" = "k";
-
-        "[" = "z";
-        "\'" = "q";
-      };
-
-      "hd-gold+shift" = {
-        y = ":";
-        u = "*";
-        i = "\\";
-        o = "?";
-        p = "\"";
-        h = "#";
-        n = "_";
-      };
-      esc = {
-        "1" = "toggle(colemak)";
-        "2" = "toggle(hd-gold)";
+      navigation = {
+        j = "left";
+        k = "down";
+        i = "up";
+        l = "right";
+        u = "pageup";
+        o = "pagedown";
       };
     };
   };
