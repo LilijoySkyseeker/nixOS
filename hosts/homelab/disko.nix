@@ -210,22 +210,18 @@
             "local" = {
               type = "zfs_fs";
               options.mountpoint = "none"; # top dir is options.mountpoint
-              options."com.sun:auto-snapshot" = "false";
             };
             "local/state" = {
               type = "zfs_fs";
               mountpoint = "/nix/state"; # sub dir are just mountpoint
-              options."com.sun:auto-snapshot" = "false";
             };
             "local/nix" = {
               type = "zfs_fs";
               mountpoint = "/nix";
-              options."com.sun:auto-snapshot" = "false";
             };
             "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
-              options."com.sun:auto-snapshot" = "false";
               postCreateHook = "zfs snapshot zroot/local/root@blank";
             };
           };

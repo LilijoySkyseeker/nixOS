@@ -26,15 +26,6 @@
   boot.kernelModules = [ "r8125" ];
   nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
 
-  # networking
-  networking.networkmanager = {
-    enable = true;
-    insertNameservers = [
-      "8.8.8.8"
-      "1.1.1.1"
-    ];
-  };
-
   # zfs snapshots
   services.sanoid = {
     enable = true;

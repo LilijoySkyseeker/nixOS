@@ -1,5 +1,5 @@
 {
-  pkgs,
+  pkgs-unstable,
   modulesPath,
   vars,
   config,
@@ -12,7 +12,7 @@
   ];
   nixpkgs.hostPlatform = "x86_64-linux";
 
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with pkgs-unstable; [
     neovim
     disko
     parted

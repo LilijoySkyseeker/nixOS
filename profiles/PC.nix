@@ -70,6 +70,15 @@
       bambu-studio
     ]);
 
+  # networking
+  networking.networkmanager = {
+    enable = true;
+    insertNameservers = [
+      "8.8.8.8"
+      "1.1.1.1"
+    ];
+  };
+
   # android
   programs.adb.enable = true;
 
@@ -116,18 +125,12 @@
     KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
   '';
 
-  # ssh key type order
-  programs.ssh.hostKeyAlgorithms = [
-    #   "ed25519"
-    #   "ecdsa"
-  ];
-
   # home-manager
   home-manager.users.lilijoy = {
     imports = [
       ../modules/home-manager/tooling.nix
       inputs.impermanence.homeManagerModules.impermanence
-      inputs.plasma-manager.homeManagerModules.plasma-manager
+      inputs.plasma-manager.homeModules.plasma-manager
       inputs.plover-flake.homeManagerModules.plover
     ];
     home.stateVersion = "23.11";
@@ -241,6 +244,7 @@
       "wheel"
       "dialout" # for plover
       "input" # for plover
+      "docker"
     ];
   };
 
