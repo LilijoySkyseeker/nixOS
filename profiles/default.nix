@@ -35,6 +35,12 @@
     ffmpeg
   ];
 
+  # tailscale
+  services.tailscale = {
+    enable = true;
+    useRoutingFeatures = "both";
+  };
+
   # firmware updates
   services.fwupd.enable = true;
 

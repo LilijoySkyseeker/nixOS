@@ -23,9 +23,6 @@
     ++ (with pkgs-stable; [
     ]);
 
-  # tailscale
-  services.tailscale.enable = true;
-
   # fingerprint reader
   services.fprintd.enable = true;
 
