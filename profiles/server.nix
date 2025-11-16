@@ -1,11 +1,24 @@
 {
   pkgs,
+  lib,
   ...
 }:
 {
   environment.systemPackages = with pkgs; [
-    flac
   ];
+
+  services.networkd-dispatcher = {
+    enable = true;
+    rules."50-tailscale" = {
+      onState = [ "routable" ];
+      script = ''
+        ${lib.getExe pkgs.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
+      '';
+    };
+  };
+
+  # allow caddy to modify tailscale
+  services.tailscale.permitCertUid = "caddy";
 
   #security
   # lock down nix
