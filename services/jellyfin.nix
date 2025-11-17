@@ -19,7 +19,7 @@
   ];
 
   # caddy
-  services.caddy.virtualHosts."jellyfin.skyseekerlabs.xyz".extraConfig = ''
+  services.caddy.virtualHosts."jellyfin.homelab.taila4ae6c.ts.net".extraConfig = ''
     reverse_proxy localhost:8096
   '';
   networking.firewall.allowedTCPPorts = [ 443 ];

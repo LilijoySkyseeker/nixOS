@@ -33,6 +33,7 @@
     helix
     trippy # ping+traceroute tool
     ffmpeg
+    flac
   ];
 
   # tailscale

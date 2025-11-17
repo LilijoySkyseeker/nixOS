@@ -13,7 +13,6 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
-    ../../services/cloudflared.nix
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
@@ -29,7 +28,6 @@
     btop
     tmux
     zellij
-    cloudflared
   ];
 
   # disable staggered hdd spin up
