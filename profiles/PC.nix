@@ -34,7 +34,6 @@
       bitwarden-desktop
       thunderbird
       vscode-fhs
-      jellyfin-media-player
       easyeffects
       qpwgraph
       libreoffice
@@ -43,11 +42,12 @@
       yubioath-flutter
       nicotine-plus
       vial
-      element-desktop
       ungoogled-chromium
       python313Packages.nomadnet
       rns
       signal-desktop
+      lutris
+      orca-slicer
 
       texliveFull
 
