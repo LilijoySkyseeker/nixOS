@@ -28,13 +28,14 @@
       caligula # cli burning tool
       scrcpy
       isd
+      kdePackages.krfb
+      kdePackages.krdc
 
       yubikey-manager
       distrobox
       bitwarden-desktop
       thunderbird
       vscode-fhs
-      jellyfin-media-player
       easyeffects
       qpwgraph
       libreoffice
