@@ -28,6 +28,8 @@
       caligula # cli burning tool
       scrcpy
       isd
+      kdePackages.krfb
+      kdePackages.krdc
 
       yubikey-manager
       distrobox
@@ -42,12 +44,11 @@
       yubioath-flutter
       nicotine-plus
       vial
+      element-desktop
       ungoogled-chromium
       python313Packages.nomadnet
       rns
       signal-desktop
-      lutris
-      orca-slicer
 
       texliveFull
 
