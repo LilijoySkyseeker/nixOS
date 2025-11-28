@@ -120,7 +120,7 @@
     KERNEL=="hidraw*", ATTRS{idVendor}=="2dc8", MODE="0660", TAG+="uaccess"
 
     # 8bitdo Bluetooth
-    KERNEL=="hidraw*", KERNELS=="*2DC8:*", MODE="0660", TAG+="uaccess"
+    # KERNEL=="hidraw*", KERNELS=="*2DC8:*", MODE="0660", TAG+="uaccess"
 
     # plover
     KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
