@@ -28,8 +28,9 @@
       caligula # cli burning tool
       scrcpy
       isd
-      kdePackages.krfb
-      kdePackages.krdc
+      kdePackages.krfb # kde remote desktop tool
+      kdePackages.krdc # kde remote desktop tool
+      vipsdisp # big image viewer
 
       yubikey-manager
       distrobox
