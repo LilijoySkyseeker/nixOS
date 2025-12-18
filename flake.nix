@@ -35,12 +35,16 @@
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     plover-flake.url = "github:openstenoproject/plover-flake";
+
+    copyparty.url = "github:9001/copyparty";
+
   };
 
   outputs =
     inputs@{
       nixpkgs-unstable,
       nixpkgs-stable,
+      copyparty,
       ...
     }:
     let
@@ -59,14 +63,17 @@
         config = {
           allowUnfree = true;
           permittedInsecurePackages = [
-            "libsoup-2.74.3"
-            "qtwebengine-5.15.19"
+            # "libsoup-2.74.3"
+            # "qtwebengine-5.15.19"
           ];
         };
       };
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
         config = {
+          permittedInsecurePackages = [
+            "electron-36.9.5"
+          ];
           allowUnfree = true;
         };
       };
@@ -111,6 +118,7 @@
         };
         #==================================================
         homelab = nixpkgs-stable.lib.nixosSystem {
+          modules = [ ./hosts/homelab/configuration.nix ];
           specialArgs = {
             inherit
               inputs
@@ -119,19 +127,11 @@
               vars
               ;
           };
-          modules = [ ./hosts/homelab/configuration.nix ];
-          #         specialArgs = {
-          #           inherit
-          #             pkgs-unstable
-          #             vars
-          #             ;
-          #           inputs = inputs;
-          #         };
-          #         pkgs-stable = import nixpkgs-stable {
-          #           system = "x86_64-linux";
-          #           config.allowUnfree = true;
-          #           overlays = [ copyparty.overlays.default ];
-          #         };
+          pkgs-stable = import nixpkgs-stable {
+            system = "x86_64-linux";
+            config.allowUnfree = true;
+            overlays = [ copyparty.overlays.default ];
+          };
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {

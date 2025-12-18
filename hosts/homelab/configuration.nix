@@ -13,6 +13,8 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
+    ../../services/copyparty.nix
+
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix

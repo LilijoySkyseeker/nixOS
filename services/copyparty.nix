@@ -47,8 +47,8 @@
   '';
 
   # firewall
-  networking.firewall.allowedTCPPorts = [ 443 ];
-  networking.firewall.allowedUDPPorts = [ 443 ];
+  networking.firewall.allowedTCPPorts = [ 3923 ];
+  networking.firewall.allowedUDPPorts = [ 3923 ];
 
   # passwords
   sops.secrets.copyparty_lilijoy = {
