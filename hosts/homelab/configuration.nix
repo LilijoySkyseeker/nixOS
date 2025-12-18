@@ -67,21 +67,6 @@
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
 
-  # caddy
-  services.caddy = {
-    enable = true;
-    #   acmeCA = "https://acme.zerossl.com/v2/DV90";
-    email = "lilijoyskyseeker@gmail.com";
-  };
-  networking.firewall.allowedTCPPorts = [
-    80
-    443
-  ];
-  networking.firewall.allowedUDPPorts = [
-    80
-    443
-  ];
-
   # backblaze secrets prefetcher for rclone config file
   sops.secrets = {
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = { };

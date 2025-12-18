@@ -41,11 +41,6 @@
   # permissions
   users.users.copyparty.extraGroups = [ "multimedia" ];
 
-  # caddy
-  services.caddy.virtualHosts."copyparty.skyseekerlabs.xyz".extraConfig = ''
-    reverse_proxy localhost:3923
-  '';
-
   # firewall
   networking.firewall.allowedTCPPorts = [ 3923 ];
   networking.firewall.allowedUDPPorts = [ 3923 ];
