@@ -44,7 +44,6 @@
     inputs@{
       nixpkgs-unstable,
       nixpkgs-stable,
-      copyparty,
       ...
     }:
     let
@@ -75,6 +74,7 @@
             "electron-36.9.5"
           ];
           allowUnfree = true;
+          #          overlays = [ copyparty.overlays.default ];
         };
       };
     in
@@ -118,7 +118,6 @@
         };
         #==================================================
         homelab = nixpkgs-stable.lib.nixosSystem {
-          modules = [ ./hosts/homelab/configuration.nix ];
           specialArgs = {
             inherit
               inputs
@@ -127,11 +126,9 @@
               vars
               ;
           };
-          pkgs-stable = import nixpkgs-stable {
-            system = "x86_64-linux";
-            config.allowUnfree = true;
-            overlays = [ copyparty.overlays.default ];
-          };
+          modules = [
+            ./hosts/homelab/configuration.nix
+          ];
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {
