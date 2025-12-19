@@ -18,12 +18,9 @@
     "d ${config.services.jellyfin.logDir} 0770 jellyfin - - -"
   ];
 
-  # caddy
-  services.caddy.virtualHosts."jellyfin.homelab.taila4ae6c.ts.net".extraConfig = ''
-    reverse_proxy localhost:8096
-  '';
-  networking.firewall.allowedTCPPorts = [ 443 ];
-  networking.firewall.allowedUDPPorts = [ 443 ];
+  # networking
+  networking.firewall.allowedTCPPorts = [ 8096 ];
+  networking.firewall.allowedUDPPorts = [ 8096 ];
 
   # persistence
   environment.persistence."/nix/state".directories = with config.services.jellyfin; [

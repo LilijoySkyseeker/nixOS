@@ -39,30 +39,15 @@
     group = "freshrss";
   };
 
-  # caddy
-  services.caddy.virtualHosts."freshrss.skyseekerlabs.xyz".extraConfig = ''
-    reverse_proxy localhost:8081
-  '';
-  services.caddy.virtualHosts."rss-bridge.skyseekerlabs.xyz".extraConfig = ''
-    reverse_proxy localhost:8082
-  '';
-
-  # nginx virtual host
-  services.nginx.virtualHosts.freshrss.listen = [
-    {
-      addr = "localhost";
-      port = 8081;
-    }
+  # networking
+  networking.firewall.allowedTCPPorts = [
+    8081
+    8082
   ];
-  services.nginx.virtualHosts.rss-bridge.listen = [
-    {
-      addr = "localhost";
-      port = 8082;
-    }
+  networking.firewall.allowedUDPPorts = [
+    8081
+    8082
   ];
-  # firewall
-  networking.firewall.allowedTCPPorts = [ 443 ];
-  networking.firewall.allowedUDPPorts = [ 443 ];
 
   # persistence
   environment.persistence."/nix/state".directories = [

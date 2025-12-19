@@ -13,6 +13,8 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
+    ../../services/copyparty.nix
+
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
@@ -63,21 +65,6 @@
     "d /srv 0770 - root root -"
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"
-  ];
-
-  # caddy
-  services.caddy = {
-    enable = true;
-    #   acmeCA = "https://acme.zerossl.com/v2/DV90";
-    email = "lilijoyskyseeker@gmail.com";
-  };
-  networking.firewall.allowedTCPPorts = [
-    80
-    443
-  ];
-  networking.firewall.allowedUDPPorts = [
-    80
-    443
   ];
 
   # backblaze secrets prefetcher for rclone config file

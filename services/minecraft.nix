@@ -1,12 +1,6 @@
 { ... }:
 {
   # networking
-  services.caddy.virtualHosts."minecraft.skyseekerlabs.xyz".extraConfig = ''
-    reverse_proxy localhost:25565
-  '';
-  services.caddy.virtualHosts."minecraft-map.skyseekerlabs.xyz".extraConfig = ''
-    reverse_proxy localhost:8100
-  '';
   networking.firewall.allowedTCPPorts = [
     25565
     8100

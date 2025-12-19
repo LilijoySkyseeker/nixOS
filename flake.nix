@@ -35,6 +35,9 @@
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     plover-flake.url = "github:openstenoproject/plover-flake";
+
+    copyparty.url = "github:9001/copyparty";
+
   };
 
   outputs =
@@ -59,15 +62,19 @@
         config = {
           allowUnfree = true;
           permittedInsecurePackages = [
-            "libsoup-2.74.3"
-            "qtwebengine-5.15.19"
+            # "libsoup-2.74.3"
+            # "qtwebengine-5.15.19"
           ];
         };
       };
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
         config = {
+          permittedInsecurePackages = [
+            "electron-36.9.5"
+          ];
           allowUnfree = true;
+          #          overlays = [ copyparty.overlays.default ];
         };
       };
     in
@@ -119,19 +126,9 @@
               vars
               ;
           };
-          modules = [ ./hosts/homelab/configuration.nix ];
-          #         specialArgs = {
-          #           inherit
-          #             pkgs-unstable
-          #             vars
-          #             ;
-          #           inputs = inputs;
-          #         };
-          #         pkgs-stable = import nixpkgs-stable {
-          #           system = "x86_64-linux";
-          #           config.allowUnfree = true;
-          #           overlays = [ copyparty.overlays.default ];
-          #         };
+          modules = [
+            ./hosts/homelab/configuration.nix
+          ];
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {
