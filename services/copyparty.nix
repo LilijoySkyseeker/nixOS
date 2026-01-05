@@ -31,7 +31,7 @@
           A = [ "*" ];
         };
       };
-      "/bulk" = {
+      "/Bulk" = {
         path = "/storage-bulk";
         access = {
           A = [ "*" ];

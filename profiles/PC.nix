@@ -135,9 +135,16 @@
       inputs.plasma-manager.homeModules.plasma-manager
       inputs.plover-flake.homeManagerModules.plover
     ];
-    home.stateVersion = "23.11";
-    home.username = "lilijoy";
-    home.homeDirectory = "/home/lilijoy";
+    home = {
+      stateVersion = "23.11";
+      username = "lilijoy";
+      homeDirectory = "/home/lilijoy";
+
+      # fish environment variables
+      sessionVariables = {
+        SSH_AUTH_SOCK = "/home/<user>/.bitwarden-ssh-agent.sock"; # bitwarden ssh-agent
+      };
+    };
     programs.home-manager.enable = true;
 
     programs.plover = {

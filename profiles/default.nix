@@ -34,6 +34,7 @@
     trippy # ping+traceroute tool
     ffmpeg
     flac
+    bitwarden-cli
   ];
 
   # tailscale
