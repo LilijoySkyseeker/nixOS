@@ -2,6 +2,7 @@
   inputs,
   pkgs,
   config,
+  lib,
   ...
 }:
 {
@@ -41,7 +42,7 @@
   };
 
   # permissions
-  users.users.copyparty.extraGroups = [ "multimedia" ];
+  users.users.copyparty.group = lib.mkForce "multimedia";
 
   # networking
   networking.firewall.allowedTCPPorts = [
