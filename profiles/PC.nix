@@ -50,7 +50,8 @@
       python313Packages.nomadnet
       rns
       signal-desktop
-      picard
+      picard # music metadata tool
+      grayjay
 
       texliveFull
 
@@ -132,7 +133,6 @@
   home-manager.users.lilijoy = {
     imports = [
       ../modules/home-manager/tooling.nix
-      inputs.impermanence.homeManagerModules.impermanence
       inputs.plasma-manager.homeModules.plasma-manager
       inputs.plover-flake.homeManagerModules.plover
     ];

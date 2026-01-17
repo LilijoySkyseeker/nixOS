@@ -26,7 +26,7 @@
     git
     lazygit
     neovim
-    nixfmt-rfc-style
+    nixfmt
     rsync
     sops # secrets management
     smartmontools

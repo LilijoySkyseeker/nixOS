@@ -66,7 +66,7 @@
             "nil"
             "nixd"
           ];
-          formatter.command = "${pkgs-stable.nixfmt-rfc-style}/bin/nixfmt";
+          formatter.command = "${pkgs-stable.nixfmt}/bin/nixfmt";
         }
       ];
       language-server = {
@@ -161,7 +161,7 @@
         export NIXPKGS_ALLOW_UNFREE=1 && nix shell 'nixpkgs/nixos-unstable#'{$argv} --impure
       '';
       nhu.body = ''
-        git add --all && nix flake update && nh os build && git add --all
+        git add --all && nix flake update && git add --all
       '';
       nht.body = ''
         git add --all && nh os test
