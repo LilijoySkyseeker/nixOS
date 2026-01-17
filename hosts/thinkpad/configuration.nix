@@ -101,7 +101,6 @@
     settings = {
       "zroot/local/root".use_template = "working";
       "zroot/local/home".use_template = "working";
-      "zroot/local/state".use_template = "working";
       template_working = {
         frequent_period = 1;
         frequently = 59;
