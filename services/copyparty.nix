@@ -46,26 +46,26 @@
 
   # networking
   networking.firewall.allowedTCPPorts = [
-    69 # tftp
-    1900 # ssdp
-    3921 # ftp
+    #   69 # tftp
+    #   1900 # ssdp
+    #   3921 # ftp
     3923 # http/https
-    3945 # smb
-    3969 # tftp
-    3990 # ftps
-    5353 # mdns
-    12000 # passive-ftp
+    #   3945 # smb
+    #   3969 # tftp
+    #   3990 # ftps
+    #   5353 # mdns
+    #   12000 # passive-ftp
   ];
   networking.firewall.allowedUDPPorts = [
-    69 # tftp
-    1900 # ssdp
-    3921 # ftp
+    #   69 # tftp
+    #   1900 # ssdp
+    #   3921 # ftp
     3923 # http/https
-    3945 # smb
-    3969 # tftp
-    3990 # ftps
-    5353 # mdns
-    12000 # passive-ftp
+    #   3945 # smb
+    #   3969 # tftp
+    #   3990 # ftps
+    #   5353 # mdns
+    #   12000 # passive-ftp
   ];
 
   # passwords
