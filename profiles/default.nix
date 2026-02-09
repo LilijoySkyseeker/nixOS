@@ -35,6 +35,9 @@
     ffmpeg
     flac
     bitwarden-cli
+
+    zfs-prune-snapshots # TEMP, zfs needs module
+
   ];
 
   # tailscale
