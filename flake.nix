@@ -3,14 +3,14 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixpkgs-stable.url = "nixpkgs/nixos-25.05";
+    nixpkgs-stable.url = "nixpkgs/nixos-25.11";
 
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 
-    home-manager.url = "github:nix-community/home-manager/release-25.05";
+    home-manager.url = "github:nix-community/home-manager/release-25.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs-stable";
 
-    stylix.url = "github:danth/stylix/release-25.05";
+    stylix.url = "github:danth/stylix/release-25.11";
     stylix.inputs.nixpkgs.follows = "nixpkgs-stable";
 
     sops-nix.url = "github:Mic92/sops-nix";
@@ -40,12 +40,7 @@
 
   };
 
-  outputs =
-    inputs@{
-      nixpkgs-unstable,
-      nixpkgs-stable,
-      ...
-    }:
+  outputs = inputs@{ nixpkgs-unstable, nixpkgs-stable, ... }:
     let
       vars = {
         # root access ssh keys
@@ -70,75 +65,36 @@
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
         config = {
-          permittedInsecurePackages = [
-            "electron-36.9.5"
-          ];
+          permittedInsecurePackages = [ "electron-36.9.5" ];
           allowUnfree = true;
           #          overlays = [ copyparty.overlays.default ];
         };
       };
-    in
-    {
+    in {
       nixosConfigurations = {
         #==================================================
         legion = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
+          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
           modules = [ ./hosts/legion/configuration.nix ];
         };
         #==================================================
         thinkpad = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
+          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
           modules = [ ./hosts/thinkpad/configuration.nix ];
         };
         #==================================================
         torrent = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
+          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
           modules = [ ./hosts/torrent/configuration.nix ];
         };
         #==================================================
         homelab = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
-          modules = [
-            ./hosts/homelab/configuration.nix
-          ];
+          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
+          modules = [ ./hosts/homelab/configuration.nix ];
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              vars
-              ;
-          };
+          specialArgs = { inherit inputs pkgs-unstable vars; };
           modules = [ ./hosts/isoimage/configuration.nix ];
         };
       };
