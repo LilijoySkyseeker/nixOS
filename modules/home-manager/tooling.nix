@@ -175,6 +175,10 @@
       gds.body = ''
         git add --all && git diff --staged | bat --paging always --pager less
       '';
+      __fish_command_not_found_handler.body = ''
+        comma $argv[1]
+      '';
+
     };
     shellAliases = {
       e = "eza --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
