@@ -52,6 +52,7 @@
       signal-desktop
       picard # music metadata tool
       grayjay
+      calibre
 
       texliveFull
 

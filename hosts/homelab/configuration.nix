@@ -124,7 +124,7 @@
       user = "root";
       paths = [ "/tmp/restic" ];
       timerConfig = {
-        OnCalendar = "04:00";
+        OnCalendar = "Wed 04:00:00";
         Persistent = true;
       };
       pruneOpts = [
