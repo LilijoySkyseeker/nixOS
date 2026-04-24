@@ -31,6 +31,8 @@
       kdePackages.krfb # kde remote desktop tool
       kdePackages.krdc # kde remote desktop tool
       vipsdisp # big image viewer
+      yt-dlp
+      android-tools
 
       yubikey-manager
       distrobox
@@ -53,14 +55,15 @@
       picard # music metadata tool
       grayjay
       calibre
+      quodlibet
 
       texliveFull
 
       # closed source
       obsidian
       spotify
-    ])
-    ++ (with pkgs-stable; [
+
+      # temp copy from stable
       feishin
       prismlauncher
       vesktop
@@ -73,6 +76,8 @@
 
       # closed source
       bambu-studio
+    ])
+    ++ (with pkgs-stable; [
     ]);
 
   # networking
@@ -83,9 +88,6 @@
       "1.1.1.1"
     ];
   };
-
-  # android
-  programs.adb.enable = true;
 
   # Waydroid
   virtualisation.waydroid.enable = true;

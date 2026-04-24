@@ -40,7 +40,8 @@
 
   };
 
-  outputs = inputs@{ nixpkgs-unstable, nixpkgs-stable, ... }:
+  outputs =
+    inputs@{ nixpkgs-unstable, nixpkgs-stable, ... }:
     let
       vars = {
         # root access ssh keys
@@ -70,26 +71,55 @@
           #          overlays = [ copyparty.overlays.default ];
         };
       };
-    in {
+    in
+    {
       nixosConfigurations = {
         #==================================================
         legion = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
+          specialArgs = {
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
+          };
           modules = [ ./hosts/legion/configuration.nix ];
         };
         #==================================================
-        thinkpad = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
+        thinkpad = nixpkgs-unstable.lib.nixosSystem {
+          specialArgs = {
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
+          };
           modules = [ ./hosts/thinkpad/configuration.nix ];
         };
         #==================================================
-        torrent = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
+        torrent = nixpkgs-unstable.lib.nixosSystem {
+          specialArgs = {
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
+          };
           modules = [ ./hosts/torrent/configuration.nix ];
         };
         #==================================================
         homelab = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs-unstable pkgs-stable vars; };
+          specialArgs = {
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
+          };
           modules = [ ./hosts/homelab/configuration.nix ];
         };
         #==================================================
