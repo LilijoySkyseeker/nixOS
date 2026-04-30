@@ -35,6 +35,7 @@
     ffmpeg
     flac
     bitwarden-cli
+    topgrade
 
     zfs-prune-snapshots # TEMP, zfs needs module
 
