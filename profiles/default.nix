@@ -153,6 +153,7 @@
     "8.8.8.8"
     "1.1.1.1"
   ];
+  services.resolved.enable = true;
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
