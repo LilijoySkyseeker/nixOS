@@ -41,6 +41,9 @@
 
   ];
 
+  # 26.11 change for zfs security
+  boot.zfs.forceImportRoot = false;
+
   # tailscale
   services.tailscale = {
     enable = true;

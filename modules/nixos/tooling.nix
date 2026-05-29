@@ -56,7 +56,7 @@
           enableTreesitter = true;
           nix = {
             enable = true;
-            format.type = "nixfmt";
+            format.type = [ "nixfmt" ];
             extraDiagnostics.enable = false;
           };
           markdown.enable = true;

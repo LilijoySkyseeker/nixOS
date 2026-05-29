@@ -1,6 +1,7 @@
 {
   pkgs-stable,
   pkgs-unstable,
+  config,
   lib,
   ...
 }:
@@ -84,8 +85,10 @@
   # Git
   programs.git = {
     enable = true;
-    userName = "LilijoySkyseeker";
-    userEmail = "lilijoyskyseeker@gmail.com";
+    settings = {
+      user.name = "LilijoySkyseeker";
+      user.email = "lilijoyskyseeker@gmail.com";
+    };
   };
 
   # fzf
@@ -135,6 +138,8 @@
   # Firefox
   programs.firefox = {
     enable = true;
+    configPath = "${config.xdg.configHome}/mozilla/firefox";
+
   };
 
   # fish
