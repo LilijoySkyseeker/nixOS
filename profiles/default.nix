@@ -18,6 +18,7 @@
     inputs.nvf.nixosModules.default
   ];
   environment.systemPackages = with pkgs-unstable; [
+    btop
     wget
     eza
     tldr
@@ -40,6 +41,19 @@
     zfs-prune-snapshots # TEMP, zfs needs module
 
   ];
+
+  # sudo for run0 alias
+  security.run0 = {
+    enable = true;
+    enableSudoAlias = true;
+  };
+
+  # sudo
+  security.sudo = {
+    enable = false;
+    execWheelOnly = true;
+    package = pkgs-unstable.sudo.override { withInsults = true; };
+  };
 
   # 26.11 change for zfs security
   boot.zfs.forceImportRoot = false;
@@ -164,7 +178,7 @@
     "all"
   ];
   i18n.extraLocaleSettings = {
-    LC_ALL = "en_US.UTF-8";
+    LC_MEASUREMENT = "en_GB.UTF-8"; # metric units
   };
 
   # x86_64

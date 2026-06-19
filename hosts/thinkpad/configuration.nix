@@ -41,45 +41,8 @@
     keyboards.default.ids = [ "0001:0001" ];
     keyboards.default.settings = {
       main = {
-        capslock = "overload(control, esc)";
-        rightalt = "overload(navigation, backspace)";
-        leftalt = "layer(navigation)";
-        leftcontrol = "leftalt";
-        q = "q";
-        w = "w";
-        e = "f";
-        r = "p";
-        t = "b";
-        y = "j";
-        u = "l";
-        i = "u";
-        o = "y";
-        p = ";";
-        a = "a";
-        s = "r";
-        d = "s";
-        f = "t";
-        g = "g";
-        h = "m";
-        j = "n";
-        k = "e";
-        l = "i";
-        ";" = "o";
-        z = "x";
-        x = "c";
-        c = "d";
-        v = "v";
-        b = "z";
-        n = "k";
-        m = "h";
-      };
-      navigation = {
-        j = "left";
-        k = "down";
-        i = "up";
-        l = "right";
-        u = "pageup";
-        o = "pagedown";
+        capslock = "control";
+        leftcontrol = "capslock";
       };
     };
   };

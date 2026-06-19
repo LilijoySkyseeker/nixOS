@@ -58,15 +58,14 @@
         config = {
           allowUnfree = true;
           permittedInsecurePackages = [
-            # "libsoup-2.74.3"
-            # "qtwebengine-5.15.19"
+            "electron-39.8.10"
           ];
         };
       };
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
         config = {
-          permittedInsecurePackages = [ "electron-36.9.5" ];
+          permittedInsecurePackages = [ "" ];
           allowUnfree = true;
           #          overlays = [ copyparty.overlays.default ];
         };

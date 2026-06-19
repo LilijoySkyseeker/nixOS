@@ -53,7 +53,6 @@
       rns
       signal-desktop
       picard # music metadata tool
-      grayjay
       calibre
       quodlibet
 
@@ -112,6 +111,7 @@
     enable = true;
     uninstallUnmanaged = false;
     packages = [
+      "app.grayjay.Grayjay"
       "info.beyondallreason.bar"
     ];
   };
@@ -217,16 +217,6 @@
   programs.nix-ld.libraries = with pkgs-unstable; [
     # add any missing dynamic libraries for unpackaged programs here
   ];
-
-  # sudo for run0 alias
-  security.run0.enableSudoAlias = true;
-
-  # sudo
-  security.sudo = {
-    enable = false;
-    execWheelOnly = true;
-    package = pkgs-unstable.sudo.override { withInsults = true; };
-  };
 
   # Enable bluetooth
   hardware.bluetooth.enable = true;
