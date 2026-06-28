@@ -1,0 +1,10 @@
+Etymotic ER4XR Harman Full EQ
+May302024-162109
+
+Preamp: -8.20 dB
+
+Filter 1: ON PK Fc 25.8 Hz Gain 8.18 dB Q 0.32
+Filter 2: ON PK Fc 266.2 Hz Gain -1.79 dB Q 1.86
+Filter 3: ON PK Fc 1431.6 Hz Gain -2.15 dB Q 2.26
+Filter 4: ON PK Fc 2151.6 Hz Gain -2.37 dB Q 1.88
+Filter 5: ON PK Fc 6540.3 Hz Gain 4.35 dB Q 2.64

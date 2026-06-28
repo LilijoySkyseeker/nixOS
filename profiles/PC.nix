@@ -73,8 +73,6 @@
       qbittorrent
       texlive.combined.scheme-full
 
-      # closed source
-      bambu-studio
     ])
     ++ (with pkgs-stable; [
     ]);

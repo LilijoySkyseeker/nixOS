@@ -17,6 +17,8 @@
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [
+      # closed source
+      bambu-studio
     ])
     ++ (with pkgs-stable; [
     ]);

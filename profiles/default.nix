@@ -106,6 +106,7 @@
     useGlobalPkgs = true;
     useUserPackages = true;
     backupFileExtension = "backup"; # Force backup conflicted files
+    overwriteBackup = true;
   };
 
   # comma and cache
