@@ -132,6 +132,7 @@
       cpu_single_graph = true;
       proc_per_core = true;
       proc_sorting = "cpu direct";
+      show_gpu_info = true;
     };
   };
 
