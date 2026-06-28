@@ -41,56 +41,11 @@
     keyboards.default.ids = [ "0001:0001" ];
     keyboards.default.settings = {
       main = {
-        # layers
-        "esc+1" = "layer(default)";
-        "esc+2" = "layer(qwerty)";
-
         # mods
         capslock = "overload(control, esc)";
         esc = "overload(capslock, esc)";
         leftalt = "layer(navigation)";
         leftcontrol = "leftalt";
-
-        # colemak-dh-anglemod
-        q = "q";
-        w = "w";
-        e = "f";
-        r = "p";
-        t = "b";
-        y = "j";
-        u = "l";
-        i = "u";
-        o = "y";
-        p = ";";
-        a = "a";
-        s = "r";
-        d = "s";
-        f = "t";
-        g = "g";
-        h = "m";
-        j = "n";
-        k = "e";
-        l = "i";
-        ";" = "o";
-        z = "x";
-        x = "c";
-        c = "d";
-        v = "v";
-        b = "z";
-        n = "k";
-        m = "h";
-      };
-      qwerty = {
-        # layers
-        "esc+1" = "layer(default)";
-        "esc+2" = "layer(qwerty)";
-
-        # mods
-        capslock = "leftcontrol";
-        esc = "overload(capslock, esc)";
-        leftalt = "layer(navigation)";
-        leftcontrol = "leftalt";
-
       };
       navigation = {
         j = "left";
