@@ -53,21 +53,22 @@
         ];
         username = "lilijoy";
       };
-      commonConfig = {
-        allowUnfree = true;
-#       cudaSupport = true;
-#       rocmSupport = true;
-        permittedInsecurePackages = [
-          "electron-39.8.10"
-        ];
-      };
       pkgs-unstable = import inputs.nixpkgs-unstable {
         system = "x86_64-linux";
-        config = commonConfig;
+        config = {
+          allowUnfree = true;
+          permittedInsecurePackages = [
+            "electron-39.8.10"
+          ];
+        };
       };
       pkgs-stable = import inputs.nixpkgs-stable {
         system = "x86_64-linux";
-        config = commonConfig;
+        config = {
+          permittedInsecurePackages = [ "" ];
+          allowUnfree = true;
+          #          overlays = [ copyparty.overlays.default ];
+        };
       };
     in
     {
