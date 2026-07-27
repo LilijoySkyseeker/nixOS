@@ -9,11 +9,11 @@
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [
+      xdg-desktop-portal
+      kdePackages.xdg-desktop-portal-kde
     ])
     ++ (with pkgs-stable; [
       kdePackages.filelight # kde disk usage
-      xdg-desktop-portal
-      kdePackages.xdg-desktop-portal-kde
       qalculate-qt
       kile
     ]);
