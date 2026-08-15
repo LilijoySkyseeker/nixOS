@@ -59,7 +59,6 @@
       texliveFull
 
       # closed source
-      obsidian
       spotify
       claude-code
 

@@ -135,6 +135,13 @@
     };
   };
 
+  # Obsidian
+  programs.obsidian = {
+    enable = true;
+    package = pkgs-unstable.obsidian;
+    cli.enable = true;
+  };
+
   # Firefox
   programs.firefox = {
     enable = true;
