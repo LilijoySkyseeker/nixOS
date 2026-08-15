@@ -61,6 +61,7 @@
       # closed source
       obsidian
       spotify
+      claude-code
 
       # temp copy from stable
       feishin
@@ -134,7 +135,6 @@
   home-manager.users.lilijoy = {
     imports = [
       ../modules/home-manager/tooling.nix
-      inputs.plasma-manager.homeModules.plasma-manager
       inputs.plover-flake.homeManagerModules.plover
     ];
     home = {
@@ -274,7 +274,6 @@
   # Mullvad vpn
   services.mullvad-vpn = {
     enable = true;
-    package = pkgs-unstable.mullvad-vpn;
+    gui.enable = true;
   };
-
 }

@@ -28,10 +28,6 @@
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
-    plasma-manager.url = "github:nix-community/plasma-manager";
-    plasma-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
-    plasma-manager.inputs.home-manager.follows = "home-manager";
-
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     plover-flake.url = "github:openstenoproject/plover-flake";
