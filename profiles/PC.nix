@@ -221,7 +221,13 @@
   hardware.bluetooth.powerOnBoot = true;
 
   # Enable CUPS to print documents.
-  services.printing.enable = true;
+  services.printing = {
+    enable = true;
+    drivers = [
+      pkgs-unstable.brlaser
+    ];
+  };
+  # network printing
   services.avahi = {
     enable = true;
     nssmdns4 = true;
