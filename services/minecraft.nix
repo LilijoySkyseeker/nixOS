@@ -50,18 +50,19 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
-        # c2me-fabric
-        # carpet
+        c2me-fabric
+        carpet
         distanthorizons
         # easy-shulker-boxes
-        # ferrite-core
+        ferrite-core
         # infinitymendingbows
-        # krypton
-        # lithium
+        krypton
+        lithium
         no-chat-reports
-        # scalablelux
-        # servux
-        # vmp-fabric
+        scalablelux
+        # servux — not a performance mod, it's a data/protocol companion
+        # for client-side MiniHUD/Tweakeroo; leave disabled unless wanted
+        vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
       # RCON isn't published in `ports` below, so it's already
