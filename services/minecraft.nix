@@ -53,6 +53,7 @@
         c2me-fabric
         carpet
         distanthorizons
+        easy-shulker-boxes
         ferrite-core
         krypton
         lithium
