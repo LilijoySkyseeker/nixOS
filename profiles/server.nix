@@ -17,9 +17,6 @@
     };
   };
 
-  # allow caddy to modify tailscale
-  services.tailscale.permitCertUid = "caddy";
-
   #security
   # lock down nix
   nix.settings.allowed-users = [ "root" ];

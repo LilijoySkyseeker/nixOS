@@ -326,7 +326,6 @@
     hideMounts = true;
     directories = [
       "/etc/nixos"
-      "/etc/duckdns"
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
