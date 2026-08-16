@@ -62,9 +62,6 @@
   # Define your hostname.
   networking.hostName = "torrent";
 
-  # Set extra groups
-  users.users.lilijoy.extraGroups = [ "" ];
-
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];
   services.zfs = {
