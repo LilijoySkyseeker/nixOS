@@ -67,6 +67,24 @@ in
         data itself is actually advancing.
       '';
     };
+
+    staleMarkerFiles = lib.mkOption {
+      type = lib.types.attrsOf lib.types.int;
+      default = { };
+      example = {
+        "/var/lib/restic-backups-backblazeDaily/last-success" = 192;
+      };
+      description = ''
+        Files to check for staleness by mtime, mapped to the maximum age in
+        hours before alerting. Intended for services (like an offsite restic
+        backup) that have no local ZFS dataset to measure via
+        `backupStaleness`: have the service touch the file only on success
+        (e.g. via ExecStartPost, which only runs after a successful
+        ExecStart), so its mtime is proof of the last completed run — this
+        catches the run silently never finishing (hung, retrying forever)
+        even when it never reaches a "failed" systemd state.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -152,6 +170,27 @@ in
                 fi
               fi
             '') cfg.backupStaleness
+          )}
+        ''}
+
+        ${lib.optionalString (cfg.staleMarkerFiles != { }) ''
+          # marker-file staleness (catches a service hanging/retrying
+          # forever without ever reaching systemd's "failed" state)
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (path: maxHours: ''
+              stale_key="marker-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg path} | tr -c 'a-zA-Z0-9_-' '-')"
+              if [ ! -e ${lib.escapeShellArg path} ]; then
+                notify "$stale_key" "Marker file missing" "${path}: file does not exist"
+              else
+                mtime=$(stat -c %Y ${lib.escapeShellArg path})
+                age_hours=$(( (now - mtime) / 3600 ))
+                if [ "$age_hours" -ge ${toString maxHours} ]; then
+                  notify "$stale_key" "Backup is stale" "${path}: last success was $age_hours hours ago (threshold: ${toString maxHours}h)"
+                else
+                  clear_alert "$stale_key"
+                fi
+              fi
+            '') cfg.staleMarkerFiles
           )}
         ''}
 

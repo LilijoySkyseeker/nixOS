@@ -187,6 +187,16 @@
       # would conflict with that, so only the always-safe flag applies.
       NoNewPrivileges = true;
       PrivateTmp = lib.mkForce false;
+      # a Backblaze auth failure can make restic/rclone retry its lock
+      # operations forever instead of erroring out — this once left the
+      # unit "running" (and thus blocking every future weekly trigger) for
+      # 7+ weeks with no successful backup. Force a hard failure instead,
+      # so the timer can retry and the failed-units health check fires.
+      RuntimeMaxSec = "6h";
+      StateDirectory = "restic-backups-backblazeDaily";
+      # only reached on success (ExecStartPost doesn't run after a failed
+      # ExecStart), so its mtime is proof a backup actually completed.
+      ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeDaily/last-success";
     };
   };
 
@@ -307,6 +317,11 @@
       "zbackup/backup/homelab/storage" = 6;
       "zbackup/backup-bulk/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
+    };
+    # offsite restic backup runs weekly (Wed 04:00); 192h = 8 days gives
+    # one day of slack before alerting on a missed/stuck run.
+    staleMarkerFiles = {
+      "/var/lib/restic-backups-backblazeDaily/last-success" = 192;
     };
   };
 
