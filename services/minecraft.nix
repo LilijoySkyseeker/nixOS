@@ -2,7 +2,7 @@
 {
   sops.secrets.minecraft_username = { };
   sops.templates."minecraft-whitelist".content = ''
-    WHITELIST=${config.sops.placeholder.minecraft_username}
+    WHITELIST=${config.sops.placeholder.minecraft_username},.LilijoySkySeekr
     OPS=${config.sops.placeholder.minecraft_username}
   '';
 
@@ -12,6 +12,7 @@
   ];
   networking.firewall.allowedUDPPorts = [
     25565
+    19132 # Geyser Bedrock listener
   ];
 
   # persistence
@@ -28,6 +29,7 @@
     image = "itzg/minecraft-server";
     ports = [
       "25565:25565"
+      "19132:19132/udp" # Geyser Bedrock listener
     ];
     environment = {
       TYPE = "FABRIC";
@@ -55,6 +57,8 @@
         distanthorizons
         easy-shulker-boxes
         ferrite-core
+        floodgate
+        geyser
         krypton
         lithium
         no-chat-reports
