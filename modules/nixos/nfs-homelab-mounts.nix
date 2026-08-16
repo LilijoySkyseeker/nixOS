@@ -1,4 +1,13 @@
 {
+  # matches homelab's "multimedia" group (services/jellyfin.nix), which
+  # owns /storage and /storage-bulk — NFS with sec=sys authorizes purely
+  # by numeric uid/gid, so lilijoy needs this exact gid locally to get
+  # group read/write on the mounts below.
+  users.groups.multimedia = {
+    gid = 999;
+    members = [ "lilijoy" ];
+  };
+
   # nfs client mounts for homelab's tailnet-only file share (see
   # services/nfs.nix). Automounted on first access rather than at boot —
   # laptops/desktops aren't always on the tailnet or near homelab, so

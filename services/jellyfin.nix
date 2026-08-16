@@ -10,7 +10,15 @@
     dataDir = "/srv/jellyfin/data";
     logDir = "/srv/jellyfin/log";
   };
-  users.groups.multimedia.members = [ "jellyfin" ];
+  # pinned explicitly (rather than left to dynamic allocation) so its gid
+  # stays stable across rebuilds — NFS clients (see
+  # modules/nixos/nfs-homelab-mounts.nix) authorize purely by numeric
+  # gid, so drift here would silently break their access to /storage and
+  # /storage-bulk.
+  users.groups.multimedia = {
+    gid = 999;
+    members = [ "jellyfin" ];
+  };
   systemd.tmpfiles.rules = [
     "d ${config.services.jellyfin.configDir} 0770 jellyfin - - -"
     "d ${config.services.jellyfin.cacheDir} 0770 jellyfin - - -"

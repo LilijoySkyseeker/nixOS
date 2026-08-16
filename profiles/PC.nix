@@ -109,6 +109,11 @@
   hardware.keyboard.qmk.enable = true;
 
   #flatpak
+  # gid pinned off its dynamically-allocated default (which lands on 999)
+  # to keep 999 free for the "multimedia" group — see
+  # modules/nixos/nfs-homelab-mounts.nix, which needs that exact gid to
+  # match homelab's NFS-exported /storage group ownership.
+  users.groups.flatpak.gid = 998;
   services.flatpak = {
     enable = true;
     uninstallUnmanaged = false;
