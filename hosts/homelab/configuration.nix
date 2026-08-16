@@ -233,6 +233,21 @@
     enable = true;
     interval = "hourly";
     commonArgs = [ "--no-sync-snap" ]; # "--create-bookmark" for mobile machines
+    # Module default omits "destroy": without it, syncoid can't run "zfs
+    # receive -A" to abort a partial receive whose source snapshot has since
+    # been pruned, so it fails every run forever instead of self-healing.
+    # Scoped to target datasets only (the ones syncoid already fully owns
+    # via delegation) — source datasets don't get this permission.
+    localTargetAllow = [
+      "change-key"
+      "compression"
+      "create"
+      "mount"
+      "mountpoint"
+      "receive"
+      "rollback"
+      "destroy"
+    ];
     commands = {
       "zdata/storage/storage" = {
         source = "zdata/storage/storage";
