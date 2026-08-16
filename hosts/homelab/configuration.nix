@@ -21,7 +21,6 @@
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
-    ../../services/rss.nix
   ];
 
   # System installed pkgs
@@ -288,6 +287,16 @@
     trim.enable = true;
   };
   networking.hostId = "e0019fd8";
+
+  # tailscale: advertise the LAN subnet and act as an exit node
+  boot.kernel.sysctl = {
+    "net.ipv4.ip_forward" = 1;
+    "net.ipv6.conf.all.forwarding" = 1;
+  };
+  services.tailscale.extraUpFlags = lib.mkAfter [
+    "--advertise-routes=192.168.1.0/24"
+    "--advertise-exit-node"
+  ];
 
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;

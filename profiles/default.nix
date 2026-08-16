@@ -1,4 +1,5 @@
 {
+  config,
   pkgs-unstable,
   pkgs-stable,
   inputs,
@@ -62,10 +63,21 @@
   boot.zfs.forceImportRoot = false;
 
   # tailscale
+  # declarative login: authKeyFile logs the host into the tailnet on boot,
+  # no manual `tailscale up` needed. Each host uses its own non-reusable
+  # pre-authorized key (tailscale_authkey_<hostname>) already tagged with
+  # tag:<hostname> at generation time, so a leaked key only ever grants
+  # that one host's identity/tag rather than a shared credential.
   services.tailscale = {
     enable = true;
     useRoutingFeatures = "both";
+    authKeyFile = config.sops.secrets."tailscale_authkey_${config.networking.hostName}".path;
+    extraUpFlags = [
+      "--ssh"
+      "--advertise-tags=tag:${config.networking.hostName}"
+    ];
   };
+  sops.secrets."tailscale_authkey_${config.networking.hostName}" = { };
 
   # firmware updates
   services.fwupd.enable = true;
