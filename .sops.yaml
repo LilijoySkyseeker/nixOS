@@ -4,6 +4,7 @@ keys:
   # sops.age.generateKey machine identity (profiles/PC.nix), lives on the
   # root filesystem so it can decrypt secrets before /home is mounted.
   - &thinkpad-machine age1llhdgjk8anr2737ang0guppzfsrnyhl5cwud6l8dklahyktk0gnqc43eyq
+  - &torrent-machine age1nv3rufpc9th6ctgmu7fngcn3p3ufxv2ljg4kmzz6y22y8nvl0drqeplwas
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad
   - &torrent-age age1gsmfmtvd97d9x52d2hpgx5qppna5admpf6ch5l0hcn58cv7dp5ws9fhu2t
 creation_rules:
@@ -13,5 +14,6 @@ creation_rules:
         - *nixos-thinkpad
         - *thinkpad-ssh
         - *thinkpad-machine
+        - *torrent-machine
         - *homelab3
         - *torrent-age

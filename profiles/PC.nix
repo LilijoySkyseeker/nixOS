@@ -73,7 +73,7 @@
       wl-clipboard # for waydroid
       quickemu
       qbittorrent
-      texlive.combined.scheme-full
+      texliveSmall
 
     ])
     ++ (with pkgs-stable; [
@@ -150,6 +150,9 @@
       };
     };
     programs.home-manager.enable = true;
+
+    stylix.targets.firefox.profileNames = [ "default" ];
+    stylix.targets.qt.platform = "qtct";
 
     programs.plover = {
       enable = true;
