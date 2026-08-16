@@ -1,5 +1,11 @@
-{ ... }:
+{ config, ... }:
 {
+  sops.secrets.minecraft_username = { };
+  sops.templates."minecraft-whitelist".content = ''
+    WHITELIST=${config.sops.placeholder.minecraft_username}
+    OPS=${config.sops.placeholder.minecraft_username}
+  '';
+
   # networking
   networking.firewall.allowedTCPPorts = [
     25565
@@ -63,13 +69,8 @@
       # viafabric
       # viarewind
       ENABLE_WHITELIST = "TRUE";
-      WHITELIST = ''
-        LilijoySkyseeker
-      '';
-      OPS = ''
-        LilijoySkyseeker
-      '';
     };
+    environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
     volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
   };
 }

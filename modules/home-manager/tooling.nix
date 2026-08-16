@@ -85,10 +85,7 @@
   # Git
   programs.git = {
     enable = true;
-    settings = {
-      user.name = "LilijoySkyseeker";
-      user.email = "lilijoyskyseeker@gmail.com";
-    };
+    includes = [ { path = "/home/lilijoy/.config/git/identity"; } ];
   };
 
   # fzf

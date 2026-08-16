@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   inputs,
+  config,
   ...
 }:
 {
@@ -184,6 +185,19 @@
   sops.age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
   sops.age.keyFile = "/var/lib/sops-nix/key.txt";
   sops.age.generateKey = true;
+
+  # git identity, rendered to avoid storing name/email in the nix store
+  sops.secrets.git_username = { };
+  sops.secrets.git_email = { };
+  sops.templates."git-identity" = {
+    path = "/home/lilijoy/.config/git/identity";
+    owner = "lilijoy";
+    content = ''
+      [user]
+          name = ${config.sops.placeholder.git_username}
+          email = ${config.sops.placeholder.git_email}
+    '';
+  };
 
   # nh, nix helper
   environment.variables = {
