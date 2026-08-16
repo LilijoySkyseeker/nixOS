@@ -170,10 +170,17 @@
   nix.settings.allowed-users = [ "@wheel" ];
 
   # sops config
-  sops.age.sshKeyPaths = [
-    "/home/lilijoy/.ssh/id_ed25519"
-    "/home/lilijoy/.ssh/id_ed25519"
-  ];
+  # ssh key is only usable once /home is mounted (interactive `sops` edits as
+  # lilijoy). Boot-time secret decryption (e.g. for services that need a
+  # secret before login, like tailscale's authkey) needs an identity that
+  # lives on the root filesystem instead, since /home isn't mounted yet
+  # during early activation. generateKey creates that identity on first
+  # activation if it doesn't already exist, so it's reproducible from a
+  # fresh install: its public key just needs to be added to .sops.yaml
+  # afterwards (see secrets/README or repo history for the one-time step).
+  sops.age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
+  sops.age.keyFile = "/var/lib/sops-nix/key.txt";
+  sops.age.generateKey = true;
 
   # nh, nix helper
   environment.variables = {
