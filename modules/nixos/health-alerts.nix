@@ -134,6 +134,10 @@ in
         User = "health-check";
         Group = "health-check";
         StateDirectory = "health-alerts";
+        # smartctl's SG_IO ioctls require CAP_SYS_RAWIO even with rw access
+        # to the block device via the "disk" group; grant only that, not root.
+        AmbientCapabilities = [ "CAP_SYS_RAWIO" ];
+        CapabilityBoundingSet = [ "CAP_SYS_RAWIO" ];
       };
     };
 
