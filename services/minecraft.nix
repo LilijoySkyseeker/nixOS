@@ -88,7 +88,13 @@
     # specific directory, not by dropping --read-only outright.
     extraOptions = [
       "--read-only"
-      "--tmpfs=/tmp:rw,nosuid,nodev,size=1024m"
+      # exec is required: netty and DistantHorizons both extract and run
+      # native .so libraries from /tmp at startup — Docker's --tmpfs
+      # defaults to noexec unless overridden, which silently broke both
+      # (netty falls back to pure-Java, DH's error handler NPEs because
+      # the real "library validation" failure it's reporting is itself
+      # this noexec block, and that handler assumes a client context).
+      "--tmpfs=/tmp:rw,exec,nosuid,nodev,size=1024m"
       "--cap-drop=ALL"
       "--cap-add=SETUID"
       "--cap-add=SETGID"
