@@ -31,7 +31,7 @@
     ];
     environment = {
       TYPE = "FABRIC";
-      VERSION = "1.21.4";
+      VERSION = "26.2";
       EULA = "TRUE";
       # the entrypoint writes /etc/nsswitch.conf on every start unless told
       # not to; --read-only below makes that write fail, so skip it — the
@@ -50,18 +50,18 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
-        c2me-fabric
-        carpet
+        # c2me-fabric
+        # carpet
         distanthorizons
         # easy-shulker-boxes
-        ferrite-core
+        # ferrite-core
         # infinitymendingbows
-        krypton
-        lithium
+        # krypton
+        # lithium
         no-chat-reports
-        scalablelux
-        servux
-        vmp-fabric
+        # scalablelux
+        # servux
+        # vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
       # RCON isn't published in `ports` below, so it's already
