@@ -70,18 +70,6 @@
     {
       nixosConfigurations = {
         #==================================================
-        legion = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
-          modules = [ ./hosts/legion/configuration.nix ];
-        };
-        #==================================================
         thinkpad = nixpkgs-unstable.lib.nixosSystem {
           specialArgs = {
             inherit
