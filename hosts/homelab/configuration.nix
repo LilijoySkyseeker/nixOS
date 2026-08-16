@@ -335,6 +335,9 @@
   # `true` once that's done, rather than leaving broken placeholder
   # values live.
   sops.secrets.homelab_wireguard_private_key = lib.mkIf false { };
+  # same PSK file content as vps's wireguard_vps_homelab_psk — see
+  # TODO-vps-manual-steps.md.
+  sops.secrets.wireguard_vps_homelab_psk = lib.mkIf false { };
   networking.wireguard.interfaces.wg0 = lib.mkIf false {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
@@ -342,6 +345,7 @@
       {
         # vps
         publicKey = "REPLACE_WITH_VPS_WIREGUARD_PUBLIC_KEY";
+        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         endpoint = "REPLACE_WITH_VPS_PUBLIC_IP:51820";
         allowedIPs = [ "10.100.0.1/32" ];
         # CGNAT mappings expire without periodic traffic; keep the

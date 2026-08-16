@@ -134,6 +134,11 @@ in
   # (behind CGNAT) dials out to it. allowedIPs restricts the tunnel to
   # a single homelab peer since nothing else should ride this link.
   sops.secrets.vps_wireguard_private_key = { };
+  # PSK is an extra symmetric secret required on top of the keypair
+  # handshake — defense-in-depth against a future break of the
+  # asymmetric crypto, standard WireGuard hardening advice. Same file
+  # content needed verbatim on both ends (see TODO-vps-manual-steps.md).
+  sops.secrets.wireguard_vps_homelab_psk = { };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;
@@ -142,6 +147,7 @@ in
       {
         # homelab
         publicKey = "REPLACE_WITH_HOMELAB_WIREGUARD_PUBLIC_KEY";
+        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         allowedIPs = [ "10.100.0.2/32" ];
       }
     ];
@@ -232,6 +238,13 @@ in
     enable = true;
     virtualHosts = {
       "jellyfin.${lib.removeSuffix "." vars.domain}".extraConfig = ''
+        header {
+          Strict-Transport-Security "max-age=31536000"
+          X-Content-Type-Options "nosniff"
+          X-Frame-Options "SAMEORIGIN"
+          Referrer-Policy "strict-origin-when-cross-origin"
+          Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        }
         reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock
       '';
     };

@@ -45,6 +45,10 @@ each piece.
       `REPLACE_WITH_VPS_WIREGUARD_PUBLIC_KEY`
 - [ ] the vps's actual public IP → `hosts/homelab/configuration.nix`,
       replacing `REPLACE_WITH_VPS_PUBLIC_IP`
+- [ ] Generate a preshared key (`wg genpsk`) and put the *same* value
+      into sops as `wireguard_vps_homelab_psk` — used verbatim on both
+      hosts' peer config (defense-in-depth on top of the keypair
+      handshake), not host-prefixed since it must match exactly
 
 ## 4. DNS + domain (octoDNS + Cloudflare, synced from homelab)
 
@@ -103,6 +107,25 @@ values/missing secrets above before the manual work is done:
       tailscale, and the activation/switch process itself. If something
       broke, the likely fix is dropping `noexec` from whichever specific
       mount is affected rather than reverting the whole change.
+- [ ] In Jellyfin's admin dashboard (Networking settings), add
+      `10.100.0.1` (and `10.100.0.2` itself) to "Known Proxies" —
+      without this, Jellyfin sees every external request as coming
+      from the vps's tunnel IP instead of the real client IP, which
+      breaks its own per-IP failed-login lockout (one bad actor could
+      lock out everyone, since they'd all look like the same source).
+      This is a runtime dashboard setting, not something Nix declares.
+- [ ] Watch Minecraft/Factorio container startup after the
+      `--read-only`/`--cap-drop=ALL` change in `services/minecraft.nix`/
+      `services/factorio.nix` — `docker logs minecraft-vanilla-plus` /
+      `docker logs factorio-main` for "Read-only file system" or
+      "Operation not permitted" errors. Both were only reasoned through
+      statically (itzg/factoriotools entrypoints are expected to only
+      write under /data or /factorio, already-writable volumes, plus
+      /tmp which now has a tmpfs) — never actually run under these
+      flags. If something breaks: check which path it tried to write,
+      add a matching `--tmpfs=/that/path` to `extraOptions` first;
+      only drop `--read-only`/`--cap-drop=ALL` entirely as a last
+      resort.
 
 ## Confirmed NOT exposed (by design)
 

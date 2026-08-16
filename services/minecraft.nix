@@ -60,8 +60,31 @@
         vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
+      # RCON isn't published in `ports` below, so it's already
+      # unreachable from outside the docker network — this is belt-and-
+      # suspenders in case a port ever gets added later without
+      # noticing (the itzg image has historically shipped RCON enabled
+      # by default with a weak default password).
+      ENABLE_RCON = "FALSE";
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
     volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
+    # container hardening: no capabilities beyond what a JVM needs (none),
+    # no privilege escalation, and a read-only rootfs — everything the
+    # itzg entrypoint/JVM actually needs to write lives under /data
+    # (already a writable volume) or /tmp (tmpfs below).
+    #
+    # TROUBLESHOOTING: if the container fails to start or crash-loops
+    # after this change, check `docker logs minecraft-vanilla-plus` for
+    # "Read-only file system" errors — that means the entrypoint or a
+    # mod/plugin writes somewhere outside /data and /tmp that wasn't
+    # anticipated here. Fix by adding another `--tmpfs=/path` for that
+    # specific directory, not by dropping --read-only outright.
+    extraOptions = [
+      "--read-only"
+      "--tmpfs=/tmp:rw,nosuid,nodev,size=1024m"
+      "--cap-drop=ALL"
+      "--security-opt=no-new-privileges:true"
+    ];
   };
 }
