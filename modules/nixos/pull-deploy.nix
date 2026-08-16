@@ -32,6 +32,21 @@ in
       default = true;
       description = "Whether to reboot automatically when a switch changes the running kernel/initrd.";
     };
+
+    operation = lib.mkOption {
+      type = lib.types.enum [
+        "switch"
+        "boot"
+      ];
+      default = "switch";
+      description = "nixos-rebuild operation to run: \"switch\" activates immediately, \"boot\" only sets the default boot entry for next reboot.";
+    };
+
+    requireACPower = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Only run the deploy job while on AC power (e.g. for laptops).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -62,12 +77,15 @@ in
         git merge --ff-only origin/master
 
         if nixos-rebuild build --flake .#${cfg.hostAttr}; then
-          nixos-rebuild switch --flake .#${cfg.hostAttr}
+          nixos-rebuild ${cfg.operation} --flake .#${cfg.hostAttr}
         else
           echo "Build failed, not switching." >&2
           exit 1
         fi
       '';
+      unitConfig = lib.mkIf cfg.requireACPower {
+        ConditionACPower = true;
+      };
       serviceConfig = {
         Type = "oneshot";
         User = "root";

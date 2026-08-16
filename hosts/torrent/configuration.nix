@@ -21,6 +21,7 @@
     hostAttr = "torrent";
     dates = "Thu 03:00";
     autoReboot = false;
+    operation = "boot";
   };
 
   # System installed pkgs
