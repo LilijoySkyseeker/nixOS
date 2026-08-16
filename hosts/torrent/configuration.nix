@@ -11,8 +11,17 @@
     ./disko.nix
     ../../profiles/PC.nix
     ../../modules/nixos/kde.nix
+    ../../modules/nixos/pull-deploy.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
+
+  myPullDeploy = {
+    enable = true;
+    flakeDir = "/home/lilijoy/dotfiles";
+    hostAttr = "torrent";
+    dates = "Thu 03:00";
+    autoReboot = false;
+  };
 
   # System installed pkgs
   environment.systemPackages =

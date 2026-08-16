@@ -13,6 +13,8 @@
     ../../profiles/default.nix
     ../../profiles/server.nix
 
+    ../../modules/nixos/auto-update.nix
+
     ../../services/copyparty.nix
 
     ../../services/jellyfin.nix
@@ -230,6 +232,16 @@
 
   # Define your hostname.
   networking.hostName = "homelab";
+
+  # automated flake.lock updates: bump inputs on a branch, build-test, merge
+  # to master only if it builds, then switch (rebooting only if the kernel
+  # actually changed)
+  myAutoUpdate = {
+    enable = true;
+    hostAttr = "homelab";
+    updateDates = "Wed 03:00";
+    switchDates = "Thu 03:00";
+  };
 
   # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;

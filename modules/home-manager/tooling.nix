@@ -187,6 +187,9 @@
       gds.body = ''
         git add --all && git diff --staged | bat --paging always --pager less
       '';
+      deploy-homelab.body = ''
+        ssh root@homelab systemctl start --wait nixos-upgrade.service
+      '';
       __fish_command_not_found_handler.body = ''
         comma $argv[1]
       '';
