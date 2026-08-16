@@ -202,8 +202,13 @@
       template_working = {
         frequent_period = 1;
         frequently = 59;
-        hourly = 24;
-        daily = 1;
+        # hourly/daily give syncoid ~2 weeks of slack to recover a stuck
+        # target before its resume base gets pruned out from under it
+        # (see localTargetAllow's "destroy" comment below for context) —
+        # zdata has 8TB+ free and current snapshot overhead is negligible,
+        # so this is cheap.
+        hourly = 168;
+        daily = 14;
         weekly = 0;
         monthly = 0;
         yearly = 0;
