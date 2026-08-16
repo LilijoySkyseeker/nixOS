@@ -21,6 +21,7 @@
       grc # Text colors
       ripgrep
       gitFull
+      gh # GitHub CLI
       gjs # for kdeconnect
       restic # backups
       fd

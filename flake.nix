@@ -68,6 +68,8 @@
       };
     in
     {
+      devShells.x86_64-linux.default = import ./devshell.nix { inherit pkgs-unstable; };
+
       nixosConfigurations = {
         #==================================================
         thinkpad = nixpkgs-unstable.lib.nixosSystem {
