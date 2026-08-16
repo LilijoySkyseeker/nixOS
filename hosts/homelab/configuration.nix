@@ -330,6 +330,11 @@
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
+      "/var/lib/tailscale" # node identity/state; without this, a non-reusable authKeyFile
+      # is consumed on first boot then fails every boot after since the state gets wiped
+      "/var/lib/health-alerts" # alert dedup stamps
+      "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
+      "/var/lib/sanoid" # snapshot state cache
     ];
     files = [
       "/etc/machine-id"
