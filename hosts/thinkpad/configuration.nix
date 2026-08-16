@@ -35,9 +35,9 @@
   services.fprintd.enable = true;
 
   # state change settings/buttons
-  services.logind = {
-    lidSwitch = "hybrid-sleep";
-    powerKey = "poweroff";
+  services.logind.settings.Login = {
+    HandleLidSwitch = "hybrid-sleep";
+    HandlePowerKey = "poweroff";
   };
 
   # update microcode
