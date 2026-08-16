@@ -16,7 +16,6 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
 
-
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
@@ -82,41 +81,15 @@
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
 
-  # backblaze secrets prefetcher for rclone config file
   sops.secrets = {
-    homelab_backblaze_restic_AWS_ACCESS_KEY_ID = { };
-    homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = { };
+    # the whole rclone ini stanza ([backblazeDaily]/type/account/key) as one
+    # multiline secret, so it can be handed to rcloneConfigFile directly —
+    # no prefetcher service needed to assemble it from separate fields.
+    homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
     homelab_discord_webhook = {
       owner = "health-check";
       group = "health-check";
-    };
-  };
-  systemd.services.restic-backups-backblazeDaily-startup = {
-    enable = true;
-    wantedBy = [ "multi-user.target" ];
-    before = [ "restic-backups-backblazeDaily.service" ];
-    script = ''
-      mkdir -p /etc/rclone
-      rm -f /etc/rclone/rcloneCfg
-      echo "[backblazeDaily]" >> /etc/rclone/rcloneCfg
-      echo "type = b2" >> /etc/rclone/rcloneCfg
-      echo "account = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_ACCESS_KEY_ID.path})" >> /etc/rclone/rcloneCfg
-      echo "key = $(cat ${config.sops.secrets.homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY.path})" >> /etc/rclone/rcloneCfg
-    '';
-    serviceConfig = {
-      User = "root";
-      Type = "oneshot";
-      NoNewPrivileges = true;
-      ProtectSystem = "strict";
-      ReadWritePaths = [ "/etc/rclone" ];
-      ProtectHome = true;
-      ProtectKernelModules = true;
-      ProtectKernelTunables = true;
-      ProtectKernelLogs = true;
-      ProtectControlGroups = true;
-      RestrictNamespaces = true;
-      PrivateTmp = true;
     };
   };
 
@@ -131,7 +104,7 @@
         transfers = "32";
         b2-hard-delete = "false";
       };
-      rcloneConfigFile = "/etc/rclone/rcloneCfg";
+      rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
       #       mount all the most recent backups in a temp folder for restic to trawl
       backupPrepareCommand = ''
         datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
@@ -434,6 +407,7 @@
       "/var/lib/health-alerts" # alert dedup stamps
       "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
       "/var/lib/sanoid" # snapshot state cache
+      "/var/lib/restic-backups-backblazeDaily" # last-success marker for staleness alerting
     ];
     files = [
       "/etc/machine-id"
