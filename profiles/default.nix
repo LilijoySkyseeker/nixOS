@@ -4,6 +4,7 @@
   inputs,
   lib,
   vars,
+  options,
   ...
 }:
 {
@@ -42,18 +43,22 @@
 
   ];
 
-  # sudo for run0 alias
-  security.run0 = {
-    enable = true;
-    enableSudoAlias = true;
-  };
-
-  # sudo
-  security.sudo = {
-    enable = false;
-    execWheelOnly = true;
-    package = pkgs-unstable.sudo.override { withInsults = true; };
-  };
+  security = lib.mkMerge [
+    # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module)
+    (lib.optionalAttrs (options.security ? run0) {
+      run0 = {
+        enable = true;
+        enableSudoAlias = true;
+      };
+    })
+    {
+      sudo = {
+        enable = false;
+        execWheelOnly = true;
+        package = pkgs-unstable.sudo.override { withInsults = true; };
+      };
+    }
+  ];
 
   # 26.11 change for zfs security
   boot.zfs.forceImportRoot = false;
