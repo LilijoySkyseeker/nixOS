@@ -169,6 +169,11 @@ in
         sourcePort = 25565;
       }
       {
+        destination = "10.100.0.2:19132";
+        proto = "udp";
+        sourcePort = 19132; # minecraft: geyser (bedrock edition)
+      }
+      {
         destination = "10.100.0.2:34197";
         proto = "udp";
         sourcePort = 34197;
@@ -193,6 +198,13 @@ in
     iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
       -m hashlimit --hashlimit-above 15/minute --hashlimit-burst 10 \
       --hashlimit-mode srcip --hashlimit-name mc-new -j DROP
+
+    # minecraft (geyser/bedrock): cap packet rate per source IP (also
+    # blunts UDP amplification/reflection abuse of this port, same as
+    # the factorio rule below)
+    iptables -t raw -A vps-ratelimit -p udp --dport 19132 \
+      -m hashlimit --hashlimit-above 60/second --hashlimit-burst 30 \
+      --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
 
     # factorio: cap packet rate per source IP (also blunts UDP
     # amplification/reflection abuse of this port)
