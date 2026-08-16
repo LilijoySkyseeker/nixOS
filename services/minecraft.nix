@@ -60,6 +60,9 @@
         no-chat-reports
         scalablelux
         servux
+        viabackwards
+        viafabric
+        viarewind
         vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
