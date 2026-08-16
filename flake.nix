@@ -48,6 +48,10 @@
 
         ];
         username = "lilijoy";
+        # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
+        # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
+        # TODO: replace with the real domain once one is registered
+        domain = "example.com.";
       };
       pkgs-unstable = import inputs.nixpkgs-unstable {
         system = "x86_64-linux";
@@ -106,6 +110,18 @@
               ;
           };
           modules = [ ./hosts/homelab/configuration.nix ];
+        };
+        #==================================================
+        vps = nixpkgs-unstable.lib.nixosSystem {
+          specialArgs = {
+            inherit
+              inputs
+              pkgs-unstable
+              pkgs-stable
+              vars
+              ;
+          };
+          modules = [ ./hosts/vps/configuration.nix ];
         };
         #==================================================
         isoimage = nixpkgs-unstable.lib.nixosSystem {

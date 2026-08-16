@@ -21,6 +21,7 @@
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
+    ../../services/octodns.nix
   ];
 
   # System installed pkgs
@@ -297,6 +298,31 @@
     "--advertise-routes=192.168.1.0/24"
     "--advertise-exit-node"
   ];
+
+  # wireguard: dial out to the vps (hosts/vps) so it can act as a public
+  # tunnel endpoint for us despite being behind CGNAT — homelab always
+  # initiates, nothing needs to be reachable inbound at home.
+  #
+  # Disabled until the vps side is actually provisioned and the real
+  # keys/IP are filled in (see TODO-vps-manual-steps.md) — flip to
+  # `true` once that's done, rather than leaving broken placeholder
+  # values live.
+  sops.secrets.homelab_wireguard_private_key = lib.mkIf false { };
+  networking.wireguard.interfaces.wg0 = lib.mkIf false {
+    ips = [ "10.100.0.2/24" ];
+    privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
+    peers = [
+      {
+        # vps
+        publicKey = "REPLACE_WITH_VPS_WIREGUARD_PUBLIC_KEY";
+        endpoint = "REPLACE_WITH_VPS_PUBLIC_IP:51820";
+        allowedIPs = [ "10.100.0.1/32" ];
+        # CGNAT mappings expire without periodic traffic; keep the
+        # tunnel (and the vps's route back to us) alive.
+        persistentKeepalive = 25;
+      }
+    ];
+  };
 
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;
