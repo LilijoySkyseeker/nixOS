@@ -31,9 +31,6 @@
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     plover-flake.url = "github:openstenoproject/plover-flake";
-
-    copyparty.url = "github:9001/copyparty";
-
   };
 
   outputs =
@@ -67,7 +64,6 @@
         config = {
           permittedInsecurePackages = [ "" ];
           allowUnfree = true;
-          #          overlays = [ copyparty.overlays.default ];
         };
       };
     in

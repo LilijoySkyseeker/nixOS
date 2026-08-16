@@ -21,8 +21,7 @@ let
   vpsPublicIp = "REPLACE_WITH_VPS_PUBLIC_IP"; # TODO: fill in once the vps is provisioned
 
   # Only jellyfin, minecraft, and factorio are meant to be publicly
-  # reachable (see hosts/vps/README.md) — copyparty deliberately has no
-  # record here.
+  # reachable (see hosts/vps/README.md).
   zoneRecords = {
     "" = [
       {

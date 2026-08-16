@@ -230,9 +230,7 @@ in
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
 
   # anubis: proof-of-work challenge in front of jellyfin, absorbing bot/
-  # scraper noise before it reaches caddy's backend at all. copyparty is
-  # deliberately not fronted here or in caddy below — it stays homelab/
-  # tailnet-only and is never exposed publicly.
+  # scraper noise before it reaches caddy's backend at all.
   services.anubis.instances.jellyfin = {
     enable = true;
     settings = {

@@ -16,12 +16,12 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
 
-    ../../services/copyparty.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
     ../../services/octodns.nix
+    ../../services/nfs.nix
   ];
 
   # System installed pkgs

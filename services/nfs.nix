@@ -1,0 +1,31 @@
+{
+
+  # nfs server — tailnet-only file share for /storage and /storage-bulk
+  # (the same datasets previously served by copyparty). Linux clients only,
+  # so NFSv4 is sufficient — no Samba/SMB needed.
+  services.nfs.server = {
+    enable = true;
+    # NFSv4-only: single port (2049), no rpcbind/mountd/statd/lockd
+    # negotiation needed on the wire, which keeps the firewall surface to
+    # one port below.
+    extraNfsdConfig = ''
+      vers3=n
+      vers4=y
+    '';
+    exports = ''
+      /storage 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
+      /storage-bulk 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
+    '';
+  };
+
+  # restrict to the tailnet interface only — never exposed on the LAN NIC,
+  # even though homelab is also a LAN subnet router/exit node (see
+  # tailscale extraUpFlags in hosts/homelab/configuration.nix). The
+  # 100.64.0.0/10 restriction in the exports above is defense-in-depth on
+  # top of this interface scoping.
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 2049 ];
+
+  # /storage and /storage-bulk are already-persistent ZFS datasets (see
+  # zdata/storage/* in hosts/homelab/configuration.nix), not impermanence
+  # paths, so no environment.persistence entry is needed here.
+}
