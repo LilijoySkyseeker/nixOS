@@ -33,6 +33,10 @@
       TYPE = "FABRIC";
       VERSION = "1.21.4";
       EULA = "TRUE";
+      # the entrypoint writes /etc/nsswitch.conf on every start unless told
+      # not to; --read-only below makes that write fail, so skip it — the
+      # image's default nsswitch config is fine for our use.
+      SKIP_NSSWITCH_CONF = "TRUE";
       MEMORY = "4G";
       USE_MEOWICE_FLAGS = "TRUE";
       MOTD = "GC and Friends";
@@ -69,10 +73,12 @@
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
     volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
-    # container hardening: no capabilities beyond what a JVM needs (none),
-    # no privilege escalation, and a read-only rootfs — everything the
-    # itzg entrypoint/JVM actually needs to write lives under /data
-    # (already a writable volume) or /tmp (tmpfs below).
+    # container hardening: no capabilities beyond what a JVM needs (none)
+    # plus the two the entrypoint needs to drop from root to the
+    # "minecraft" user (SETUID/SETGID, via gosu), no privilege escalation,
+    # and a read-only rootfs — everything the itzg entrypoint/JVM actually
+    # needs to write lives under /data (already a writable volume) or /tmp
+    # (tmpfs below).
     #
     # TROUBLESHOOTING: if the container fails to start or crash-loops
     # after this change, check `docker logs minecraft-vanilla-plus` for
@@ -84,6 +90,8 @@
       "--read-only"
       "--tmpfs=/tmp:rw,nosuid,nodev,size=1024m"
       "--cap-drop=ALL"
+      "--cap-add=SETUID"
+      "--cap-add=SETGID"
       "--security-opt=no-new-privileges:true"
     ];
   };
