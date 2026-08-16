@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Enforce Conventional Commits (type(scope)!: subject).
+set -euo pipefail
+
+msg_file="$1"
+first_line="$(head -n1 "$msg_file")"
+
+# Skip merge commits and fixup/squash commits.
+if [[ "$first_line" =~ ^(Merge|fixup!|squash!) ]]; then
+  exit 0
+fi
+
+types="feat|fix|chore|refactor|docs|test|security|perf|ci|build|revert"
+pattern="^(${types})(\([a-z0-9._-]+\))?!?: .{1,88}$"
+
+if [[ ! "$first_line" =~ $pattern ]]; then
+  echo "Commit message rejected: does not follow Conventional Commits." >&2
+  echo "  Expected: <type>(<scope>)?: <subject>" >&2
+  echo "  Types: ${types//|/, }" >&2
+  echo "  Got:   $first_line" >&2
+  exit 1
+fi
+
+exit 0

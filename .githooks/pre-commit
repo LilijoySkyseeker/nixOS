@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Block obviously-plaintext secrets from being committed.
+set -euo pipefail
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACM)"
+[[ -z "$staged_files" ]] && exit 0
+
+fail=0
+
+while IFS= read -r file; do
+  [[ -f "$file" ]] || continue
+
+  # secrets.yaml files must be sops-encrypted (contain sops metadata block).
+  if [[ "$(basename "$file")" == "secrets.yaml" ]]; then
+    if ! git show ":$file" | grep -q '^sops:'; then
+      echo "BLOCKED: $file looks unencrypted (no 'sops:' metadata block)." >&2
+      fail=1
+    fi
+    continue
+  fi
+
+  # Skip binary files.
+  git diff --cached --numstat -- "$file" | awk '$1=="-"{exit 1}' || continue
+
+  content="$(git show ":$file")"
+
+  if grep -qE -- '-----BEGIN (RSA |EC |OPENSSH |DSA |)PRIVATE KEY-----' <<<"$content"; then
+    echo "BLOCKED: $file contains a private key block." >&2
+    fail=1
+  fi
+
+  if grep -qE 'AGE-SECRET-KEY-1[A-Z0-9]+' <<<"$content"; then
+    echo "BLOCKED: $file contains an age secret key." >&2
+    fail=1
+  fi
+
+  if grep -qE '(AKIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{10,}|ghp_[0-9A-Za-z]{36})' <<<"$content"; then
+    echo "BLOCKED: $file contains what looks like a live API/access token." >&2
+    fail=1
+  fi
+done <<<"$staged_files"
+
+if [[ "$fail" -eq 1 ]]; then
+  echo "" >&2
+  echo "If this is a false positive, commit with 'git commit --no-verify'." >&2
+  exit 1
+fi
+
+exit 0

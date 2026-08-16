@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Build (don't switch) every NixOS host whose config changed in the commits
+# being pushed, so breakage is caught before it lands on another machine.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+zero="0000000000000000000000000000000000000000"
+changed_files=""
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue # deleting a ref, nothing to build
+
+  if [[ "$remote_sha" == "$zero" ]]; then
+    # New branch: diff against master, or against empty tree if master itself.
+    range="$(git merge-base origin/master "$local_sha" 2>/dev/null || true)..$local_sha"
+    [[ -z "${range%%..*}" ]] && range="$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+
+  files="$(git diff --name-only "$range" -- hosts/ profiles/ modules/ services/ flake.nix flake.lock 2>/dev/null || true)"
+  changed_files+=$'\n'"$files"
+done
+
+changed_files="$(echo "$changed_files" | sed '/^$/d' | sort -u)"
+
+if [[ -z "$changed_files" ]]; then
+  exit 0
+fi
+
+hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
+to_build=""
+
+for host in $hosts; do
+  if echo "$changed_files" | grep -qE "^(hosts/${host}/|profiles/|modules/|services/|flake\.nix|flake\.lock)"; then
+    to_build+=" $host"
+  fi
+done
+
+if [[ -z "$to_build" ]]; then
+  exit 0
+fi
+
+echo "pre-push: building affected hosts:${to_build}"
+
+for host in $to_build; do
+  echo "--- nixos-rebuild build --flake .#${host} ---"
+  if ! nixos-rebuild build --flake ".#${host}"; then
+    echo "" >&2
+    echo "BLOCKED: build failed for host '${host}'. Fix it, or push with --no-verify to skip this check." >&2
+    exit 1
+  fi
+done
+
+exit 0

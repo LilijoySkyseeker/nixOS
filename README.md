@@ -1,5 +1,8 @@
 # Lilijoy's NixOS Machines
 
+See [GIT_WORKFLOW.md](./GIT_WORKFLOW.md) for git hooks/conventions used in
+this repo (auto-configured by the flake's dev shell via direnv).
+
 ## Structure Guide
 
 All configuration starts with [flake.nix](./flake.nix)
