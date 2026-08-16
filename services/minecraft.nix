@@ -49,19 +49,16 @@
       SEED = "3522075773609978693";
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
-      # servux is intentionally left out: it's a data/protocol companion
-      # for client-side MiniHUD/Tweakeroo, not a performance mod.
       MODRINTH_PROJECTS = ''
         c2me-fabric
         carpet
         distanthorizons
-        # easy-shulker-boxes
         ferrite-core
-        # infinitymendingbows
         krypton
         lithium
         no-chat-reports
         scalablelux
+        servux
         vmp-fabric
       '';
       ENABLE_WHITELIST = "TRUE";
