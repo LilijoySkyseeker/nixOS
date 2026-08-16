@@ -9,11 +9,9 @@
   # networking
   networking.firewall.allowedTCPPorts = [
     25565
-    8100
   ];
   networking.firewall.allowedUDPPorts = [
     25565
-    8100
   ];
 
   # persistence
@@ -30,7 +28,6 @@
     image = "itzg/minecraft-server";
     ports = [
       "25565:25565"
-      "8100:8100"
     ];
     environment = {
       TYPE = "FABRIC";
@@ -49,13 +46,12 @@
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
-        bluemap
         c2me-fabric
         carpet
         distanthorizons
-        easy-shulker-boxes
+        # easy-shulker-boxes
         ferrite-core
-        infinitymendingbows
+        # infinitymendingbows
         krypton
         lithium
         no-chat-reports
@@ -63,11 +59,6 @@
         servux
         vmp-fabric
       '';
-      # enchant-tweaker
-      # memoryleakfix
-      # viabackwards
-      # viafabric
-      # viarewind
       ENABLE_WHITELIST = "TRUE";
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
