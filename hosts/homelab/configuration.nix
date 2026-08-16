@@ -14,6 +14,7 @@
     ../../profiles/server.nix
 
     ../../modules/nixos/auto-update.nix
+    ../../modules/nixos/health-alerts.nix
 
     ../../services/copyparty.nix
 
@@ -74,6 +75,10 @@
     homelab_backblaze_restic_AWS_ACCESS_KEY_ID = { };
     homelab_backblaze_restic_AWS_SECRET_ACCESS_KEY = { };
     homelab_backblaze_restic_password = { };
+    homelab_discord_webhook = {
+      owner = "health-check";
+      group = "health-check";
+    };
   };
   systemd.services.restic-backups-backblazeDaily-startup = {
     enable = true;
@@ -241,6 +246,13 @@
     hostAttr = "homelab";
     updateDates = "Wed 03:00";
     switchDates = "Thu 03:00";
+  };
+
+  # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
+  myHealthAlerts = {
+    enable = true;
+    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    interval = "*:0/15";
   };
 
   # ssh server
