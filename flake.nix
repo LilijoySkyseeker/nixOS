@@ -3,7 +3,7 @@
 
   # use `nix flake metadata` to see duplicated sources
   inputs = {
-    nixpkgs-stable.url = "nixpkgs/nixos-25.11";
+    nixpkgs-stable.url = "nixpkgs/nixos-26.05";
 
     nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
 

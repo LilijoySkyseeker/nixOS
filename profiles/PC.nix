@@ -10,6 +10,8 @@
     ../modules/nixos/tooling.nix
     ./default.nix
     ../modules/nixos/wooting.nix
+    inputs.stylix.nixosModules.stylix
+    inputs.nvf.nixosModules.default
   ];
 
   # System installed pkgs

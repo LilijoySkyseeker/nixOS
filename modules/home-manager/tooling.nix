@@ -95,6 +95,7 @@
   programs.fzf = {
     enable = true;
     enableFishIntegration = true;
+    enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
   };
 
   # KDE Connect

@@ -15,8 +15,6 @@
     inputs.disko.nixosModules.disko
     inputs.impermanence.nixosModules.impermanence
     inputs.nix-flatpak.nixosModules.nix-flatpak
-    inputs.stylix.nixosModules.stylix
-    inputs.nvf.nixosModules.default
   ];
   environment.systemPackages = with pkgs-unstable; [
     btop
@@ -44,12 +42,12 @@
   ];
 
   security = lib.mkMerge [
-    # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module)
+    # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module;
+    # newer run0 modules dropped the `enable` toggle since run0 itself is always available)
     (lib.optionalAttrs (options.security ? run0) {
-      run0 = {
-        enable = true;
-        enableSudoAlias = true;
-      };
+      run0 =
+        { enableSudoAlias = true; }
+        // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
     })
     {
       sudo = {
