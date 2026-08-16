@@ -2,7 +2,7 @@
 {
   sops.secrets.minecraft_username = { };
   sops.templates."minecraft-whitelist".content = ''
-    WHITELIST=${config.sops.placeholder.minecraft_username},.LilijoySkySeekr
+    WHITELIST=${config.sops.placeholder.minecraft_username}
     OPS=${config.sops.placeholder.minecraft_username}
   '';
 
@@ -75,7 +75,15 @@
       # suspenders in case a port ever gets added later without
       # noticing (the itzg image has historically shipped RCON enabled
       # by default with a weak default password).
-      ENABLE_RCON = "FALSE";
+      #
+      # TEMP: flipped on to whitelist a Floodgate/Bedrock username via
+      # `docker exec minecraft-vanilla-plus rcon-cli whitelist add
+      # .LilijoySkySeekr` — itzg's startup-time WHITELIST env var does a
+      # hard Mojang API lookup and crash-loops on non-Java names, but the
+      # live in-game/RCON whitelist command goes through the running
+      # server's profile cache, which Floodgate correctly hooks. Revert
+      # to FALSE once that command has been run.
+      ENABLE_RCON = "TRUE";
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
     volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
