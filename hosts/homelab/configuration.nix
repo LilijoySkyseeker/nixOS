@@ -280,6 +280,14 @@
     enable = true;
     webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
     interval = "*:0/15";
+    # syncoid runs hourly; alert if a target hasn't advanced in 2x that plus
+    # slack, so a stuck target is caught long before the source's ~24h
+    # snapshot retention prunes the base it needs to resume from.
+    backupStaleness = {
+      "zbackup/backup/homelab/storage" = 6;
+      "zbackup/backup-bulk/homelab/storage-bulk" = 6;
+      "zbackup/backup/homelab/state" = 6;
+    };
   };
 
   # ssh server

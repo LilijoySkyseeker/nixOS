@@ -50,6 +50,23 @@ in
       default = true;
       description = "Whether to check SMART health on scannable drives. Disable on hosts with no real block devices to check (e.g. cloud VMs on virtio disks).";
     };
+
+    backupStaleness = lib.mkOption {
+      type = lib.types.attrsOf lib.types.int;
+      default = { };
+      example = {
+        "zbackup/backup/homelab/storage" = 6;
+        "zbackup/backup-bulk/homelab/storage-bulk" = 6;
+      };
+      description = ''
+        ZFS datasets to check for backup staleness, mapped to the maximum
+        age in hours their newest snapshot may reach before alerting. Catches
+        a syncoid target that's stuck (e.g. failing every run without making
+        progress) even though each individual failed run is already covered
+        by the failed-units check — this instead measures whether the backup
+        data itself is actually advancing.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -115,6 +132,27 @@ in
           else
             clear_alert smart-failed
           fi
+        ''}
+
+        ${lib.optionalString (cfg.backupStaleness != { }) ''
+          # backup snapshot staleness (catches a syncoid target stuck making
+          # no progress, distinct from an individual run failing)
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (dataset: maxHours: ''
+              stale_key="backup-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"
+              newest=$(zfs list -t snapshot -H -p -o creation -s creation ${lib.escapeShellArg dataset} 2>/dev/null | tail -1)
+              if [ -z "$newest" ]; then
+                notify "$stale_key" "Backup staleness check failed" "${dataset}: no snapshots found (dataset missing or empty)"
+              else
+                age_hours=$(( (now - newest) / 3600 ))
+                if [ "$age_hours" -ge ${toString maxHours} ]; then
+                  notify "$stale_key" "Backup is stale" "${dataset}: newest snapshot is $age_hours hours old (threshold: ${toString maxHours}h)"
+                else
+                  clear_alert "$stale_key"
+                fi
+              fi
+            '') cfg.backupStaleness
+          )}
         ''}
 
         # failed systemd units
