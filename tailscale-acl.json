@@ -1,0 +1,62 @@
+// Tailnet ACL / policy file, managed in the Tailscale admin console
+// (https://login.tailscale.com/admin/acls/file) — not applied by Nix.
+// Kept here only as a reference copy; update this file whenever the
+// console policy changes so the two don't drift.
+//
+// Notes:
+// - All hosts in this repo join as tagged devices (see
+//   profiles/default.nix: authKeyFile + --advertise-tags=tag:<hostname>),
+//   not as a logged-in user. autogroup:member only covers user identities,
+//   so tagged devices need their own tags listed explicitly in any
+//   grants/acls src that should include device-to-device access.
+// - Exit node routing requires dst: autogroup:internet — granting access
+//   to the tag itself only allows reaching the device (e.g. SSH), not
+//   routing internet traffic through it.
+// - autoApprovers references tag:homelab (not a user) so re-advertising
+//   the exit node / subnet route auto-approves without manual admin
+//   approval, and doesn't break if a user account is later suspended.
+{
+    "tagOwners": {
+        "tag:thinkpad": ["autogroup:admin"],
+        "tag:torrent":  ["autogroup:admin"],
+        "tag:homelab":  ["autogroup:admin"],
+        "tag:isoimage": ["autogroup:admin"],
+    },
+
+    "autoApprovers": {
+        "exitNode": ["tag:homelab"],
+        "routes": {
+            "192.168.1.0/24": ["tag:homelab"],
+        },
+    },
+
+    "grants": [
+        // members and all tagged devices can reach each other
+        {
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "dst": ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "ip":  ["*"],
+        },
+        // let members and tagged devices use homelab as an exit node
+        {
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "dst": ["autogroup:internet"],
+            "ip":  ["*"],
+        },
+        // let members and tagged devices reach homelab's advertised LAN subnet
+        {
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "dst": ["192.168.1.0/24"],
+            "ip":  ["*"],
+        },
+    ],
+
+    "ssh": [
+        {
+            "action": "check",
+            "src":    ["autogroup:member"],
+            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+    ],
+}

@@ -119,3 +119,7 @@ NixOS
 
 - [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
   [Impermanence](https://github.com/nix-community/impermanence)
+- [tailscale-acl.json](./tailscale-acl.json) is a reference copy of the
+  tailnet ACL policy, which is actually managed in the Tailscale admin
+  console (not applied by Nix) — keep it in sync manually when the console
+  policy changes.
