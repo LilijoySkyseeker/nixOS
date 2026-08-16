@@ -89,6 +89,11 @@ in
       serviceConfig = {
         Type = "oneshot";
         User = "root";
+        # this unit runs `nixos-rebuild switch`/`boot` itself — real
+        # system activation — so it can't be filesystem/kernel-sandboxed
+        # the way a plain build-only job can (see myAutoUpdate's
+        # flake-update-test vs nixos-upgrade for the same distinction).
+        NoNewPrivileges = true;
         ExecStartPost = lib.optionals cfg.autoReboot [
           (pkgs.writeShellScript "reboot-if-kernel-changed" ''
             if [ "$(readlink /run/booted-system/kernel)" != "$(readlink /run/current-system/kernel)" ]; then

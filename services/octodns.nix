@@ -119,6 +119,15 @@ in
         Group = "octodns";
         EnvironmentFile = config.sops.templates."octodns-env".path;
         ExecStart = "${octodnsEnv}/bin/octodns-sync --config-file=${octodnsConfig} --doit";
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        RestrictNamespaces = true;
+        PrivateTmp = true;
       };
     };
 

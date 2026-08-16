@@ -3,6 +3,13 @@
 # tmpfs (wiped every boot); /nix and /persist are the only durable
 # partitions. Adjust the device path to match the provider's virtual
 # disk (Vultr/most KVM providers expose /dev/vda).
+#
+# No disk-backed swap partition — see zramSwap in configuration.nix.
+# sops decrypts several live secrets (WireGuard key, CrowdSec bouncer
+# key, Caddy env, Tailscale authkey) into /run under memory pressure;
+# a disk swap partition could let that material page out to
+# persistent, unencrypted storage. zram compresses into RAM instead
+# and never touches disk.
 {
   disko.devices = {
     disk = {
@@ -21,12 +28,6 @@
                 mountpoint = "/boot";
               };
             };
-            swap = {
-              size = "2G";
-              content = {
-                type = "swap";
-              };
-            };
             nix = {
               size = "50%";
               content = {
@@ -41,6 +42,17 @@
                 type = "filesystem";
                 format = "ext4";
                 mountpoint = "/persist";
+                # nothing under /persist (caddy certs, crowdsec state,
+                # tailscale state, logs, /etc/nixos checkout) needs to be
+                # executed directly — everything actually run comes from
+                # /nix/store, which is a separate partition and stays
+                # exec-enabled below.
+                mountOptions = [
+                  "defaults"
+                  "noexec"
+                  "nosuid"
+                  "nodev"
+                ];
               };
             };
           };

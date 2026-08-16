@@ -7,21 +7,18 @@
   environment.systemPackages = with pkgs; [
   ];
 
-  services.networkd-dispatcher = {
-    enable = true;
-    rules."50-tailscale" = {
-      onState = [ "routable" ];
-      script = ''
-        ${lib.getExe pkgs.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
-      '';
-    };
-  };
-
   #security
   # lock down nix
   nix.settings.allowed-users = [ "root" ];
   # disable sudo
   security.sudo.enable = false;
+
+  # audit log of every executed command — /var/log/audit/audit.log,
+  # which lives under /var/log, already in each host's persistence
+  # directories list (impermanence would otherwise wipe it every boot).
+  security.auditd.enable = true;
+  security.audit.enable = true;
+  security.audit.rules = [ "-a exit,always -F arch=b64 -S execve" ];
 
   # nh, nix helper
   programs.nh = {

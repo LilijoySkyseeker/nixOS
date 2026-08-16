@@ -38,6 +38,18 @@ in
       default = 20;
       description = "How long a nixos-rebuild switch can run before it's considered stuck.";
     };
+
+    checkZfs = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to check ZFS pool health. Disable on hosts with no ZFS pools (e.g. cloud VMs) — otherwise `zpool status -x` reporting \"no pools available\" gets treated as unhealthy on every run.";
+    };
+
+    checkSmart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to check SMART health on scannable drives. Disable on hosts with no real block devices to check (e.g. cloud VMs on virtio disks).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -70,7 +82,7 @@ in
             fi
           fi
           echo "$now" > "$stamp"
-          payload=$(jq -n --arg content "**[homelab] $title**\n\`\`\`\n$body\n\`\`\`" '{content: $content}')
+          payload=$(jq -n --arg content "**[${config.networking.hostName}] $title**\n\`\`\`\n$body\n\`\`\`" '{content: $content}')
           echo "$payload" | curl -sS -K ${cfg.webhookUrlFile} -H "Content-Type: application/json" --data-binary @- >/dev/null
         }
 
@@ -78,28 +90,32 @@ in
           rm -f "$state/$1"
         }
 
-        # ZFS pool health
-        if ! zpool_out=$(zpool status -x 2>&1); then
-          notify zfs-error "ZFS check failed" "$zpool_out"
-        elif [ "$zpool_out" != "all pools are healthy" ]; then
-          notify zfs-unhealthy "ZFS pool unhealthy" "$zpool_out"
-        else
-          clear_alert zfs-unhealthy
-          clear_alert zfs-error
-        fi
-
-        # SMART health on every scannable drive
-        smart_failed=""
-        for dev in $(smartctl --scan | awk '{print $1}'); do
-          if ! smartctl -H "$dev" >/dev/null 2>&1; then
-            smart_failed="$smart_failed$dev\n"
+        ${lib.optionalString cfg.checkZfs ''
+          # ZFS pool health
+          if ! zpool_out=$(zpool status -x 2>&1); then
+            notify zfs-error "ZFS check failed" "$zpool_out"
+          elif [ "$zpool_out" != "all pools are healthy" ]; then
+            notify zfs-unhealthy "ZFS pool unhealthy" "$zpool_out"
+          else
+            clear_alert zfs-unhealthy
+            clear_alert zfs-error
           fi
-        done
-        if [ -n "$smart_failed" ]; then
-          notify smart-failed "SMART health check failed" "$smart_failed"
-        else
-          clear_alert smart-failed
-        fi
+        ''}
+
+        ${lib.optionalString cfg.checkSmart ''
+          # SMART health on every scannable drive
+          smart_failed=""
+          for dev in $(smartctl --scan | awk '{print $1}'); do
+            if ! smartctl -H "$dev" >/dev/null 2>&1; then
+              smart_failed="$smart_failed$dev\n"
+            fi
+          done
+          if [ -n "$smart_failed" ]; then
+            notify smart-failed "SMART health check failed" "$smart_failed"
+          else
+            clear_alert smart-failed
+          fi
+        ''}
 
         # failed systemd units
         failed=$(systemctl --failed --no-legend --plain)
@@ -138,6 +154,15 @@ in
         # to the block device via the "disk" group; grant only that, not root.
         AmbientCapabilities = [ "CAP_SYS_RAWIO" ];
         CapabilityBoundingSet = [ "CAP_SYS_RAWIO" ];
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        RestrictNamespaces = true;
+        PrivateTmp = true;
       };
     };
 

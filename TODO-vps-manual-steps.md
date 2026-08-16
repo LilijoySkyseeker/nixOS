@@ -94,6 +94,15 @@ values/missing secrets above before the manual work is done:
 - [ ] Verify Jellyfin reachable through the real domain (should hit
       the anubis challenge page first, then proxy through on success)
 - [ ] Verify Minecraft/Factorio reachable on the vps's public IP
+- [ ] Verify `noexec` on `/` and `/persist` (`disko.nix`/`configuration.nix`)
+      didn't break anything at first boot — this was only statically
+      verified (`nix eval`/`nix build`, traced the impermanence bind-mount
+      scripts to confirm they don't override the inherited noexec flag),
+      never actually booted. Watch `journalctl -b` for `Permission denied`
+      / exec-related failures, especially from caddy (ACME), crowdsec,
+      tailscale, and the activation/switch process itself. If something
+      broke, the likely fix is dropping `noexec` from whichever specific
+      mount is affected rather than reverting the whole change.
 
 ## Confirmed NOT exposed (by design)
 

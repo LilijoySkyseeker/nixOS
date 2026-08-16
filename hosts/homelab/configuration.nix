@@ -40,6 +40,18 @@
     options libahci ignore_sss=1
   '';
 
+  # tailscale UDP GRO forwarding tweak — enp3s0 is this host's real NIC,
+  # not applicable to any other host in this repo.
+  services.networkd-dispatcher = {
+    enable = true;
+    rules."50-tailscale" = {
+      onState = [ "routable" ];
+      script = ''
+        ${lib.getExe pkgs-stable.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
+      '';
+    };
+  };
+
   # docker settings
   virtualisation.docker.daemon.settings = {
     userland-proxy = false;
@@ -95,6 +107,16 @@
     serviceConfig = {
       User = "root";
       Type = "oneshot";
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ReadWritePaths = [ "/etc/rclone" ];
+      ProtectHome = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      PrivateTmp = true;
     };
   };
 
@@ -159,6 +181,11 @@
       # backup is always lowest priority to not effect running processes
       Nice = 19;
       CPUSchedulingPolicy = "idle";
+      # this service mounts/unmounts ZFS snapshots into a shared /tmp
+      # (that's why PrivateTmp is already forced off below) and needs
+      # real mount(8) access — ProtectSystem/namespace restrictions
+      # would conflict with that, so only the always-safe flag applies.
+      NoNewPrivileges = true;
       PrivateTmp = lib.mkForce false;
     };
   };
@@ -264,7 +291,7 @@
     extraConfig = ''
       passwordAuthentication = no
       PermitRootLogin = prohibit-password
-      AllowTcpForwarding yes
+      AllowTcpForwarding no
       X11Forwarding no
       AllowAgentForwarding no
       AllowStreamLocalForwarding no

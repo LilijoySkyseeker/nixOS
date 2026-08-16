@@ -79,6 +79,21 @@ in
       serviceConfig = {
         Type = "oneshot";
         User = "root";
+        # `nixos-rebuild build` here delegates the actual build to
+        # nix-daemon, so this process itself never needs kernel/module
+        # access — unlike system.autoUpgrade below, this one never runs
+        # `switch`. ProtectHome is deliberately left off: git push
+        # authenticates via whatever's in /root (ssh key/credential
+        # helper), unverified from here, so restricting it risked
+        # silently breaking the push step.
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ReadWritePaths = [ flakeDir ];
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        RestrictNamespaces = true;
       };
     };
 
@@ -103,13 +118,21 @@ in
     # Only reboot if the switch actually changed the running kernel/initrd,
     # instead of rebooting on every switch (system.autoUpgrade's allowReboot
     # would reboot unconditionally).
-    systemd.services.nixos-upgrade.serviceConfig.ExecStartPost = [
-      (pkgs.writeShellScript "reboot-if-kernel-changed" ''
-        if [ "$(readlink /run/booted-system/kernel)" != "$(readlink /run/current-system/kernel)" ]; then
-          echo "Kernel/initrd changed, rebooting."
-          systemctl reboot
-        fi
-      '')
-    ];
+    systemd.services.nixos-upgrade.serviceConfig = {
+      ExecStartPost = [
+        (pkgs.writeShellScript "reboot-if-kernel-changed" ''
+          if [ "$(readlink /run/booted-system/kernel)" != "$(readlink /run/current-system/kernel)" ]; then
+            echo "Kernel/initrd changed, rebooting."
+            systemctl reboot
+          fi
+        '')
+      ];
+      # This unit runs `nixos-rebuild switch` itself — real system
+      # activation (bootloader, kernel modules, arbitrary unit
+      # restarts) — so it can't be sandboxed the way a plain build/git
+      # job can. NoNewPrivileges is the one flag safe to add regardless
+      # (root already has every privilege it could gain).
+      NoNewPrivileges = true;
+    };
   };
 }

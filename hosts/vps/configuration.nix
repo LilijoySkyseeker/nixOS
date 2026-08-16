@@ -4,12 +4,20 @@
   vars,
   ...
 }:
+let
+  # TODO: confirm against the provider's actual public interface name (`ip a` from rescue mode)
+  externalInterface = "eth0";
+in
 {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
 
     ../../profiles/default.nix
+    ../../profiles/server.nix
+
+    ../../modules/nixos/pull-deploy.nix
+    ../../modules/nixos/health-alerts.nix
   ];
 
   # Set your time zone.
@@ -18,8 +26,25 @@
   # Define your hostname.
   networking.hostName = "vps";
 
+  # pull whatever homelab's myAutoUpdate has already build-tested and
+  # merged to master, then build/switch/reboot-if-needed here too — no
+  # separate bump/test/merge cycle (that's homelab's job), just apply
+  # what's already vetted on master.
+  myPullDeploy = {
+    enable = true;
+    flakeDir = "/etc/nixos";
+    hostAttr = "vps";
+    dates = "Thu 03:00"; # matches homelab's myAutoUpdate.switchDates
+    autoReboot = true;
+    operation = "switch";
+  };
+
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  # zram instead of a disk-backed swap partition — see disko.nix for why
+  # (decrypted secrets in /run shouldn't be able to page out to disk).
+  zramSwap.enable = true;
 
   # impermanence: root is tmpfs and wiped every boot. No ZFS here — a
   # single cloud disk gets nothing from it without redundancy to
@@ -31,6 +56,12 @@
     options = [
       "size=2G"
       "mode=0755"
+      # everything actually executed comes from /nix/store (a separate,
+      # exec-enabled partition) via symlinks — nothing physically
+      # written to the root tmpfs itself needs to be run directly.
+      "noexec"
+      "nosuid"
+      "nodev"
     ];
     neededForBoot = true;
   };
@@ -64,13 +95,19 @@
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
     enable = true;
+    allowSFTP = false;
     settings.KbdInteractiveAuthentication = false;
     extraConfig = ''
       passwordAuthentication = no
       PermitRootLogin = prohibit-password
+      AllowTcpForwarding no
       X11Forwarding no
       AllowAgentForwarding no
+      AllowStreamLocalForwarding no
       AuthenticationMethods publickey
+      PermitTunnel no
+      ClientAliveInterval 60
+      ClientAliveCountMax 5
     '';
     hostKeys = [
       {
@@ -88,12 +125,10 @@
   # below.
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  # sops age key derived from this host's own ssh host key, same pattern
-  # as the other hosts (see profiles/server.nix). This host's age public
-  # key (`nix run nixpkgs#ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub`)
+  # sops.age.sshKeyPaths comes from profiles/server.nix. This host's age
+  # public key (`nix run nixpkgs#ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub`)
   # needs to be added to .sops.yaml's creation_rules before any
   # sops.secrets below will decrypt — see README.md.
-  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
   # wireguard: this box is the public-facing tunnel endpoint; homelab
   # (behind CGNAT) dials out to it. allowedIPs restricts the tunnel to
@@ -113,10 +148,14 @@
   };
 
   # forward the game server ports straight through to homelab over the
-  # tunnel — these are raw TCP/UDP, not HTTP, so caddy can't front them.
+  # tunnel — these are raw TCP/UDP, not HTTP, so caddy can't front them,
+  # and unlike the caddy path they never pass through anubis or
+  # crowdsec (those only see sshd/caddy traffic) — DNAT happens at the
+  # netfilter level below caddy/anubis/crowdsec entirely. The
+  # per-source rate limits below are this path's only abuse defense.
   networking.nat = {
     enable = true;
-    externalInterface = "eth0"; # TODO: confirm against the provider's actual public interface name
+    inherit externalInterface;
     forwardPorts = [
       {
         destination = "10.100.0.2:25565";
@@ -130,6 +169,47 @@
       }
     ];
   };
+
+  # per-source-IP rate limiting on the forwarded game ports, since
+  # DNAT'd traffic bypasses anubis/crowdsec entirely (see above). Raw
+  # table so it's evaluated before conntrack/NAT and independent of
+  # whatever chain names the nat/firewall modules generate internally.
+  # Thresholds are deliberately loose (a real player's client won't hit
+  # them) — this is a floor against basic scanning/flooding, not a full
+  # DDoS mitigation; a large enough volumetric flood saturates the
+  # uplink before any firewall rule gets a say regardless.
+  networking.firewall.extraCommands = ''
+    iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
+    iptables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
+      || iptables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
+
+    # minecraft: cap new-connection attempts per source IP
+    iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
+      -m hashlimit --hashlimit-above 15/minute --hashlimit-burst 10 \
+      --hashlimit-mode srcip --hashlimit-name mc-new -j DROP
+
+    # factorio: cap packet rate per source IP (also blunts UDP
+    # amplification/reflection abuse of this port)
+    iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
+      -m hashlimit --hashlimit-above 60/second --hashlimit-burst 30 \
+      --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
+  '';
+
+  # profiles/default.nix sets useRoutingFeatures = "both" for every
+  # host, which forces net.ipv{4,6}.conf.all.forwarding = true at a
+  # priority that beats a plain sysctl override — needed on homelab
+  # (subnet router + exit node) but not here: this box only uses
+  # tailscale for admin SSH, never as an exit node/subnet router.
+  # Narrowing to "client" here stops that forced-on IPv6 forwarding
+  # (IPv4 forwarding stays on regardless, via the nat module — that
+  # one's intentional, it's what makes the homelab DNAT work).
+  services.tailscale.useRoutingFeatures = lib.mkForce "client";
+
+  # this box never needs to forward IPv6 (nat/forwardPorts above is
+  # IPv4-only, and minecraft/factorio are only reachable via the IPv4
+  # DNAT rules) — explicit off rather than relying on the kernel
+  # default, so there's no ambient IPv6 forwarding path to homelab.
+  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
 
   # anubis: proof-of-work challenge in front of jellyfin, absorbing bot/
   # scraper noise before it reaches caddy's backend at all. copyparty is
@@ -183,6 +263,20 @@
     ];
   };
   services.crowdsec-firewall-bouncer.enable = true;
+
+  # failed-unit / stuck-switch alerts to the same Discord channel as
+  # homelab. ZFS/SMART checks are off — this box has no ZFS pools and
+  # no real block devices to check (single virtio disk).
+  sops.secrets.vps_discord_webhook = {
+    owner = "health-check";
+    group = "health-check";
+  };
+  myHealthAlerts = {
+    enable = true;
+    webhookUrlFile = config.sops.secrets.vps_discord_webhook.path;
+    checkZfs = false;
+    checkSmart = false;
+  };
 
   networking.firewall.allowedTCPPorts = [
     80
