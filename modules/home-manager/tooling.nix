@@ -104,14 +104,6 @@
     indicator = true;
   };
 
-  # Virtual-machine (also neeed nixos module)
-  dconf.settings = {
-    "org/virt-manager/virt-manager/connections" = {
-      autoconnect = [ "qemu:///system" ];
-      uris = [ "qemu:///system" ];
-    };
-  };
-
   # zoxide
   programs.zoxide = {
     enable = true;

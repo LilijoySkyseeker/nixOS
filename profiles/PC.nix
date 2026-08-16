@@ -136,6 +136,7 @@
   home-manager.users.lilijoy = {
     imports = [
       ../modules/home-manager/tooling.nix
+      ../modules/home-manager/virt-manager.nix
       inputs.plover-flake.homeManagerModules.plover
     ];
     home = {
