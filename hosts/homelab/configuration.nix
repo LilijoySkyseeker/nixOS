@@ -82,7 +82,7 @@
   ];
 
   sops.secrets = {
-    # the whole rclone ini stanza ([backblazeWeekly]/type/account/key) as one
+    # the whole rclone ini stanza ([backblazeDaily]/type/account/key) as one
     # multiline secret, so it can be handed to rcloneConfigFile directly —
     # no prefetcher service needed to assemble it from separate fields.
     homelab_backblaze_rclone_config = { };
@@ -99,7 +99,12 @@
       initialize = true;
       createWrapper = true; # usable with restic-backblazeWeekly
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repository = "rclone:backblazeWeekly:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
+      # "backblazeDaily" here is the rclone remote name (the [stanza] header
+      # inside the homelab_backblaze_rclone_config secret), not this
+      # backup's name — it's a leftover from before the backblazeWeekly
+      # rename and must stay in sync with the secret unless that's also
+      # updated (sops secrets aren't edited directly; see repo docs).
+      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
