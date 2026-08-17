@@ -102,6 +102,22 @@ check with `lsblk` first) and that `externalInterface` in
 `configuration.nix` matches the real public interface name (`ip a` —
 often `eth0` on DigitalOcean, but not guaranteed).
 
+DigitalOcean droplets boot via a legacy-BIOS chainload of the disk's
+own boot sector, not native UEFI firmware — even though the stock
+image itself mounts an EFI partition, that's for portability across
+providers, not what DigitalOcean's own hypervisor actually chainloads.
+A disk with only `systemd-boot`'s UEFI ESP (no legacy-bootable MBR
+code) leaves nothing for that BIOS stage to find; confirmed via the
+DigitalOcean recovery console hanging at "Booting from Hard Disk..."
+on an install with `boot.loader.systemd-boot` (the default in
+`profiles/default.nix`). `hosts/vps/configuration.nix` overrides to
+`boot.loader.grub` in legacy BIOS mode instead, and `disko.nix` has a
+small unformatted `EF02` partition for GRUB's `core.img` plus a real
+ext4 `/boot` partition (disko auto-populates `boot.loader.grub.devices`
+from the `EF02` partition — don't also set `devices`/`device` in
+`configuration.nix`, that duplicates the entry and fails the
+`mirroredBoots` assertion).
+
 ## 3. Generate and store the WireGuard keys
 
 ```
