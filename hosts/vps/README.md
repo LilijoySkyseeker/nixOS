@@ -24,8 +24,17 @@ US regions to homelab + you), bring the droplet up, and install with
 
 ```
 nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
-  --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix
+  --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix \
+  --kexec-extra-flags -c
 ```
+
+`--kexec-extra-flags -c` forces the legacy `KEXEC_LOAD` syscall
+instead of the default auto-selected `KEXEC_FILE_LOAD`. On DigitalOcean
+(observed on a 512MB SFO droplet) the newer syscall fails with
+`kexec_file_load failed: Address not available` — a known issue
+(nixos-anywhere#651) tied to secure-boot/signed-kernel verification
+support the DO kernel doesn't offer cleanly. `-c` sidesteps it
+entirely.
 
 `--generate-hardware-config` has `nixos-anywhere` run
 `nixos-generate-config` on the target during install and write the

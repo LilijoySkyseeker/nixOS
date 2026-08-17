@@ -19,7 +19,8 @@ each piece.
       config (see `hosts/vps/README.md` and `AGENTS.md` for why):
       ```
       nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
-        --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix
+        --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix \
+        --kexec-extra-flags -c
       ```
 
 ## 2. sops
