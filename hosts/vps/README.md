@@ -26,6 +26,15 @@ prior research), bring it up in rescue mode, and install with
 nixos-anywhere --flake .#vps root@<vps-ip>
 ```
 
+Build on the local machine, not the remote, whenever possible — leave
+`--build-on-remote` unset. Small/cheap VPS instances tend to be
+memory- and disk-constrained, and building the closure remotely risks
+the instance hanging or OOMing mid-install (observed during initial
+setup: the target went unreachable during a remote closure-copy/GC
+pass and needed a manual reboot from the provider console to recover).
+Building locally and pushing the finished closure over is more
+reliable.
+
 Confirm the disk device in `disko.nix` matches the provider's actual
 block device (`/dev/vda` is the common default for KVM/virtio, but
 check with `lsblk` from rescue mode first) and that `externalInterface`

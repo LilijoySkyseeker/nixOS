@@ -47,6 +47,11 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
   change (e.g. compare against `git stash` / previous commit).
 - Don't build or switch a live host's configuration remotely — that's
   the user's call, not something to run unprompted.
+- When installing with `nixos-anywhere`, build on the local machine
+  rather than the remote target whenever possible (leave
+  `--build-on-remote` unset). Remote targets, especially small/cheap
+  VPS instances, can be memory- or disk-constrained enough that
+  building the closure there risks hanging or OOMing mid-install.
 
 ## Commit conventions
 
