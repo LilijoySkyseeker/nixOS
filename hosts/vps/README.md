@@ -31,7 +31,10 @@ nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
 `nixos-generate-config` on the target during install and write the
 result to the given path on the local machine — use this for every
 new install so `hardware-configuration.nix` reflects the real
-instance instead of a stale/scaffolded one.
+instance instead of a stale/scaffolded one. Point the path at
+whichever checkout/worktree you're currently working from (not
+necessarily `/home/lilijoy/dotfiles`), so the file lands where you'll
+actually commit it.
 
 Build on the local machine, not the remote, whenever possible — leave
 `--build-on-remote` unset. Small/cheap VPS instances tend to be

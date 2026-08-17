@@ -59,7 +59,9 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
   `--generate-hardware-config nixos-generate-config <path>` (e.g.
   `hosts/<host>/hardware-configuration.nix`) so the real target's
   hardware config is captured instead of relying on a
-  stale/scaffolded one.
+  stale/scaffolded one. Point `<path>` at the checkout/worktree
+  currently being worked on — not necessarily the main checkout — so
+  the generated file lands where it'll actually get committed from.
 
 ## Commit conventions
 
