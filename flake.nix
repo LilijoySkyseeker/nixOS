@@ -47,8 +47,7 @@
         username = "lilijoy";
         # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
         # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
-        # TODO: replace with the real domain once one is registered
-        domain = "example.com.";
+        domain = "skyseekerlabs.net.";
       };
       pkgs-unstable = import inputs.nixpkgs-unstable {
         system = "x86_64-linux";
