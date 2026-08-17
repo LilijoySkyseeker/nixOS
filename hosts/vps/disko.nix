@@ -2,7 +2,7 @@
 # redundancy to leverage gets nothing from ZFS beyond overhead. Root is
 # tmpfs (wiped every boot); /nix and /persist are the only durable
 # partitions. Adjust the device path to match the provider's virtual
-# disk (Vultr/most KVM providers expose /dev/vda).
+# disk (DigitalOcean/most KVM providers expose /dev/vda).
 #
 # No disk-backed swap partition — see zramSwap in configuration.nix.
 # sops decrypts several live secrets (WireGuard key, CrowdSec bouncer

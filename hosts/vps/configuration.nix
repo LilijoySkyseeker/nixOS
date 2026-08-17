@@ -5,7 +5,10 @@
   ...
 }:
 let
-  externalInterface = "enp1s0";
+  # TODO: confirm against `ip a` once the DigitalOcean droplet exists —
+  # was "enp1s0" on the prior Vultr instance; DigitalOcean's predictable
+  # interface naming may differ (often "eth0" on their images).
+  externalInterface = "eth0";
 in
 {
   imports = [

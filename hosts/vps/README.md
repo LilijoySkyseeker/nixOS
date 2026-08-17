@@ -18,10 +18,10 @@ deploys:
 
 ## 1. Provision the instance
 
-Pick a provider/region (Vultr LA or Silicon Valley recommended — see
-prior research). `nixos-anywhere` (build closure locally, push it over
-SSH into the provider's rescue-mode kexec environment) proved
-unreliable against small/cheap VPS instances — the target went
+Pick a provider/region (DigitalOcean SFO or NYC recommended — closest
+US regions to homelab + you). `nixos-anywhere` (build closure locally,
+push it over SSH into the provider's rescue-mode kexec environment)
+proved unreliable against small/cheap VPS instances — the target went
 unreachable mid-install more than once and needed a manual reboot from
 the provider console to recover. Instead, install from a custom boot
 ISO:
@@ -34,8 +34,9 @@ ISO:
    installer for this repo (SSH server with your keys baked in via
    `vars.publicSshKeys`, plus `disko`/`git`/`parted`/`neovim`) — not
    vps-specific, reusable for any bare-metal/cloud host in this flake.
-2. Upload that `.iso` as a Custom ISO in the Vultr dashboard, attach it
-   to the instance, and boot from it instead of the stock OS image.
+2. Upload that `.iso` as a Custom Image in the DigitalOcean dashboard
+   (Images → Custom Images), attach it to the droplet's boot config,
+   and boot from it instead of the stock OS image.
 3. Once booted, SSH in as root (your key is already authorized) and
    confirm the real disk device and public interface name:
    ```
@@ -43,9 +44,9 @@ ISO:
    ip a
    ```
    Update `disko.nix`'s disk device if it's not `/dev/vda`, and
-   `configuration.nix`'s `externalInterface` if it's not `enp1s0`
-   (matches the last real instance we saw — not guaranteed to be the
-   same on a fresh one).
+   `configuration.nix`'s `externalInterface` if it's not `eth0`
+   (DigitalOcean's typical name — not guaranteed, confirm against the
+   real droplet).
 4. From the booted ISO, clone the repo, regenerate the real hardware
    config, and install:
    ```
@@ -63,10 +64,11 @@ ISO:
    `hardware-configuration.nix` back into your real checkout afterward
    — it's the only file this whole process produces that needs to be
    committed.
-5. Reboot into the installed system, drop the ISO attachment in the
-   Vultr dashboard, and confirm it comes up on the real disk (`lsblk`
-   should show the `esp`/`nix`/`persist` layout from `disko.nix`, not
-   the original stock partitioning).
+5. Reboot into the installed system, detach the custom ISO from the
+   droplet's boot config in the DigitalOcean dashboard, and confirm it
+   comes up on the real disk (`lsblk` should show the `esp`/`nix`/
+   `persist` layout from `disko.nix`, not the original stock
+   partitioning).
 
 ## 2. Enroll the host's sops age key + tailscale
 

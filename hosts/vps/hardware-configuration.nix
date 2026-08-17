@@ -1,4 +1,4 @@
-# Generic KVM/virtio cloud VM hardware profile (e.g. Vultr).
+# Generic KVM/virtio cloud VM hardware profile (e.g. DigitalOcean).
 # Replace with the real output of `nixos-generate-config --no-filesystems`
 # once the instance exists, if anything here doesn't match.
 {
