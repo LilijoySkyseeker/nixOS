@@ -4,6 +4,7 @@ pkgs-unstable.mkShell {
     # core (needed even off-NixOS, e.g. macOS/other-distro w/ Nix installed)
     git
     nixos-rebuild # `nixos-rebuild build/switch --flake .#<host>` from anywhere
+    nixos-anywhere # remote installs, e.g. `nixos-anywhere --flake .#vps root@<ip>`
 
     # editing/linting the flake itself
     nixd # nix LSP

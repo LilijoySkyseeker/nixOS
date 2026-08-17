@@ -8,24 +8,19 @@ each piece.
 
 - [ ] Pick provider/region — DigitalOcean, SFO or NYC (closest US
       regions to homelab + you)
-- [ ] Build the installer ISO locally:
-      `nix build .#nixosConfigurations.isoimage.config.system.build.isoImage`
-- [ ] Upload `result/iso/*.iso` as a Custom Image in the DigitalOcean
-      dashboard, attach it to the droplet's boot config, boot from it
-- [ ] SSH in, confirm from there:
+- [ ] Create the droplet, confirm from it (SSH in, before running
+      nixos-anywhere):
   - [ ] real disk device (`lsblk`) — update `hosts/vps/disko.nix` if
         it's not `/dev/vda`
   - [ ] real public interface name (`ip a`) — update
         `networking.nat.externalInterface` in
         `hosts/vps/configuration.nix` if it's not `eth0`
-- [ ] `git clone` the repo onto the booted ISO, run disko, regenerate
-      `hardware-configuration.nix` (`--no-filesystems --root /mnt`),
-      `nixos-install --flake .#vps --no-root-passwd` — see
-      `hosts/vps/README.md` §1 for the exact commands
-- [ ] Reboot, detach the custom ISO from the droplet's boot config,
-      confirm it comes up on the real (disko) disk layout
-- [ ] Copy the freshly generated `hardware-configuration.nix` back
-      into the real checkout and commit it
+- [ ] Install, building locally and generating the real hardware
+      config (see `hosts/vps/README.md` and `AGENTS.md` for why):
+      ```
+      nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
+        --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix
+      ```
 
 ## 2. sops
 
