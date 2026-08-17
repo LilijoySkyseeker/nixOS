@@ -82,7 +82,7 @@
   ];
 
   sops.secrets = {
-    # the whole rclone ini stanza ([backblazeDaily]/type/account/key) as one
+    # the whole rclone ini stanza ([backblazeWeekly]/type/account/key) as one
     # multiline secret, so it can be handed to rcloneConfigFile directly —
     # no prefetcher service needed to assemble it from separate fields.
     homelab_backblaze_rclone_config = { };
@@ -95,11 +95,11 @@
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
-    backblazeDaily = {
+    backblazeWeekly = {
       initialize = true;
-      createWrapper = true; # usable with restic-backblazeDaily
+      createWrapper = true; # usable with restic-backblazeWeekly
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
+      repository = "rclone:backblazeWeekly:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
@@ -126,7 +126,7 @@
       user = "root";
       paths = [ "/tmp/restic" ];
       timerConfig = {
-        OnCalendar = "Wed 04:00:00";
+        OnCalendar = "Fri 03:00:00";
         Persistent = true;
       };
       pruneOpts = [
@@ -140,7 +140,7 @@
       ];
     };
   };
-  systemd.services.restic-backups-backblazeDaily = {
+  systemd.services.restic-backups-backblazeWeekly = {
     path = with pkgs-stable; [
       # necessary for pre and post scripts
       zfs
@@ -174,10 +174,10 @@
       # snapshot was 2026-06-23). Bumped to 1w — still bounded by the
       # weekly timer, but long enough for a run to actually finish.
       TimeoutStartSec = "1w";
-      StateDirectory = "restic-backups-backblazeDaily";
+      StateDirectory = "restic-backups-backblazeWeekly";
       # only reached on success (ExecStartPost doesn't run after a failed
       # ExecStart), so its mtime is proof a backup actually completed.
-      ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeDaily/last-success";
+      ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
     };
   };
 
@@ -299,10 +299,12 @@
       "zbackup/backup-bulk/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
     };
-    # offsite restic backup runs weekly (Wed 04:00); 192h = 8 days gives
-    # one day of slack before alerting on a missed/stuck run.
+    # offsite restic backup runs weekly (Fri 03:00) and can now take up to
+    # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give
+    # zero slack; 336h = 14 days gives a full week of slack past a
+    # worst-case 1-week run before alerting on a missed/stuck run.
     staleMarkerFiles = {
-      "/var/lib/restic-backups-backblazeDaily/last-success" = 192;
+      "/var/lib/restic-backups-backblazeWeekly/last-success" = 336;
     };
   };
 
@@ -415,7 +417,7 @@
       "/var/lib/health-alerts" # alert dedup stamps
       "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
       "/var/lib/sanoid" # snapshot state cache
-      "/var/lib/restic-backups-backblazeDaily" # last-success marker for staleness alerting
+      "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
     ];
     files = [
       "/etc/machine-id"
