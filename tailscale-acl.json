@@ -21,6 +21,7 @@
         "tag:torrent":  ["autogroup:admin"],
         "tag:homelab":  ["autogroup:admin"],
         "tag:isoimage": ["autogroup:admin"],
+        "tag:vps":      ["autogroup:admin"],
     },
 
     "autoApprovers": {
@@ -35,6 +36,14 @@
         {
             "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
             "dst": ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "ip":  ["*"],
+        },
+        // vps only needs to be reachable by you for admin SSH — not by
+        // other tailnet devices, and it doesn't need outbound access to
+        // anything beyond what the internet grant below already covers
+        {
+            "src": ["autogroup:member"],
+            "dst": ["tag:vps"],
             "ip":  ["*"],
         },
         // let members and tagged devices use homelab as an exit node
@@ -55,7 +64,7 @@
         {
             "action": "check",
             "src":    ["autogroup:member"],
-            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage", "tag:vps"],
             "users":  ["autogroup:nonroot", "root"],
         },
     ],
