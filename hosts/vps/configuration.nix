@@ -5,8 +5,7 @@
   ...
 }:
 let
-  # TODO: confirm against the provider's actual public interface name (`ip a` from rescue mode)
-  externalInterface = "eth0";
+  externalInterface = "enp1s0";
 in
 {
   imports = [
