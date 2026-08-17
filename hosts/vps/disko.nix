@@ -29,7 +29,7 @@
               };
             };
             nix = {
-              size = "12G";
+              size = "18G";
               content = {
                 type = "filesystem";
                 format = "ext4";
