@@ -3,6 +3,7 @@
   pkgs-unstable,
   config,
   lib,
+  options,
   ...
 }:
 {
@@ -92,6 +93,9 @@
   programs.fzf = {
     enable = true;
     enableFishIntegration = true;
+  }
+  # not declared on the home-manager release tracking nixpkgs-stable
+  // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "enableNushellIntegration" ] options) {
     enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
   };
 
