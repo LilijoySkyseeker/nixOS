@@ -55,6 +55,11 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
 - Same for `nixos-rebuild --target-host <host>`: prefer building
   locally and pushing the closure (leave `--build-host` unset/local)
   rather than `--build-host <host>`, for the same reason.
+- On a fresh `nixos-anywhere` install, pass
+  `--generate-hardware-config nixos-generate-config <path>` (e.g.
+  `hosts/<host>/hardware-configuration.nix`) so the real target's
+  hardware config is captured instead of relying on a
+  stale/scaffolded one.
 
 ## Commit conventions
 
