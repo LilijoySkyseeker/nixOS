@@ -52,6 +52,9 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
   `--build-on-remote` unset). Remote targets, especially small/cheap
   VPS instances, can be memory- or disk-constrained enough that
   building the closure there risks hanging or OOMing mid-install.
+- Same for `nixos-rebuild --target-host <host>`: prefer building
+  locally and pushing the closure (leave `--build-host` unset/local)
+  rather than `--build-host <host>`, for the same reason.
 
 ## Commit conventions
 
