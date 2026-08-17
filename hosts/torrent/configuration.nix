@@ -26,14 +26,13 @@
     operation = "boot";
   };
 
-  # rebuild the recovery iso and sync it to the Ventoy drive every time
-  # pull-deploy successfully updates this host
+  # rebuild the recovery iso into ~/Downloads every time pull-deploy
+  # successfully updates this host, for manual copying onto Ventoy
   myIsoAutobuild = {
     enable = true;
     flakeDir = "/home/lilijoy/dotfiles";
     buildUser = "lilijoy";
     isoAttr = "isoimage";
-    ventoyLabel = "Ventoy";
     triggeredBy = [ "pull-deploy.service" ];
   };
 
