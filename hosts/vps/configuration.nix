@@ -41,19 +41,8 @@ in
     operation = "switch";
   };
 
-  # DigitalOcean droplets don't support UEFI boot at all (confirmed via
-  # DO's own docs/community forum) — systemd-boot never gets invoked and
-  # the droplet hangs unbootable with no console output. GRUB in legacy
-  # BIOS mode (GPT + a BIOS boot partition, see disko.nix) is required.
-  boot.loader.systemd-boot.enable = lib.mkForce false;
-  boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
-  # devices intentionally omitted — disko auto-populates
-  # boot.loader.grub.devices from the EF02 partition it finds in
-  # disko.nix; setting it here too duplicates the entry.
-  boot.loader.grub = {
-    enable = true;
-    efiSupport = false;
-  };
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
   # zram instead of a disk-backed swap partition — see disko.nix for why
   # (decrypted secrets in /run shouldn't be able to page out to disk).

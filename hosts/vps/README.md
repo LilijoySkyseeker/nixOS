@@ -63,21 +63,6 @@ check with `lsblk` first) and that `externalInterface` in
 `configuration.nix` matches the real public interface name (`ip a` —
 often `eth0` on DigitalOcean, but not guaranteed).
 
-**DigitalOcean droplets don't support UEFI boot at all** (confirmed
-via DO's own docs/community forum — this isn't a per-image opt-in,
-it's a platform limitation). An install with `boot.loader.systemd-boot`
-(the default in `profiles/default.nix`) silently produces an
-unbootable disk — the droplet hangs after `nixos-anywhere` reboots it,
-unreachable even via the DigitalOcean web console or recovery mode,
-because UEFI firmware never invokes systemd-boot in the first place.
-`hosts/vps/configuration.nix` overrides to `boot.loader.grub` in
-legacy BIOS mode instead, and `disko.nix` has a small unformatted
-`EF02` partition for GRUB's `core.img` plus a real ext4 `/boot`
-partition (disko auto-populates `boot.loader.grub.devices` from the
-`EF02` partition — don't also set `devices`/`device` in
-`configuration.nix`, that duplicates the entry and fails the
-`mirroredBoots` assertion).
-
 ## 2. Enroll the host's sops age key + tailscale
 
 After first boot:
