@@ -168,7 +168,12 @@
       # (RuntimeMaxSec has no effect on Type=oneshot — there's no separate
       # "running" phase to bound, the ExecStart sequence *is* the start
       # phase — so TimeoutStartSec is the one that actually applies here.)
-      TimeoutStartSec = "6h";
+      # 6h was too short for the actual backlog (~2.9TiB): every weekly run
+      # got killed mid-upload before committing a snapshot, so no progress
+      # ever landed and it kept restarting from scratch (last successful
+      # snapshot was 2026-06-23). Bumped to 1w — still bounded by the
+      # weekly timer, but long enough for a run to actually finish.
+      TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeDaily";
       # only reached on success (ExecStartPost doesn't run after a failed
       # ExecStart), so its mtime is proof a backup actually completed.
