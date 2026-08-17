@@ -19,37 +19,54 @@ deploys:
 ## 1. Provision the instance
 
 Pick a provider/region (Vultr LA or Silicon Valley recommended — see
-prior research), bring it up in rescue mode, and install with
-`nixos-anywhere`:
+prior research). `nixos-anywhere` (build closure locally, push it over
+SSH into the provider's rescue-mode kexec environment) proved
+unreliable against small/cheap VPS instances — the target went
+unreachable mid-install more than once and needed a manual reboot from
+the provider console to recover. Instead, install from a custom boot
+ISO:
 
-```
-nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
-  --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix
-```
-
-`--generate-hardware-config` has `nixos-anywhere` run
-`nixos-generate-config` on the target during install and write the
-result to the given path on the local machine — use this for every
-new install so `hardware-configuration.nix` reflects the real
-instance instead of a stale/scaffolded one. Point the path at
-whichever checkout/worktree you're currently working from (not
-necessarily `/home/lilijoy/dotfiles`), so the file lands where you'll
-actually commit it.
-
-Build on the local machine, not the remote, whenever possible — leave
-`--build-on-remote` unset. Small/cheap VPS instances tend to be
-memory- and disk-constrained, and building the closure remotely risks
-the instance hanging or OOMing mid-install (observed during initial
-setup: the target went unreachable during a remote closure-copy/GC
-pass and needed a manual reboot from the provider console to recover).
-Building locally and pushing the finished closure over is more
-reliable.
-
-Confirm the disk device in `disko.nix` matches the provider's actual
-block device (`/dev/vda` is the common default for KVM/virtio, but
-check with `lsblk` from rescue mode first) and that `externalInterface`
-in `configuration.nix` matches the real public interface name
-(`ip a` from rescue mode — often `eth0`, but not guaranteed).
+1. Build the repo's installer ISO locally:
+   ```
+   nix build .#nixosConfigurations.isoimage.config.system.build.isoImage
+   ```
+   The result symlinks into `./result/iso/*.iso`. It's a generic
+   installer for this repo (SSH server with your keys baked in via
+   `vars.publicSshKeys`, plus `disko`/`git`/`parted`/`neovim`) — not
+   vps-specific, reusable for any bare-metal/cloud host in this flake.
+2. Upload that `.iso` as a Custom ISO in the Vultr dashboard, attach it
+   to the instance, and boot from it instead of the stock OS image.
+3. Once booted, SSH in as root (your key is already authorized) and
+   confirm the real disk device and public interface name:
+   ```
+   lsblk
+   ip a
+   ```
+   Update `disko.nix`'s disk device if it's not `/dev/vda`, and
+   `configuration.nix`'s `externalInterface` if it's not `enp1s0`
+   (matches the last real instance we saw — not guaranteed to be the
+   same on a fresh one).
+4. From the booted ISO, clone the repo, regenerate the real hardware
+   config, and install:
+   ```
+   git clone <this-repo-url> /tmp/dotfiles && cd /tmp/dotfiles
+   nix run github:nix-community/disko -- --mode disko ./hosts/vps/disko.nix
+   nixos-generate-config --no-filesystems --root /mnt \
+     --dir /tmp/dotfiles/hosts/vps
+   nixos-install --flake .#vps --no-root-passwd
+   ```
+   `--no-filesystems` matters — disko already declares filesystems in
+   `disko.nix`; letting `nixos-generate-config` also write them into
+   `hardware-configuration.nix` would conflict. (If any of the
+   disk/interface facts above changed, edit them in `/tmp/dotfiles`
+   before running `disko`/`nixos-install`.) Copy the resulting
+   `hardware-configuration.nix` back into your real checkout afterward
+   — it's the only file this whole process produces that needs to be
+   committed.
+5. Reboot into the installed system, drop the ISO attachment in the
+   Vultr dashboard, and confirm it comes up on the real disk (`lsblk`
+   should show the `esp`/`nix`/`persist` layout from `disko.nix`, not
+   the original stock partitioning).
 
 ## 2. Enroll the host's sops age key + tailscale
 
@@ -107,10 +124,8 @@ just confirm the ports match `services/minecraft.nix` /
 
 ## Known gaps in this scaffold
 
-- `hardware-configuration.nix` is a generic virtio stub — replace with
-  the real `nixos-generate-config` output if the provider's virtualization
-  differs.
-- No domains/DNS wired up yet (placeholder in `configuration.nix`).
+- `hardware-configuration.nix` is a generic virtio stub until step 1.4
+  above replaces it with the real `nixos-generate-config` output.
 - CrowdSec is enabled with a few community collections
   (`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)
   but nothing beyond that has been tuned — worth reviewing its default

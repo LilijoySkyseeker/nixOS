@@ -47,21 +47,15 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
   change (e.g. compare against `git stash` / previous commit).
 - Don't build or switch a live host's configuration remotely — that's
   the user's call, not something to run unprompted.
-- When installing with `nixos-anywhere`, build on the local machine
-  rather than the remote target whenever possible (leave
-  `--build-on-remote` unset). Remote targets, especially small/cheap
-  VPS instances, can be memory- or disk-constrained enough that
-  building the closure there risks hanging or OOMing mid-install.
 - Same for `nixos-rebuild --target-host <host>`: prefer building
   locally and pushing the closure (leave `--build-host` unset/local)
   rather than `--build-host <host>`, for the same reason.
-- On a fresh `nixos-anywhere` install, pass
-  `--generate-hardware-config nixos-generate-config <path>` (e.g.
-  `hosts/<host>/hardware-configuration.nix`) so the real target's
-  hardware config is captured instead of relying on a
-  stale/scaffolded one. Point `<path>` at the checkout/worktree
-  currently being worked on — not necessarily the main checkout — so
-  the generated file lands where it'll actually get committed from.
+- Fresh remote/cloud installs use the repo's own installer ISO
+  (`hosts/isoimage`), not `nixos-anywhere` — see `hosts/vps/README.md`
+  for the boot-the-ISO-and-install-manually procedure. Building the
+  target's closure over an SSH connection into a small/cheap VPS
+  proved unreliable (hangs/disconnects mid-install); installing from a
+  local shell on the booted target sidesteps that entirely.
 
 ## Commit conventions
 

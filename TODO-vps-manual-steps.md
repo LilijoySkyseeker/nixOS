@@ -9,13 +9,24 @@ each piece.
 - [ ] Pick provider/region — Vultr, Los Angeles or Silicon Valley
       (lowest latency to homelab + you, only provider researched with
       an actual US West Coast region)
-- [ ] Boot it into rescue mode, confirm from there:
+- [ ] Build the installer ISO locally:
+      `nix build .#nixosConfigurations.isoimage.config.system.build.isoImage`
+- [ ] Upload `result/iso/*.iso` as a Custom ISO in the Vultr dashboard,
+      attach it, boot from it
+- [ ] SSH in, confirm from there:
   - [ ] real disk device (`lsblk`) — update `hosts/vps/disko.nix` if
         it's not `/dev/vda`
   - [ ] real public interface name (`ip a`) — update
         `networking.nat.externalInterface` in
-        `hosts/vps/configuration.nix` if it's not `eth0`
-- [ ] Install: `nixos-anywhere --flake .#vps root@<vps-ip>`
+        `hosts/vps/configuration.nix` if it's not `enp1s0`
+- [ ] `git clone` the repo onto the booted ISO, run disko, regenerate
+      `hardware-configuration.nix` (`--no-filesystems --root /mnt`),
+      `nixos-install --flake .#vps --no-root-passwd` — see
+      `hosts/vps/README.md` §1 for the exact commands
+- [ ] Reboot, drop the ISO attachment, confirm it comes up on the real
+      (disko) disk layout
+- [ ] Copy the freshly generated `hardware-configuration.nix` back
+      into the real checkout and commit it
 
 ## 2. sops
 
