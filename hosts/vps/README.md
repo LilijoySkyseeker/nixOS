@@ -29,13 +29,20 @@ unreachable except via the cloud provider's web console.
 Fix: generate the vps's SSH host key *locally*, ahead of the install,
 somewhere entirely outside this repo checkout (never inside it, not
 even gitignored — a plain path under `/tmp` or your home directory is
-fine, e.g. `~/vps-extra-files`):
+fine, e.g. `~/vps-extra-files`). This host uses impermanence
+(`environment.persistence."/persist"` in `configuration.nix` persists
+`/etc/ssh/ssh_host_ed25519_key`), so the key must land under
+`persist/etc/ssh/`, not `etc/ssh/` — `--extra-files` writes relative
+to the target's real root, and placing it directly at `etc/ssh/`
+races the persist-files activation script (it finds a file already
+sitting at the live path, refuses to bind-mount over it, and the key
+silently doesn't survive the next reboot):
 
 ```
-mkdir -p ~/vps-extra-files/etc/ssh
-ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
-chmod 600 ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
-nix run nixpkgs#ssh-to-age < ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key.pub
+mkdir -p ~/vps-extra-files/persist/etc/ssh
+ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
+chmod 600 ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
+nix run nixpkgs#ssh-to-age < ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key.pub
 ```
 
 Add the resulting `age1...` key to `.sops.yaml`'s `creation_rules`

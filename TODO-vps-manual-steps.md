@@ -14,10 +14,10 @@ it locally first, entirely outside this repo checkout (e.g.
 `~/vps-extra-files`, never inside the worktree):
 
 - [ ] ```
-      mkdir -p ~/vps-extra-files/etc/ssh
-      ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
-      chmod 600 ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
-      nix run nixpkgs#ssh-to-age < ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key.pub
+      mkdir -p ~/vps-extra-files/persist/etc/ssh
+      ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
+      chmod 600 ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
+      nix run nixpkgs#ssh-to-age < ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key.pub
       ```
 - [ ] Add that `age1...` key to `.sops.yaml`'s `creation_rules`
       (alongside `homelab3`/`torrent-age`)
