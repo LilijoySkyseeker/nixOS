@@ -165,7 +165,10 @@
       # unit "running" (and thus blocking every future weekly trigger) for
       # 7+ weeks with no successful backup. Force a hard failure instead,
       # so the timer can retry and the failed-units health check fires.
-      RuntimeMaxSec = "6h";
+      # (RuntimeMaxSec has no effect on Type=oneshot — there's no separate
+      # "running" phase to bound, the ExecStart sequence *is* the start
+      # phase — so TimeoutStartSec is the one that actually applies here.)
+      TimeoutStartSec = "6h";
       StateDirectory = "restic-backups-backblazeDaily";
       # only reached on success (ExecStartPost doesn't run after a failed
       # ExecStart), so its mtime is proof a backup actually completed.
