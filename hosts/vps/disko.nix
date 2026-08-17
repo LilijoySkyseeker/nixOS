@@ -19,12 +19,21 @@
         content = {
           type = "gpt";
           partitions = {
-            esp = {
+            # DigitalOcean droplets are BIOS-only, no UEFI support at all
+            # (confirmed via DO docs/community forum) — GRUB in legacy
+            # mode needs this small unformatted partition to embed its
+            # core.img into on a GPT disk (blocklist-embedding straight
+            # into the disk is unreliable/discouraged). No mountpoint;
+            # GRUB writes to it directly.
+            grub = {
+              size = "1M";
+              type = "EF02";
+            };
+            boot = {
               size = "512M";
-              type = "EF00";
               content = {
                 type = "filesystem";
-                format = "vfat";
+                format = "ext4";
                 mountpoint = "/boot";
               };
             };
