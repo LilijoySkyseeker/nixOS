@@ -82,6 +82,20 @@
     "flakes"
   ];
 
+  # "minimal" -> "recovery": overrides installation-cd-minimal.nix's
+  # isoImage.edition. The rest of the filename (nixos version + build
+  # date + revision) is already dynamic via system.nixos.label, e.g.
+  # nixos-recovery-26.11.20260813.<rev>-x86_64-linux.iso.
+  isoImage.edition = "recovery";
+
+  # recovery convenience: auto-login as root, no password, on the
+  # local tty this boots to. Root already has an empty password by
+  # default on nixos installer media (installation-device.nix); this
+  # only swaps *which* account autologins from "nixos" to "root" so a
+  # local user has full access immediately. SSH stays locked to
+  # pubkey-only regardless (see services.openssh below).
+  services.getty.autologinUser = lib.mkForce "root";
+
   # drivers
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
   boot.kernelModules = [ "r8125" ];
