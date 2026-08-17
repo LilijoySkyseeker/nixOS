@@ -5,17 +5,18 @@
   # so NFSv4 is sufficient — no Samba/SMB needed.
   services.nfs.server = {
     enable = true;
-    # NFSv4-only: single port (2049), no rpcbind/mountd/statd/lockd
-    # negotiation needed on the wire, which keeps the firewall surface to
-    # one port below.
-    extraNfsdConfig = ''
-      vers3=n
-      vers4=y
-    '';
     exports = ''
       /storage 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
       /storage-bulk 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
     '';
+  };
+
+  # NFSv4-only: single port (2049), no rpcbind/mountd/statd/lockd
+  # negotiation needed on the wire, which keeps the firewall surface to
+  # one port below.
+  services.nfs.settings.nfsd = {
+    vers3 = false;
+    vers4 = true;
   };
 
   # restrict to the tailnet interface only — never exposed on the LAN NIC,
