@@ -7,7 +7,8 @@ each piece.
 ## 1. Provision the instance
 
 - [ ] Pick provider/region — DigitalOcean, SFO or NYC (closest US
-      regions to homelab + you)
+      regions to homelab + you), at least the 1GB RAM / 25GB disk plan
+      (the 512MB/10GB plan is too small — closure is ~8.4GiB)
 - [ ] Create the droplet, confirm from it (SSH in, before running
       nixos-anywhere):
   - [ ] real disk device (`lsblk`) — update `hosts/vps/disko.nix` if

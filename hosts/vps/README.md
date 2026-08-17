@@ -19,8 +19,11 @@ deploys:
 ## 1. Provision the instance
 
 Pick a provider/region (DigitalOcean SFO or NYC recommended — closest
-US regions to homelab + you), bring the droplet up, and install with
-`nixos-anywhere`:
+US regions to homelab + you). Use at least the 1GB RAM / 25GB disk
+plan — the vps closure (caddy, crowdsec, tailscale, docker for
+minecraft/factorio) is ~8.4GiB, which doesn't fit on the cheapest
+512MB/10GB droplet (`disko.nix`'s `/nix` partition is sized for a
+25GB disk). Bring the droplet up and install with `nixos-anywhere`:
 
 ```
 nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
