@@ -6,7 +6,6 @@
 }:
 let
   cfg = config.myIsoAutobuild;
-  destName = "recovery.iso";
   stateDir = "/var/lib/iso-autobuild";
   resultLink = "${stateDir}/result";
   downloadsDir = "/home/${cfg.buildUser}/Downloads";
@@ -22,11 +21,16 @@ let
       exit 0
     fi
 
-    tmp="${downloadsDir}/${destName}.tmp"
+    name=$(basename "$src")
+    tmp="${downloadsDir}/$name.tmp"
     cp -L "$src" "$tmp"
-    mv -f "$tmp" "${downloadsDir}/${destName}"
+    mv -f "$tmp" "${downloadsDir}/$name"
 
-    echo "Copied $src to ${downloadsDir}/${destName}"
+    # Drop older builds so Downloads doesn't accumulate one gigabyte-plus
+    # iso per rebuild — every filename shares this prefix (isoImage.edition).
+    find "${downloadsDir}" -maxdepth 1 -name 'nixos-recovery-*.iso' -not -name "$name" -delete
+
+    echo "Copied $src to ${downloadsDir}/$name"
   '';
 in
 {
