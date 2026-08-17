@@ -1,6 +1,6 @@
 # Lilijoy's NixOS Machines
 
-See [GIT_WORKFLOW.md](./GIT_WORKFLOW.md) for git hooks/conventions used in
+See [GIT_WORKFLOW.md](./docs/GIT_WORKFLOW.md) for git hooks/conventions used in
 this repo (auto-configured by the flake's dev shell via direnv).
 
 ## Structure Guide
@@ -122,7 +122,7 @@ NixOS
 
 - [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
   [Impermanence](https://github.com/nix-community/impermanence)
-- [tailscale-acl.json](./tailscale-acl.json) is a reference copy of the
+- [tailscale-acl.json](./docs/tailscale-acl.json) is a reference copy of the
   tailnet ACL policy, which is actually managed in the Tailscale admin
   console (not applied by Nix) — keep it in sync manually when the console
   policy changes.

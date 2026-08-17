@@ -362,12 +362,12 @@
   # initiates, nothing needs to be reachable inbound at home.
   #
   # Disabled until the vps side is actually provisioned and the real
-  # keys/IP are filled in (see TODO-vps-manual-steps.md) — flip to
+  # keys/IP are filled in (see docs/TODO-vps-manual-steps.md) — flip to
   # `true` once that's done, rather than leaving broken placeholder
   # values live.
   sops.secrets.homelab_wireguard_private_key = lib.mkIf false { };
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
-  # TODO-vps-manual-steps.md.
+  # docs/TODO-vps-manual-steps.md.
   sops.secrets.wireguard_vps_homelab_psk = lib.mkIf false { };
   networking.wireguard.interfaces.wg0 = lib.mkIf false {
     ips = [ "10.100.0.2/24" ];

@@ -137,7 +137,7 @@ in
   # PSK is an extra symmetric secret required on top of the keypair
   # handshake — defense-in-depth against a future break of the
   # asymmetric crypto, standard WireGuard hardening advice. Same file
-  # content needed verbatim on both ends (see TODO-vps-manual-steps.md).
+  # content needed verbatim on both ends (see docs/TODO-vps-manual-steps.md).
   sops.secrets.wireguard_vps_homelab_psk = { };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];

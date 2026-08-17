@@ -22,10 +22,10 @@ pkgs-unstable.mkShell {
     shellcheck
     shfmt
 
-    # misc CLI needed by things documented in this repo (TODO-vps-manual-steps.md)
+    # misc CLI needed by things documented in this repo (docs/TODO-vps-manual-steps.md)
     wireguard-tools # wg genkey/pubkey/genpsk
     dig # DNS verification (octoDNS/Cloudflare records)
-    jq # tailscale-acl.json
+    jq # docs/tailscale-acl.json
     yq-go # secrets.yaml / other yaml
 
     gh
