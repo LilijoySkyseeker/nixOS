@@ -62,6 +62,14 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
   stale/scaffolded one. Point `<path>` at the checkout/worktree
   currently being worked on — not necessarily the main checkout — so
   the generated file lands where it'll actually get committed from.
+- If the host's SSH access depends on a secret (e.g. Tailscale) that
+  sops-nix decrypts at boot, pre-generate that host's SSH host key
+  locally before install and pass it via `--extra-files` so its age
+  key can be enrolled and secrets re-encrypted *before* first boot —
+  otherwise sops can't decrypt anything (including the secret needed
+  to reach the box at all) on a fresh install. See `hosts/vps/README.md`
+  step 1. Never generate or stage that key material inside a tracked
+  repo checkout, even gitignored — keep it entirely outside the repo.
 
 ## Commit conventions
 

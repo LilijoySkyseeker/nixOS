@@ -4,7 +4,33 @@ Temporary tracking doc — delete once the vps is live and this is all
 done. See `hosts/vps/README.md` for the fuller background/rationale on
 each piece.
 
-## 1. Provision the instance
+## 1. Pre-generate the host SSH key + sops (breaks a chicken-and-egg)
+
+Admin SSH only works over Tailscale, which only comes up once sops
+decrypts `tailscale_authkey_vps`, which only works if the vps's age
+key is already in `.sops.yaml` — but that key is normally derived
+from an SSH host key that doesn't exist until after install. Generate
+it locally first, entirely outside this repo checkout (e.g.
+`~/vps-extra-files`, never inside the worktree):
+
+- [ ] ```
+      mkdir -p ~/vps-extra-files/etc/ssh
+      ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
+      chmod 600 ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
+      nix run nixpkgs#ssh-to-age < ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key.pub
+      ```
+- [ ] Add that `age1...` key to `.sops.yaml`'s `creation_rules`
+      (alongside `homelab3`/`torrent-age`)
+- [ ] `sops updatekeys secrets/secrets.yaml` so the vps is a valid
+      recipient before it ever boots
+- [ ] Add `tailscale_authkey_vps` secret (same pattern as the other
+      hosts — a non-reusable pre-authorized key tagged `tag:vps`)
+- [ ] Add `tag:vps` to `tailscale-acl.json`'s `tagOwners` (and decide
+      whether it needs `grants`/`ssh` entries — it mainly just needs
+      to be reachable by you for admin SSH, not by other tailnet
+      devices)
+
+## 2. Provision the instance
 
 - [ ] Pick provider/region — DigitalOcean, SFO or NYC (closest US
       regions to homelab + you), at least the 1GB RAM / 25GB disk plan
@@ -16,26 +42,15 @@ each piece.
   - [ ] real public interface name (`ip a`) — update
         `networking.nat.externalInterface` in
         `hosts/vps/configuration.nix` if it's not `eth0`
-- [ ] Install, building locally and generating the real hardware
-      config (see `hosts/vps/README.md` and `AGENTS.md` for why):
+- [ ] Install, building locally, generating the real hardware config,
+      and pre-seeding the SSH host key from step 1 (see
+      `hosts/vps/README.md` and `AGENTS.md` for why):
       ```
       nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
         --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix \
-        --kexec-extra-flags -c
+        --kexec-extra-flags -c \
+        --extra-files ~/vps-extra-files
       ```
-
-## 2. sops
-
-- [ ] `ssh root@vps 'nix run nixpkgs#ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub'`
-- [ ] Add that `age1...` key to `.sops.yaml`'s `creation_rules`
-      (alongside `homelab3`/`torrent-age`)
-- [ ] Re-encrypt `secrets/secrets.yaml` for the new recipient
-- [ ] Add `tailscale_authkey_vps` secret (same pattern as the other
-      hosts — a non-reusable pre-authorized key tagged `tag:vps`)
-- [ ] Add `tag:vps` to `tailscale-acl.json`'s `tagOwners` (and decide
-      whether it needs `grants`/`ssh` entries — it mainly just needs
-      to be reachable by you for admin SSH, not by other tailnet
-      devices)
 
 ## 3. WireGuard keys
 

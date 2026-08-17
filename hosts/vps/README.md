@@ -16,19 +16,51 @@ to be public.
 This is a scaffold — several things still need real values before it
 deploys:
 
-## 1. Provision the instance
+## 1. Pre-generate the host's SSH key (breaks a chicken-and-egg)
+
+Admin SSH to the vps only ever works over Tailscale (see below), and
+Tailscale only comes up once sops has decrypted
+`tailscale_authkey_vps` — but sops can't decrypt anything for a host
+whose age key isn't already in `.sops.yaml`, and that age key is
+normally derived from an SSH host key that doesn't exist until the
+box has already been installed. Fresh installs would otherwise be
+unreachable except via the cloud provider's web console.
+
+Fix: generate the vps's SSH host key *locally*, ahead of the install,
+somewhere entirely outside this repo checkout (never inside it, not
+even gitignored — a plain path under `/tmp` or your home directory is
+fine, e.g. `~/vps-extra-files`):
+
+```
+mkdir -p ~/vps-extra-files/etc/ssh
+ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
+chmod 600 ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key
+nix run nixpkgs#ssh-to-age < ~/vps-extra-files/etc/ssh/ssh_host_ed25519_key.pub
+```
+
+Add the resulting `age1...` key to `.sops.yaml`'s `creation_rules`
+(see how `homelab3`/`torrent-age` are wired in), then run
+`sops updatekeys secrets/secrets.yaml` so the vps is a valid recipient
+*before* it ever boots. Also add the `tailscale_authkey_vps` secret
+now (same pattern as the other hosts — a non-reusable pre-authorized
+key tagged `tag:vps`), since it'll be readable from first boot.
+
+## 2. Provision the instance
 
 Pick a provider/region (DigitalOcean SFO or NYC recommended — closest
 US regions to homelab + you). Use at least the 1GB RAM / 25GB disk
 plan — the vps closure (caddy, crowdsec, tailscale, docker for
 minecraft/factorio) is ~8.4GiB, which doesn't fit on the cheapest
 512MB/10GB droplet (`disko.nix`'s `/nix` partition is sized for a
-25GB disk). Bring the droplet up and install with `nixos-anywhere`:
+25GB disk). Bring the droplet up and install with `nixos-anywhere`,
+passing the pre-generated host key via `--extra-files` so it lands in
+place before sshd/sops ever run:
 
 ```
 nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
   --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix \
-  --kexec-extra-flags -c
+  --kexec-extra-flags -c \
+  --extra-files ~/vps-extra-files
 ```
 
 `--kexec-extra-flags -c` forces the legacy `KEXEC_LOAD` syscall
@@ -62,22 +94,6 @@ block device (`/dev/vda` is the common default for KVM/virtio, but
 check with `lsblk` first) and that `externalInterface` in
 `configuration.nix` matches the real public interface name (`ip a` —
 often `eth0` on DigitalOcean, but not guaranteed).
-
-## 2. Enroll the host's sops age key + tailscale
-
-After first boot:
-
-```
-ssh root@vps 'nix run nixpkgs#ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub'
-```
-
-Add the resulting `age1...` key to `.sops.yaml`'s `creation_rules` (see
-how `homelab3`/`torrent-age` are wired in), then re-encrypt
-`secrets/secrets.yaml` so this host can decrypt its secrets. Also add a
-`tailscale_authkey_vps` secret (`services.tailscale` itself comes from
-`profiles/default.nix`, same as every other host) — SSH access depends
-on this box being on the tailnet, since port 22 is never opened
-publicly (`networking.firewall.trustedInterfaces = [ "tailscale0" ]`).
 
 ## 3. Generate and store the WireGuard keys
 
