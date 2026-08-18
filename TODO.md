@@ -11,6 +11,38 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-18: migrate torrent and thinkpad to impermanence.**
+      Agreed as a prerequisite for eventually shrinking their zfs-backup
+      scope (see the zfs-backups item below) — both hosts currently
+      keep `zroot/local/root` as durable state, impermanence would wipe
+      root on boot and move real state to an explicit persist dataset.
+      Needs its own disko layout changes + persist-path audit per host,
+      and should be VM-tested before real hardware per
+      `feedback_test_remote_deploys_in_vm`. Not started.
+
+- [ ] **2026-08-18: syncoid push backups, torrent + thinkpad → homelab
+      (zfs snapshot based, over Tailscale).** Architected 2026-08-18:
+      shared `myBackupPush` module (`modules/nixos/backup-push.nix`),
+      used identically by both hosts, pushing `zroot/local/home` +
+      `zroot/local/root` to a new dedicated `backup-recv` user on
+      homelab via `zfs allow`-scoped delegation into
+      `zbackup/backup/torrent/*` and `zbackup/backup/thinkpad/*` (the
+      `backup/thinkpad` disko dataset already existed as an unused
+      placeholder; `backup/torrent` is new). Uses syncoid
+      `--create-bookmark` so long offline periods (esp. the thinkpad
+      laptop) don't force a full resync once sanoid's short source-side
+      retention (hourly=24/daily=1) prunes past the last pushed
+      snapshot. Trigger: hourly systemd timer, `Persistent = true`,
+      gated by a Tailscale-reachability `ExecCondition` so an
+      asleep/offline laptop no-ops instead of alerting. Target-side
+      retention on `zbackup` reuses the existing `template_backup`
+      (hourly=168, daily=366) already governing `backup/thinkpad`/
+      `backup/legion`. **Follow-up once impermanence (above) lands**:
+      `zroot/local/root` will likely stop being the meaningful thing to
+      back up — update `myBackupPush.datasets` on both hosts to point
+      at whatever the new persist dataset ends up being called instead.
+      Not yet implemented in code.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [

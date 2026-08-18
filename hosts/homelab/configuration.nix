@@ -269,6 +269,40 @@
     };
   };
 
+  # receive side for torrent's + thinkpad's syncoid push backups (see
+  # TODO.md "syncoid push backups" and modules/nixos/backup-push.nix).
+  # Dedicated non-root user per feedback_dedicated_service_users; scoped
+  # via `zfs allow` to only the two subtrees it needs, not the whole
+  # zbackup pool, so a compromised source host key can't touch anything
+  # else on this pool.
+  users.users.backup-recv = {
+    isSystemUser = true;
+    group = "backup-recv";
+    shell = pkgs-stable.bash; # needed for syncoid's remote zfs commands over ssh
+    openssh.authorizedKeys.keys = [
+      # TODO: paste torrent_backup_push_key's *public* key here once generated
+      # TODO: paste thinkpad_backup_push_key's *public* key here once generated
+    ];
+  };
+  users.groups.backup-recv = { };
+
+  systemd.services.backup-recv-zfs-allow = {
+    description = "Delegate zfs receive permissions on backup/{torrent,thinkpad} to backup-recv";
+    after = [ "zfs-import-zbackup.service" ];
+    wantedBy = [ "multi-user.target" ];
+    # not gated in front of sshd: if this ever fails (e.g. zbackup import
+    # trouble), ssh access to homelab should still come up — a syncoid
+    # push just fails and gets caught by backupStaleness instead.
+    path = [ pkgs-stable.zfs ];
+    serviceConfig.Type = "oneshot";
+    serviceConfig.RemainAfterExit = true;
+    # zfs allow is idempotent — safe to re-run every activation/boot.
+    script = ''
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/torrent
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/thinkpad
+    '';
+  };
+
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
 
@@ -326,6 +360,17 @@
       "zbackup/backup/homelab/storage" = 6;
       "zbackup/backup-bulk/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
+      # torrent is an always-on server, same tight threshold as homelab's
+      # own datasets applies.
+      "zbackup/backup/torrent/home" = 6;
+      "zbackup/backup/torrent/root" = 6;
+      # thinkpad is a laptop that legitimately goes offline for long
+      # stretches (asleep/traveling) — syncoid's --create-bookmark means
+      # that's not a resync risk, so this threshold is only meant to catch
+      # a genuinely broken key/config, not normal laptop-off time. 336h =
+      # 2 weeks.
+      "zbackup/backup/thinkpad/home" = 336;
+      "zbackup/backup/thinkpad/root" = 336;
     };
     # offsite restic backup runs weekly (Fri 03:00) and can now take up to
     # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give

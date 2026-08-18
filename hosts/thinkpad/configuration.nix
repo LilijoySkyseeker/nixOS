@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   lib,
+  config,
   ...
 }:
 {
@@ -13,6 +14,7 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/backup-push.nix
   ];
 
   myPullDeploy = {
@@ -110,4 +112,17 @@
   networking.hostId = "5f763495";
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
+
+  # push home+root snapshots to homelab's zbackup pool over tailscale
+  # (see TODO.md "syncoid push backups" for the design)
+  sops.secrets.thinkpad_backup_push_key = { };
+  myBackupPush = {
+    enable = true;
+    targetHost = "backup-recv@homelab";
+    identityFile = config.sops.secrets.thinkpad_backup_push_key.path;
+    datasets = {
+      "zroot/local/home" = "zbackup/backup/thinkpad/home";
+      "zroot/local/root" = "zbackup/backup/thinkpad/root";
+    };
+  };
 }

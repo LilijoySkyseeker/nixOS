@@ -13,6 +13,7 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/backup-push.nix
     ../../modules/nixos/iso-autobuild.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
@@ -92,4 +93,17 @@
   };
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
+
+  # push home+root snapshots to homelab's zbackup pool over tailscale
+  # (see TODO.md "syncoid push backups" for the design)
+  sops.secrets.torrent_backup_push_key = { };
+  myBackupPush = {
+    enable = true;
+    targetHost = "backup-recv@homelab";
+    identityFile = config.sops.secrets.torrent_backup_push_key.path;
+    datasets = {
+      "zroot/local/home" = "zbackup/backup/torrent/home";
+      "zroot/local/root" = "zbackup/backup/torrent/root";
+    };
+  };
 }

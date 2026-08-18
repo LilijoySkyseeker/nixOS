@@ -167,6 +167,12 @@
               mountpoint = "/backup/thinkpad/bulk";
               options."com.sun:auto-snapshot" = "false";
             };
+            # torrent
+            "backup/torrent" = {
+              type = "zfs_fs";
+              mountpoint = "/backup/torrent";
+              options."com.sun:auto-snapshot" = "false";
+            };
             # legion
             "backup/legion" = {
               type = "zfs_fs";
