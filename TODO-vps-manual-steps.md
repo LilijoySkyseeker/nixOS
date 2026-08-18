@@ -52,25 +52,19 @@ it locally first, entirely outside this repo checkout (e.g.
         --extra-files ~/vps-extra-files
       ```
 
-## 3. WireGuard keys
+## 3. WireGuard keys — DONE
 
-- [ ] Generate both keypairs:
-  ```
-  wg genkey | tee vps-private.key | wg pubkey > vps-public.key
-  wg genkey | tee homelab-private.key | wg pubkey > homelab-public.key
-  ```
-- [ ] `vps-private.key` → sops secret `vps_wireguard_private_key`
-- [ ] `homelab-private.key` → sops secret `homelab_wireguard_private_key`
-- [ ] `homelab-public.key` → `hosts/vps/configuration.nix`, replacing
-      `REPLACE_WITH_HOMELAB_WIREGUARD_PUBLIC_KEY`
-- [ ] `vps-public.key` → `hosts/homelab/configuration.nix`, replacing
-      `REPLACE_WITH_VPS_WIREGUARD_PUBLIC_KEY`
-- [ ] the vps's actual public IP → `hosts/homelab/configuration.nix`,
-      replacing `REPLACE_WITH_VPS_PUBLIC_IP`
-- [ ] Generate a preshared key (`wg genpsk`) and put the *same* value
-      into sops as `wireguard_vps_homelab_psk` — used verbatim on both
-      hosts' peer config (defense-in-depth on top of the keypair
-      handshake), not host-prefixed since it must match exactly
+- [x] Both keypairs generated (`vps_wireguard_private_key`,
+      `homelab_wireguard_private_key`) and the PSK
+      (`wireguard_vps_homelab_psk`) are all set in sops
+- [x] `homelab-public.key` → `hosts/vps/configuration.nix`'s peer entry
+- [x] `vps-public.key` → `hosts/homelab/configuration.nix`'s peer entry
+- [x] vps's real public IP (IPv6:
+      `[2604:a880:4:1d0:0:3:5045:8000]:51820`) → homelab's peer
+      `endpoint`
+- [x] `nixos-rebuild build --flake .#vps` and `--flake .#homelab` both
+      succeed with the tunnel enabled (homelab's `lib.mkIf false`
+      wrappers on `wg0`/its secrets removed)
 
 ## 4. DNS + domain (octoDNS + Cloudflare, synced from homelab)
 

@@ -375,24 +375,19 @@
   # wireguard: dial out to the vps (hosts/vps) so it can act as a public
   # tunnel endpoint for us despite being behind CGNAT — homelab always
   # initiates, nothing needs to be reachable inbound at home.
-  #
-  # Disabled until the vps side is actually provisioned and the real
-  # keys/IP are filled in (see TODO-vps-manual-steps.md) — flip to
-  # `true` once that's done, rather than leaving broken placeholder
-  # values live.
-  sops.secrets.homelab_wireguard_private_key = lib.mkIf false { };
+  sops.secrets.homelab_wireguard_private_key = { };
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
   # TODO-vps-manual-steps.md.
-  sops.secrets.wireguard_vps_homelab_psk = lib.mkIf false { };
-  networking.wireguard.interfaces.wg0 = lib.mkIf false {
+  sops.secrets.wireguard_vps_homelab_psk = { };
+  networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
     peers = [
       {
         # vps
-        publicKey = "REPLACE_WITH_VPS_WIREGUARD_PUBLIC_KEY";
+        publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
-        endpoint = "REPLACE_WITH_VPS_PUBLIC_IP:51820";
+        endpoint = "[2604:a880:4:1d0:0:3:5045:8000]:51820";
         allowedIPs = [ "10.100.0.1/32" ];
         # CGNAT mappings expire without periodic traffic; keep the
         # tunnel (and the vps's route back to us) alive.
