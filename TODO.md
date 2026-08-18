@@ -41,7 +41,59 @@ items rather than letting them rot.
       `zroot/local/root` will likely stop being the meaningful thing to
       back up — update `myBackupPush.datasets` on both hosts to point
       at whatever the new persist dataset ends up being called instead.
-      Not yet implemented in code.
+      Also gained (2026-08-18): source-side runs as a dedicated
+      `backup-push` user (zfs-allow-scoped, not root — see
+      `modules/nixos/backup-push.nix`), and a paired
+      `modules/nixos/zfs-space-guard.nix` (`myZfsSpaceGuard`) on both
+      hosts auto-prunes oldest local snapshots under free-space pressure
+      (torrent/thinkpad's game libraries under `zroot/local/home` churn
+      heavily) plus a `zfs-emergency-prune.service` manual escape hatch.
+      torrent's `backupStaleness` threshold relaxed to 336h/2wk to match
+      thinkpad's, since it's a desktop that can also go dark on
+      vacation. Code committed on branch `worktree-zfs-backup-push`
+      (commits b9954dd, 265000d); **not yet deployed to any real host.**
+
+      Checklist to finish rollout:
+      - [ ] Generate `torrent_backup_push_key` and
+            `thinkpad_backup_push_key` ed25519 keypairs.
+      - [ ] Add both private keys to `secrets/secrets.yaml` via `sops
+            secrets/secrets.yaml` (never edit sops files directly).
+      - [ ] Paste both public keys into
+            `hosts/homelab/configuration.nix`'s
+            `backup-recv.openssh.authorizedKeys.keys`, each prefixed
+            with `restrict ` (two `# TODO` markers there now).
+      - [ ] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
+            to confirm all three build clean once secrets exist.
+      - [ ] Deploy homelab first (creates `backup-recv` user + zfs
+            delegation + `backup/torrent` dataset under `zbackup`).
+      - [ ] Deploy torrent and thinkpad; watch
+            `systemctl status backup-push-torrent.service` /
+            `journalctl -u backup-push-torrent` for the first real push
+            (first run is a full send — expect it to take longer and
+            transfer more than subsequent hourly incrementals).
+      - [ ] On homelab, confirm snapshots are actually landing:
+            `zfs list -t snapshot -r zbackup/backup/torrent` and
+            `.../thinkpad`.
+      - [ ] Confirm the Tailscale-reachability `ExecCondition` behaves
+            as intended: stop tailscaled (or disconnect) on thinkpad,
+            confirm `backup-push-thinkpad.service` reports as skipped/
+            inactive rather than failed, then reconnect and confirm the
+            next timer fire (or a manual `systemctl start`) catches up
+            immediately (`Persistent = true`).
+      - [ ] Sanity-check `zfs-space-guard.timer` on both hosts: manually
+            drop a test dataset's free space (or just review the script
+            logic against `zpool list -Hpo capacity`) and confirm the
+            15%-free trigger and `keepMin = 2` floor behave as expected
+            before trusting it under real pressure.
+      - [ ] Confirm `systemctl start zfs-emergency-prune.service` works
+            as a manual break-glass action on both hosts (dry-run reading
+            the script's `zfs destroy` targets first, since it's
+            destructive by design).
+      - [ ] Once real backups exist, wire
+            `myHealthAlerts.backupStaleness` values (already set) into a
+            live check — confirm a Discord alert actually fires if a
+            target dataset goes stale past 336h, e.g. by temporarily
+            lowering the threshold for a smoke test.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
