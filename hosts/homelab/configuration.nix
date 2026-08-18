@@ -22,6 +22,7 @@
     ../../services/factorio.nix
     ../../services/octodns.nix
     ../../services/nfs.nix
+    ../../services/samba.nix
   ];
 
   # System installed pkgs
