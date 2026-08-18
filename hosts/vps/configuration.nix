@@ -65,43 +65,45 @@ let
         ;;
     esac
 
-    # nixos-rebuild's run0-elevated `nix-env --set` step, updating the
-    # system profile to point at the new generation — confirmed live,
-    # another separate remote command issued before the actual
-    # activation command below. Restricted to this system's own store
-    # paths and the standard system profile path, same as elsewhere.
+    # nixos-rebuild's `nix-env --set` step, updating the system profile
+    # to point at the new generation — a separate remote command issued
+    # before the actual activation command below. This isn't a plain
+    # nix-daemon store operation (which trusted-users would cover) but a
+    # direct filesystem symlink write under /nix/var/nix/profiles, owned
+    # by root — it only succeeds at all because nixos-rebuild --sudo
+    # wraps it in `sudo`, which is aliased to run0 here (see
+    # security.run0.enableSudoAlias in profiles/default.nix), not real
+    # sudo. Confirmed live across two different nixos-rebuild-ng
+    # wrapping shapes (with and without --sudo) — match on the essential
+    # substring regardless of the surrounding sudo/env-sanitizer
+    # envelope, restricted to this system's own store path.
     case "$cmd" in
-      *"systemd-run --uid=0 --pipe --quiet --wait --collect --service-type=exec --send-sighup"*)
-        case "$cmd" in
-          *"nix-env -p /nix/var/nix/profiles/system --set /nix/store/"*"-nixos-system-vps-"*)
-            exec /bin/sh -c "$cmd"
-            ;;
-        esac
+      *"nix-env -p /nix/var/nix/profiles/system --set /nix/store/"*"-nixos-system-vps-"*)
+        exec /bin/sh -c "$cmd"
         ;;
     esac
 
-    # nixos-rebuild's run0-elevated switch-to-configuration invocation
-    # — validate both the elevation wrapper shape and that the actual
-    # target path is this system's own store path before allowing it.
-    # nixos-rebuild sends this with or without an inner isolation
-    # wrapper (--unit=nixos-rebuild-switch-to-configuration) depending
-    # on whether its own "is systemd running" check succeeds — match
-    # both forms rather than assuming one.
+    # nixos-rebuild's switch-to-configuration invocation — confirmed
+    # live in two different wrapping shapes depending on nixpkgs
+    # version/flags (a direct `systemd-run --uid=0 ...` form, and a
+    # `sudo`-wrapped `systemd-run ...` form without --uid=0 since sudo/
+    # run0 already elevates), and nixos-rebuild also varies whether an
+    # inner --unit= isolation wrapper is present depending on its own
+    # "is systemd running" probe. Rather than chase the exact flag list
+    # again next time it changes, just require that "systemd-run"
+    # appears together with this system's own store path, ending in the
+    # exact switch-to-configuration invocation.
     case "$cmd" in
-      *"systemd-run --uid=0 --pipe --quiet --wait --collect --service-type=exec --send-sighup"*)
-        case "$cmd" in
-          *"/nix/store/"*"-nixos-system-vps-"*"/bin/switch-to-configuration switch")
-            exec /bin/sh -c "$cmd"
-            ;;
-        esac
+      *"systemd-run"*"/nix/store/"*"-nixos-system-vps-"*"/bin/switch-to-configuration switch")
+        exec /bin/sh -c "$cmd"
         ;;
     esac
 
     # our own reboot-if-kernel-changed trigger (constructed by
-    # myPushDeploy on homelab, using the exact same elevation shape so
-    # it goes through the same polkit grant) — we fully control this
-    # string ourselves, so it's matched exactly.
-    if [ "$cmd" = "systemd-run --uid=0 --pipe --quiet --wait --collect --service-type=exec --send-sighup -- systemctl reboot" ]; then
+    # myPushDeploy on homelab) — we fully control this string ourselves,
+    # so it's matched exactly. Goes through the same sudo/run0 alias as
+    # the steps above.
+    if [ "$cmd" = "sudo systemctl reboot" ]; then
       exec /bin/sh -c "$cmd"
     fi
 
