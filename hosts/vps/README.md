@@ -156,16 +156,16 @@ provider's API token and switch Caddy's ACME config to use it.
 just confirm the ports match `services/minecraft.nix` /
 `services/factorio.nix` if those ever change.
 
-## Known gaps in this scaffold
+## Status
 
-- `hardware-configuration.nix` is a generic virtio stub — replace with
-  the real `nixos-generate-config` output if the provider's virtualization
-  differs.
-- No domains/DNS wired up yet (placeholder in `configuration.nix`).
-- CrowdSec is enabled with a few community collections
-  (`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)
-  but nothing beyond that has been tuned — worth reviewing its default
-  scenarios/decisions once it's actually seeing traffic.
+Live and deployed on DigitalOcean since 2026-08-17: real
+`hardware-configuration.nix`, real domain/DNS (Cloudflare via octoDNS,
+synced from homelab), WireGuard tunnel to homelab up, Jellyfin/
+Minecraft/Factorio all verified reachable. `hosts/vps/configuration.nix`
+no longer builds/evaluates locally — homelab's `myPushDeploy` builds
+and pushes finished closures instead (see that host's config).
 
-See `docs/TODO-vps-manual-steps.md` for the full,
-checkbox-tracked list of what's left before this deploys.
+CrowdSec is enabled with a few community collections
+(`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)
+but nothing beyond that has been tuned — worth reviewing its default
+scenarios/decisions periodically as it sees more real traffic.

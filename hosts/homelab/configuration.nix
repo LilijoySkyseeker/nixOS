@@ -299,7 +299,7 @@
   # pushes+activates the finished closure over SSH, as the unprivileged
   # vps-deploy user (see hosts/vps/configuration.nix — real activation
   # happens via nixos-rebuild's polkit-based run0 elevator, not root
-  # login, not sudo). See docs/TODO-vps-manual-steps.md.
+  # login, not sudo).
   sops.secrets.homelab_vps_deploy_key = { };
   myPushDeploy = {
     enable = true;
@@ -392,7 +392,7 @@
   # initiates, nothing needs to be reachable inbound at home.
   sops.secrets.homelab_wireguard_private_key = { };
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
-  # docs/TODO-vps-manual-steps.md.
+  # hosts/vps/configuration.nix's peer entry.
   sops.secrets.wireguard_vps_homelab_psk = { };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];

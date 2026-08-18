@@ -2,7 +2,7 @@
 
 Running log of plans and goals discussed for this repo, so they can be
 referenced across sessions. Not a replacement for host-specific docs
-like `TODO-vps-manual-steps.md` — this is for higher-level, cross-host
+(e.g. `hosts/*/README.md`) — this is for higher-level, cross-host
 or longer-horizon items.
 
 Convention: add a dated entry when a new plan/goal is agreed on; check
@@ -58,9 +58,9 @@ items rather than letting them rot.
 
 - [ ] **2026-08-18: layer distributed builders across the tailnet**.
       vps's rebuilds are already offloaded off-box — homelab builds and
-      pushes vps's closure via `myPushDeploy`, vps itself never
-      evaluates/builds (see `docs/TODO-vps-manual-steps.md`'s "Offload
-      vps rebuilds off-box" section, done). This item is the optional
+      pushes vps's closure via `myPushDeploy` (see
+      `hosts/homelab/configuration.nix`), vps itself never
+      evaluates/builds. This item is the optional
       follow-on, and applies beyond just vps: set
       `nix.distributedBuilds = true` + `nix.buildMachines` (pointing at
       other tailnet hosts, e.g. homelab/thinkpad/torrent as capacity
