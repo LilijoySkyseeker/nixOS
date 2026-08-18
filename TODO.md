@@ -88,21 +88,40 @@ items rather than letting them rot.
       traffic until anubis's socket exists with the right group perms
       already applied.
 
-- [ ] **2026-08-18: confirm crowdsec is actually banning things on
-      vps.** Found trawling logs: heavy vulnerability-scanner traffic
-      hit `jellyfin.skyseekerlabs.net` in the last 24h (leakix.net
-      scanner + others probing `.env`, `.git/config`,
-      WordPress/Jira/vCenter/cPanel exploit paths), but
-      `cscli decisions list`/`cscli alerts list` (as the `crowdsec`
-      user) both came back completely empty — zero bans, zero alerts,
-      despite `crowdsec`/`crowdsec-firewall-bouncer` both reporting
-      healthy/running. Plausible explanation: all that scan traffic
-      502'd before reaching jellyfin (see the anubis-socket item
-      above), so it never matched whatever backend-response scenario
-      crowdsec's `crowdsecurity/caddy` collection keys off — but not
-      confirmed. Needs: verify crowdsec is actually parsing/acting on
-      caddy's access log (not just tailing sshd), e.g. by checking
-      `cscli metrics` for bucket hit counts, before trusting it as a
-      real defense layer.
-
 ## Done
+
+- [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
+      banning anything on vps.** Root cause found via
+      `curl http://127.0.0.1:6060/metrics` (crowdsec's own prometheus
+      endpoint) and `cscli explain`: `services.caddy.virtualHosts.
+      <host>.logFormat` defaults to `null` in the pinned nixpkgs caddy
+      module (confirmed by reading
+      `nixos/modules/services/web-servers/caddy/default.nix` directly,
+      not just docs), so no `log {}` block was ever emitted for
+      `jellyfin.skyseekerlabs.net` — caddy only wrote sparse
+      error/tls/acme events to the journal, never real per-request
+      access logs. crowdsec's `crowdsecurity/caddy-logs` parser (which
+      needs the `request` object only access-log entries carry) had
+      **0 hits in its entire runtime**, confirmed both via its
+      prometheus counter being entirely absent from `/metrics` and via
+      a live test request producing no new parser activity — despite
+      heavy leakix.net-style vulnerability-scanner traffic hitting the
+      host over the preceding 24h. (Side note while debugging: `sudo
+      -u crowdsec cscli ...` silently no-ops with exit 200 and zero
+      output on this host, since `sudo` is aliased to `run0` which
+      can't switch to `crowdsec`'s `nologin` shell — use
+      `runuser -u crowdsec --` instead; my first pass at this
+      investigation used the broken `sudo -u crowdsec` form and
+      wrongly reported "zero decisions/alerts" as a real empty result
+      rather than a broken command.) Fix: added an explicit
+      `logFormat = "output stdout\nformat json"` to the jellyfin
+      vhost in `hosts/vps/configuration.nix`, verified by inspecting
+      the actual rendered `Caddyfile` (`log { output stdout; format
+      json }` now present) and by confirming via `cscli explain` that
+      a real captured caddy log line parses successfully and matches
+      `crowdsecurity/http-crawl-non_statics` once given that JSON
+      shape. Build-tested (`nixos-rebuild build --flake .#vps`
+      succeeds); not yet deployed to the live host — needs a real
+      `switch` to take effect, and then a follow-up check a day or two
+      later that `crowdsecurity/caddy-logs` actually shows hits in
+      `/metrics` against real traffic.
