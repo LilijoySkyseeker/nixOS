@@ -38,11 +38,12 @@
             "dst": ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
             "ip":  ["*"],
         },
-        // vps only needs to be reachable by you for admin SSH — not by
-        // other tailnet devices, and it doesn't need outbound access to
-        // anything beyond what the internet grant below already covers
+        // vps is reachable for admin SSH by you and by all your other
+        // tailnet devices (all tagged devices here belong to you) — it
+        // doesn't need outbound access to anything beyond what the
+        // internet grant below already covers
         {
-            "src": ["autogroup:member"],
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
             "dst": ["tag:vps"],
             "ip":  ["*"],
         },
@@ -61,10 +62,29 @@
     ],
 
     "ssh": [
+        // tag:vps is deliberately NOT a dst here (and never should be) —
+        // Tailscale's own SSH feature (services.tailscale.extraUpFlags
+        // = ["--ssh"]) intercepts and fully bypasses the real sshd on a
+        // matched host, including its authorized_keys ForceCommand
+        // restrictions. vps relies on that ForceCommand to lock its
+        // dedicated push-deploy user (vps-deploy) down to an allowlist
+        // of exactly three commands (see hosts/vps/configuration.nix) —
+        // confirmed live that Tailscale SSH matched and intercepted a
+        // connection to vps-deploy before this fix, entirely outside
+        // that restriction. Every user on vps, root included, must go
+        // through real OpenSSH only.
         {
             "action": "check",
             "src":    ["autogroup:member"],
-            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage", "tag:vps"],
+            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+        // tagged devices have no user identity to run a "check" (WebAuthn
+        // re-auth) against, so device-to-device SSH must use "accept".
+        {
+            "action": "accept",
+            "src":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
             "users":  ["autogroup:nonroot", "root"],
         },
     ],

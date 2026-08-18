@@ -38,8 +38,15 @@
     allowSFTP = true;
     enable = true;
     settings.KbdInteractiveAuthentication = false;
+    # PasswordAuthentication must be set as a structured option, not via
+    # extraConfig — NixOS's openssh module renders its own default
+    # (PasswordAuthentication yes) *before* extraConfig, and sshd_config
+    # uses first-directive-wins, so "passwordAuthentication = no" here
+    # was silently overridden and password auth was actually enabled
+    # this whole time (confirmed live on vps, which had the identical
+    # pattern; fixed there too — see hosts/vps/configuration.nix).
+    settings.PasswordAuthentication = false;
     extraConfig = ''
-      passwordAuthentication = no
       PermitRootLogin = prohibit-password
       AllowTcpForwarding yes
       X11Forwarding no

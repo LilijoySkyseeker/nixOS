@@ -149,6 +149,31 @@ values/missing secrets above before the manual work is done:
       only drop `--read-only`/`--cap-drop=ALL` entirely as a last
       resort.
 
+## Future: offload vps rebuilds off-box (downsizing prerequisite)
+
+Measured live (2026-08-18): a from-scratch `nixos-rebuild build` on the
+vps itself peaked around 1.7GB used + ~424MB swap (out of the droplet's
+~2GB total) — evaluation (unpacking/evaluating nixpkgs, home-manager,
+disko, etc.), not compilation, was the dominant cost. `myPullDeploy`
+currently runs `nixos-rebuild build`/`switch` locally on vps
+(`hosts/vps/configuration.nix`), which is why it needs this much RAM at
+all. Before downsizing the droplet below ~2GB:
+
+- [ ] Stop evaluating/building on vps itself — run the actual
+      `nixos-rebuild switch --target-host` invocation from a beefier
+      tailnet machine (homelab, or wherever `myAutoUpdate` already
+      builds), so vps only ever activates an already-finished closure.
+      This is the main fix; evaluation cost doesn't move to remote
+      build machines on its own (see below).
+- [ ] Optionally, once that's in place, layer distributed builders on
+      top (`nix.distributedBuilds = true` + `nix.buildMachines`
+      pointing at other tailnet hosts) so any actual compilation (not
+      just evaluation) fans out across the tailnet instead of landing
+      on whichever machine initiates the rebuild. Note this only helps
+      the *build* phase — it does NOT reduce the evaluation-time memory
+      cost measured above, so it's a complement to the point above, not
+      a substitute for it.
+
 ## Confirmed NOT exposed (by design)
 
 - copyparty — homelab/tailnet-only, no vhost or forward for it anywhere

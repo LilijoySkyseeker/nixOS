@@ -15,6 +15,7 @@
 
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
+    ../../modules/nixos/push-deploy.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -278,6 +279,28 @@
     switchDates = "Thu 03:00";
   };
 
+  # vps builds nothing itself anymore (myPullDeploy removed there — a
+  # from-scratch local build peaked at ~1.7GB RAM + 424MB swap out of
+  # its ~2GB total, measured live 2026-08-18, too tight to keep
+  # building on-box). homelab builds vps's config here instead and
+  # pushes+activates the finished closure over SSH, as the unprivileged
+  # vps-deploy user (see hosts/vps/configuration.nix — real activation
+  # happens via nixos-rebuild's polkit-based run0 elevator, not root
+  # login, not sudo). See TODO-vps-manual-steps.md.
+  sops.secrets.homelab_vps_deploy_key = { };
+  myPushDeploy = {
+    enable = true;
+    flakeDir = "/etc/nixos";
+    hostAttr = "vps";
+    targetHost = "vps-deploy@vps";
+    identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
+    # dates left at its default (Thu 03:15) as a periodic fallback —
+    # the onSuccess wiring below is the primary trigger, right after
+    # homelab's own myAutoUpdate switch, so this reuses the same
+    # already-vetted master checkout instead of racing/duplicating it.
+  };
+  systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
+
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
@@ -304,8 +327,15 @@
     enable = true;
     allowSFTP = true;
     settings.KbdInteractiveAuthentication = false;
+    # PasswordAuthentication must be set as a structured option, not via
+    # extraConfig — NixOS's openssh module renders its own default
+    # (PasswordAuthentication yes) *before* extraConfig, and sshd_config
+    # uses first-directive-wins, so "passwordAuthentication = no" here
+    # was silently overridden and password auth was actually enabled
+    # this whole time (confirmed live on vps, which had the identical
+    # pattern; fixed there too — see hosts/vps/configuration.nix).
+    settings.PasswordAuthentication = false;
     extraConfig = ''
-      passwordAuthentication = no
       PermitRootLogin = prohibit-password
       AllowTcpForwarding no
       X11Forwarding no

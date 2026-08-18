@@ -72,8 +72,20 @@
     enable = true;
     useRoutingFeatures = "both";
     authKeyFile = config.sops.secrets."tailscale_authkey_${config.networking.hostName}".path;
+    # --ssh (Tailscale's own SSH server/auth implementation) is
+    # deliberately NOT enabled: once on, it intercepts ALL SSH
+    # connections to that host and gates them via the tailnet ACL's
+    # "ssh" block, entirely bypassing real sshd — including any
+    # authorized_keys ForceCommand restriction (confirmed live: this
+    # broke vps's dedicated push-deploy user's command allowlist, and
+    # when no ACL "ssh" rule matched, connections were hard-rejected
+    # rather than falling through to real sshd — no partial/fallback
+    # mode exists). SSH still only ever travels over the tailnet either
+    # way (trustedInterfaces=tailscale0 + closed public port 22 on
+    # every host that matters); this only decides whether real sshd or
+    # tailscale's own proxy handles the authentication, and every host
+    # here relies on real sshd being the one in control of that.
     extraUpFlags = [
-      "--ssh"
       "--advertise-tags=tag:${config.networking.hostName}"
     ];
   };
