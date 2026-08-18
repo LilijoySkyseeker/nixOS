@@ -18,97 +18,118 @@ let
   externalInterface = "ens4";
 
   # Forced SSH command for the vps-deploy automation user (see below) —
-  # only three exact command shapes are let through; everything else is
-  # rejected. This allowlist, not the polkit grant it relies on, is the
-  # real security boundary: it's what stops a compromised deploy key
-  # from doing anything beyond "copy in and activate this exact
-  # system's closure, or reboot".
+  # only six fixed operations are let through (see the dispatcher below
+  # for exactly which); everything else is rejected. This allowlist, not
+  # the polkit grant it relies on, is the real security boundary: it's
+  # what stops a compromised deploy key from doing anything beyond "copy
+  # in and activate a vps system closure, or reboot".
   #
-  # The activate case matches nixos-rebuild's own `--elevate=run0`
-  # remote invocation, derived from nixos-rebuild-ng's source
-  # (elevate.py's Run0Elevator + nix.py's SWITCH_TO_CONFIGURATION_CMD_
-  # PREFIX — the switch-to-configuration call is itself wrapped in an
-  # inner systemd-run for unit isolation, then that whole thing is
-  # wrapped again in the outer uid=0 systemd-run for elevation). Worth
-  # a live smoke test the first time push-deploy actually runs, since
-  # this was derived from source rather than captured empirically.
+  # We never re-execute $SSH_ORIGINAL_COMMAND (or any substring of it)
+  # through a shell — an earlier version of this dispatcher matched
+  # commands with unanchored `case ... *"..."*)` globs and then ran
+  # `exec /bin/sh -c "$cmd"`, which let an attacker holding the deploy
+  # key smuggle arbitrary shell metacharacters before/after a matched
+  # substring and get them executed too (caught by code review). Instead:
+  # classify $cmd by which known operation it *contains* (a boolean
+  # check, safe regardless of what surrounds the matched text, since we
+  # never act on the matched text itself), separately extract the one
+  # attacker-influenceable parameter we actually need (a nix store path)
+  # with a strict regex, and then `exec` a freshly constructed argv built
+  # entirely from fixed strings and that validated store path — never
+  # from $cmd. A crafted $cmd can at most cause a misclassification into
+  # one of these six fixed, harmless operations; it can never inject
+  # additional shell syntax, because nothing derived from it ever reaches
+  # a shell's command-string parser again.
   vpsDeployDispatcher = pkgs.writeShellScript "vps-deploy-dispatcher" ''
     set -eu
     cmd=$SSH_ORIGINAL_COMMAND
 
+    # Nix store paths are a fixed-width hash plus name; restrict the name
+    # half to this system's own closures. head -n1 picks the first match
+    # deterministically if $cmd somehow contains more than one — doesn't
+    # matter which, since every consumer below only ever treats the
+    # result as an opaque, syntax-validated path, not as shell input.
+    store_path=$(
+      printf '%s\n' "$cmd" \
+        | ${pkgs.gnugrep}/bin/grep -oE '/nix/store/[0-9a-z]{32}-nixos-system-vps-[0-9A-Za-z._-]+' \
+        | ${pkgs.coreutils}/bin/head -n1
+    ) || store_path=""
+
+    reject() {
+      echo "vps-deploy: rejected command: $cmd" >&2
+      exit 1
+    }
+
+    require_store_path() {
+      [ -n "$store_path" ] || reject
+    }
+
     case "$cmd" in
-      "nix-store --serve --write")
-        exec nix-store --serve --write
+      *"nix-store --serve --write"*)
+        exec ${pkgs.nix}/bin/nix-store --serve --write
         ;;
     esac
 
     # nixos-rebuild's pre-activation sanity check ("does this closure
-    # look like a real NixOS system") — confirmed live, this is a
-    # separate remote command nixos-rebuild issues before the actual
-    # activation command below. Read-only stat, no side effects;
-    # restricted to this system's own store paths same as activation.
+    # look like a real NixOS system"). Read-only stat, no side effects.
     case "$cmd" in
-      *"test -f /nix/store/"*"-nixos-system-vps-"*"/nixos-version")
-        exec /bin/sh -c "$cmd"
+      *"test -f "*"/nixos-version"*)
+        require_store_path
+        exec ${pkgs.coreutils}/bin/test -f "$store_path/nixos-version"
         ;;
     esac
 
-    # nixos-rebuild's own "is systemd actually running" check —
-    # confirmed live, it precedes the activation command and (since our
-    # dispatcher was rejecting it) caused nixos-rebuild to infer
-    # systemd wasn't running and send a simpler activation form without
-    # the inner isolation wrapper the "real" (systemd-running) path
-    # uses. Read-only stat, no side effects.
+    # nixos-rebuild's own "is systemd actually running" check — no
+    # attacker-influenceable data involved at all, fixed command.
     case "$cmd" in
-      *"test -d /run/systemd/system")
-        exec /bin/sh -c "$cmd"
+      *"test -d /run/systemd/system"*)
+        exec ${pkgs.coreutils}/bin/test -d /run/systemd/system
         ;;
     esac
 
     # nixos-rebuild's `nix-env --set` step, updating the system profile
-    # to point at the new generation — a separate remote command issued
-    # before the actual activation command below. This isn't a plain
-    # nix-daemon store operation (which trusted-users would cover) but a
-    # direct filesystem symlink write under /nix/var/nix/profiles, owned
-    # by root — it only succeeds at all because nixos-rebuild --sudo
-    # wraps it in `sudo`, which is aliased to run0 here (see
+    # to point at the new generation. This is a direct filesystem
+    # symlink write under root-owned /nix/var/nix/profiles, not a plain
+    # nix-daemon store operation (trusted-users doesn't cover it) — it
+    # only succeeds via sudo, which is aliased to run0 here (see
     # security.run0.enableSudoAlias in profiles/default.nix), not real
-    # sudo. Confirmed live across two different nixos-rebuild-ng
-    # wrapping shapes (with and without --sudo) — match on the essential
-    # substring regardless of the surrounding sudo/env-sanitizer
-    # envelope, restricted to this system's own store path.
+    # sudo.
     case "$cmd" in
-      *"nix-env -p /nix/var/nix/profiles/system --set /nix/store/"*"-nixos-system-vps-"*)
-        exec /bin/sh -c "$cmd"
+      *"nix-env -p /nix/var/nix/profiles/system --set"*)
+        require_store_path
+        exec /run/current-system/sw/bin/sudo ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --set "$store_path"
         ;;
     esac
 
-    # nixos-rebuild's switch-to-configuration invocation — confirmed
-    # live in two different wrapping shapes depending on nixpkgs
-    # version/flags (a direct `systemd-run --uid=0 ...` form, and a
-    # `sudo`-wrapped `systemd-run ...` form without --uid=0 since sudo/
-    # run0 already elevates), and nixos-rebuild also varies whether an
-    # inner --unit= isolation wrapper is present depending on its own
-    # "is systemd running" probe. Rather than chase the exact flag list
-    # again next time it changes, just require that "systemd-run"
-    # appears together with this system's own store path, ending in the
-    # exact switch-to-configuration invocation.
+    # nixos-rebuild's switch-to-configuration invocation — the actual
+    # activation step.
     case "$cmd" in
-      *"systemd-run"*"/nix/store/"*"-nixos-system-vps-"*"/bin/switch-to-configuration switch")
-        exec /bin/sh -c "$cmd"
+      *"switch-to-configuration switch"*)
+        require_store_path
+        exec /run/current-system/sw/bin/sudo "$store_path/bin/switch-to-configuration" switch
         ;;
     esac
 
     # our own reboot-if-kernel-changed trigger (constructed by
-    # myPushDeploy on homelab) — we fully control this string ourselves,
-    # so it's matched exactly. Goes through the same sudo/run0 alias as
-    # the steps above.
-    if [ "$cmd" = "sudo systemctl reboot" ]; then
-      exec /bin/sh -c "$cmd"
-    fi
+    # myPushDeploy on homelab) — fixed command, no parameters.
+    case "$cmd" in
+      *"systemctl reboot"*)
+        exec /run/current-system/sw/bin/sudo ${pkgs.systemd}/bin/systemctl reboot
+        ;;
+    esac
 
-    echo "vps-deploy: rejected command: $cmd" >&2
-    exit 1
+    # myPushDeploy's pre-reboot kernel-change check (also constructed by
+    # homelab) — read-only, no parameters, no side effects.
+    case "$cmd" in
+      *"readlink /run/booted-system/kernel"*)
+        exec ${pkgs.coreutils}/bin/readlink /run/booted-system/kernel
+        ;;
+      *"readlink /run/current-system/kernel"*)
+        exec ${pkgs.coreutils}/bin/readlink /run/current-system/kernel
+        ;;
+    esac
+
+    reject
   '';
 in
 {
@@ -420,15 +441,30 @@ in
     ];
   };
 
-  # per-source-IP rate limiting on the forwarded game ports, since
-  # DNAT'd traffic bypasses anubis/crowdsec entirely (see above). Raw
-  # table so it's evaluated before conntrack/NAT and independent of
-  # whatever chain names the nat/firewall modules generate internally.
-  # Thresholds are deliberately loose (a real player's client won't hit
-  # them) — this is a floor against basic scanning/flooding, not a full
-  # DDoS mitigation; a large enough volumetric flood saturates the
-  # uplink before any firewall rule gets a say regardless.
+  # DNAT alone doesn't rewrite the packet's source address, so without
+  # this the forwarded game-server packets leave wg0 still carrying the
+  # original internet client's IP — WireGuard's cryptokey routing on the
+  # homelab side only accepts inbound traffic whose source matches this
+  # host's own allowedIPs entry (10.100.0.1/32 above) and silently drops
+  # anything else, so the connection would otherwise die completely on
+  # the way out (caught by code review; confirmed against how the
+  # nat-iptables module actually builds its rules — forwardPorts alone
+  # never emits a POSTROUTING rule, only internalInterfaces/internalIPs
+  # do, and neither applies to this wg0-egress direction). Idempotent
+  # like the ratelimit rules below, so repeat activations don't stack
+  # duplicate rules.
   networking.firewall.extraCommands = ''
+    iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
+      || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
+
+    # per-source-IP rate limiting on the forwarded game ports, since
+    # DNAT'd traffic bypasses anubis/crowdsec entirely (see above). Raw
+    # table so it's evaluated before conntrack/NAT and independent of
+    # whatever chain names the nat/firewall modules generate internally.
+    # Thresholds are deliberately loose (a real player's client won't hit
+    # them) — this is a floor against basic scanning/flooding, not a full
+    # DDoS mitigation; a large enough volumetric flood saturates the
+    # uplink before any firewall rule gets a say regardless.
     iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
     iptables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
       || iptables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
