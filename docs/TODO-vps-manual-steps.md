@@ -147,15 +147,26 @@ values/missing secrets above before the manual work is done:
       `-i ens4` rate-limit jump rule is still sitting in the live
       ruleset (harmless, only matches private VPC traffic now) and
       will clear itself on the vps's next reboot.
-- [ ] Verify `noexec` on `/` and `/persist` (`disko.nix`/`configuration.nix`)
-      didn't break anything at first boot — this was only statically
-      verified (`nix eval`/`nix build`, traced the impermanence bind-mount
-      scripts to confirm they don't override the inherited noexec flag),
-      never actually booted. Watch `journalctl -b` for `Permission denied`
-      / exec-related failures, especially from caddy (ACME), crowdsec,
-      tailscale, and the activation/switch process itself. If something
-      broke, the likely fix is dropping `noexec` from whichever specific
-      mount is affected rather than reverting the whole change.
+- [x] Verify `noexec` on `/` and `/persist` (`disko.nix`/`configuration.nix`)
+      didn't break anything at first boot — **confirmed live** via SSH
+      (`mount` shows `noexec` active on both `/` and `/persist`,
+      `journalctl -b` scanned for permission-denied/exec-related
+      failures). No noexec-caused breakage found: 0 failed systemd
+      units on the current boot (up 13h40m), and caddy/crowdsec/
+      crowdsec-firewall-bouncer/tailscaled all `active (running)` for
+      hours. The only permission-denied entries in the boot log are the
+      already-known-harmless cloud-init `boothooks` writes to a
+      read-only `/etc` (see the comment on that in
+      `hosts/vps/configuration.nix`) and stale logs from earlier
+      deploy-loop attempts within the same boot (WireGuard peer
+      failing on the placeholder public key, crowdsec-firewall-bouncer
+      failing on a not-yet-provisioned credential) before the real
+      secrets/config landed — not noexec-related, and gone by the time
+      the system settled. Verified the homelab side of the tunnel too:
+      `wg show` has a live handshake (22s old) with real transfer
+      stats, `ping 10.100.0.2` from homelab is clean, and
+      `octodns-sync.timer` is running on schedule with "no changes
+      were planned" (no drift).
 - [ ] In Jellyfin's admin dashboard (Networking settings), add
       `10.100.0.1` (and `10.100.0.2` itself) to "Known Proxies" —
       without this, Jellyfin sees every external request as coming
