@@ -542,22 +542,36 @@ in
   services.caddy = {
     enable = true;
     virtualHosts = {
-      "jellyfin.${lib.removeSuffix "." vars.domain}".extraConfig = ''
-        header {
-          Strict-Transport-Security "max-age=31536000"
-          X-Content-Type-Options "nosniff"
-          X-Frame-Options "SAMEORIGIN"
-          Referrer-Policy "strict-origin-when-cross-origin"
-          Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        }
-        reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
-          # anubis refuses to proxy without this — it doesn't infer the
-          # client IP from X-Forwarded-For (confirmed live: every
-          # request 500'd with "[misconfiguration] X-Real-Ip header is
-          # not set" until this was added).
-          header_up X-Real-Ip {remote_host}
-        }
-      '';
+      "jellyfin.${lib.removeSuffix "." vars.domain}" = {
+        # logFormat defaults to null (no `log {}` block emitted at
+        # all) — without this, caddy never wrote real per-request
+        # access logs, only sparse error/tls/acme events; crowdsec's
+        # `crowdsecurity/caddy-logs` parser needs the `request` object
+        # only access-log entries carry, so despite heavy scanner
+        # traffic hitting this host, that parser had 0 hits in its
+        # entire runtime (confirmed live via its prometheus metric)
+        # and crowdsec never banned anything from it.
+        logFormat = ''
+          output stdout
+          format json
+        '';
+        extraConfig = ''
+          header {
+            Strict-Transport-Security "max-age=31536000"
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "SAMEORIGIN"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            Permissions-Policy "camera=(), microphone=(), geolocation=()"
+          }
+          reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
+            # anubis refuses to proxy without this — it doesn't infer the
+            # client IP from X-Forwarded-For (confirmed live: every
+            # request 500'd with "[misconfiguration] X-Real-Ip header is
+            # not set" until this was added).
+            header_up X-Real-Ip {remote_host}
+          }
+        '';
+      };
     };
   };
 
