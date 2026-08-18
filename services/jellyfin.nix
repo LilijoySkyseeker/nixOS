@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, lib, ... }:
 {
   # jellyfin
   services.jellyfin = {
@@ -10,6 +10,28 @@
     dataDir = "/srv/jellyfin/data";
     logDir = "/srv/jellyfin/log";
   };
+
+  # The NixOS jellyfin module has no option for network.xml (only
+  # encoding.xml, via services.jellyfin.transcoding/hardwareAcceleration)
+  # — KnownProxies has to be patched into the XML ourselves. Without this,
+  # every request through the vps -> Anubis -> Caddy -> wireguard chain
+  # arrives at Jellyfin looking like it came from the tunnel IP rather
+  # than the real client, which breaks Jellyfin's own per-IP failed-login
+  # lockout (one bad actor could lock out every real user, since they'd
+  # all look like the same source IP). Runs on every start so it's
+  # idempotent and self-heals if the dashboard ever clears it; only
+  # touches the KnownProxies element, leaving any other network.xml
+  # settings made through the dashboard untouched.
+  systemd.services.jellyfin.preStart = lib.mkAfter ''
+    networkXml=${lib.escapeShellArg "${config.services.jellyfin.configDir}/network.xml"}
+    if [ -f "$networkXml" ]; then
+      ${lib.getExe' pkgs.xmlstarlet "xmlstarlet"} ed -L \
+        -d '/NetworkConfiguration/KnownProxies/*' \
+        -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.1' \
+        -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.2' \
+        "$networkXml"
+    fi
+  '';
   # pinned explicitly (rather than left to dynamic allocation) so its gid
   # stays stable across rebuilds — NFS clients (see
   # modules/nixos/nfs-homelab-mounts.nix) authorize purely by numeric

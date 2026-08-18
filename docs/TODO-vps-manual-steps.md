@@ -167,13 +167,27 @@ values/missing secrets above before the manual work is done:
       stats, `ping 10.100.0.2` from homelab is clean, and
       `octodns-sync.timer` is running on schedule with "no changes
       were planned" (no drift).
-- [ ] In Jellyfin's admin dashboard (Networking settings), add
-      `10.100.0.1` (and `10.100.0.2` itself) to "Known Proxies" —
+- [x] Add `10.100.0.1`/`10.100.0.2` to Jellyfin's "Known Proxies" —
       without this, Jellyfin sees every external request as coming
       from the vps's tunnel IP instead of the real client IP, which
       breaks its own per-IP failed-login lockout (one bad actor could
       lock out everyone, since they'd all look like the same source).
-      This is a runtime dashboard setting, not something Nix declares.
+      Made declarative instead of a manual dashboard click: the NixOS
+      `jellyfin` module has no option for `network.xml` (only
+      `encoding.xml`, via `services.jellyfin.transcoding`/
+      `hardwareAcceleration` — confirmed by reading the module source
+      in the pinned nixpkgs), so `services/jellyfin.nix` now patches
+      `KnownProxies` in `network.xml` via an `xmlstarlet`-based
+      `preStart` script (`lib.mkAfter`'d onto the module's own
+      `preStart`), idempotent and self-healing on every start, editing
+      only that one element so other dashboard-configured network
+      settings survive. Verified live on homelab: confirmed
+      `network.xml` had an empty `<KnownProxies />` before, deployed
+      via `nixos-rebuild switch --flake .#homelab --target-host
+      root@homelab`, Jellyfin restarted clean (watched
+      `journalctl -u jellyfin`), `network.xml` now has both addresses,
+      and `https://jellyfin.skyseekerlabs.net/` still returns a normal
+      302 (not the 502 an Anubis/Caddy chain break would cause).
 - [x] Watch Minecraft/Factorio container startup after the
       `--read-only`/`--cap-drop=ALL` change — **found and fixed for
       real**: factorio's container hardening broke startup outright
