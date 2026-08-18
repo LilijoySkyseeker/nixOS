@@ -608,7 +608,26 @@ in
       {
         source = "journalctl";
         journalctl_filter = [ "_SYSTEMD_UNIT=caddy.service" ];
-        labels.type = "caddy";
+        # Must be "syslog", not "caddy" — journalctl always emits lines
+        # with the syslog envelope ("Mon DD HH:MM:SS host caddy[pid]: ")
+        # prefixed onto the actual message, and only `labels.type =
+        # "syslog"` routes events through crowdsecurity/syslog-logs,
+        # which strips that envelope before crowdsecurity/caddy-logs
+        # ever sees the line. A non-"syslog" type here falls through
+        # to the non-syslog catch-all instead, which does NOT strip
+        # the envelope, so caddy-logs' `UnmarshalJSON(evt.Parsed.
+        # message, ...)` always failed on the leading "Mon DD ..."
+        # text — confirmed live: crowdsecurity/caddy-logs had 0 hits
+        # in this agent's entire runtime despite real traffic, and
+        # journalctl -u crowdsec showed `UnmarshalJSON: invalid
+        # character 'A' looking for beginning of value` on every
+        # single caddy line. This is a known crowdsec gotcha, not
+        # specific to this setup (crowdsecurity/crowdsec#4098:
+        # "Journalctl sources MUST use syslog type"). Verified fixed
+        # via `cscli explain --type syslog` against a real captured
+        # line (with the journalctl envelope intact) — it now reaches
+        # crowdsecurity/caddy-logs successfully.
+        labels.type = "syslog";
       }
     ];
   };
