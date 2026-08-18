@@ -6,16 +6,26 @@
   ...
 }:
 let
-  # Confirmed via the real droplet's `ip a` + DO metadata service
-  # (/metadata/v1.json, matched by MAC): ens4 is the public interface
-  # (137.184.45.18/20, gw 137.184.32.1), ens3 is the private/internal
-  # one (10.124.0.2/20, gw 10.124.0.1). DigitalOcean droplet NICs do
+  # Re-confirmed live via `ip a`/`ip route` on the real droplet: ens3
+  # carries the public IP (137.184.45.18/20, default route via
+  # 137.184.32.1) and ens4 is the private VPC interface
+  # (10.124.0.2/20) — the reverse of what an earlier comment here
+  # claimed. That earlier ens3/ens4 swap silently broke the
+  # DNAT/FORWARD/rate-limit rules below (all `-i ${externalInterface}`
+  # scoped): Caddy's HTTP/HTTPS kept working since it listens
+  # unscoped on all interfaces, masking the bug, but real external
+  # traffic to the DNAT'd game ports (25565/19132/34197) never
+  # matched `-i ens4` and silently vanished — confirmed live via 0
+  # packets on every nixos-nat-pre/nixos-filter-forward/vps-ratelimit
+  # counter no matter how many real connection attempts were made,
+  # even after ruling out DigitalOcean's Cloud Firewall product
+  # entirely (removed it, no change). DigitalOcean droplet NICs do
   # NOT serve real DHCP (confirmed: NetworkManager sat in
   # "connecting (getting IP configuration)" forever, 45s DHCP timeouts,
   # never a DHCPOFFER) — nixos-infect works around this the same way,
   # by hardcoding the static address/gateway pair instead of relying
   # on DHCP. See networking config below.
-  externalInterface = "ens4";
+  externalInterface = "ens3";
 
   # Forced SSH command for the vps-deploy automation user (see below) —
   # only six fixed operations are let through (see the dispatcher below
