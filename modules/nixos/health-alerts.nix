@@ -72,7 +72,7 @@ in
       type = lib.types.attrsOf lib.types.int;
       default = { };
       example = {
-        "/var/lib/restic-backups-backblazeDaily/last-success" = 192;
+        "/var/lib/restic-backups-backblazeWeekly/last-success" = 192;
       };
       description = ''
         Files to check for staleness by mtime, mapped to the maximum age in

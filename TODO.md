@@ -1,14 +1,20 @@
-# TODO
+# TODO / plans & goals
 
-Repo-wide follow-ups that aren't tied to a single host's setup doc (see
-e.g. `TODO-vps-manual-steps.md` for vps-specific ones).
+Running log of plans and goals discussed for this repo, so they can be
+referenced across sessions. Not a replacement for host-specific docs
+like `TODO-vps-manual-steps.md` — this is for higher-level, cross-host
+or longer-horizon items.
 
-## Known issues
+Convention: add a dated entry when a new plan/goal is agreed on; check
+items off or move them to "Done" as they land; prune stale/abandoned
+items rather than letting them rot.
 
-- [ ] **sops-nix `age.keyFile` fallback doesn't actually fire when
-      `age.sshKeyPaths` fails during early boot** (torrent, discovered
-      2026-08-18). `profiles/PC.nix` configures both `sops.age.sshKeyPaths
-      = [ "/home/lilijoy/.ssh/id_ed25519" ]` and `sops.age.keyFile =
+## Active
+
+- [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
+      fire when `age.sshKeyPaths` fails during early boot** (torrent).
+      `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
+      "/home/lilijoy/.ssh/id_ed25519" ]` and `sops.age.keyFile =
       "/var/lib/sops-nix/key.txt"`, with `keyFile` explicitly intended
       as the early-boot fallback since `/home` isn't mounted yet during
       initrd-stage activation (see the comment there). On a real boot,
@@ -30,3 +36,5 @@ e.g. `TODO-vps-manual-steps.md` for vps-specific ones).
       drop `sshKeyPaths` from the boot-time identity list entirely and
       rely on `keyFile` alone there). Not yet reproduced against a clean
       reboot (holding off per the no-unconfirmed-local-restarts rule).
+
+## Done

@@ -167,5 +167,5 @@ just confirm the ports match `services/minecraft.nix` /
   but nothing beyond that has been tuned — worth reviewing its default
   scenarios/decisions once it's actually seeing traffic.
 
-See `TODO-vps-manual-steps.md` at the repo root for the full,
+See `docs/TODO-vps-manual-steps.md` for the full,
 checkbox-tracked list of what's left before this deploys.

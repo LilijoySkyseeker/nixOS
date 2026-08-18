@@ -10,6 +10,10 @@
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
+    # matches nixpkgs-stable's release; used only by hosts pinned to nixpkgs-stable
+    home-manager-stable.url = "github:nix-community/home-manager/release-26.05";
+    home-manager-stable.inputs.nixpkgs.follows = "nixpkgs-stable";
+
     stylix.url = "github:danth/stylix";
     stylix.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
@@ -31,6 +35,10 @@
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     plover-flake.url = "github:openstenoproject/plover-flake";
+
+    # provides the services.copyparty NixOS module used on hosts/isoimage
+    copyparty.url = "github:9001/copyparty";
+    copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
   outputs =
@@ -98,11 +106,12 @@
         homelab = nixpkgs-stable.lib.nixosSystem {
           specialArgs = {
             inherit
-              inputs
               pkgs-unstable
               pkgs-stable
               vars
               ;
+            # use the home-manager release matching nixpkgs-stable to avoid a version mismatch
+            inputs = inputs // { home-manager = inputs.home-manager-stable; };
           };
           modules = [ ./hosts/homelab/configuration.nix ];
         };

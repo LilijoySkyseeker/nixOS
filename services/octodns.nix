@@ -7,7 +7,7 @@
 }:
 let
   # Disabled until the vps is provisioned and a real Cloudflare token
-  # exists (see TODO-vps-manual-steps.md) — flip to `true` once that's
+  # exists (see docs/TODO-vps-manual-steps.md) — flip to `true` once that's
   # done, rather than leaving a service pointed at a placeholder IP
   # live.
   enable = false;

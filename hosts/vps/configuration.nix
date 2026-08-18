@@ -198,7 +198,7 @@ in
   # ceiling to keep doing on-box. homelab now builds and pushes
   # finished closures here instead (myPushDeploy, hosts/homelab
   # configuration.nix) via the vps-deploy user below. See
-  # TODO-vps-manual-steps.md.
+  # docs/TODO-vps-manual-steps.md.
 
   # DigitalOcean droplets don't support UEFI boot at all (confirmed via
   # DO's own docs/community forum) — systemd-boot never gets invoked and
@@ -282,7 +282,7 @@ in
   # at ~1.7GB used + ~424MB swap out of ~2GB total (measured live,
   # 2026-08-18) — too close to the edge to safely downsize the droplet
   # while myPullDeploy built locally here. See
-  # TODO-vps-manual-steps.md's "offload vps rebuilds off-box" section.
+  # docs/TODO-vps-manual-steps.md's "offload vps rebuilds off-box" section.
   #
   # Dedicated, unprivileged, single-purpose account for that automation
   # — never root, never interactive. Its SSH key is locked to a forced
@@ -397,7 +397,7 @@ in
   # PSK is an extra symmetric secret required on top of the keypair
   # handshake — defense-in-depth against a future break of the
   # asymmetric crypto, standard WireGuard hardening advice. Same file
-  # content needed verbatim on both ends (see TODO-vps-manual-steps.md).
+  # content needed verbatim on both ends (see docs/TODO-vps-manual-steps.md).
   sops.secrets.wireguard_vps_homelab_psk = { };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];

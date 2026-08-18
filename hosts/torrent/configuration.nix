@@ -13,6 +13,7 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/iso-autobuild.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
 
@@ -23,6 +24,16 @@
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
+  };
+
+  # rebuild the recovery iso into ~/Downloads every time pull-deploy
+  # successfully updates this host, for manual copying onto Ventoy
+  myIsoAutobuild = {
+    enable = true;
+    flakeDir = "/home/lilijoy/dotfiles";
+    buildUser = "lilijoy";
+    isoAttr = "isoimage";
+    triggeredBy = [ "pull-deploy.service" ];
   };
 
   # System installed pkgs
