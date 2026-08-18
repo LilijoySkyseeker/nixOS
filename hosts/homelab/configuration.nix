@@ -293,7 +293,7 @@
   users.groups.backup-recv = { };
 
   systemd.services.backup-recv-zfs-allow = {
-    description = "Delegate zfs receive permissions on backup/{torrent,thinkpad} to backup-recv";
+    description = "Delegate zfs receive permissions on backup-bulk/{torrent,thinkpad} to backup-recv";
     after = [ "zfs-import-zbackup.service" ];
     wantedBy = [ "multi-user.target" ];
     # not gated in front of sshd: if this ever fails (e.g. zbackup import
@@ -303,9 +303,11 @@
     serviceConfig.Type = "oneshot";
     serviceConfig.RemainAfterExit = true;
     # zfs allow is idempotent — safe to re-run every activation/boot.
+    # backup-bulk, not backup: torrent/thinkpad home datasets carry large
+    # game libraries that are not offsite-eligible (see disko.nix).
     script = ''
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/torrent
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/thinkpad
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup-bulk/torrent
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup-bulk/thinkpad
     '';
   };
 
@@ -371,15 +373,15 @@
       # reasoning as thinkpad below: bookmarks make this a non-issue for
       # resync, so the threshold only exists to catch a genuinely broken
       # key/config, not normal off time. 336h = 2 weeks.
-      "zbackup/backup/torrent/home" = 336;
-      "zbackup/backup/torrent/root" = 336;
+      "zbackup/backup-bulk/torrent/home" = 336;
+      "zbackup/backup-bulk/torrent/root" = 336;
       # thinkpad is a laptop that legitimately goes offline for long
       # stretches (asleep/traveling) — syncoid's --create-bookmark means
       # that's not a resync risk, so this threshold is only meant to catch
       # a genuinely broken key/config, not normal laptop-off time. 336h =
       # 2 weeks.
-      "zbackup/backup/thinkpad/home" = 336;
-      "zbackup/backup/thinkpad/root" = 336;
+      "zbackup/backup-bulk/thinkpad/home" = 336;
+      "zbackup/backup-bulk/thinkpad/root" = 336;
     };
     # offsite restic backup runs weekly (Fri 03:00) and can now take up to
     # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give

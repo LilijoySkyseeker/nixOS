@@ -167,10 +167,12 @@
               mountpoint = "/backup/thinkpad/bulk";
               options."com.sun:auto-snapshot" = "false";
             };
-            # torrent
-            "backup/torrent" = {
+            # torrent — bulk only (large, frequently-churned game
+            # libraries, same reasoning as backup-bulk/thinkpad above).
+            # No plain "backup/torrent" — nothing here is offsite-eligible.
+            "backup-bulk/torrent" = {
               type = "zfs_fs";
-              mountpoint = "/backup/torrent";
+              mountpoint = "/backup/torrent/bulk";
               options."com.sun:auto-snapshot" = "false";
             };
             # legion

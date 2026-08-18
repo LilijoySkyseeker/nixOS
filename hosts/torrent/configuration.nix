@@ -105,8 +105,10 @@
     targetHost = "backup-recv@homelab";
     identityFile = config.sops.secrets.torrent_backup_push_key.path;
     datasets = {
-      "zroot/local/home" = "zbackup/backup/torrent/home";
-      "zroot/local/root" = "zbackup/backup/torrent/root";
+      # backup-bulk, not backup: this data (large game libraries under
+      # home) is not offsite-eligible — see hosts/homelab/disko.nix.
+      "zroot/local/home" = "zbackup/backup-bulk/torrent/home";
+      "zroot/local/root" = "zbackup/backup-bulk/torrent/root";
     };
   };
 
