@@ -280,8 +280,14 @@
     group = "backup-recv";
     shell = pkgs-stable.bash; # needed for syncoid's remote zfs commands over ssh
     openssh.authorizedKeys.keys = [
-      # TODO: paste torrent_backup_push_key's *public* key here once generated
-      # TODO: paste thinkpad_backup_push_key's *public* key here once generated
+      # "restrict" disables port/agent/X11 forwarding and pty allocation —
+      # this key should only ever run zfs-receive-adjacent commands, same
+      # least-privilege spirit as vps-deploy's forced-command key
+      # (hosts/vps/configuration.nix). No forced `command=` here since
+      # syncoid needs to run different zfs commands with dynamic args, so
+      # `zfs allow`'s scoping (below) is the real boundary, not this.
+      # TODO: paste torrent_backup_push_key's *public* key here, prefixed with "restrict "
+      # TODO: paste thinkpad_backup_push_key's *public* key here, prefixed with "restrict "
     ];
   };
   users.groups.backup-recv = { };
@@ -360,10 +366,13 @@
       "zbackup/backup/homelab/storage" = 6;
       "zbackup/backup-bulk/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
-      # torrent is an always-on server, same tight threshold as homelab's
-      # own datasets applies.
-      "zbackup/backup/torrent/home" = 6;
-      "zbackup/backup/torrent/root" = 6;
+      # torrent is a desktop, not a server — usually up, but can go dark
+      # for a while too (e.g. powered off during vacation). Same
+      # reasoning as thinkpad below: bookmarks make this a non-issue for
+      # resync, so the threshold only exists to catch a genuinely broken
+      # key/config, not normal off time. 336h = 2 weeks.
+      "zbackup/backup/torrent/home" = 336;
+      "zbackup/backup/torrent/root" = 336;
       # thinkpad is a laptop that legitimately goes offline for long
       # stretches (asleep/traveling) — syncoid's --create-bookmark means
       # that's not a resync risk, so this threshold is only meant to catch

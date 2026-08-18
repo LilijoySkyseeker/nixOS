@@ -14,6 +14,7 @@
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/backup-push.nix
+    ../../modules/nixos/zfs-space-guard.nix
     ../../modules/nixos/iso-autobuild.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
@@ -96,7 +97,9 @@
 
   # push home+root snapshots to homelab's zbackup pool over tailscale
   # (see TODO.md "syncoid push backups" for the design)
-  sops.secrets.torrent_backup_push_key = { };
+  sops.secrets.torrent_backup_push_key = {
+    owner = "backup-push"; # readable only by the dedicated backup-push user, not root-wide
+  };
   myBackupPush = {
     enable = true;
     targetHost = "backup-recv@homelab";
@@ -105,5 +108,23 @@
       "zroot/local/home" = "zbackup/backup/torrent/home";
       "zroot/local/root" = "zbackup/backup/torrent/root";
     };
+  };
+
+  # home holds large, frequently-churned Steam/game libraries — zfs
+  # snapshots pin the space of anything they touch, so heavy install/
+  # uninstall cycles can eat free space fast even with sanoid's normal
+  # retention. Auto-prune oldest snapshots under pressure; see
+  # `systemctl start zfs-emergency-prune.service` for an immediate
+  # manual escape hatch. Safe alongside myBackupPush above since
+  # --create-bookmark already preserves incremental replication history
+  # independent of which local snapshots survive.
+  myZfsSpaceGuard = {
+    enable = true;
+    pool = "zroot";
+    datasets = [
+      "zroot/local/home"
+      "zroot/local/root"
+    ];
+    freeThresholdPercent = 15;
   };
 }

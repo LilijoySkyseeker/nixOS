@@ -53,8 +53,40 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Dedicated, unprivileged, single-purpose account (per
+    # feedback_dedicated_service_users) — zfs send/bookmark/hold/release
+    # are delegated to it below via `zfs allow` instead of running this
+    # as root. It never accepts an inbound ssh connection (its key is
+    # only ever used outbound, as a client), so no authorized_keys/shell
+    # hardening is needed on this side the way backup-recv needs on the
+    # homelab receive side.
+    users.users.backup-push = {
+      isSystemUser = true;
+      group = "backup-push";
+    };
+    users.groups.backup-push = { };
+
+    # zfs allow is idempotent — safe to re-run every boot. No "destroy"
+    # or "snapshot" permission: sanoid (root) owns the local snapshot
+    # lifecycle entirely; this account only ever reads and sends.
+    systemd.services."backup-push-${hostName}-zfs-allow" = {
+      description = "Delegate zfs send permissions on backup-push source datasets to backup-push";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "backup-push-${hostName}.service" ];
+      path = [ pkgs.zfs ];
+      serviceConfig.Type = "oneshot";
+      serviceConfig.RemainAfterExit = true;
+      script = lib.concatStringsSep "\n" (
+        lib.mapAttrsToList (source: _: ''
+          zfs allow backup-push send,bookmark,hold,release ${lib.escapeShellArg source}
+        '') cfg.datasets
+      );
+    };
+
     systemd.services."backup-push-${hostName}" = {
       description = "Push zfs snapshots to ${cfg.targetHost}";
+      after = [ "backup-push-${hostName}-zfs-allow.service" ];
+      requires = [ "backup-push-${hostName}-zfs-allow.service" ];
       path = with pkgs; [
         sanoid # provides syncoid
         openssh
@@ -62,12 +94,8 @@ in
       ];
       serviceConfig = {
         Type = "oneshot";
-        User = "root";
+        User = "backup-push";
         NoNewPrivileges = true;
-        # bookmarks + zfs send/receive both need root on the source side
-        # (reading arbitrary datasets, managing snapshots/bookmarks) —
-        # matches how sanoid's own service is pinned to root elsewhere in
-        # this repo (see systemd.services.sanoid.serviceConfig.User).
         # tailscale ping actually exercises the tunnel (not just ARP/ICMP
         # to a routed IP), so this also fails closed if tailscaled itself
         # is down (e.g. right after boot, before it's come up) — either

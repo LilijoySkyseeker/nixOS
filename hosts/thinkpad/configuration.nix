@@ -15,6 +15,7 @@
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/backup-push.nix
+    ../../modules/nixos/zfs-space-guard.nix
   ];
 
   myPullDeploy = {
@@ -115,7 +116,9 @@
 
   # push home+root snapshots to homelab's zbackup pool over tailscale
   # (see TODO.md "syncoid push backups" for the design)
-  sops.secrets.thinkpad_backup_push_key = { };
+  sops.secrets.thinkpad_backup_push_key = {
+    owner = "backup-push"; # readable only by the dedicated backup-push user, not root-wide
+  };
   myBackupPush = {
     enable = true;
     targetHost = "backup-recv@homelab";
@@ -124,5 +127,17 @@
       "zroot/local/home" = "zbackup/backup/thinkpad/home";
       "zroot/local/root" = "zbackup/backup/thinkpad/root";
     };
+  };
+
+  # same rationale as torrent's myZfsSpaceGuard (see its comment) — this
+  # laptop's home also carries large game libraries.
+  myZfsSpaceGuard = {
+    enable = true;
+    pool = "zroot";
+    datasets = [
+      "zroot/local/home"
+      "zroot/local/root"
+    ];
+    freeThresholdPercent = 15;
   };
 }
