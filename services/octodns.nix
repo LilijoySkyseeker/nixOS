@@ -43,17 +43,21 @@ let
     ];
     # minecraft/factorio clients connect via ip:port, not domain, but a
     # record still makes it easier to hand out a hostname instead of a
-    # raw IP.
+    # raw IP. IPv4-only, deliberately: these ports are only DNAT'd
+    # through to homelab over IPv4 (net.ipv6.conf.all.forwarding is
+    # explicitly off on the vps, see hosts/vps/configuration.nix, and
+    # there are no ip6tables DNAT rules for them either) — an AAAA
+    # record here would advertise reachability that doesn't exist and
+    # silently break any client that prefers IPv6 when a hostname
+    # resolves to both (confirmed live: a Bedrock client could connect
+    # to the raw IPv4 address fine but not to the hostname). The apex
+    # keeps its AAAA record since that's Caddy running directly on the
+    # vps — native IPv6, no forwarding involved.
     minecraft = [
       {
         type = "A";
         ttl = 300;
         value = vpsPublicIp;
-      }
-      {
-        type = "AAAA";
-        ttl = 300;
-        value = vpsPublicIp6;
       }
     ];
     factorio = [
@@ -61,11 +65,6 @@ let
         type = "A";
         ttl = 300;
         value = vpsPublicIp;
-      }
-      {
-        type = "AAAA";
-        ttl = 300;
-        value = vpsPublicIp6;
       }
     ];
   };
