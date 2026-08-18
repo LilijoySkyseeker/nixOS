@@ -136,8 +136,21 @@ values/missing secrets above before the manual work is done:
       full chain (Caddy → Anubis → Jellyfin over the wireguard tunnel)
       returns a real `200`/`<title>Jellyfin</title>` page.
 - [ ] Verify Minecraft/Factorio reachable on the vps's public IP —
-      DNS is live (A/AAAA records exist) but the actual game
-      connections haven't been tested yet
+      tested and currently **blocked**. Live findings: the nixos-level
+      DNAT/firewall config is correct (`nixos-nat-pre` DNAT rules and
+      `nixos-filter-forward` ACCEPT rules for 25565/19132/34197 are
+      both present), and the tunnel path works (from the vps,
+      `/dev/tcp/10.100.0.2/25565` connects instantly over wg0). But a
+      real external connection attempt to `137.184.45.18:25565` never
+      registered a single packet on the vps's own netfilter counters
+      (`nixos-nat-pre` stayed at 0 pkts) — meanwhile port 443 to the
+      same IP connects fine. This points at a **DigitalOcean Cloud
+      Firewall** (a network-level firewall separate from the droplet's
+      own iptables) blocking inbound on the game ports before traffic
+      ever reaches the box. Needs manual check: DigitalOcean dashboard
+      → Networking → Firewalls — if one's attached to this droplet,
+      add inbound rules for TCP 25565 and UDP 19132/34197 (or detach it
+      if it's not meant to be restricting this box at all).
 - [ ] Verify `noexec` on `/` and `/persist` (`disko.nix`/`configuration.nix`)
       didn't break anything at first boot — this was only statically
       verified (`nix eval`/`nix build`, traced the impermanence bind-mount
