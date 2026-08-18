@@ -156,45 +156,20 @@
               options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";
             };
-            # thinkpad
-            "backup/thinkpad" = {
-              type = "zfs_fs";
-              mountpoint = "/backup/thinkpad"; # "<path>" just mountpoint
-              options."com.sun:auto-snapshot" = "false";
-            };
+            # thinkpad — bulk only (large, frequently-churned game
+            # libraries). Remote-host push backups only ever go to
+            # backup-bulk, never plain backup — see myBackupPush usage in
+            # hosts/thinkpad/configuration.nix. Pure container: real data
+            # lives in the home/root children syncoid creates underneath.
             "backup-bulk/thinkpad" = {
               type = "zfs_fs";
-              mountpoint = "/backup/thinkpad/bulk";
+              options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";
             };
-            # torrent — bulk only (large, frequently-churned game
-            # libraries, same reasoning as backup-bulk/thinkpad above).
-            # No plain "backup/torrent" — nothing here is offsite-eligible.
+            # torrent — same reasoning as backup-bulk/thinkpad above.
             "backup-bulk/torrent" = {
               type = "zfs_fs";
-              mountpoint = "/backup/torrent/bulk";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            # legion
-            "backup/legion" = {
-              type = "zfs_fs";
-              mountpoint = "/backup/legion";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            "backup-bulk/legion" = {
-              type = "zfs_fs";
-              mountpoint = "/backup/legion/bulk";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            # other
-            "backup/other" = {
-              type = "zfs_fs";
-              mountpoint = "/backup/other";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            "backup-bulk/other" = {
-              type = "zfs_fs";
-              mountpoint = "/backup/other/bulk";
+              options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";
             };
           };

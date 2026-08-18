@@ -62,6 +62,36 @@ items rather than letting them rot.
       vacation. Code committed on branch `worktree-zfs-backup-push`
       (commits b9954dd, 265000d); **not yet deployed to any real host.**
 
+      **Dataset review (2026-08-18)**: audited disko.nix's zbackup tree
+      against what's actually referenced anywhere in config.
+      `backup/legion`/`backup-bulk/legion` and `backup/other`/
+      `backup-bulk/other` were unreferenced placeholders — dropped from
+      disko.nix. `backup/thinkpad` (the original non-bulk container) is
+      now fully superseded since remote-host push backups only ever go
+      to backup-bulk — dropped from disko.nix too. `backup-bulk/thinkpad`
+      and `backup-bulk/torrent` converted to pure `mountpoint = "none"`
+      containers (matching `backup/homelab`'s existing convention) since
+      the real data lives in their `home`/`root` children, not the
+      container itself. **None of this touched the live homelab pool —
+      disko.nix is install-time only.** If any of `zbackup/backup/legion`,
+      `zbackup/backup-bulk/legion`, `zbackup/backup/other`,
+      `zbackup/backup-bulk/other`, or `zbackup/backup/thinkpad` actually
+      exist live (run `zfs list -r zbackup/backup` on homelab first to
+      check — disko.nix declaring them doesn't guarantee they were ever
+      actually created, since disko only runs at install), destroying
+      them is a manual, deliberate call:
+      ```
+      zfs list -r zbackup/backup zbackup/backup-bulk   # see what's really there first
+      zfs destroy -r zbackup/backup/thinkpad            # only if empty/confirmed unused
+      zfs destroy -r zbackup/backup/legion               # only if it exists and is confirmed placeholder-only
+      zfs destroy -r zbackup/backup-bulk/legion
+      zfs destroy -r zbackup/backup/other
+      zfs destroy -r zbackup/backup-bulk/other
+      # then, to match disko.nix's new pure-container convention on the live pool:
+      zfs set mountpoint=none zbackup/backup-bulk/thinkpad
+      ```
+      Not run by me — check contents first, run at your own pace.
+
       Checklist to finish rollout:
       - [ ] Generate `torrent_backup_push_key` and
             `thinkpad_backup_push_key` ed25519 keypairs.
