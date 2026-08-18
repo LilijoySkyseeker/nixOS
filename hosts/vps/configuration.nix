@@ -486,15 +486,21 @@ in
 
     # minecraft (geyser/bedrock): cap packet rate per source IP (also
     # blunts UDP amplification/reflection abuse of this port, same as
-    # the factorio rule below)
+    # the factorio rule below). 60/sec was way too low — confirmed
+    # live it was dropping real Bedrock client traffic too.
     iptables -t raw -A vps-ratelimit -p udp --dport 19132 \
-      -m hashlimit --hashlimit-above 60/second --hashlimit-burst 30 \
+      -m hashlimit --hashlimit-above 1000/second --hashlimit-burst 500 \
       --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
 
     # factorio: cap packet rate per source IP (also blunts UDP
-    # amplification/reflection abuse of this port)
+    # amplification/reflection abuse of this port). 60/sec was way too
+    # low for real traffic — confirmed live it dropped 90k+ packets of
+    # a single legitimate client's own map download/sync, manifesting
+    # as multi-KB/s speeds with random stalls to 0. Factorio's UDP
+    # protocol bursts far above typical scan/flood-detection thresholds
+    # during normal map sync.
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
-      -m hashlimit --hashlimit-above 60/second --hashlimit-burst 30 \
+      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
   '';
 
