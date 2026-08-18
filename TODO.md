@@ -155,6 +155,25 @@ items rather than letting them rot.
       evaluated only. Build (not switch) both before relying on them,
       then switch when ready.
 
+- [ ] **2026-08-18: homelab's weekly restic-to-Backblaze backup has no
+      safeguard against `myAutoUpdate`'s Thursday auto-switch killing
+      a mid-run backup.** During a full-bucket reset/re-test of the
+      backup (see this session), we found homelab runs
+      `nixos-rebuild switch` every Thursday 03:00 via `myAutoUpdate`
+      (`hosts/homelab/configuration.nix`), and `switch-to-configuration`
+      restarts any systemd unit whose definition changed — including
+      `restic-backups-backblazeWeekly.service` (Type=oneshot,
+      `TimeoutStartSec=1w`) if the restic module, its overrides, or a
+      shared dep like `pkgs-stable` changes. A run in progress (backups
+      have taken multiple days for the ~2.9TiB dataset) would be killed
+      with no resumption. Worked around this time by manually pausing
+      the `nixos-upgrade` timer for the duration of the manual run.
+      Needs a permanent fix: either make the backup service resilient
+      to being interrupted/restarted (state/resume support, or a
+      `ConditionXXX`/lock that defers an auto-switch while a backup is
+      active), or have `myAutoUpdate` skip switching while
+      `restic-backups-backblazeWeekly.service` is active.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
