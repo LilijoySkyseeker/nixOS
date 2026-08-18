@@ -203,17 +203,22 @@ values/missing secrets above before the manual work is done:
 Measured live (2026-08-18): a from-scratch `nixos-rebuild build` on the
 vps itself peaked around 1.7GB used + ~424MB swap (out of the droplet's
 ~2GB total) — evaluation (unpacking/evaluating nixpkgs, home-manager,
-disko, etc.), not compilation, was the dominant cost. `myPullDeploy`
-currently runs `nixos-rebuild build`/`switch` locally on vps
-(`hosts/vps/configuration.nix`), which is why it needs this much RAM at
-all. Before downsizing the droplet below ~2GB:
+disko, etc.), not compilation, was the dominant cost.
 
-- [ ] Stop evaluating/building on vps itself — run the actual
-      `nixos-rebuild switch --target-host` invocation from a beefier
-      tailnet machine (homelab, or wherever `myAutoUpdate` already
-      builds), so vps only ever activates an already-finished closure.
-      This is the main fix; evaluation cost doesn't move to remote
-      build machines on its own (see below).
+- [x] Stop evaluating/building on vps itself — **done**. `myPullDeploy`
+      was removed from `hosts/vps/configuration.nix`; the vps no longer
+      has its own flake checkout or evaluates/builds anything.
+      `hosts/homelab/configuration.nix` now runs `myPushDeploy`
+      (`hostAttr = "vps"`, `targetHost = "vps-deploy@vps"`), which
+      builds vps's config on homelab and pushes+activates the finished
+      closure over SSH as the unprivileged `vps-deploy` user (real
+      activation via nixos-rebuild's polkit-based `run0` elevator, not
+      root login/sudo — see the `vps-deploy` user/ForceCommand
+      allowlist in `hosts/vps/configuration.nix`). Wired to
+      `systemd.services.nixos-upgrade.onSuccess` right after homelab's
+      own `myAutoUpdate` switch, plus a Thursday 03:15 periodic
+      fallback timer — confirmed live via
+      `systemctl list-timers push-deploy-vps.timer` on homelab.
 - [ ] Optionally, once that's in place, layer distributed builders on
       top (`nix.distributedBuilds = true` + `nix.buildMachines`
       pointing at other tailnet hosts) so any actual compilation (not
