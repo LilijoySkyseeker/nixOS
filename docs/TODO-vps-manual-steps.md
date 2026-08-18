@@ -13,44 +13,39 @@ from an SSH host key that doesn't exist until after install. Generate
 it locally first, entirely outside this repo checkout (e.g.
 `~/vps-extra-files`, never inside the worktree):
 
-- [ ] ```
+- [x] ```
       mkdir -p ~/vps-extra-files/persist/etc/ssh
       ssh-keygen -t ed25519 -N "" -f ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
       chmod 600 ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key
       nix run nixpkgs#ssh-to-age < ~/vps-extra-files/persist/etc/ssh/ssh_host_ed25519_key.pub
       ```
-- [ ] Add that `age1...` key to `.sops.yaml`'s `creation_rules`
-      (alongside `homelab3`/`torrent-age`)
-- [ ] `sops updatekeys secrets/secrets.yaml` so the vps is a valid
+- [x] Add that `age1...` key to `.sops.yaml`'s `creation_rules`
+      (alongside `homelab3`/`torrent-age`) — `&vps` key is enrolled
+- [x] `sops updatekeys secrets/secrets.yaml` so the vps is a valid
       recipient before it ever boots
-- [ ] Add `tailscale_authkey_vps` secret (same pattern as the other
+- [x] Add `tailscale_authkey_vps` secret (same pattern as the other
       hosts — a non-reusable pre-authorized key tagged `tag:vps`)
-- [ ] Add `tag:vps` to `tailscale-acl.json`'s `tagOwners` (and decide
-      whether it needs `grants`/`ssh` entries — it mainly just needs
-      to be reachable by you for admin SSH, not by other tailnet
-      devices)
+- [x] Add `tag:vps` to `tailscale-acl.json`'s `tagOwners` — present in
+      `docs/tailscale-acl.json`, plus a ForceCommand allowlist for the
+      `vps-deploy` automation user (see the "fix: dispatcher injection"
+      commit)
 
 ## 2. Provision the instance
 
-- [ ] Pick provider/region — DigitalOcean, SFO or NYC (closest US
-      regions to homelab + you), at least the 1GB RAM / 25GB disk plan
-      (the 512MB/10GB plan is too small — closure is ~8.4GiB)
-- [ ] Create the droplet, confirm from it (SSH in, before running
-      nixos-anywhere):
-  - [ ] real disk device (`lsblk`) — update `hosts/vps/disko.nix` if
-        it's not `/dev/vda`
-  - [ ] real public interface name (`ip a`) — update
-        `networking.nat.externalInterface` in
-        `hosts/vps/configuration.nix` if it's not `eth0`
-- [ ] Install, building locally, generating the real hardware config,
-      and pre-seeding the SSH host key from step 1 (see
-      `hosts/vps/README.md` and `AGENTS.md` for why):
-      ```
-      nixos-anywhere --flake .#vps --target-host root@<vps-ip> \
-        --generate-hardware-config nixos-generate-config hosts/vps/hardware-configuration.nix \
-        --kexec-extra-flags -c \
-        --extra-files ~/vps-extra-files
-      ```
+- [x] Pick provider/region — ended up on DigitalOcean (an earlier
+      Vultr attempt was reverted — see "refactor: switch vps provider
+      from Vultr to DigitalOcean")
+- [x] Create the droplet, confirm from it:
+  - [x] real disk device — `hosts/vps/disko.nix` (`/dev/vda`, real
+        `hardware-configuration.nix` generated and checked in)
+  - [x] real public interface name — `externalInterface = "ens3"` in
+        `hosts/vps/configuration.nix`, with a comment recording a live
+        incident where the ens3/ens4 assignment was initially backwards
+        and silently broke DNAT for the game ports
+- [x] Install — done via `nixos-anywhere` with the real hardware config
+      and pre-seeded SSH host key. Also needed a legacy-GRUB fix
+      (DigitalOcean chainloads BIOS, not UEFI) and bumping `/nix` to
+      18G (the real closure didn't fit in the originally planned 12G).
 
 ## 3. WireGuard keys — DONE
 
@@ -168,18 +163,15 @@ values/missing secrets above before the manual work is done:
       breaks its own per-IP failed-login lockout (one bad actor could
       lock out everyone, since they'd all look like the same source).
       This is a runtime dashboard setting, not something Nix declares.
-- [ ] Watch Minecraft/Factorio container startup after the
-      `--read-only`/`--cap-drop=ALL` change in `services/minecraft.nix`/
-      `services/factorio.nix` — `docker logs minecraft-vanilla-plus` /
-      `docker logs factorio-main` for "Read-only file system" or
-      "Operation not permitted" errors. Both were only reasoned through
-      statically (itzg/factoriotools entrypoints are expected to only
-      write under /data or /factorio, already-writable volumes, plus
-      /tmp which now has a tmpfs) — never actually run under these
-      flags. If something breaks: check which path it tried to write,
-      add a matching `--tmpfs=/that/path` to `extraOptions` first;
-      only drop `--read-only`/`--cap-drop=ALL` entirely as a last
-      resort.
+- [x] Watch Minecraft/Factorio container startup after the
+      `--read-only`/`--cap-drop=ALL` change — **found and fixed for
+      real**: factorio's container hardening broke startup outright
+      (see "fix: factorio container hardening was breaking startup
+      entirely"), root-caused and resolved without dropping
+      `--cap-drop=ALL`. Minecraft's game-port rate limiting was also
+      found to be throttling real gameplay traffic (not just abuse)
+      and fixed live (see "fix: game-port rate limits were throttling
+      real gameplay, not just abuse"). Both are now running live.
 
 ## Future: offload vps rebuilds off-box (downsizing prerequisite)
 
