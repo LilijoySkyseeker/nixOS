@@ -94,6 +94,12 @@ let
       cloudflare = {
         class = "octodns_cloudflare.CloudflareProvider";
         token = "env/CLOUDFLARE_TOKEN";
+        # We don't use Cloudflare page rules, and the scoped DNS-edit
+        # token doesn't have Page Rules permission — without this,
+        # octodns-cloudflare's default pagerules=true makes an extra
+        # GET /zones/{id}/pagerules call that 403s and gets
+        # misreported as a DNS auth failure.
+        pagerules = false;
       };
     };
     zones."${domain}" = {

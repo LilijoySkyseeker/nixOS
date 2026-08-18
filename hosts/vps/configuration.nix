@@ -519,6 +519,11 @@ in
   # `vars.domain` is the single source of truth for the public domain
   # (also consumed by services/octodns.nix) — see flake.nix's `vars`.
   sops.secrets.vps_caddy_env = { }; # TODO: populate with DNS provider API token if using DNS-01 challenges
+  # anubis's unix socket is group-owned `anubis` at mode 0770 — caddy
+  # (a separate system user) needs group membership to reverse_proxy
+  # into it, or every request 502s with "permission denied" (confirmed
+  # live on the vps).
+  users.users.caddy.extraGroups = [ "anubis" ];
   services.caddy = {
     enable = true;
     virtualHosts = {
@@ -530,7 +535,13 @@ in
           Referrer-Policy "strict-origin-when-cross-origin"
           Permissions-Policy "camera=(), microphone=(), geolocation=()"
         }
-        reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock
+        reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
+          # anubis refuses to proxy without this — it doesn't infer the
+          # client IP from X-Forwarded-For (confirmed live: every
+          # request 500'd with "[misconfiguration] X-Real-Ip header is
+          # not set" until this was added).
+          header_up X-Real-Ip {remote_host}
+        }
       '';
     };
   };
