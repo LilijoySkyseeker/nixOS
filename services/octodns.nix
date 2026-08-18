@@ -6,11 +6,7 @@
   ...
 }:
 let
-  # Disabled until the vps is provisioned and a real Cloudflare token
-  # exists (see docs/TODO-vps-manual-steps.md) — flip to `true` once that's
-  # done, rather than leaving a service pointed at a placeholder IP
-  # live.
-  enable = false;
+  enable = true;
 
   # Everything octoDNS needs is generated from these two values instead
   # of checked-in YAML — the zone data and octoDNS's own config file are
@@ -18,7 +14,10 @@ let
   # (also consumed by hosts/vps/configuration.nix) — see flake.nix's
   # `vars`.
   domain = vars.domain;
-  vpsPublicIp = "REPLACE_WITH_VPS_PUBLIC_IP"; # TODO: fill in once the vps is provisioned
+  vpsPublicIp = "137.184.45.18";
+  # Same droplet's public IPv6 — already in use as the WireGuard peer
+  # endpoint in hosts/homelab/configuration.nix.
+  vpsPublicIp6 = "2604:a880:4:1d0:0:3:5045:8000";
 
   # Only jellyfin, minecraft, and factorio are meant to be publicly
   # reachable (see hosts/vps/README.md).
@@ -28,6 +27,11 @@ let
         type = "A";
         ttl = 300;
         value = vpsPublicIp;
+      }
+      {
+        type = "AAAA";
+        ttl = 300;
+        value = vpsPublicIp6;
       }
     ];
     jellyfin = [
@@ -46,12 +50,22 @@ let
         ttl = 300;
         value = vpsPublicIp;
       }
+      {
+        type = "AAAA";
+        ttl = 300;
+        value = vpsPublicIp6;
+      }
     ];
     factorio = [
       {
         type = "A";
         ttl = 300;
         value = vpsPublicIp;
+      }
+      {
+        type = "AAAA";
+        ttl = 300;
+        value = vpsPublicIp6;
       }
     ];
   };
