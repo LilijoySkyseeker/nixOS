@@ -189,6 +189,14 @@
       # weekly timer, but long enough for a run to actually finish.
       TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeWeekly";
+      # declaratively (re)assert the B2 bucket's lifecycle rule every run,
+      # since it's cloud-side state with no other source of truth: with
+      # b2-hard-delete=false, restic's own prunes (--keep-daily 30) only
+      # hide old versions rather than deleting them, so this purges hidden
+      # versions after 1 day — a short safety buffer, not a retention
+      # policy (restic's prune already governs what data is kept).
+      # Idempotent: safe to re-set on every run.
+      ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # only reached on success (ExecStartPost doesn't run after a failed
       # ExecStart), so its mtime is proof a backup actually completed.
       ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
