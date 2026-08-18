@@ -70,4 +70,39 @@ items rather than letting them rot.
       Purely a build-time-distribution optimization, not required for
       any host's correctness.
 
+- [ ] **2026-08-18: caddy hits a permission-denied race against the
+      anubis unix socket right after vps reboots.** Found trawling
+      vps's logs: from 03:18–03:47 (right after a 23:47 reboot), every
+      request to `jellyfin.skyseekerlabs.net` 502'd with `dial unix
+      /run/anubis/anubis-jellyfin/anubis.sock: connect: permission
+      denied` (36 requests total), then self-resolved and hasn't
+      recurred since (0 in the following ~13h). `caddy`'s `id` shows
+      it *is* in the `anubis` group (`hosts/vps/configuration.nix`
+      already has `users.users.caddy.extraGroups = [ "anubis" ]`,
+      added for exactly this failure mode per the comment there) — so
+      this looks like a boot-order race, not a missing-permission bug:
+      caddy's group membership or the socket itself isn't ready by the
+      time caddy starts serving. Needs: add an explicit
+      `systemd.services.caddy.after`/`wants` (or similar ordering) on
+      the anubis service/socket so caddy doesn't start accepting
+      traffic until anubis's socket exists with the right group perms
+      already applied.
+
+- [ ] **2026-08-18: confirm crowdsec is actually banning things on
+      vps.** Found trawling logs: heavy vulnerability-scanner traffic
+      hit `jellyfin.skyseekerlabs.net` in the last 24h (leakix.net
+      scanner + others probing `.env`, `.git/config`,
+      WordPress/Jira/vCenter/cPanel exploit paths), but
+      `cscli decisions list`/`cscli alerts list` (as the `crowdsec`
+      user) both came back completely empty — zero bans, zero alerts,
+      despite `crowdsec`/`crowdsec-firewall-bouncer` both reporting
+      healthy/running. Plausible explanation: all that scan traffic
+      502'd before reaching jellyfin (see the anubis-socket item
+      above), so it never matched whatever backend-response scenario
+      crowdsec's `crowdsecurity/caddy` collection keys off — but not
+      confirmed. Needs: verify crowdsec is actually parsing/acting on
+      caddy's access log (not just tailing sshd), e.g. by checking
+      `cscli metrics` for bucket hit counts, before trusting it as a
+      real defense layer.
+
 ## Done
