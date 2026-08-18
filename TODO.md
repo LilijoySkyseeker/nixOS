@@ -56,4 +56,18 @@ items rather than letting them rot.
       WireGuard's cryptokey routing (mirrors the existing IPv4
       POSTROUTING SNAT rule), then re-add the AAAA records.
 
+- [ ] **2026-08-18: layer distributed builders across the tailnet**.
+      vps's rebuilds are already offloaded off-box — homelab builds and
+      pushes vps's closure via `myPushDeploy`, vps itself never
+      evaluates/builds (see `docs/TODO-vps-manual-steps.md`'s "Offload
+      vps rebuilds off-box" section, done). This item is the optional
+      follow-on, and applies beyond just vps: set
+      `nix.distributedBuilds = true` + `nix.buildMachines` (pointing at
+      other tailnet hosts, e.g. homelab/thinkpad/torrent as capacity
+      allows) so actual compilation — not evaluation, which stays local
+      to whichever machine initiates a given host's rebuild — fans out
+      across the tailnet instead of always landing on one machine.
+      Purely a build-time-distribution optimization, not required for
+      any host's correctness.
+
 ## Done

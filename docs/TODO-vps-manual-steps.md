@@ -198,7 +198,7 @@ values/missing secrets above before the manual work is done:
       and fixed live (see "fix: game-port rate limits were throttling
       real gameplay, not just abuse"). Both are now running live.
 
-## Future: offload vps rebuilds off-box (downsizing prerequisite)
+## Offload vps rebuilds off-box (downsizing prerequisite) — DONE
 
 Measured live (2026-08-18): a from-scratch `nixos-rebuild build` on the
 vps itself peaked around 1.7GB used + ~424MB swap (out of the droplet's
@@ -219,14 +219,11 @@ disko, etc.), not compilation, was the dominant cost.
       own `myAutoUpdate` switch, plus a Thursday 03:15 periodic
       fallback timer — confirmed live via
       `systemctl list-timers push-deploy-vps.timer` on homelab.
-- [ ] Optionally, once that's in place, layer distributed builders on
-      top (`nix.distributedBuilds = true` + `nix.buildMachines`
-      pointing at other tailnet hosts) so any actual compilation (not
-      just evaluation) fans out across the tailnet instead of landing
-      on whichever machine initiates the rebuild. Note this only helps
-      the *build* phase — it does NOT reduce the evaluation-time memory
-      cost measured above, so it's a complement to the point above, not
-      a substitute for it.
+
+(The optional follow-on — layering distributed builders across the
+tailnet so actual compilation, not just evaluation, fans out — is
+cross-host, not vps-specific, so it's tracked in the repo-root
+`TODO.md` instead.)
 
 ## Confirmed NOT exposed (by design)
 
