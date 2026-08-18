@@ -143,9 +143,15 @@
         OnCalendar = "Fri 03:00:00";
         Persistent = true;
       };
+      # this job runs weekly, so "--keep-daily" here really means "keep
+      # the last N runs" (one snapshot lands per day-with-a-run, not per
+      # calendar day) — 2 keeps roughly the last 2 weekly cycles. This is
+      # a disaster-recovery copy only, not a versioning history (ZFS
+      # snapshots/sanoid already cover that), so a short window is
+      # intentional.
       pruneOpts = [
         "--retry-lock 15m"
-        "--keep-daily 30"
+        "--keep-daily 2"
       ];
       runCheck = true;
       checkOpts = [
