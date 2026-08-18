@@ -135,22 +135,23 @@ values/missing secrets above before the manual work is done:
       cert (issuer `Let's Encrypt CN=YE1`) is being served, and the
       full chain (Caddy → Anubis → Jellyfin over the wireguard tunnel)
       returns a real `200`/`<title>Jellyfin</title>` page.
-- [ ] Verify Minecraft/Factorio reachable on the vps's public IP —
-      tested and currently **blocked**. Live findings: the nixos-level
-      DNAT/firewall config is correct (`nixos-nat-pre` DNAT rules and
-      `nixos-filter-forward` ACCEPT rules for 25565/19132/34197 are
-      both present), and the tunnel path works (from the vps,
-      `/dev/tcp/10.100.0.2/25565` connects instantly over wg0). But a
-      real external connection attempt to `137.184.45.18:25565` never
-      registered a single packet on the vps's own netfilter counters
-      (`nixos-nat-pre` stayed at 0 pkts) — meanwhile port 443 to the
-      same IP connects fine. This points at a **DigitalOcean Cloud
-      Firewall** (a network-level firewall separate from the droplet's
-      own iptables) blocking inbound on the game ports before traffic
-      ever reaches the box. Needs manual check: DigitalOcean dashboard
-      → Networking → Firewalls — if one's attached to this droplet,
-      add inbound rules for TCP 25565 and UDP 19132/34197 (or detach it
-      if it's not meant to be restricting this box at all).
+- [x] Verify Minecraft/Factorio reachable on the vps's public IP —
+      **root-caused and fixed**. Initial suspicion (DigitalOcean Cloud
+      Firewall) was ruled out: the user removed all Cloud Firewalls
+      from the droplet and the problem persisted. Actual cause:
+      `externalInterface` in `hosts/vps/configuration.nix` was set to
+      `ens4`, but `ip a`/`ip route` on the real droplet showed `ens3`
+      is the one carrying the public IP and default route (the
+      reverse of what an old comment claimed) — every
+      DNAT/FORWARD/rate-limit rule was scoped to the wrong interface,
+      so real external traffic to 25565/19132/34197 never matched and
+      silently vanished. HTTP/HTTPS were unaffected the whole time
+      since Caddy listens unscoped on all interfaces, which is what
+      masked this. Fixed by switching `externalInterface` to `ens3`;
+      confirmed live — Minecraft connects successfully now. A stale
+      `-i ens4` rate-limit jump rule is still sitting in the live
+      ruleset (harmless, only matches private VPC traffic now) and
+      will clear itself on the vps's next reboot.
 - [ ] Verify `noexec` on `/` and `/persist` (`disko.nix`/`configuration.nix`)
       didn't break anything at first boot — this was only statically
       verified (`nix eval`/`nix build`, traced the impermanence bind-mount
