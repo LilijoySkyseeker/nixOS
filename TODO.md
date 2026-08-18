@@ -11,6 +11,29 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-18: verify Android SMB share end-to-end** (homelab,
+      `services/samba.nix`, commit c5c0f0e). Added Samba alongside the
+      existing NFS export (`services/nfs.nix`) so Android — which has
+      no usable native NFS client — can reach `/storage` and
+      `/storage-bulk` read-write over the tailnet. Firewall/interface
+      scoping mirrors nfs.nix (tailscale0 only, port 445, nmbd/winbindd
+      disabled). Dedicated `android-smb` system user (multimedia group,
+      no shell/login) is the SMB auth identity; smbd itself still runs
+      as root since the upstream module gives it no user/group option
+      and setuid-per-request is how Samba works — capability set is
+      trimmed with the same always-safe systemd flags used elsewhere in
+      this repo instead. `/var/lib/samba` added to homelab's
+      impermanence persistence list so the SMB password survives
+      reboot. Build-tested (`nixos-rebuild build --flake .#homelab`)
+      but not yet deployed/switched or tested from an actual Android
+      device. Needs: deploy to homelab, run `smbpasswd -a android-smb`
+      manually on the host (sops secrets aren't edited directly — see
+      repo convention), then connect from an Android SMB client
+      (Material Files / Solid Explorer / CX File Explorer) via
+      `homelab.<tailnet>.ts.net` or the Tailscale IP, port 445, and
+      confirm read-write actually lands with `multimedia` group
+      ownership.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
