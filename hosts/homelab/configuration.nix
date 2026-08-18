@@ -121,7 +121,7 @@
       rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
       #       mount all the most recent backups in a temp folder for restic to trawl
       backupPrepareCommand = ''
-        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
+        datasets="zroot/local/state zdata/storage/storage"
 
         for dataset in $datasets; do
           snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
