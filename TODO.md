@@ -120,8 +120,24 @@ items rather than letting them rot.
       json }` now present) and by confirming via `cscli explain` that
       a real captured caddy log line parses successfully and matches
       `crowdsecurity/http-crawl-non_statics` once given that JSON
-      shape. Build-tested (`nixos-rebuild build --flake .#vps`
-      succeeds); not yet deployed to the live host — needs a real
-      `switch` to take effect, and then a follow-up check a day or two
-      later that `crowdsecurity/caddy-logs` actually shows hits in
-      `/metrics` against real traffic.
+      shape. **Deployed and confirmed live 2026-08-18**: after the
+      `logFormat` fix, `crowdsecurity/caddy-logs` still had 0 hits —
+      `journalctl -u crowdsec` showed `UnmarshalJSON: invalid
+      character 'A' looking for beginning of value` on every caddy
+      line. Second root cause: journalctl always prefixes lines with
+      the syslog envelope (`Mon DD HH:MM:SS host caddy[pid]: `), and
+      only `labels.type = "syslog"` (not `"caddy"`) routes events
+      through `crowdsecurity/syslog-logs` to strip that prefix before
+      `caddy-logs` sees the JSON — a known crowdsec gotcha
+      (crowdsecurity/crowdsec#4098: "Journalctl sources MUST use
+      syslog type"). Fixed the acquisition's `labels.type` to
+      `"syslog"` in `hosts/vps/configuration.nix`, redeployed, then
+      verified end-to-end live: sent real probe requests
+      (`.env`, `.git/config`, `wp-login.php`, etc.) through
+      `jellyfin.skyseekerlabs.net`, watched `cs_bucket_poured_total`
+      increment across five caddy scenarios, and got a real
+      `crowdsecurity/http-admin-interface-probing` ban decision back
+      from `cscli decisions list` — then deleted that decision since
+      it was our own test traffic, not a real attacker. crowdsec now
+      genuinely bans scanners hitting jellyfin; before this it never
+      had.
