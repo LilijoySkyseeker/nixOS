@@ -33,7 +33,7 @@
     ];
     environment = {
       TYPE = "FABRIC";
-      VERSION = "26.2";
+      VERSION = "LATEST";
       EULA = "TRUE";
       # the entrypoint writes /etc/nsswitch.conf on every start unless told
       # not to; --read-only below makes that write fail, so skip it — the
@@ -49,6 +49,13 @@
       ALLOW_FLIGHT = "TRUE";
       SPAWN_PROTECTION = "FALSE";
       SEED = "3522075773609978693";
+      # pause the JVM (SIGSTOP) when no clients are connected, resuming on
+      # the next connection attempt (knockd watches for it on the
+      # container's eth0). Requires max-tick-time disabled below — the
+      # server watchdog would otherwise self-kill on resume, since a
+      # single tick spans however long the process was paused.
+      ENABLE_AUTOPAUSE = "TRUE";
+      MAX_TICK_TIME = "-1";
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
@@ -78,7 +85,12 @@
       ENABLE_RCON = "FALSE";
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
-    volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
+    volumes = [
+      "/srv/minecraft/vanilla-plus:/data"
+      # overlays Geyser-Fabric/config.yml into /data/config on every start
+      # (itzg's /config sync); see services/minecraft-geyser-config for why.
+      "${./minecraft-geyser-config}:/config:ro"
+    ];
     # container hardening: no capabilities beyond what a JVM needs (none)
     # plus the two the entrypoint needs to drop from root to the
     # "minecraft" user (SETUID/SETGID, via gosu), no privilege escalation,
@@ -104,6 +116,9 @@
       "--cap-drop=ALL"
       "--cap-add=SETUID"
       "--cap-add=SETGID"
+      # knockd (autopause) sniffs the connection attempt that wakes the
+      # paused JVM back up; needs raw-socket access to do that.
+      "--cap-add=NET_RAW"
       "--security-opt=no-new-privileges:true"
     ];
   };
