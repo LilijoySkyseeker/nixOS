@@ -402,7 +402,17 @@
         # vps
         publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
-        endpoint = "[2604:a880:4:1d0:0:3:5045:8000]:51820";
+        # IPv4 literal, not vps's IPv6 address — confirmed live this
+        # tunnel silently died for hours despite persistentKeepalive:
+        # homelab's own outbound IPv6 addresses are RFC4941 "temporary
+        # dynamic" privacy addresses that rotate periodically, and once
+        # one rotated, the vps side's auto-learned endpoint for this
+        # peer went stale (source-address roaming only relearns from a
+        # freshly-arriving packet, and nothing forced one). vps's IPv4
+        # (137.184.45.18, ens3 — see hosts/vps/configuration.nix) is
+        # static and is what every other IPv4-only piece of this path
+        # (game-port DNAT/SNAT/rate-limits) already keys off of.
+        endpoint = "137.184.45.18:51820";
         allowedIPs = [ "10.100.0.1/32" ];
         # CGNAT mappings expire without periodic traffic; keep the
         # tunnel (and the vps's route back to us) alive.
