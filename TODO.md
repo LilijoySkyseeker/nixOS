@@ -193,30 +193,86 @@ items rather than letting them rot.
         yet on any host. Will coordinate with backblaze-homelab-reset
         before any real pool-affecting action once homelab's turn
         comes, well after this backup episode.
-      - **distributed nix builds setup, jellyfin gpu acceleration,
-        add samba smb share, verify crawler rate limiting** — status
-        not yet reported back as of this writing; nix-build-cache
-        already flagged distributed-nix-builds as a likely
-        `configuration.nix` sequencing conflict (same 3 hosts, same
-        files, complementary features).
+      - **distributed nix builds setup**
+        (`worktree-distributed-build-todo`) — done, build-clean on all
+        3 hosts, committed but not deployed/switched. New
+        `modules/nixos/build-worker.nix` +
+        `nix.distributedBuilds`/`nix.buildMachines` in
+        `hosts/{homelab,thinkpad,torrent}/configuration.nix`, 3 new
+        sops secrets, one homelab persistence-list entry. Three
+        placeholder values (`publicHostKey` per host, real `maxJobs`,
+        thinkpad's AC power-supply node name) still need filling in
+        before a real `switch`, though that doesn't block merging the
+        Nix code itself. **Confirmed overlap with nix-build-cache**:
+        both add `nix.*`/host config to the same three hosts'
+        `configuration.nix` — complementary (this distributes compute,
+        cache warms pre-built outputs) but list-type option merges
+        need a direct diff before finalizing merge order; flagged to
+        both sessions to compare directly.
+      - **jellyfin gpu acceleration** (`worktree-jellyfin-gpu-accel`)
+        — done, 1 commit (`0806016`) pushed to origin, not
+        merged/deployed. Touches `hosts/homelab/configuration.nix`
+        (`hardware.graphics`/`hardware.nvidia`/videoDrivers) and
+        `services/jellyfin.nix` (hardware transcoding config, Intel
+        render-node DeviceAllow, jellyfin user added to render group).
+        Only risk is the generic shared-file overlap on
+        `hosts/homelab/configuration.nix` — no semantic conflict found
+        with anything else on this list.
+      - **add samba smb share** (`worktree-android-smb-share`) — in
+        progress, build-clean, 3 commits local to the worktree
+        (`c5c0f0e`, `421f4c8`, `e851b8d`), not yet pushed. New
+        `services/samba.nix`, one import line in
+        `hosts/homelab/configuration.nix`, comment-only edit to
+        `services/nfs.nix`. Author wants a live smoke test (tailnet-only
+        lockdown) before considering it merge-ready even though it
+        builds clean. Only the generic shared-file overlap on
+        `hosts/homelab/configuration.nix` — no semantic conflict found.
+      - **verify crawler rate limiting** (`worktree-vps-base-ratelimit`)
+        — done, 3 commits (`8aec08d`, `bf774ef`, `dbcfd83`), not
+        pushed. vps-only (`hosts/vps/configuration.nix`, an iptables
+        rate-limit rule for caddy's 80/443 entry point) — a different
+        host from homelab, no shared files, conflict-free and
+        independent of the homelab-unblock sequencing entirely.
 
-      **Working order once homelab is unblocked** (draft, pending the
-      remaining 4 reports and final user go-ahead):
-      1. backblaze-homelab-reset finishes/lands its held-back commit.
-      2. minecraft-geyser merges any time (no dependency).
-      3. wireguard-ipv6 rebases on master, deploys together with #1 in
-         one switch.
-      4. nix-build-cache and distributed-nix-builds-setup diff/rebase
-         against each other and against backblaze-reset's
-         `backblazeWeekly` OnCalendar change, then merge in an agreed
-         sequence (not simultaneously).
-      5. zfs-backups+spaceguard and zfs-pool-recovery-restore diff
+      **Working order once homelab is unblocked** (all 10 sessions
+      have now reported; still needs final user go-ahead before any
+      push/merge/switch):
+      1. backblaze-homelab-reset finishes its in-progress B2 backup,
+         then lands the held-back `1977e94` commit via `switch`.
+      2. Merge any time, independent of the backup/homelab sequencing:
+         minecraft-geyser (pushed, no overlap), jellyfin-gpu-accel
+         (pushed, no semantic overlap), crawler-rate-limiting
+         (vps-only, fully independent).
+      3. wireguard-ipv6 rebases on master, deploys together with #1's
+         commit in one `switch` (already coordinated between those two
+         sessions) to avoid multiple restic-unit restarts.
+      4. nix-build-cache and distributed-nix-builds-setup: **already
+         diffed directly, resolved as low-risk.** No semantic option
+         conflict (separate namespaces, distinct sops secret names);
+         the only real conflict is a same-line `imports` insertion
+         point in all three of `hosts/{homelab,thinkpad,torrent}/
+         configuration.nix` (both insert their new module import right
+         after `../../modules/nixos/push-deploy.nix`) — trivial to
+         resolve by keeping both lines (import order doesn't matter),
+         but whoever merges second must do it manually, not blind
+         auto-merge. Separately, still diff nix-build-cache's
+         `backblazeWeekly` OnCalendar move (Fri→Thu 03:00) against
+         backblaze-reset's restic block before merging either.
+      5. add-samba-smb-share: push once its author is satisfied with a
+         live tailnet-lockdown smoke test, then merge — only a
+         shared-file (not semantic) overlap with anything above.
+      6. zfs-backups+spaceguard and zfs-pool-recovery-restore diff
          `hosts/homelab/disko.nix` + sanoid/syncoid areas against each
          other before either merges; zfs-pool-recovery-restore's
-         Phase-2 bits stay inert (`myPhase2.reinstalled=false`)
-         regardless of merge order.
-      6. samba, jellyfin-gpu, crawler-rate-limiting — pending status,
-         presumed independent unless they report otherwise.
+         Phase-2 bits (LUKS/secure-boot/impermanence, reinstall
+         orchestration) stay inert (`myPhase2.reinstalled=false`)
+         regardless of merge order, and its homelab reinstall is last
+         in that project's own sequencing (thinkpad → torrent →
+         homelab), well after this round of merges.
+
+      Net: only step 1 is a hard blocker on the live backup finishing;
+      everything else can be diffed/sequenced now and merged as soon
+      as the user gives the go-ahead, in roughly the order above.
 
 ## Done
 
