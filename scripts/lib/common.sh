@@ -67,7 +67,14 @@ run_cmd() {
   "$@"
 }
 
-ssh_opts=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
+# -A: forwards the operator's own ssh agent to the recovery ISO, so
+# syncoid running there can authenticate outbound to homelab (backup
+# import/send, restore receive) without any private key ever living on
+# the ISO. Only safe because every target here is the ISO itself
+# (ephemeral, booted by the operator) — never forward an agent to an
+# untrusted or persistent host. See hosts/isoimage/configuration.nix's
+# AllowAgentForwarding for the other end of this.
+ssh_opts=(-A -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
 
 # ssh_to <user@host> <command...> — thin wrapper so every remote call
 # uses the same options and shows what's being run. In --dry-run, logs

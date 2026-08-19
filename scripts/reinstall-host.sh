@@ -3,27 +3,43 @@
 # impermanence rollout). Template script, driven by scripts/hosts/<host>.conf
 # — copy scripts/hosts/thinkpad.conf to add a new host.
 #
-# Stages run in different places — read this before starting:
+# Boot the host straight to the recovery ISO ONCE (no need to boot the
+# old install first) and everything that can possibly happen over ssh
+# to that one ISO session does — backup, install, and restore. Only
+# what genuinely requires physical/local presence is left local:
 #
-#   backup      LOCAL, on the CURRENTLY RUNNING host, before wiping it.
-#   install     REMOTE, from your admin machine, over ssh to the
-#               recovery ISO's DHCP IP once it's live-booted on the target.
-#   restore     LOCAL, on the freshly-installed host, after first boot.
-#   secureboot  LOCAL, on the freshly-installed host — pauses for the
-#               BIOS Setup Mode step, which nothing can automate.
-#   tpm2        LOCAL, on the freshly-installed host, after Secure Boot
-#               is confirmed working.
+#   backup      REMOTE, from your admin machine, ssh to the booted
+#               ISO. Imports the host's CURRENT (pre-reinstall) pool
+#               read-write (forced — hostid won't match the ISO's) and
+#               syncoid-sends the data off before anything is wiped.
+#   install     REMOTE, same ISO session. disko-install wipes the
+#               disk(s) and lays down the new LUKS+ZFS config.
+#   restore     REMOTE, same ISO session, before ever booting the new
+#               install. Receives the backed-up data straight into the
+#               freshly disko-installed pool, then exports it and
+#               offers to reboot the host into the real install.
+#   secureboot  LOCAL, on the booted new install — pauses for the BIOS
+#               Setup Mode step, which nothing can automate.
+#   tpm2        LOCAL, on the booted new install, after Secure Boot is
+#               confirmed working — must run post-reboot, since PCR7
+#               has to reflect the real signed boot chain, not the ISO's.
 #
 # Full sequence for a given host:
-#   1. On the host:            ./reinstall-host.sh backup thinkpad
-#   2. Boot the recovery ISO on the host (USB/Ventoy), note its IP.
-#   3. From your admin machine: ./reinstall-host.sh install thinkpad <iso-ip>
-#   4. Reboot the host into the new install.
-#   5. On the host:            ./reinstall-host.sh restore thinkpad
-#   6. On the host:            ./reinstall-host.sh secureboot thinkpad
-#   7. On the host:            ./reinstall-host.sh tpm2 thinkpad
-#   8. On your dotfiles checkout: flip myPhase2.reinstalled = true for
+#   1. Boot the recovery ISO on the host (USB/Ventoy), note its IP.
+#   2. From your admin machine: ./reinstall-host.sh backup     thinkpad <iso-ip>
+#   3. From your admin machine: ./reinstall-host.sh install    thinkpad <iso-ip>
+#   4. From your admin machine: ./reinstall-host.sh restore    thinkpad <iso-ip>
+#      (this stage ends by offering to reboot the host for you)
+#   5. On the host, after it boots the new install:
+#                                ./reinstall-host.sh secureboot thinkpad
+#   6. On the host:              ./reinstall-host.sh tpm2       thinkpad
+#   7. On your dotfiles checkout: flip myPhase2.reinstalled = true for
 #      this host, nixos-rebuild build to confirm, commit, push.
+#
+# backup/install/restore all use ssh -A (agent forwarding) to the ISO,
+# so syncoid running there can reach homelab using YOUR forwarded
+# agent — no private key ever touches the ISO. See
+# hosts/isoimage/configuration.nix's AllowAgentForwarding.
 #
 # TEMPORARY: the backup/restore stages are a stand-in for real automated
 # backups (being built separately — see TODO.md). Once thinkpad/torrent
@@ -49,9 +65,9 @@ usage() {
 Usage: $0 [--dry-run] <stage> <host> [args...]
 
 Stages:
-  backup     <host>                run on the host, before wiping it
+  backup     <host> <iso-ip>       run from your admin machine
   install    <host> <iso-ip>       run from your admin machine
-  restore    <host>                run on the freshly-installed host
+  restore    <host> <iso-ip>       run from your admin machine
   secureboot <host>                run on the freshly-installed host
   tpm2       <host>                run on the freshly-installed host
 
@@ -76,18 +92,23 @@ require_local_host() {
 
 stage_backup() {
   local host="$1"
-  require_local_host "$host"
+  local iso_ip="$2"
+  local target="root@${iso_ip}"
 
-  log "Backing up ${#DATA_DATASETS[@]} dataset(s) from $host to ${HOMELAB_SSH}:${BACKUP_DATASET}"
-  confirm "This will snapshot and send: ${DATA_DATASETS[*]} -> ${HOMELAB_SSH}:${BACKUP_DATASET}/<leaf>. This is a TEMPORARY pre-reinstall safety net, not the real backup system."
+  log "Importing $host's current pool '$SOURCE_POOL' read-write on the ISO (forced — hostid won't match) to read data out before it's wiped."
+  confirm "About to import '$SOURCE_POOL' on $target and send ${DATA_DATASETS[*]} -> ${HOMELAB_SSH}:${BACKUP_DATASET}/<leaf>. Read-write import so syncoid can snapshot, but nothing here writes application data — this pool is about to be wiped by the 'install' stage regardless. TEMPORARY pre-reinstall safety net, not the real backup system."
+
+  ssh_to "$target" zpool import -f -N "$SOURCE_POOL"
 
   for ds in "${DATA_DATASETS[@]}"; do
     local leaf="${ds##*/}"
-    run_cmd run0 syncoid --no-privilege-elevation "$ds" "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}"
+    ssh_to "$target" syncoid "$ds" "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}"
   done
 
+  ssh_to "$target" zpool export "$SOURCE_POOL"
+
   ok "Backup complete. Verify on homelab with: zfs list -r ${BACKUP_DATASET}"
-  ok "Next: boot the recovery ISO on $host, then run 'install $host <iso-ip>' from your admin machine."
+  ok "Next: ./reinstall-host.sh install $host $iso_ip"
 }
 
 stage_install() {
@@ -119,21 +140,32 @@ stage_install() {
 
   ssh_to "$target" zpool export -af
 
-  ok "Install complete. Reboot $host into the new install, then run 'restore $host' locally on it."
+  ok "Install complete. Next: ./reinstall-host.sh restore $host $iso_ip"
 }
 
 stage_restore() {
   local host="$1"
-  require_local_host "$host"
+  local iso_ip="$2"
+  local target="root@${iso_ip}"
 
-  confirm "About to receive ${HOMELAB_SSH}:${BACKUP_DATASET}/* into ${RESTORE_DATASET} on this freshly-installed host. Verify this is really the new install, not a stray old dataset, before continuing."
+  confirm "About to import the freshly disko-installed pool on $target and receive ${HOMELAB_SSH}:${BACKUP_DATASET}/* into ${RESTORE_DATASET}. Verify 'install' really just ran against this ISO session before continuing."
+
+  local new_pool="${RESTORE_DATASET%%/*}"
+  ssh_to "$target" zpool import -f -N "$new_pool"
 
   for ds in "${DATA_DATASETS[@]}"; do
     local leaf="${ds##*/}"
-    run_cmd run0 syncoid --no-privilege-elevation "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}" "${RESTORE_DATASET}"
+    ssh_to "$target" syncoid "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}" "${RESTORE_DATASET}"
   done
 
-  ok "Restore complete. Next: run 'secureboot $host' locally on this host."
+  ssh_to "$target" zpool export -af
+
+  ok "Restore complete."
+  pause "Remove the installer USB/media from $host now, if it hasn't already been ejected."
+  confirm "Reboot $host (via $target) into the new install now?"
+  ssh_to "$target" reboot || warn "ssh dropped, as expected once reboot fires — that's fine."
+
+  ok "Once $host has booted the new install, continue locally on it: ./reinstall-host.sh secureboot $host"
 }
 
 stage_secureboot() {
@@ -189,12 +221,18 @@ dry && warn "--dry-run: no disk, ssh, or hardware state will actually be touched
 require_host_conf "$HOST_ARG"
 
 case "$STAGE" in
-backup) stage_backup "$HOST_ARG" ;;
+backup)
+  [ $# -ge 1 ] || die "backup requires <iso-ip>"
+  stage_backup "$HOST_ARG" "$1"
+  ;;
 install)
   [ $# -ge 1 ] || die "install requires <iso-ip>"
   stage_install "$HOST_ARG" "$1"
   ;;
-restore) stage_restore "$HOST_ARG" ;;
+restore)
+  [ $# -ge 1 ] || die "restore requires <iso-ip>"
+  stage_restore "$HOST_ARG" "$1"
+  ;;
 secureboot) stage_secureboot "$HOST_ARG" ;;
 tpm2) stage_tpm2 "$HOST_ARG" ;;
 *) usage ;;

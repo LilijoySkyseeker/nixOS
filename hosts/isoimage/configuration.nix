@@ -124,7 +124,15 @@
       PermitRootLogin = prohibit-password
       AllowTcpForwarding yes
       X11Forwarding no
-      AllowAgentForwarding no
+      # yes (unlike every other host's sshd): scripts/reinstall-host.sh
+      # drives this ISO's backup/install/restore stages over ssh -A, so
+      # syncoid running here can authenticate outbound to homelab using
+      # the operator's own forwarded agent, without ever placing a
+      # private key on the ISO image itself. Acceptable here because
+      # this is ephemeral recovery media (nothing persists across
+      # reboots) being ssh'd into from the operator's own machine, not
+      # a persistent host accepting connections from anyone else.
+      AllowAgentForwarding yes
       AllowStreamLocalForwarding no
       AuthenticationMethods publickey
       PermitTunnel no
