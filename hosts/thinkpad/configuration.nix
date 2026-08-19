@@ -11,12 +11,14 @@
     ./nvidia.nix
     ./disko.nix
 
-    inputs.lanzaboote.nixosModules.lanzaboote
-
     ../../profiles/PC.nix
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/secure-boot.nix
+    ../../modules/nixos/zfs-support.nix
+    ../../modules/nixos/zfs-snapshots.nix
+    ../../modules/nixos/zfs-root-impermanence.nix
   ];
 
   myPullDeploy = {
@@ -29,23 +31,10 @@
     requireACPower = true;
   };
 
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-      sbctl # Secure Boot key mgmt/debugging (boot.lanzaboote below)
-    ])
-    ++ (with pkgs-stable; [
-    ]);
-
-  # Secure Boot (TODO.md Phase 1: lanzaboote), tested here first —
-  # easiest host to physically recover if boot breaks. Beta-quality
-  # upstream (NixOS wiki flags sharp edges). See README.md for the
-  # one-time manual sbctl/firmware steps this config alone can't do.
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/var/lib/sbctl";
-  };
-  boot.loader.systemd-boot.enable = lib.mkForce false;
+  # Secure Boot (modules/nixos/secure-boot.nix — TODO.md Phase 1),
+  # tested here first — easiest host to physically recover if boot
+  # breaks.
+  mySecureBoot.enable = true;
 
   # fingerprint reader
   services.fprintd.enable = true;
@@ -91,69 +80,33 @@
     "intel_pstate=active"
   ];
 
-  # zfs snapshots
-  services.sanoid = {
+  # zfs snapshots (modules/nixos/zfs-snapshots.nix — defaults match
+  # this host's prior inline template, so no override needed here)
+  myZfsSnapshots = {
     enable = true;
-    extraArgs = [ "--verbose" ];
-    interval = "minutely";
-    settings = {
-      "zroot/local/root".use_template = "working";
-      "zroot/local/home".use_template = "working";
-      template_working = {
-        frequent_period = 1;
-        frequently = 59;
-        hourly = 24;
-        daily = 1;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "yes";
-        autoprune = "yes";
-      };
-    };
-  };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
+    workingDatasets = [
+      "zroot/local/root"
+      "zroot/local/home"
+    ];
   };
 
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
-  };
-  networking.hostId = "5f763495";
-  fileSystems."/nix".neededForBoot = true;
-  fileSystems."/nix/state".neededForBoot = true;
-
-  # impermanence (TODO.md Phase 2: folded in alongside the LUKS
-  # reinstall since it's already mandatory). Root goes ephemeral,
-  # /home stays untouched — it's already its own zfs dataset
-  # (local/home in disko.nix), separate from local/root, so the
-  # rollback below never touches it. Mirrors homelab's existing
-  # pattern (hosts/homelab/configuration.nix); the flake checkout
-  # itself lives under /home/lilijoy/dotfiles (myPullDeploy above), so
-  # unlike homelab this host doesn't need /etc/nixos persisted.
-  boot.initrd = {
-    systemd = {
-      enable = true;
-      services.rollback = {
-        description = "Rollback root filesystem to a pristine state on boot";
-        wantedBy = [ "initrd.target" ];
-        after = [ "zfs-import-zroot.service" ];
-        before = [ "sysroot.mount" ];
-        path = with pkgs-stable; [ zfs ];
-        unitConfig.DefaultDependencies = "no";
-        serviceConfig.Type = "oneshot";
-        script = ''
-          zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
-        '';
-      };
-    };
-  };
-  environment.persistence."/nix/state" = {
+  # zfs support (modules/nixos/zfs-support.nix)
+  myZfsSupport = {
     enable = true;
-    hideMounts = true;
+    hostId = "5f763495";
+  };
+
+  # impermanence (modules/nixos/zfs-root-impermanence.nix — TODO.md
+  # Phase 2, folded in alongside the LUKS reinstall since it's already
+  # mandatory). Root goes ephemeral, /home stays untouched — it's
+  # already its own zfs dataset (local/home in disko.nix), separate
+  # from local/root, so the rollback never touches it. Mirrors
+  # homelab's existing pattern; the flake checkout itself lives under
+  # /home/lilijoy/dotfiles (myPullDeploy above), so unlike homelab
+  # this host doesn't need /etc/nixos persisted (module default files
+  # list — machine-id + SSH host key — covers what's needed as-is).
+  myZfsImpermanence = {
+    enable = true;
     directories = [
       "/var/log"
       "/var/lib/systemd/timers" # persistent timers across reboots
@@ -185,11 +138,6 @@
       "/var/lib/waydroid" # Android container rootfs/image
       # (virtualisation.waydroid, profiles/PC.nix) — multi-GB, avoids a
       # full `waydroid init` re-provision every boot
-    ];
-    files = [
-      "/etc/machine-id"
-      "/etc/ssh/ssh_host_ed25519_key"
-      "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
   };
 }

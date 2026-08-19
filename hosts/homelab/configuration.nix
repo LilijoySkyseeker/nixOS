@@ -11,14 +11,16 @@
     ./hardware-configuration.nix
     ./disko.nix
 
-    inputs.lanzaboote.nixosModules.lanzaboote
-
     ../../profiles/default.nix
     ../../profiles/server.nix
 
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
+    ../../modules/nixos/secure-boot.nix
+    ../../modules/nixos/zfs-support.nix
+    ../../modules/nixos/zfs-snapshots.nix
+    ../../modules/nixos/zfs-root-impermanence.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -35,7 +37,6 @@
     backblaze-b2
     btop
     tmux
-    sbctl # Secure Boot key mgmt/debugging (boot.lanzaboote below)
     zellij
   ];
 
@@ -191,31 +192,36 @@
     };
   };
 
-  # zfs snapshots
-  services.sanoid = {
+  # zfs snapshots (modules/nixos/zfs-snapshots.nix) — homelab's
+  # retention/dataset set differs from thinkpad/torrent's simple
+  # single-template case (syncoid-slack-tuned working template, plus a
+  # whole second "backup" template for the recursive zbackup target),
+  # so both get overridden here via extraSettings rather than sharing
+  # the module default.
+  myZfsSnapshots = {
     enable = true;
-    extraArgs = [ "--verbose" ];
-    interval = "minutely";
-    settings = {
-      "zroot/local/state".use_template = "working";
-      "zdata/storage/storage".use_template = "working";
-      "zdata/storage/storage-bulk".use_template = "working";
-      template_working = {
-        frequent_period = 1;
-        frequently = 59;
-        # hourly/daily give syncoid ~2 weeks of slack to recover a stuck
-        # target before its resume base gets pruned out from under it
-        # (see localTargetAllow's "destroy" comment below for context) —
-        # zdata has 8TB+ free and current snapshot overhead is negligible,
-        # so this is cheap.
-        hourly = 168;
-        daily = 14;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "yes";
-        autoprune = "yes";
-      };
+    workingDatasets = [
+      "zroot/local/state"
+      "zdata/storage/storage"
+      "zdata/storage/storage-bulk"
+    ];
+    workingTemplate = {
+      frequent_period = 1;
+      frequently = 59;
+      # hourly/daily give syncoid ~2 weeks of slack to recover a stuck
+      # target before its resume base gets pruned out from under it
+      # (see localTargetAllow's "destroy" comment below for context) —
+      # zdata has 8TB+ free and current snapshot overhead is negligible,
+      # so this is cheap.
+      hourly = 168;
+      daily = 14;
+      weekly = 0;
+      monthly = 0;
+      yearly = 0;
+      autosnap = "yes";
+      autoprune = "yes";
+    };
+    extraSettings = {
       "zbackup" = {
         use_template = "backup";
         recursive = "yes";
@@ -231,9 +237,6 @@
         autoprune = "yes";
       };
     };
-  };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
   };
   services.syncoid = {
     enable = true;
@@ -373,23 +376,15 @@
     ];
   };
 
-  # Secure Boot (TODO.md Phase 1: lanzaboote). This is beta-quality
-  # upstream (NixOS wiki flags sharp edges) and was proven on thinkpad
-  # first before landing here — see hosts/homelab/README.md for the
-  # one-time manual sbctl/firmware steps this config alone can't do.
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/var/lib/sbctl";
-  };
-  boot.loader.systemd-boot.enable = lib.mkForce false;
+  # Secure Boot (modules/nixos/secure-boot.nix — TODO.md Phase 1),
+  # proven on thinkpad first before landing here.
+  mySecureBoot.enable = true;
 
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
+  # zfs support (modules/nixos/zfs-support.nix)
+  myZfsSupport = {
+    enable = true;
+    hostId = "e0019fd8";
   };
-  networking.hostId = "e0019fd8";
 
   # tailscale: advertise the LAN subnet and act as an exit node
   boot.kernel.sysctl = {
@@ -425,32 +420,9 @@
     ];
   };
 
-  # impermanance
-  fileSystems."/nix/state".neededForBoot = true;
-  fileSystems."/nix".neededForBoot = true;
-  boot.initrd = {
-    systemd = {
-      enable = true;
-      services.rollback = {
-        description = "Rollback root filesystem to a pristine state on boot";
-        wantedBy = [ "initrd.target" ];
-        after = [ "zfs-import-zroot.service" ];
-        before = [ "sysroot.mount" ];
-        path = with pkgs-stable; [ zfs ];
-        unitConfig.DefaultDependencies = "no";
-        serviceConfig.Type = "oneshot";
-        script = ''
-          zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
-        '';
-      };
-    };
-  };
-
-  # persistence
-  environment.persistence."/nix/state" = {
-    # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
+  # impermanence (modules/nixos/zfs-root-impermanence.nix)
+  myZfsImpermanence = {
     enable = true;
-    hideMounts = true;
     directories = [
       "/etc/nixos"
       "/var/log"
@@ -462,11 +434,6 @@
       "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
       "/var/lib/sanoid" # snapshot state cache
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
-    ];
-    files = [
-      "/etc/machine-id"
-      "/etc/ssh/ssh_host_ed25519_key"
-      "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
   };
 }

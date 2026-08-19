@@ -131,6 +131,29 @@ items rather than letting them rot.
       list (`hosts/isoimage/configuration.nix`) — the Phase 3 runbooks
       need both there and `sbctl` was missing.
 
+      **Refactored the duplicated boilerplate into shared modules**
+      once all three hosts had it inline — `modules/nixos/secure-boot.nix`
+      (lanzaboote wiring, `mySecureBoot.enable`), `zfs-support.nix`
+      (`myZfsSupport.enable`/`hostId`), `zfs-snapshots.nix` (sanoid,
+      `myZfsSnapshots.enable`/`workingDatasets`/`workingTemplate`/
+      `extraSettings` — homelab's syncoid-tuned retention + zbackup
+      template override the module defaults, thinkpad/torrent use them
+      as-is), `zfs-root-impermanence.nix` (the initrd rollback unit +
+      `environment.persistence`, `myZfsImpermanence.enable`/
+      `directories`/`files`), and `modules/nixos/disko-luks-zfs.nix` (a
+      plain Nix helper, not a NixOS module — disko.nix files are bare
+      attrsets — imported into each host's disko.nix to build the
+      LUKS-wrapped zfs partition content instead of repeating the same
+      comment+options block per disk). All three hosts' configuration.nix
+      now just set a few options instead of carrying the full inline
+      blocks; homelab was migrated too, not just thinkpad/torrent,
+      since it was the original template these were extracted from.
+      Verified as a pure refactor, not just "it builds": `nix store
+      diff-closures` between each host's pre- and post-refactor build
+      came back empty for all three (homelab, thinkpad, torrent) —
+      zero behavioral change, confirmed at the closure level, not just
+      by eval passing.
+
       Must do Phase 1 before Phase 2 on a given host: the TPM2 unseal
       policy should bind to PCR 7 (Secure Boot state) and the UKI/boot
       measurements, not just PCR sealing in isolation — otherwise an

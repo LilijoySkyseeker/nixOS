@@ -21,6 +21,7 @@
 
   disko.devices =
     let
+      luksZfs = import ../../modules/nixos/disko-luks-zfs.nix;
       rootSsd = idx: id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
@@ -44,30 +45,10 @@
             };
             zfs = {
               size = "100%";
-              content = {
-                # LUKS wraps the zfs partition rather than using ZFS
-                # native encryption: systemd-cryptenroll's TPM2 sealing
-                # is an upstream-supported NixOS module for LUKS, with
-                # no equivalent for native ZFS encryption (see
-                # TODO.md's FDE/Secure Boot/TPM2 entry). enrollRecovery
-                # has disko auto-generate a second, high-entropy
-                # passphrase slot at provision time (printed/QR'd for
-                # escrow) alongside whatever passphrase is typed
-                # interactively — never a TPM2-only slot, so a TPM
-                # failure/board swap always has a manual fallback. The
-                # TPM2 slot itself is enrolled post-install via
-                # `systemd-cryptenroll`, once Secure Boot (lanzaboote)
-                # is confirmed working — not here, disko has no TPM2
-                # primitive and sealing before Secure Boot is verified
-                # would seal against an untrusted boot chain.
-                type = "luks";
+              content = luksZfs {
                 name = "zroot-crypt";
-                enrollRecovery = true;
-                settings.allowDiscards = true; # SSD
-                content = {
-                  type = "zfs";
-                  pool = "zroot";
-                };
+                pool = "zroot";
+                extraSettings.allowDiscards = true; # SSD
               };
             };
           };
@@ -86,14 +67,9 @@
           type = "gpt";
           partitions.zfs = {
             size = "100%";
-            content = {
-              type = "luks";
+            content = luksZfs {
               inherit name;
-              enrollRecovery = true;
-              content = {
-                type = "zfs";
-                pool = "zdata";
-              };
+              pool = "zdata";
             };
           };
         };
@@ -105,14 +81,9 @@
           type = "gpt";
           partitions.zfs = {
             size = "100%";
-            content = {
-              type = "luks";
+            content = luksZfs {
               inherit name;
-              enrollRecovery = true;
-              content = {
-                type = "zfs";
-                pool = "zbackup";
-              };
+              pool = "zbackup";
             };
           };
         };
