@@ -16,14 +16,19 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
-    ../../modules/nixos/nix-cache-server.nix
-    ../../modules/nixos/nix-cache-warm.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
     ../../services/factorio.nix
     ../../services/octodns.nix
     ../../services/nfs.nix
+
+    # appended here rather than grouped with the other modules/nixos/*
+    # imports above so this doesn't land on the same insertion point as
+    # worktree-distributed-build-todo's build-worker.nix import — see
+    # cross-session coordination, 2026-08-19.
+    ../../modules/nixos/nix-cache-server.nix
+    ../../modules/nixos/nix-cache-warm.nix
   ];
 
   # System installed pkgs
