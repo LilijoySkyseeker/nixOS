@@ -115,16 +115,19 @@ items rather than letting them rot.
       together — not done automatically.
 
       Checklist to finish rollout:
-      - [ ] Generate `torrent_backup_push_key` and
-            `thinkpad_backup_push_key` ed25519 keypairs.
-      - [ ] Add both private keys to `secrets/secrets.yaml` via `sops
+      - [x] Generate `torrent_backup_push_key` and
+            `thinkpad_backup_push_key` ed25519 keypairs. (2026-08-19)
+      - [x] Add both private keys to `secrets/secrets.yaml` via `sops
             secrets/secrets.yaml` (never edit sops files directly).
-      - [ ] Paste both public keys into
+            (2026-08-19, done by the user)
+      - [x] Paste both public keys into
             `hosts/homelab/configuration.nix`'s
-            `backup-recv.openssh.authorizedKeys.keys`, each prefixed
-            with `restrict ` (two `# TODO` markers there now).
-      - [ ] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
-            to confirm all three build clean once secrets exist.
+            `backup-recv.openssh.authorizedKeys.keys`, prefixed with
+            `restrict `. (2026-08-19)
+      - [x] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
+            to confirm all three build clean once secrets exist. All
+            three build clean end-to-end as of 2026-08-19 — no more
+            code-side blockers.
       - [ ] Handle the live pool note above: the storage-bulk rename
             MUST land atomically with homelab's `nixos-rebuild switch`
             for this branch (see the detailed caution above) — the
