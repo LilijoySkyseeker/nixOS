@@ -11,41 +11,6 @@ items rather than letting them rot.
 
 ## Active
 
-- [ ] **2026-08-18: homelab nix binary cache — code lands on branch
-      `worktree-nix-cache`, blocked on one manual sops step before it can
-      build/deploy.** homelab runs harmonia (`myNixCacheServer`,
-      `modules/nixos/nix-cache-server.nix`), tailscale-only
-      (`networking.firewall.interfaces.tailscale0.allowedTCPPorts`).
-      `myNixCacheWarm` (`modules/nixos/nix-cache-warm.nix`) build-only
-      pre-builds every other host in `flake.nix` — thinkpad, torrent,
-      isoimage, vps — on its own independent timer, so their full
-      closures (not just paths shared with homelab's own config) land in
-      the cache. `myNixCacheClient`
-      (`modules/nixos/nix-cache-client.nix`, thinkpad+torrent) substitutes
-      from it instead of rebuilding from source. `nh.clean`'s existing
-      `--keep-since 7d --keep 7` (`profiles/default.nix`) is what bounds
-      the cache to ~1 week — no separate GC-root logic needed, homelab's
-      own kept generations already GC-root everything a client would need.
-      Every job is on its own independent systemd timer (nothing chained
-      via `onSuccess`), staggered across the week — see README.md's
-      "Scheduled jobs" table for the full current schedule (subject to
-      change; keep that table in sync as the source of truth, this entry
-      won't be re-updated per tweak).
-      **Signing key: generated, public half committed, private half still
-      needs the manual sops step (given to the user directly in-session,
-      never written to a file — see repo convention on manual secrets):**
-      - Public key (already in both `myNixCacheClient.publicKey` on
-        thinkpad/torrent): `cache.homelab-1:e9wEXPA6jHvotrbcPY1PHrUgOAVRjTWPYkUQBRu0X34=`
-      - **Needs before this can build/merge:** add the matching secret
-        key (given to the user in chat, not stored in this repo or any
-        scratch file) as `homelab_nix_cache_sign_key` in
-        `secrets/secrets.yaml` via a manual sops edit. If that value is
-        lost, regenerate with `nix key generate-secret --key-name
-        cache.homelab-1` and update the public key above + both client
-        configs to match the new pair. After the sops secret exists,
-        `nixos-rebuild build --flake .#homelab` should succeed (currently
-        fails only on the missing secret; thinkpad/torrent/isoimage/vps
-        all already build clean).
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
@@ -125,6 +90,26 @@ items rather than letting them rot.
       already applied.
 
 ## Done
+
+- [x] **2026-08-18: homelab nix binary cache — all four hosts build
+      clean, still on branch `worktree-nix-cache`, not yet merged/pushed
+      or deployed.** homelab runs harmonia (`myNixCacheServer`,
+      `modules/nixos/nix-cache-server.nix`), tailscale-only. `myNixCacheWarm`
+      (`modules/nixos/nix-cache-warm.nix`) build-only pre-builds every
+      other host in `flake.nix` (thinkpad, torrent, isoimage, vps) on
+      independent staggered timers so their *full* closures land in the
+      cache, not just paths coincidentally shared with homelab's own
+      build. `myNixCacheClient` (thinkpad/torrent) substitutes from it.
+      `nh.clean`'s existing 7-day generation retention bounds the cache
+      to ~1 week with no separate GC-root logic needed. Signing key
+      (`cache.homelab-1`) generated, public half committed into both
+      client configs, private half added by the user to
+      `secrets/secrets.yaml` as `homelab_nix_cache_sign_key` via manual
+      sops edit — `nixos-rebuild build` now succeeds for homelab,
+      thinkpad, torrent, vps, and isoimage. See README.md's "Scheduled
+      jobs" table for the full current weekly timing (kept as the source
+      of truth there, not duplicated here). Remaining: merge to master
+      and deploy whenever wanted — not done automatically.
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
