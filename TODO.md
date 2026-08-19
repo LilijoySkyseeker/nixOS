@@ -111,6 +111,29 @@ items rather than letting them rot.
       traffic until anubis's socket exists with the right group perms
       already applied.
 
+- [ ] **2026-08-19: `octodns-sync.service` failing on homelab —
+      transient DNS resolution error.** Found during a read-only log
+      trawl through homelab (checked against exposed services in
+      `hosts/homelab/configuration.nix`; no signs of compromise, SSH
+      and service access all traced to known keys/tailnet/LAN). Job
+      failed with `requests.exceptions.ConnectionError` /
+      `NameResolutionError` trying to reach `api.cloudflare.com`
+      (`Failed to resolve 'api.cloudflare.com' ... Temporary failure
+      in name resolution`). Timer retries hourly so this may self-heal,
+      but worth confirming it isn't recurring (e.g. flaky upstream
+      resolver, or the service starting before network-online.target).
+
+- [ ] **2026-08-19: `flake-update-test.service` failing on homelab —
+      root has no git identity configured.** Found during the same log
+      trawl. The update-branch step fails with `fatal: unable to
+      auto-detect email address (got 'root@homelab.(none)')` right
+      after the flake inputs are bumped, because `git config
+      --global user.email`/`user.name` were never set for root on
+      homelab. Needs: set a git identity for root declaratively (e.g.
+      via `home-manager.users.root.programs.git` in
+      `profiles/server.nix`, alongside the existing root home-manager
+      block) so `myAutoUpdate`'s commit step succeeds.
+
 ## Done
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually

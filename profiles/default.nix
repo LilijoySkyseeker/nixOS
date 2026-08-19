@@ -33,6 +33,7 @@
     smartmontools
     helix
     trippy # ping+traceroute tool
+    psmisc # fuser, killall, pstree
     ffmpeg
     flac
     bitwarden-cli
