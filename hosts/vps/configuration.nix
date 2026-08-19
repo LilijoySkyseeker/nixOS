@@ -503,21 +503,23 @@ in
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
   '';
 
-  # profiles/default.nix sets useRoutingFeatures = "both" for every
-  # host, which forces net.ipv{4,6}.conf.all.forwarding = true at a
-  # priority that beats a plain sysctl override — needed on homelab
-  # (subnet router + exit node) but not here: this box only uses
-  # tailscale for admin SSH, never as an exit node/subnet router.
-  # Narrowing to "client" here stops that forced-on IPv6 forwarding
-  # (IPv4 forwarding stays on regardless, via the nat module — that
-  # one's intentional, it's what makes the homelab DNAT work).
-  services.tailscale.useRoutingFeatures = lib.mkForce "client";
-
-  # this box never needs to forward IPv6 (nat/forwardPorts above is
-  # IPv4-only, and minecraft/factorio are only reachable via the IPv4
-  # DNAT rules) — explicit off rather than relying on the kernel
-  # default, so there's no ambient IPv6 forwarding path to homelab.
-  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
+  # this box acts as a tailscale exit node (see extraUpFlags below), so
+  # it needs profiles/default.nix's useRoutingFeatures = "both" default
+  # (net.ipv{4,6}.conf.all.forwarding = true) left alone — no override
+  # here. tailscaled manages its own MASQUERADE netfilter rules for
+  # exit-node traffic once forwarding is on; the vps-deploy/game-port
+  # NAT above (networking.nat, IPv4-only) is unrelated and unaffected.
+  #
+  # tailscale (services.tailscale itself comes from profiles/default.nix)
+  # advertises this box as an exit node — a tailnet client anywhere can
+  # opt to route all its internet traffic through here, exiting via the
+  # vps's public IP. Needs one manual step after first deploy: approve
+  # the exit node for this device in the tailscale admin console
+  # (Machines page) — declarative authKeyFile login doesn't grant that
+  # by itself, and no ACL autoApprovers rule is configured here.
+  services.tailscale.extraUpFlags = lib.mkAfter [
+    "--advertise-exit-node"
+  ];
 
   # anubis: proof-of-work challenge in front of jellyfin, absorbing bot/
   # scraper noise before it reaches caddy's backend at all.
