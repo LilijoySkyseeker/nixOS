@@ -91,21 +91,29 @@ items rather than letting them rot.
       pools to redo) last, once the LUKS+TPM2 disko recipe is proven
       on the other two.
 
-      **Phase 3 — recovery plan (sketch only, needs full
-      architecting before Phase 2 ships on any host).** The bullets
-      below are the researched shape of the plan — mechanisms,
-      ordering, what to escrow — not yet a runbook someone could follow
-      under stress. Still needed: an actual step-by-step per-host
-      recovery doc (likely `hosts/<host>/RECOVERY.md`, mirroring the
-      README convention already used for setup docs) with exact
-      commands, not prose; a decision on where the escrowed LUKS
-      recovery keyfile and sbctl PKI backups physically live (this
-      session only named the categories — paper backup, password
-      manager, offline media — not which one, or where); and a dry run
-      of the full bare-metal sequence against a spare/test disk (or a
-      VM, per this repo's existing "test remote deploys in a VM first"
-      convention) before it's trusted as the real plan for a live host.
-      Do this architecting pass before Phase 2 reinstalls anything, not
+      **Phase 3 — recovery plan.** Step-by-step runbooks now exist at
+      `hosts/homelab/RECOVERY.md`, `hosts/thinkpad/RECOVERY.md`,
+      `hosts/torrent/RECOVERY.md` — exact commands (verified against
+      the installed `systemd-cryptenroll(1)` man page and disko's
+      actual source at this flake's pinned rev, not reconstructed from
+      memory), not just the prose mechanisms below. Each covers TPM2
+      unseal failure, Secure Boot key loss, and full hardware failure/
+      disk death, plus the sops/age chicken-and-egg problem on
+      rebuild. The escrow-location question below now has a concrete
+      **recommendation** in each runbook (password-manager entry per
+      LUKS recovery passphrase + printed fallback; sbctl PKI and host
+      age keys riding along in each host's existing
+      persistence/restic backup) — still needs the user's sign-off and
+      actual setup (an agent can't create real physical/password-manager
+      escrow), and a dry run of the full bare-metal sequence against a
+      spare/test disk or VM before any runbook is trusted as the real
+      plan for a live host. Also surfaced while writing these: the
+      rescue ISO (`hosts/isoimage`) is missing `sbctl` in its package
+      list, and homelab's backup dataset naming for torrent
+      (`backup/legion`) vs. thinkpad (`backup/thinkpad`) is
+      inconsistent — worth reconciling whether `legion` is a stale
+      hostname before Phase 2 ships on torrent. Do this architecting
+      pass before Phase 2 reinstalls anything, not
       after — the recovery path needs to exist and be verified before
       the failure modes it's covering for become possible.
 
