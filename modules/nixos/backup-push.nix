@@ -25,8 +25,8 @@ in
     datasets = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       example = {
-        "zroot/local/home" = "zbackup/backup-bulk/torrent/home";
-        "zroot/local/root" = "zbackup/backup-bulk/torrent/root";
+        "zroot/local/home" = "zbackup/backup/torrent/home";
+        "zroot/local/root" = "zbackup/backup/torrent/root";
       };
       description = "Map of local source dataset to remote target dataset on targetHost.";
     };

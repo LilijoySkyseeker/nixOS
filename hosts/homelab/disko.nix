@@ -135,39 +135,31 @@
           };
           options.ashift = "12"; # IMPORTANT
           datasets = {
+            # Flat "backup/<host>/<subdir>" tree — one convention for
+            # everything (no more backup vs backup-bulk split: restic's
+            # offsite job never reads from zbackup at all regardless, so
+            # that split wasn't doing anything functionally). All pure
+            # containers; real data lives in the children underneath,
+            # created either by the local syncoid pulls below or by the
+            # remote hosts' syncoid pushes (home/root aren't declared
+            # here — they don't exist yet, syncoid creates them on first
+            # push).
             "backup" = {
               type = "zfs_fs";
               options.mountpoint = "none"; # "none" needs option.mountpoint
               options."com.sun:auto-snapshot" = "false";
             };
-            "backup-bulk" = {
-              type = "zfs_fs";
-              options.mountpoint = "none";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            # homelab
             "backup/homelab" = {
               type = "zfs_fs";
               options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";
             };
-            "backup-bulk/homelab" = {
+            "backup/thinkpad" = {
               type = "zfs_fs";
               options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";
             };
-            # thinkpad — bulk only (large, frequently-churned game
-            # libraries). Remote-host push backups only ever go to
-            # backup-bulk, never plain backup — see myBackupPush usage in
-            # hosts/thinkpad/configuration.nix. Pure container: real data
-            # lives in the home/root children syncoid creates underneath.
-            "backup-bulk/thinkpad" = {
-              type = "zfs_fs";
-              options.mountpoint = "none";
-              options."com.sun:auto-snapshot" = "false";
-            };
-            # torrent — same reasoning as backup-bulk/thinkpad above.
-            "backup-bulk/torrent" = {
+            "backup/torrent" = {
               type = "zfs_fs";
               options.mountpoint = "none";
               options."com.sun:auto-snapshot" = "false";

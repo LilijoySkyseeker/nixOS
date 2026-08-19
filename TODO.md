@@ -20,77 +20,83 @@ items rather than letting them rot.
       and should be VM-tested before real hardware per
       `feedback_test_remote_deploys_in_vm`. Not started.
 
-- [ ] **2026-08-18: syncoid push backups, torrent + thinkpad → homelab
-      (zfs snapshot based, over Tailscale).** Architected 2026-08-18:
-      shared `myBackupPush` module (`modules/nixos/backup-push.nix`),
-      used identically by both hosts, pushing `zroot/local/home` +
-      `zroot/local/root` to a new dedicated `backup-recv` user on
-      homelab via `zfs allow`-scoped delegation into
-      `zbackup/backup-bulk/torrent/*` and `zbackup/backup-bulk/thinkpad/*`
-      — backup-bulk, not backup: these hold large, frequently-churned
-      game libraries and are deliberately excluded from the offsite
-      restic-to-backblaze job, which only ever reads an explicit
-      hardcoded dataset list (`zroot/local/state zdata/storage/storage
-      zdata/storage/storage-bulk`) and never touches `zbackup` at all
-      currently — the backup/backup-bulk split just keeps this
-      forward-compatible with that job ever being pointed at `zbackup`
-      later (`backup-bulk/thinkpad` disko dataset already existed as an
-      unused placeholder; `backup-bulk/torrent` is new). Uses syncoid
-      `--create-bookmark` so long offline periods (esp. the thinkpad
-      laptop) don't force a full resync once sanoid's short source-side
-      retention (hourly=24/daily=1) prunes past the last pushed
-      snapshot. Trigger: hourly systemd timer, `Persistent = true`,
-      gated by a Tailscale-reachability `ExecCondition` so an
-      asleep/offline laptop no-ops instead of alerting. Target-side
-      retention on `zbackup` reuses the existing `template_backup`
-      (hourly=168, daily=366), applied recursively pool-wide so it
-      already covers the new `backup-bulk/torrent`/`backup-bulk/thinkpad`
-      subtrees with no extra sanoid config needed. **Follow-up once
-      impermanence (above) lands**:
-      `zroot/local/root` will likely stop being the meaningful thing to
-      back up — update `myBackupPush.datasets` on both hosts to point
-      at whatever the new persist dataset ends up being called instead.
-      Also gained (2026-08-18): source-side runs as a dedicated
-      `backup-push` user (zfs-allow-scoped, not root — see
-      `modules/nixos/backup-push.nix`), and a paired
+- [ ] **2026-08-19: syncoid push backups, torrent + thinkpad → homelab
+      (zfs snapshot based, over Tailscale).** Shared `myBackupPush`
+      module (`modules/nixos/backup-push.nix`), used identically by both
+      hosts, pushing `zroot/local/home` + `zroot/local/root` to a
+      dedicated `backup-recv` user on homelab via `zfs allow`-scoped
+      delegation. Uses syncoid `--create-bookmark` so long offline
+      periods (esp. the thinkpad laptop, but torrent can also go dark on
+      vacation) don't force a full resync once sanoid's short
+      source-side retention (hourly=24/daily=1) prunes past the last
+      pushed snapshot. Trigger: hourly systemd timer, `Persistent =
+      true`, gated by a Tailscale-reachability `ExecCondition` so an
+      offline host no-ops instead of alerting. `backupStaleness`
+      thresholds set generously (336h/2wk) for both, for the same
+      reason. Source-side runs as a dedicated `backup-push` user
+      (zfs-allow-scoped, not root), and a paired
       `modules/nixos/zfs-space-guard.nix` (`myZfsSpaceGuard`) on both
       hosts auto-prunes oldest local snapshots under free-space pressure
       (torrent/thinkpad's game libraries under `zroot/local/home` churn
       heavily) plus a `zfs-emergency-prune.service` manual escape hatch.
-      torrent's `backupStaleness` threshold relaxed to 336h/2wk to match
-      thinkpad's, since it's a desktop that can also go dark on
-      vacation. Code committed on branch `worktree-zfs-backup-push`
-      (commits b9954dd, 265000d); **not yet deployed to any real host.**
+      **Follow-up once impermanence (above) lands**: `zroot/local/root`
+      will likely stop being the meaningful thing to back up — update
+      `myBackupPush.datasets` on both hosts to point at whatever the new
+      persist dataset ends up being called instead.
 
-      **Dataset review (2026-08-18)**: audited disko.nix's zbackup tree
-      against what's actually referenced anywhere in config.
-      `backup/legion`/`backup-bulk/legion` and `backup/other`/
-      `backup-bulk/other` were unreferenced placeholders — dropped from
-      disko.nix. `backup/thinkpad` (the original non-bulk container) is
-      now fully superseded since remote-host push backups only ever go
-      to backup-bulk — dropped from disko.nix too. `backup-bulk/thinkpad`
-      and `backup-bulk/torrent` converted to pure `mountpoint = "none"`
-      containers (matching `backup/homelab`'s existing convention) since
-      the real data lives in their `home`/`root` children, not the
-      container itself. **None of this touched the live homelab pool —
-      disko.nix is install-time only.** If any of `zbackup/backup/legion`,
-      `zbackup/backup-bulk/legion`, `zbackup/backup/other`,
-      `zbackup/backup-bulk/other`, or `zbackup/backup/thinkpad` actually
-      exist live (run `zfs list -r zbackup/backup` on homelab first to
-      check — disko.nix declaring them doesn't guarantee they were ever
-      actually created, since disko only runs at install), destroying
-      them is a manual, deliberate call:
+      **Final zbackup layout (simplified 2026-08-19)**: one flat
+      `zbackup/backup/<host>/<subdir>` convention for everything — no
+      more backup-vs-backup-bulk split. That split existed to keep
+      large/churny data out of any future offsite job, but restic's
+      offsite `backblazeWeekly` job reads an explicit hardcoded dataset
+      list (`zroot/local/state zdata/storage/storage
+      zdata/storage/storage-bulk`) and never touches `zbackup` at all —
+      confirmed by reading the actual `backupPrepareCommand` — so the
+      split wasn't doing anything functional. Current tree:
       ```
-      zfs list -r zbackup/backup zbackup/backup-bulk   # see what's really there first
-      zfs destroy -r zbackup/backup/thinkpad            # only if empty/confirmed unused
-      zfs destroy -r zbackup/backup/legion               # only if it exists and is confirmed placeholder-only
-      zfs destroy -r zbackup/backup-bulk/legion
-      zfs destroy -r zbackup/backup/other
-      zfs destroy -r zbackup/backup-bulk/other
-      # then, to match disko.nix's new pure-container convention on the live pool:
-      zfs set mountpoint=none zbackup/backup-bulk/thinkpad
+      zbackup/backup/homelab/{storage,storage-bulk,state}   (local syncoid pulls)
+      zbackup/backup/thinkpad/{home,root}                    (remote syncoid push)
+      zbackup/backup/torrent/{home,root}                     (remote syncoid push)
       ```
-      Not run by me — check contents first, run at your own pace.
+      `backup/legion`, `backup-bulk/legion`, `backup/other`,
+      `backup-bulk/other` (all confirmed unreferenced placeholders) were
+      dropped entirely. Sanoid's `"zbackup" = { use_template = "backup";
+      recursive = "yes"; }` already covers the whole tree recursively —
+      no per-dataset sanoid config needed for any of this.
+      Code committed on branch `worktree-zfs-backup-push`; **not yet
+      deployed to any real host.**
+
+      **Live pool note**: none of the above touches the live homelab
+      pool — disko.nix is install-time only, and I'm not running zfs
+      commands against a live host without you present. Two things need
+      manual handling on your own schedule once you're ready:
+      1. `zdata/storage/storage-bulk`'s syncoid target *renamed* from
+         `zbackup/backup-bulk/homelab/storage-bulk` (old, this session's
+         earlier layout) to `zbackup/backup/homelab/storage-bulk` (final).
+         If the old path already has live replicated data on homelab
+         (check with `zfs list -r zbackup/backup-bulk/homelab`), rename
+         it in place rather than losing the history:
+         `zfs rename zbackup/backup-bulk/homelab/storage-bulk zbackup/backup/homelab/storage-bulk`
+         — then the next syncoid run should pick up incrementally at the
+         new target name with no re-send needed.
+      2. Any of `zbackup/backup/legion`, `zbackup/backup-bulk/legion`,
+         `zbackup/backup/other`, `zbackup/backup-bulk/other`,
+         `zbackup/backup/thinkpad` (the old non-flattened container), or
+         `zbackup/backup-bulk/thinkpad`/`zbackup/backup-bulk/torrent`
+         (this session's earlier bulk-split layout, now also superseded)
+         that exist live and are confirmed unused/empty can be destroyed:
+         ```
+         zfs list -r zbackup/backup zbackup/backup-bulk   # see what's really there first
+         zfs destroy -r zbackup/backup/legion               # only if confirmed placeholder-only
+         zfs destroy -r zbackup/backup-bulk/legion
+         zfs destroy -r zbackup/backup/other
+         zfs destroy -r zbackup/backup-bulk/other
+         zfs destroy -r zbackup/backup/thinkpad             # only if empty (superseded, pre-flatten)
+         zfs destroy -r zbackup/backup-bulk/thinkpad         # only if empty (superseded, pre-flatten)
+         zfs destroy -r zbackup/backup-bulk/torrent          # only if empty (superseded, pre-flatten)
+         ```
+      I'll handle the live side whenever you're ready to walk through it
+      together — not done automatically.
 
       Checklist to finish rollout:
       - [ ] Generate `torrent_backup_push_key` and
@@ -103,15 +109,19 @@ items rather than letting them rot.
             with `restrict ` (two `# TODO` markers there now).
       - [ ] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
             to confirm all three build clean once secrets exist.
+      - [ ] Handle the live pool note above (storage-bulk rename +
+            any confirmed-unused dataset cleanup) before or alongside
+            deploying homelab.
       - [ ] Deploy homelab first (creates `backup-recv` user + zfs
-            delegation + `backup-bulk/torrent` dataset under `zbackup`).
+            delegation + `backup/{thinkpad,torrent}` containers under
+            `zbackup`).
       - [ ] Deploy torrent and thinkpad; watch
             `systemctl status backup-push-torrent.service` /
             `journalctl -u backup-push-torrent` for the first real push
             (first run is a full send — expect it to take longer and
             transfer more than subsequent hourly incrementals).
       - [ ] On homelab, confirm snapshots are actually landing:
-            `zfs list -t snapshot -r zbackup/backup-bulk/torrent` and
+            `zfs list -t snapshot -r zbackup/backup/torrent` and
             `.../thinkpad`.
       - [ ] Confirm the Tailscale-reachability `ExecCondition` behaves
             as intended: stop tailscaled (or disconnect) on thinkpad,

@@ -258,7 +258,11 @@
       };
       "zdata/storage/storage-bulk" = {
         source = "zdata/storage/storage-bulk";
-        target = "zbackup/backup-bulk/homelab/storage-bulk";
+        # NOTE: this target is renaming from the old
+        # zbackup/backup-bulk/homelab/storage-bulk path — live data still
+        # sits at the old path on homelab as of this commit. Not renamed
+        # live yet; see TODO.md for the pending manual zfs rename.
+        target = "zbackup/backup/homelab/storage-bulk";
         extraArgs = [ "--identifier=zdata_storage_storage-bulk" ];
       };
       "zroot/local/state" = {
@@ -306,8 +310,8 @@
     # backup-bulk, not backup: torrent/thinkpad home datasets carry large
     # game libraries that are not offsite-eligible (see disko.nix).
     script = ''
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup-bulk/torrent
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup-bulk/thinkpad
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/torrent
+      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/thinkpad
     '';
   };
 
@@ -366,22 +370,22 @@
     # snapshot retention prunes the base it needs to resume from.
     backupStaleness = {
       "zbackup/backup/homelab/storage" = 6;
-      "zbackup/backup-bulk/homelab/storage-bulk" = 6;
+      "zbackup/backup/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
       # torrent is a desktop, not a server — usually up, but can go dark
       # for a while too (e.g. powered off during vacation). Same
       # reasoning as thinkpad below: bookmarks make this a non-issue for
       # resync, so the threshold only exists to catch a genuinely broken
       # key/config, not normal off time. 336h = 2 weeks.
-      "zbackup/backup-bulk/torrent/home" = 336;
-      "zbackup/backup-bulk/torrent/root" = 336;
+      "zbackup/backup/torrent/home" = 336;
+      "zbackup/backup/torrent/root" = 336;
       # thinkpad is a laptop that legitimately goes offline for long
       # stretches (asleep/traveling) — syncoid's --create-bookmark means
       # that's not a resync risk, so this threshold is only meant to catch
       # a genuinely broken key/config, not normal laptop-off time. 336h =
       # 2 weeks.
-      "zbackup/backup-bulk/thinkpad/home" = 336;
-      "zbackup/backup-bulk/thinkpad/root" = 336;
+      "zbackup/backup/thinkpad/home" = 336;
+      "zbackup/backup/thinkpad/root" = 336;
     };
     # offsite restic backup runs weekly (Fri 03:00) and can now take up to
     # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give

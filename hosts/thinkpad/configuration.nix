@@ -124,10 +124,8 @@
     targetHost = "backup-recv@homelab";
     identityFile = config.sops.secrets.thinkpad_backup_push_key.path;
     datasets = {
-      # backup-bulk, not backup: this data (large game libraries under
-      # home) is not offsite-eligible — see hosts/homelab/disko.nix.
-      "zroot/local/home" = "zbackup/backup-bulk/thinkpad/home";
-      "zroot/local/root" = "zbackup/backup-bulk/thinkpad/root";
+      "zroot/local/home" = "zbackup/backup/thinkpad/home";
+      "zroot/local/root" = "zbackup/backup/thinkpad/root";
     };
   };
 
