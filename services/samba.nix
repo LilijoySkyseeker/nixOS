@@ -1,6 +1,15 @@
 { config, lib, ... }:
 {
 
+  # declarative SMB password: sops-managed secret, applied into Samba's
+  # own user db (tdbsam) idempotently at activation/boot by
+  # samba-user-provision below, rather than a one-time manual
+  # `smbpasswd -a` that impermanence would otherwise force you to redo
+  # by hand on every host rebuild-from-scratch.
+  sops.secrets.homelab_samba_android_smb_password = {
+    restartUnits = [ "samba-user-provision.service" ];
+  };
+
   # samba (SMB) — tailnet-only file share so Android (which has no usable
   # native NFS client) can reach /storage and /storage-bulk, the same
   # datasets exported over NFS for Linux clients in services/nfs.nix.
@@ -59,6 +68,34 @@
         browseable = true;
       };
     };
+  };
+
+  # idempotently syncs android-smb's Samba password from the sops secret
+  # into passdb.tdb — add-if-missing, set-if-present, so it's safe to run
+  # on every boot and every activation, and sops-nix's restartUnits above
+  # re-runs it automatically whenever the secret's content changes.
+  systemd.services.samba-user-provision = {
+    description = "Provision the android-smb Samba user's password from sops";
+    after = [ "sops-nix.service" ];
+    wants = [ "sops-nix.service" ];
+    before = [ "samba-smbd.service" ];
+    wantedBy = [ "samba.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      pw=$(cat ${lib.escapeShellArg config.sops.secrets.homelab_samba_android_smb_password.path})
+      if ${lib.getExe' config.services.samba.package "pdbedit"} -L 2>/dev/null | cut -d: -f1 | grep -qx android-smb; then
+        printf '%s\n%s\n' "$pw" "$pw" | ${lib.getExe' config.services.samba.package "smbpasswd"} -s android-smb
+      else
+        printf '%s\n%s\n' "$pw" "$pw" | ${lib.getExe' config.services.samba.package "smbpasswd"} -s -a android-smb
+      fi
+    '';
+  };
+  systemd.services.samba-smbd = {
+    after = [ "samba-user-provision.service" ];
+    wants = [ "samba-user-provision.service" ];
   };
 
   # smbd itself must keep running as root — it setuid/setgids to the
