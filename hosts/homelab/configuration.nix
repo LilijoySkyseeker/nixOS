@@ -63,6 +63,27 @@
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
+  # GPU hardware acceleration — this box is a dual-GPU laptop (MSI):
+  # Intel HD 630 iGPU (card2/renderD129) + Nvidia GTX 1050 Mobile
+  # (card1/renderD128, currently on nouveau). Nvidia gets the proprietary
+  # driver so jellyfin can use NVENC/NVDEC; Intel's VAAPI/QSV stack is also
+  # enabled so its render node is usable as a fallback (see services/jellyfin.nix).
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs-stable; [
+      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
+      vpl-gpu-rt
+    ];
+  };
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.nvidia = {
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
+    open = false;
+    modesetting.enable = true;
+    nvidiaSettings = false; # headless, no GUI settings app needed
+  };
+
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 

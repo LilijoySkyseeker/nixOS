@@ -9,7 +9,39 @@
     cacheDir = "/srv/jellyfin/cache";
     dataDir = "/srv/jellyfin/data";
     logDir = "/srv/jellyfin/log";
+
+    # Nvidia GTX 1050 Mobile as primary transcoder: dedicated NVENC/NVDEC
+    # blocks free the CPU entirely, and it's the stronger of this host's two
+    # GPUs. The Intel iGPU's render node is also granted to the sandbox
+    # below so QSV/VAAPI can be picked from the dashboard as a fallback
+    # without touching this config.
+    hardwareAcceleration = {
+      enable = true;
+      type = "nvenc";
+      device = "/dev/dri/renderD128"; # Nvidia GTX 1050 Mobile
+    };
+    transcoding = {
+      enableHardwareEncoding = true;
+      hardwareDecodingCodecs = {
+        h264 = true;
+        hevc = true;
+        hevc10bit = true;
+        vc1 = true;
+        vp8 = true;
+        vp9 = true;
+      };
+      # av1 left off: GP107 (Pascal) NVENC has no AV1 encode block
+      hardwareEncodingCodecs = {
+        hevc = true;
+      };
+    };
   };
+
+  # Intel HD 630's render node, for the QSV/VAAPI fallback described above.
+  systemd.services.jellyfin.serviceConfig.DeviceAllow = lib.mkAfter [
+    "/dev/dri/renderD129 rw"
+  ];
+  users.users.jellyfin.extraGroups = [ "render" ];
 
   # The NixOS jellyfin module has no option for network.xml (only
   # encoding.xml, via services.jellyfin.transcoding/hardwareAcceleration)
