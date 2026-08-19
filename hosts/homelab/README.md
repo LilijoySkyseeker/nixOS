@@ -1,5 +1,37 @@
 # homelab
 
+## Secure Boot setup (lanzaboote, one-time manual steps)
+
+`configuration.nix` declares `boot.lanzaboote.enable = true`, but
+lanzaboote can't take effect purely declaratively — it needs manual
+steps on this physical machine, in this order (see
+nix-community/lanzaboote's own `docs/getting-started/`), done last
+after thinkpad and torrent proved the process out — this box runs
+always-on services, so it carries the most disruption risk if boot
+breaks:
+
+1. `sudo sbctl create-keys` — generates this machine's Secure Boot
+   keys into `/var/lib/sbctl` (the `pkiBundle` path this config
+   points at), before the first `nixos-rebuild switch` carrying this
+   config.
+2. `nixos-rebuild switch` — replaces systemd-boot with lanzaboote's
+   signed UKI entries. Firmware enforcement isn't on yet, so this
+   boots fine either way.
+3. Reboot into firmware and put Secure Boot into *Setup Mode* —
+   either an explicit "Reset to Setup Mode" option, or erasing the
+   existing Platform Key (PK) if there's no explicit toggle; exact
+   menu wording depends on this board's firmware. **Do not** wipe the
+   Forbidden Signature Database (dbx) while doing this. Save and exit.
+4. Boot back into NixOS, then `sudo sbctl enroll-keys --microsoft`.
+5. Reboot. Verify with `sudo sbctl verify` and `bootctl status`
+   (`Secure Boot: enabled (user)`).
+
+Only after this is confirmed working should the TPM2 auto-unlock work
+(Phase 2, not yet implemented — also touches the zdata/zbackup
+encryption plan, so hold off until the I/O-suspension issue below is
+resolved and ruled out as a hardware fault) be enrolled on this host.
+Treat this as beta — same caveats as thinkpad's README.
+
 ## Known issues
 
 ### zdata pool: recurring I/O suspensions (since 2026-08-07)

@@ -25,6 +25,13 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
+    # Secure Boot (TODO.md: "full-disk encryption + Secure Boot + TPM2
+    # auto-unlock" Phase 1). Excluded from vps/isoimage — vps is a
+    # BIOS-only DO droplet (no UEFI at all) and isoimage is a boot
+    # medium, not a Secure-Boot-signed target.
+    lanzaboote.url = "github:nix-community/lanzaboote";
+    lanzaboote.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs-unstable";
 

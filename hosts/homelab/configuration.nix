@@ -3,12 +3,15 @@
   pkgs-stable,
   lib,
   vars,
+  inputs,
   ...
 }:
 {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
+
+    inputs.lanzaboote.nixosModules.lanzaboote
 
     ../../profiles/default.nix
     ../../profiles/server.nix
@@ -32,6 +35,7 @@
     backblaze-b2
     btop
     tmux
+    sbctl # Secure Boot key mgmt/debugging (boot.lanzaboote below)
     zellij
   ];
 
@@ -368,6 +372,16 @@
       }
     ];
   };
+
+  # Secure Boot (TODO.md Phase 1: lanzaboote). This is beta-quality
+  # upstream (NixOS wiki flags sharp edges) and was proven on thinkpad
+  # first before landing here — see hosts/homelab/README.md for the
+  # one-time manual sbctl/firmware steps this config alone can't do.
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/var/lib/sbctl";
+  };
+  boot.loader.systemd-boot.enable = lib.mkForce false;
 
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];

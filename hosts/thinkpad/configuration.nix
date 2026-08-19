@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   lib,
+  inputs,
   ...
 }:
 {
@@ -9,6 +10,9 @@
     ./hardware-configuration.nix
     ./nvidia.nix
     ./disko.nix
+
+    inputs.lanzaboote.nixosModules.lanzaboote
+
     ../../profiles/PC.nix
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
@@ -28,9 +32,20 @@
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [
+      sbctl # Secure Boot key mgmt/debugging (boot.lanzaboote below)
     ])
     ++ (with pkgs-stable; [
     ]);
+
+  # Secure Boot (TODO.md Phase 1: lanzaboote), tested here first —
+  # easiest host to physically recover if boot breaks. Beta-quality
+  # upstream (NixOS wiki flags sharp edges). See README.md for the
+  # one-time manual sbctl/firmware steps this config alone can't do.
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/var/lib/sbctl";
+  };
+  boot.loader.systemd-boot.enable = lib.mkForce false;
 
   # fingerprint reader
   services.fprintd.enable = true;

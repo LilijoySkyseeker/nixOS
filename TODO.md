@@ -24,7 +24,9 @@ items rather than letting them rot.
       costs:
 
       **Phase 1 — Secure Boot via lanzaboote (in-place, no reinstall).**
-      All three hosts already install in UEFI mode with
+      **Config landed** (flake input + per-host `boot.lanzaboote.enable`
+      + `hosts/*/README.md` manual bootstrap steps); not yet run on any
+      real machine. All three hosts already install in UEFI mode with
       `boot.loader.systemd-boot.enable` (`profiles/default.nix:189`),
       so this is a bootloader swap: `boot.lanzaboote.enable = true`,
       `boot.loader.systemd-boot.enable = false`, `sbctl create-keys` +
@@ -32,7 +34,13 @@ items rather than letting them rot.
       changes. nix-community's lanzaboote is NLnet-funded and active,
       but the NixOS wiki still flags sharp edges on stable channels —
       treat as beta, test on thinkpad first (easiest to physically
-      recover if boot breaks) before homelab/torrent.
+      recover if boot breaks) before homelab/torrent. `pkiBundle` is
+      `/var/lib/sbctl` (confirmed against lanzaboote's own current
+      docs — older guides say `/etc/secureboot`, that's stale).
+      `nixos-rebuild build` verified clean for thinkpad/torrent/homelab
+      (and vps/isoimage unaffected) as of this commit; the physical
+      sbctl/firmware enrollment steps in each host's README still need
+      a human on the actual hardware.
 
       **Phase 2 — LUKS + TPM2 auto-unlock on zroot (requires
       reinstall/reprovision).** disko partitions the raw disk at

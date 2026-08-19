@@ -3,12 +3,16 @@
   pkgs-stable,
   lib,
   config,
+  inputs,
   ...
 }:
 {
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
+
+    inputs.lanzaboote.nixosModules.lanzaboote
+
     ../../profiles/PC.nix
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
@@ -41,6 +45,7 @@
     (with pkgs-unstable; [
       # closed source
       bambu-studio
+      sbctl # Secure Boot key mgmt/debugging (boot.lanzaboote below)
     ])
     ++ (with pkgs-stable; [
     ]);
@@ -49,6 +54,16 @@
   boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
   boot.kernelModules = [ "r8125" ];
   nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
+
+  # Secure Boot (TODO.md Phase 1: lanzaboote), landed after thinkpad
+  # proved it out. Beta-quality upstream (NixOS wiki flags sharp
+  # edges). See README.md for the one-time manual sbctl/firmware steps
+  # this config alone can't do.
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/var/lib/sbctl";
+  };
+  boot.loader.systemd-boot.enable = lib.mkForce false;
 
   # zfs snapshots
   services.sanoid = {
