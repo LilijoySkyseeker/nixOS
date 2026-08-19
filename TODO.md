@@ -22,6 +22,18 @@ items rather than letting them rot.
       round-trip) still loads cleanly and isn't tripping the new
       limit under real usage.
 
+      Checked good-crawler impact against source (not just assumption):
+      the jellyfin anubis instance has no `policy` customization, so
+      per the module's `mkPolicyFile` logic it falls back to Anubis's
+      built-in default policy, which imports `crawlers/_allow-good.yaml`
+      and `ALLOW`s known-good crawlers (Google/Bing/Apple/DuckDuckGo/
+      Qwant/Internet Archive/Kagi/Marginalia/Mojeek) by their verified
+      IP ranges — those bypass the PoW challenge entirely. The new
+      120/min-burst-60 iptables layer is separate and sits well above
+      documented real-world crawl rates from a single source IP, so
+      it shouldn't trip either. No code change needed; the live-deploy
+      check above still covers real-world confirmation.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
