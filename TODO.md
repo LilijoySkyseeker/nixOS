@@ -72,13 +72,29 @@ items rather than letting them rot.
       manual handling on your own schedule once you're ready:
       1. `zdata/storage/storage-bulk`'s syncoid target *renamed* from
          `zbackup/backup-bulk/homelab/storage-bulk` (old, this session's
-         earlier layout) to `zbackup/backup/homelab/storage-bulk` (final).
-         If the old path already has live replicated data on homelab
-         (check with `zfs list -r zbackup/backup-bulk/homelab`), rename
-         it in place rather than losing the history:
+         earlier layout, still the live/deployed path as of this
+         writing) to `zbackup/backup/homelab/storage-bulk` (final, only
+         in this branch's not-yet-deployed Nix config). **MUST happen
+         atomically with deploying this branch to homelab (same
+         maintenance window, rename immediately before or immediately
+         after `nixos-rebuild switch` — not as a standalone action on
+         its own schedule.)** Caught by a peer session
+         (backblaze-homelab-reset) reviewing this: if the live `zfs
+         rename` runs while homelab is still running the *currently
+         deployed* config (which still points syncoid at the old path),
+         the next hourly syncoid run looks for a dataset at the old path
+         that no longer exists — best case it errors, worst case it
+         auto-creates a fresh empty dataset there and starts a full
+         ~2.26TiB reseed from scratch, the same failure mode that
+         triggered that session's whole backblaze-homelab-reset task in
+         the first place. If the old path already has live replicated
+         data on homelab (check with `zfs list -r
+         zbackup/backup-bulk/homelab`), rename it in place rather than
+         losing the history:
          `zfs rename zbackup/backup-bulk/homelab/storage-bulk zbackup/backup/homelab/storage-bulk`
          — then the next syncoid run should pick up incrementally at the
-         new target name with no re-send needed.
+         new target name with no re-send needed, *provided the deployed
+         config already matches by the time that run fires*.
       2. Any of `zbackup/backup/legion`, `zbackup/backup-bulk/legion`,
          `zbackup/backup/other`, `zbackup/backup-bulk/other`,
          `zbackup/backup/thinkpad` (the old non-flattened container), or
@@ -109,9 +125,11 @@ items rather than letting them rot.
             with `restrict ` (two `# TODO` markers there now).
       - [ ] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
             to confirm all three build clean once secrets exist.
-      - [ ] Handle the live pool note above (storage-bulk rename +
-            any confirmed-unused dataset cleanup) before or alongside
-            deploying homelab.
+      - [ ] Handle the live pool note above: the storage-bulk rename
+            MUST land atomically with homelab's `nixos-rebuild switch`
+            for this branch (see the detailed caution above) — the
+            other dataset cleanup (legion/other/superseded placeholders)
+            isn't time-sensitive and can happen whenever.
       - [ ] Deploy homelab first (creates `backup-recv` user + zfs
             delegation + `backup/{thinkpad,torrent}` containers under
             `zbackup`).
