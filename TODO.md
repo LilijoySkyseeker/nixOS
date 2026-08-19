@@ -11,6 +11,58 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-18: full-disk encryption + Secure Boot + TPM2 auto-unlock**
+      for homelab, thinkpad, torrent (vps excluded — DO droplet is
+      BIOS-only/no vTPM, and the provider already has raw disk access,
+      so FDE+SB there has negligible security value). Threat model:
+      physical theft of a machine/drive, plus evil-maid/tamper
+      resistance, on top of general best-practice hardening.
+
+      Two independent phases, since they have very different retrofit
+      costs:
+
+      **Phase 1 — Secure Boot via lanzaboote (in-place, no reinstall).**
+      All three hosts already install in UEFI mode with
+      `boot.loader.systemd-boot.enable` (`profiles/default.nix:189`),
+      so this is a bootloader swap: `boot.lanzaboote.enable = true`,
+      `boot.loader.systemd-boot.enable = false`, `sbctl create-keys` +
+      enroll (ideally in firmware Setup Mode), rebuild. No disko/disk
+      changes. nix-community's lanzaboote is NLnet-funded and active,
+      but the NixOS wiki still flags sharp edges on stable channels —
+      treat as beta, test on thinkpad first (easiest to physically
+      recover if boot breaks) before homelab/torrent.
+
+      **Phase 2 — LUKS + TPM2 auto-unlock on zroot (requires
+      reinstall/reprovision).** disko partitions the raw disk at
+      install time; there's no supported in-place "encrypt zroot"
+      path. Plan is: back up `/persist` + secrets + any zdata/zbackup
+      contents (homelab), wipe, reprovision via disko/nixos-anywhere
+      with a LUKS layer under zroot (`boot.initrd.luks.devices` +
+      `systemd-cryptenroll ... tpm2-device=auto`), restore. ZFS native
+      encryption was considered and rejected for the auto-unlock goal —
+      it has no built-in TPM2 path; getting there means maintaining a
+      bespoke initrd unit, vs. LUKS+systemd-cryptenroll being an
+      upstream-supported NixOS module. LUKS sits transparently under
+      ZFS/disko, so it doesn't complicate homelab's existing
+      rollback-to-blank-snapshot impermanence setup.
+
+      Must do Phase 1 before Phase 2 on a given host: the TPM2 unseal
+      policy should bind to PCR 7 (Secure Boot state) and the UKI/boot
+      measurements, not just PCR sealing in isolation — otherwise an
+      attacker can swap the boot chain and the TPM will still happily
+      unseal the disk key (see oddlama's writeup on naive TPM2
+      auto-unlock bypasses). Without Secure Boot first, "auto-unlock"
+      only defends against a stolen drive read on another machine, not
+      against a tampered bootloader on the machine itself.
+
+      Decided with user: homelab's zdata/zbackup HDD pools get
+      encrypted too, not just zroot — same theft threat model applies
+      to bulk storage. Phase 2 reinstall order is by disruption level:
+      thinkpad (secondary laptop) → torrent (primary desktop) →
+      homelab (server, most disruptive/highest stakes, most disks/
+      pools to redo) last, once the LUKS+TPM2 disko recipe is proven
+      on the other two.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
