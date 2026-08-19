@@ -78,7 +78,30 @@ items rather than letting them rot.
       security improvement: split to per-edge keys (one sops secret per
       submitter→worker pair, matching the existing
       homelab_vps_deploy_key convention) if that isolation becomes
-      worth the added secret count.
+      worth the added secret count. Full design plan (module shape,
+      per-worker builder user, submitter buildMachines wiring, ssh-ng
+      protocol + publicHostKey pinning, thinkpad's AC-power-gated
+      availability via ac-power.target/battery-power.target, aarch64
+      via Pi 5 native + binfmt-emulated fallback on all x86 workers
+      including thinkpad) recorded 2026-08-18 in
+      `.claude/plans/quirky-herding-teapot.md`.
+      **Must comprehensively test after deployment, before treating this
+      as done**: verify remote builds actually land on each worker (not
+      silently falling back to local), confirm the AC-power gate on
+      thinkpad both drops it out of rotation on battery and restores it
+      on replug, confirm aarch64 derivations prefer the native Pi 5
+      builder over emulated x86 fallbacks once Pi 5 is enrolled, and
+      confirm a compromised/unreachable worker fails a submitter's build
+      over to another worker rather than hanging or breaking the
+      submitter's own rebuild.
+      Follow-up items uncovered during design, not yet scheduled:
+      empirically verify `speedFactor` actually biases remote-machine
+      selection as documented (an open upstream Nix issue,
+      NixOS/nix#2457, casts doubt on this for *local* builds — unclear
+      if it also affects remote); add pi5's age key to `.sops.yaml`'s
+      `creation_rules` once that host is actually provisioned; revisit
+      the per-worker vs. per-edge key tradeoff noted above once the
+      mesh has been running a while.
 
 - [ ] **2026-08-18: caddy hits a permission-denied race against the
       anubis unix socket right after vps reboots.** Found trawling
