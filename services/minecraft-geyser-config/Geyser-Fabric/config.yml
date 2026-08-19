@@ -1,0 +1,12 @@
+# Overlay for Geyser's runtime-generated config (synced into
+# /data/config/Geyser-Fabric/config.yml by the itzg image's /config
+# volume support: https://docker-minecraft-server.readthedocs.io/en/latest/mods-and-plugins/).
+#
+# Bedrock's Nether build-height cap (Y=128) is lower than Java's (Y=256).
+# Without this, Bedrock players who go above the Nether bedrock roof get
+# no chunk/block data past Y=127 from Geyser and appear to softlock
+# (stuck falling / can't move). This remaps the Bedrock client's Nether
+# dimension ID to the End's, which has no such cap, at the cost of the
+# Nether's fog rendering like the End's above the roof.
+# https://github.com/GeyserMC/Geyser/issues/2040
+above-bedrock-nether-building: true

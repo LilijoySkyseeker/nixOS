@@ -78,7 +78,12 @@
       ENABLE_RCON = "FALSE";
     };
     environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
-    volumes = [ "/srv/minecraft/vanilla-plus:/data" ];
+    volumes = [
+      "/srv/minecraft/vanilla-plus:/data"
+      # overlays Geyser-Fabric/config.yml into /data/config on every start
+      # (itzg's /config sync); see services/minecraft-geyser-config for why.
+      "${./minecraft-geyser-config}:/config:ro"
+    ];
     # container hardening: no capabilities beyond what a JVM needs (none)
     # plus the two the entrypoint needs to drop from root to the
     # "minecraft" user (SETUID/SETGID, via gosu), no privilege escalation,
