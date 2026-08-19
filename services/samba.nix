@@ -34,6 +34,11 @@
         "map to guest" = "never";
         "invalid users" = [ "root" ];
         "log level" = "1";
+        # defense-in-depth on top of the tailscale0 firewall interface
+        # scoping below — same belt-and-suspenders pattern as nfs.nix's
+        # 100.64.0.0/10 export CIDR.
+        "hosts allow" = "100.64.0.0/10";
+        "hosts deny" = "0.0.0.0/0";
       };
       storage = {
         path = "/storage";
@@ -85,6 +90,8 @@
 
   # tailnet-only, same interface-scoping pattern as nfs.nix's port 2049
   # rule. Only 445 is needed since nmbd (137/138 udp, 139 tcp) is disabled.
+  # (the "hosts allow"/"hosts deny" pair above is the second, smb.conf-level
+  # layer of the same restriction.)
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 445 ];
 
   # /var/lib/samba holds the smbpasswd user database (private/passdb.tdb).

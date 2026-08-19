@@ -32,7 +32,16 @@ items rather than letting them rot.
       (Material Files / Solid Explorer / CX File Explorer) via
       `homelab.<tailnet>.ts.net` or the Tailscale IP, port 445, and
       confirm read-write actually lands with `multimedia` group
-      ownership.
+      ownership. Also smoke-test the tailnet-only lockdown post-deploy:
+      confirm port 445 is unreachable from homelab's LAN NIC/off-tailnet
+      (e.g. `nc -zv <homelab-LAN-IP> 445` from a machine that's on the
+      LAN but not the tailnet should fail/time out — both the
+      `tailscale0`-scoped firewall rule and smb.conf's `hosts allow =
+      100.64.0.0/10` / `hosts deny = 0.0.0.0/0` should independently
+      block it), and do the same check for NFS's port 2049 while at it
+      (it has the equivalent `100.64.0.0/10` export CIDR plus the same
+      firewall interface scoping, but was never actually smoke-tested
+      end-to-end either).
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
