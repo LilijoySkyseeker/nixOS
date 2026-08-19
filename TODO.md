@@ -12,11 +12,13 @@ items rather than letting them rot.
 ## Active
 
 - [ ] **2026-08-18: full-disk encryption + Secure Boot + TPM2 auto-unlock**
-      for homelab, thinkpad, torrent (vps excluded — DO droplet is
-      BIOS-only/no vTPM, and the provider already has raw disk access,
-      so FDE+SB there has negligible security value). Threat model:
-      physical theft of a machine/drive, plus evil-maid/tamper
-      resistance, on top of general best-practice hardening.
+      **+ impermanence rollout** for homelab, thinkpad, torrent (vps
+      excluded from FDE/SB — DO droplet is BIOS-only/no vTPM, and the
+      provider already has raw disk access, so it has negligible
+      security value there; vps is already impermanent). Threat model
+      for the FDE/SB half: physical theft of a machine/drive, plus
+      evil-maid/tamper resistance, on top of general best-practice
+      hardening.
 
       Two independent phases, since they have very different retrofit
       costs:
@@ -45,6 +47,24 @@ items rather than letting them rot.
       upstream-supported NixOS module. LUKS sits transparently under
       ZFS/disko, so it doesn't complicate homelab's existing
       rollback-to-blank-snapshot impermanence setup.
+
+      Since this reinstall is already mandatory, roll thinkpad and
+      torrent onto impermanence in the same pass — root/base system
+      config goes ephemeral (rolled back to a blank snapshot every
+      boot), **home directories stay persistent, not wiped**. Both
+      hosts already partition `local/home` as a separate ZFS dataset
+      from `local/root` in their current `disko.nix`, so this is a
+      clean retrofit of homelab's existing pattern rather than a new
+      one: add a `local/state` dataset (mirroring homelab's
+      `/nix/state`) for `environment.persistence` — `/etc/nixos`,
+      `/var/log`, service state dirs (sanoid, tailscale, docker if
+      used, etc.), `/etc/machine-id`, and the SSH host key/age identity
+      files needed to avoid the sops chicken-and-egg problem on every
+      boot, not just on reinstall — plus the initrd `zfs rollback -r
+      zroot/local/root@blank` unit homelab already runs. homelab is
+      already on impermanence, so no change needed there beyond
+      whatever Phase 2 does to its layout. vps is already impermanent
+      too (tmpfs root) and out of scope per Phase 1/2 above.
 
       Must do Phase 1 before Phase 2 on a given host: the TPM2 unseal
       policy should bind to PCR 7 (Secure Boot state) and the UKI/boot
@@ -80,11 +100,14 @@ items rather than letting them rot.
 
       - *Software failure (bad rebuild, corrupted root, ransomware-ish
         scenario)*: unaffected by encryption. homelab already rolls
-        zroot back to a blank snapshot every boot (impermanence);
-        thinkpad/torrent have sanoid snapshots + NixOS generation
-        rollback via the (post-Phase-1) signed boot entries. No new
-        recovery step needed here beyond re-signing/re-sealing if a
-        rollback changes measured boot state (see PCR note below).
+        zroot back to a blank snapshot every boot (impermanence); once
+        the Phase 2 reinstall lands impermanence on thinkpad/torrent
+        too, all three hosts get the same blank-snapshot rollback,
+        plus NixOS generation rollback via the (post-Phase-1) signed
+        boot entries. Home directories are never touched by the
+        rollback on any host. No new recovery step needed here beyond
+        re-signing/re-sealing if a rollback changes measured boot state
+        (see PCR note below).
 
       - *TPM2 unseal failure* (motherboard swap, TPM cleared, BIOS
         update shifts PCR values, TPM dies): never enroll a TPM2-only
