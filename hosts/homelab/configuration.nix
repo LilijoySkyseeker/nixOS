@@ -290,8 +290,8 @@
       # (hosts/vps/configuration.nix). No forced `command=` here since
       # syncoid needs to run different zfs commands with dynamic args, so
       # `zfs allow`'s scoping (below) is the real boundary, not this.
-      # TODO: paste torrent_backup_push_key's *public* key here, prefixed with "restrict "
-      # TODO: paste thinkpad_backup_push_key's *public* key here, prefixed with "restrict "
+      "restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJl8i5+psY+G1rzCHa4oc5DWHdE84N2r31UYqSoSxQA5 torrent-backup-push"
+      "restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIWl2P8DAPk9dpt7YgXgv7oycg69LV9Ypuid+JC/U0I3 thinkpad-backup-push"
     ];
   };
   users.groups.backup-recv = { };
