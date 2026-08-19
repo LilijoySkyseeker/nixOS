@@ -67,10 +67,16 @@ items rather than letting them rot.
       recoverable than plaintext ZFS if the failure modes aren't
       planned for up front (locked LUKS → can't reach the pool → can't
       reach sops secrets → can't even rebuild the flake for that host).
-      Assumes thinkpad/torrent get syncoid+restic-to-B2 parity with
-      homelab (being architected separately) before Phase 2 lands on
-      them — Phase 2 shouldn't ship on a host that isn't backed up
-      offsite yet.
+      Assumes thinkpad/torrent get syncoid backups landing on homelab's
+      backup drives (`zbackup/backup/thinkpad`, `zbackup/backup/legion`
+      — dataset stubs already exist in `hosts/homelab/disko.nix`, wiring
+      is being architected separately) before Phase 2 lands on them —
+      Phase 2 shouldn't ship on a host with no backup destination yet.
+      Note this makes their recovery path dependent on homelab's own
+      zbackup pool surviving, not offsite-independent like homelab's
+      restic-to-B2 job — worth revisiting whether thinkpad/torrent
+      should eventually get their own offsite leg too, separate from
+      this FDE effort.
 
       - *Software failure (bad rebuild, corrupted root, ransomware-ish
         scenario)*: unaffected by encryption. homelab already rolls
@@ -113,9 +119,12 @@ items rather than letting them rot.
         boot once, confirm `sbctl status`/lanzaboote enrolled clean on
         the (repaired or replacement) hardware → only then
         `systemd-cryptenroll --tpm2-device=auto` to add the TPM2 slot,
-        sealing against a confirmed-good state → `zfs receive` from the
-        syncoid backup pool (fast path) or `restic restore` from B2
-        (offsite/last-resort) to repopulate data. The rescue ISO can't
+        sealing against a confirmed-good state → `zfs receive` to
+        repopulate data: from homelab's own zbackup/restic-to-B2 for
+        homelab itself, or from homelab's `zbackup/backup/thinkpad`
+        and `zbackup/backup/legion` datasets for those two hosts (their
+        only backup destination — see the offsite-gap note above). The
+        rescue ISO can't
         `zpool import` a pool sitting inside a still-locked LUKS
         container, so LUKS must be unlocked manually (passphrase) as
         the first step of any bare-metal recovery — the ISO should
