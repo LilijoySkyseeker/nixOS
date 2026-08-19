@@ -1,4 +1,5 @@
 {
+  config,
   pkgs-unstable,
   pkgs-stable,
   lib,
@@ -13,6 +14,7 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/build-worker.nix
   ];
 
   myPullDeploy = {
@@ -24,6 +26,53 @@
     operation = "boot";
     requireACPower = true;
   };
+
+  # distributed builds — thinkpad submits its own rebuilds to
+  # homelab/torrent, accepts builds submitted by them, and drops out of
+  # rotation as a worker while on battery (myBuildWorker.acGated below).
+  # See .claude/plans/quirky-herding-teapot.md.
+  myBuildWorker = {
+    enable = true;
+    acGated = true;
+    # TODO before deploying: confirm the real AC supply node name via
+    # `ls /sys/class/power_supply/` on thinkpad — "AC" is a guess.
+    acPowerSupplyName = "AC";
+    authorizedKeys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMqCpIC0zswd04rbRZU+DYx3T0BXzIvpZB6Z6fvlrFZH nix-builder@thinkpad"
+    ];
+  };
+  sops.secrets.builder_key_homelab = { };
+  sops.secrets.builder_key_torrent = { };
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      hostName = "torrent";
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_torrent.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan torrent | grep ed25519 | awk '{print $3}' | base64 -w0`
+      systems = [ "x86_64-linux" ];
+      # TODO confirm live via `nproc` on torrent before deploying
+      maxJobs = 8;
+      speedFactor = 3;
+    }
+    {
+      hostName = "homelab";
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_homelab.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan homelab | grep ed25519 | awk '{print $3}' | base64 -w0`
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      # TODO confirm live via `nproc` on homelab before deploying
+      maxJobs = 8;
+      speedFactor = 2;
+    }
+  ];
 
   # System installed pkgs
   environment.systemPackages =

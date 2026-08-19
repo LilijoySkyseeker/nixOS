@@ -14,6 +14,7 @@
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/iso-autobuild.nix
+    ../../modules/nixos/build-worker.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
 
@@ -35,6 +36,52 @@
     isoAttr = "isoimage";
     triggeredBy = [ "pull-deploy.service" ];
   };
+
+  # distributed builds — torrent is the strongest machine in the fleet,
+  # so it submits its own rebuilds to homelab and accepts builds
+  # submitted by homelab/thinkpad. Always on AC (desktop), so no
+  # acGated. See .claude/plans/quirky-herding-teapot.md.
+  myBuildWorker = {
+    enable = true;
+    authorizedKeys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJlNXC+Q2BiJvRqBFkSffDHEzSt2QEQxQLezW5+SBwk3 nix-builder@torrent"
+    ];
+  };
+  sops.secrets.builder_key_homelab = { };
+  sops.secrets.builder_key_thinkpad = { };
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      hostName = "homelab";
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_homelab.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan homelab | grep ed25519 | awk '{print $3}' | base64 -w0`
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      # TODO confirm live via `nproc` on homelab before deploying
+      maxJobs = 8;
+      speedFactor = 2;
+    }
+    {
+      hostName = "thinkpad";
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_thinkpad.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan thinkpad | grep ed25519 | awk '{print $3}' | base64 -w0`
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      # TODO confirm live via `nproc` on thinkpad before deploying
+      maxJobs = 4;
+      speedFactor = 1;
+    }
+  ];
 
   # System installed pkgs
   environment.systemPackages =

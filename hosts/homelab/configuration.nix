@@ -16,6 +16,7 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
+    ../../modules/nixos/build-worker.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -314,6 +315,58 @@
   };
   systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
 
+  # distributed builds — homelab both submits its own rebuilds to
+  # thinkpad/torrent when they have spare capacity, and accepts builds
+  # submitted by them (see .claude/plans/quirky-herding-teapot.md).
+  # trusted-users/openssh/AC-gating wiring lives in
+  # modules/nixos/build-worker.nix.
+  myBuildWorker = {
+    enable = true;
+    # private half: sops.secrets — see README/TODO for the manual sops
+    # edit instructions handed to the user, this key was not committed
+    # by the assistant per the repo's manual-secret-management
+    # convention.
+    authorizedKeys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILUn844HNSGRFxMyntpDqUq4kJ+MH/4ip0nQYSEJRjyF nix-builder@homelab"
+    ];
+  };
+  sops.secrets.builder_key_thinkpad = { };
+  sops.secrets.builder_key_torrent = { };
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      hostName = "torrent"; # tailnet MagicDNS name
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_torrent.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan torrent | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # (left unset for now — falls back to SSH known_hosts TOFU, not
+      # the pinned host key this plan calls for).
+      systems = [ "x86_64-linux" ];
+      # TODO confirm live via `nproc` on torrent before deploying
+      maxJobs = 8;
+      speedFactor = 3; # strongest
+    }
+    {
+      hostName = "thinkpad";
+      sshUser = "nix-builder";
+      sshKey = config.sops.secrets.builder_key_thinkpad.path;
+      protocol = "ssh-ng";
+      # TODO before deploying: fetch and set publicHostKey via
+      # `ssh-keyscan thinkpad | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # (left unset for now — falls back to SSH known_hosts TOFU, not
+      # the pinned host key this plan calls for).
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ]; # emulated fallback; AC-gated either way
+      # TODO confirm live via `nproc` on thinkpad before deploying
+      maxJobs = 4;
+      speedFactor = 1; # weakest + intermittently unavailable
+    }
+  ];
+
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
@@ -448,6 +501,7 @@
       "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
       "/var/lib/sanoid" # snapshot state cache
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
+      "/var/lib/nix-builder" # myBuildWorker's SSH home dir/authorized_keys
     ];
     files = [
       "/etc/machine-id"
