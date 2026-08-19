@@ -11,6 +11,17 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-18: verify jellyfin is still reachable after the new
+      vps base HTTP rate limit deploys** (vps). Added a base
+      per-source-IP `iptables` `hashlimit` rule covering caddy's
+      80/443 entry point (120/min, burst 60, `vps-ratelimit` raw
+      chain in `hosts/vps/configuration.nix`) so every caddy vhost
+      gets floor protection, not just jellyfin's anubis PoW. Once
+      deployed to the real droplet, confirm a normal browser session
+      against `jellyfin.skyseekerlabs.net` (including the anubis PoW
+      round-trip) still loads cleanly and isn't tripping the new
+      limit under real usage.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
