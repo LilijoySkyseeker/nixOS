@@ -33,7 +33,7 @@
     ];
     environment = {
       TYPE = "FABRIC";
-      VERSION = "26.2";
+      VERSION = "LATEST";
       EULA = "TRUE";
       # the entrypoint writes /etc/nsswitch.conf on every start unless told
       # not to; --read-only below makes that write fail, so skip it — the
