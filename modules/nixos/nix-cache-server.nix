@@ -32,7 +32,7 @@ in
     # locked-down systemd sandbox and uses LoadCredential for signKeyPaths
     # (so the key file itself can stay root-only, no group/world-readable
     # loosening needed here) — nothing to re-harden on top of that.
-    services.harmonia = {
+    services.harmonia.cache = {
       enable = true;
       signKeyPaths = [ cfg.signKeyPath ];
       settings = {
