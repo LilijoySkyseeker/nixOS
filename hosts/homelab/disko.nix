@@ -1,3 +1,4 @@
+{ config, ... }:
 {
   # Sources:
   # https://github.com/lovesegfault/nix-config/blob/eebebff8e682ba2deb96320afa35789537a1e58e/hosts/plato/disko.nix#L1
@@ -49,6 +50,7 @@
                 name = "zroot-crypt";
                 pool = "zroot";
                 extraSettings.allowDiscards = true; # SSD
+                reinstalled = config.myPhase2.reinstalled;
               };
             };
           };
@@ -70,6 +72,7 @@
             content = luksZfs {
               inherit name;
               pool = "zdata";
+              reinstalled = config.myPhase2.reinstalled;
             };
           };
         };
@@ -84,6 +87,7 @@
             content = luksZfs {
               inherit name;
               pool = "zbackup";
+              reinstalled = config.myPhase2.reinstalled;
             };
           };
         };

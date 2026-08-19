@@ -1,3 +1,4 @@
+{ config, ... }:
 {
   # disko
   disko.devices =
@@ -30,6 +31,7 @@
                 name = "zroot-crypt";
                 pool = "zroot";
                 extraSettings.allowDiscards = true; # SSD
+                reinstalled = config.myPhase2.reinstalled;
               };
             };
           };

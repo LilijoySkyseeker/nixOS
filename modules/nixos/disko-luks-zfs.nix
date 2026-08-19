@@ -16,18 +16,33 @@
 # Secure Boot (lanzaboote) is confirmed working — not here, disko has
 # no TPM2 primitive and sealing before Secure Boot is verified would
 # seal against an untrusted boot chain.
+#
+# `reinstalled` gates the LUKS wrapping itself (modules/nixos/phase2-gate.nix):
+# disko's `type = "luks"` unconditionally emits a
+# `boot.initrd.luks.devices.<name>` entry (initrdUnlock defaults true),
+# so evaluating this as "luks" on a host whose disk was never actually
+# reprovisioned with a LUKS header would hang initrd on next boot.
+# Defaults false — callers must pass `config.myPhase2.reinstalled`
+# explicitly.
 {
   name, # unique LUKS container name (one per physical disk)
   pool, # target zpool name
   extraSettings ? { }, # e.g. { allowDiscards = true; } for SSDs
+  reinstalled ? false, # only true once this disk was actually disko-installed with LUKS
 }:
-{
-  type = "luks";
-  inherit name;
-  enrollRecovery = true;
-  settings = extraSettings;
-  content = {
+if reinstalled then
+  {
+    type = "luks";
+    inherit name;
+    enrollRecovery = true;
+    settings = extraSettings;
+    content = {
+      type = "zfs";
+      inherit pool;
+    };
+  }
+else
+  {
     type = "zfs";
     inherit pool;
-  };
-}
+  }

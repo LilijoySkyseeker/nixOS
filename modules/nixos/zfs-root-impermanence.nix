@@ -53,32 +53,38 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    fileSystems.${cfg.persistPath}.neededForBoot = true;
-
-    boot.initrd = {
-      systemd = {
-        enable = true;
-        services.rollback = {
-          description = "Rollback root filesystem to a pristine state on boot";
-          wantedBy = [ "initrd.target" ];
-          after = [ "zfs-import-zroot.service" ];
-          before = [ "sysroot.mount" ];
-          path = with pkgs-stable; [ zfs ];
-          unitConfig.DefaultDependencies = "no";
-          serviceConfig.Type = "oneshot";
-          script = ''
-            zfs rollback -r ${cfg.rootDataset}@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
-          '';
+  config = lib.mkMerge [
+    # Independent of cfg.enable: services/{minecraft,jellyfin,factorio}.nix
+    # already write into environment.persistence.${cfg.persistPath}
+    # unconditionally (predates this gate), so persistPath must stay
+    # neededForBoot regardless of whether the root-rollback retrofit
+    # below has landed on this host.
+    { fileSystems.${cfg.persistPath}.neededForBoot = true; }
+    (lib.mkIf cfg.enable {
+      boot.initrd = {
+        systemd = {
+          enable = true;
+          services.rollback = {
+            description = "Rollback root filesystem to a pristine state on boot";
+            wantedBy = [ "initrd.target" ];
+            after = [ "zfs-import-zroot.service" ];
+            before = [ "sysroot.mount" ];
+            path = with pkgs-stable; [ zfs ];
+            unitConfig.DefaultDependencies = "no";
+            serviceConfig.Type = "oneshot";
+            script = ''
+              zfs rollback -r ${cfg.rootDataset}@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
+            '';
+          };
         };
       };
-    };
 
-    environment.persistence.${cfg.persistPath} = {
-      # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
-      enable = true;
-      hideMounts = true;
-      inherit (cfg) directories files;
-    };
-  };
+      environment.persistence.${cfg.persistPath} = {
+        # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
+        enable = true;
+        hideMounts = true;
+        inherit (cfg) directories files;
+      };
+    })
+  ];
 }

@@ -17,6 +17,7 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
+    ../../modules/nixos/phase2-gate.nix
     ../../modules/nixos/secure-boot.nix
     ../../modules/nixos/zfs-support.nix
     ../../modules/nixos/zfs-snapshots.nix
@@ -378,7 +379,7 @@
 
   # Secure Boot (modules/nixos/secure-boot.nix — TODO.md Phase 1),
   # proven on thinkpad first before landing here.
-  mySecureBoot.enable = true;
+  mySecureBoot.enable = config.myPhase2.reinstalled;
 
   # zfs support (modules/nixos/zfs-support.nix)
   myZfsSupport = {
@@ -422,7 +423,7 @@
 
   # impermanence (modules/nixos/zfs-root-impermanence.nix)
   myZfsImpermanence = {
-    enable = true;
+    enable = config.myPhase2.reinstalled;
     directories = [
       "/etc/nixos"
       "/var/log"

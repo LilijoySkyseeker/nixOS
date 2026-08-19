@@ -2,6 +2,7 @@
   pkgs-unstable,
   pkgs-stable,
   lib,
+  config,
   inputs,
   ...
 }:
@@ -15,6 +16,7 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/phase2-gate.nix
     ../../modules/nixos/secure-boot.nix
     ../../modules/nixos/zfs-support.nix
     ../../modules/nixos/zfs-snapshots.nix
@@ -34,7 +36,7 @@
   # Secure Boot (modules/nixos/secure-boot.nix — TODO.md Phase 1),
   # tested here first — easiest host to physically recover if boot
   # breaks.
-  mySecureBoot.enable = true;
+  mySecureBoot.enable = config.myPhase2.reinstalled;
 
   # fingerprint reader
   services.fprintd.enable = true;
@@ -106,7 +108,7 @@
   # this host doesn't need /etc/nixos persisted (module default files
   # list — machine-id + SSH host key — covers what's needed as-is).
   myZfsImpermanence = {
-    enable = true;
+    enable = config.myPhase2.reinstalled;
     directories = [
       "/var/log"
       "/var/lib/systemd/timers" # persistent timers across reboots
