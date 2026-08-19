@@ -171,9 +171,15 @@
       bash
     ];
     serviceConfig = {
-      # backup is always lowest priority to not effect running processes
-      Nice = 19;
-      CPUSchedulingPolicy = "idle";
+      # previously Nice=19 + CPUSchedulingPolicy="idle" (SCHED_IDLE) to
+      # avoid impacting other services. Removed: SCHED_IDLE is the
+      # lowest possible Linux scheduling class, only running when the
+      # CPU is otherwise fully idle -- on this 4-core box with typical
+      # load average ~12-14 (jellyfin/game servers/syncoid all
+      # concurrent), that starved restic/rclone almost completely,
+      # observed throttling a full backup to ~2MiB/s even though
+      # neither the network link nor Backblaze itself was the
+      # bottleneck. Normal scheduling lets it compete fairly instead.
       # this service mounts/unmounts ZFS snapshots into a shared /tmp
       # (that's why PrivateTmp is already forced off below) and needs
       # real mount(8) access — ProtectSystem/namespace restrictions
