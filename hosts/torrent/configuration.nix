@@ -22,13 +22,13 @@
     enable = true;
     flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "torrent";
-    # a day after homelab's cache-warm jobs (Sat, see myNixCacheWarm in
+    # a day after homelab's cache-warm jobs (Fri, see myNixCacheWarm in
     # hosts/homelab/configuration.nix) so this closure is already
     # built+cached before torrent tries to substitute it. Same day as
     # thinkpad's pull-deploy above — different hosts, no conflict. See
     # README.md's "Scheduled jobs" table for the full staggered weekly
     # cascade this fits into.
-    dates = "Sun 03:00";
+    dates = "Sat 03:00";
     autoReboot = false;
     operation = "boot";
   };

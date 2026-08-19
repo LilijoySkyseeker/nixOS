@@ -115,9 +115,17 @@
   myNixCacheWarm = {
     enable = true;
     flakeDir = "/etc/nixos";
+    # every nixosConfigurations attr in flake.nix except homelab itself
+    # (builds itself directly via myAutoUpdate, doesn't need pre-warming).
+    # vps is included so Sat's push-deploy-vps just pushes an
+    # already-built closure instead of building it from scratch first —
+    # nixos-rebuild's remote push re-evaluates/builds against this same
+    # local store, so a warm Friday build here means a fast Saturday push.
     jobs = {
-      thinkpad = "Sat 03:00";
-      torrent = "Sat 03:00";
+      thinkpad = "Fri 03:00";
+      torrent = "Fri 03:00";
+      isoimage = "Fri 03:00";
+      vps = "Fri 03:00";
     };
   };
 
@@ -346,7 +354,7 @@
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
     # own independent day, after homelab's own switch (Wed) has landed
     # a vetted master, and clear of the Thu backup below.
-    dates = "Fri 03:00";
+    dates = "Sat 03:00";
   };
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
