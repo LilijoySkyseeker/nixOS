@@ -17,6 +17,7 @@
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
     ../../modules/nixos/build-worker.nix
+    ../../modules/nixos/build-submitter.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -330,41 +331,10 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILUn844HNSGRFxMyntpDqUq4kJ+MH/4ip0nQYSEJRjyF nix-builder@homelab"
     ];
   };
-  sops.secrets.builder_key_thinkpad = { };
-  sops.secrets.builder_key_torrent = { };
-  nix.distributedBuilds = true;
-  nix.buildMachines = [
-    {
-      hostName = "torrent"; # tailnet MagicDNS name
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_torrent.path;
-      protocol = "ssh-ng";
-      # TODO before deploying: torrent has no sshd/host key yet (this
-      # change is what enables sshd there) — pin after first deploy via
-      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on torrent, or
-      # equivalently reconstruct from `ssh-keyscan torrent` (full
-      # "ssh-ed25519 AAAA..." line, NOT just the base64 field).
-      systems = [ "x86_64-linux" ];
-      maxJobs = 16; # confirmed live via `nproc` on torrent, 2026-08-19
-      speedFactor = 3; # strongest
-    }
-    {
-      hostName = "thinkpad";
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_thinkpad.path;
-      protocol = "ssh-ng";
-      # TODO before deploying: same chicken-and-egg as torrent above —
-      # pin after thinkpad's first deploy via
-      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on thinkpad.
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ]; # emulated fallback; AC-gated either way
-      # TODO confirm live via `nproc` on thinkpad before deploying
-      maxJobs = 4;
-      speedFactor = 1; # weakest + intermittently unavailable
-    }
-  ];
+  # nix.distributedBuilds/nix.buildMachines/sops.secrets.builder_key_*
+  # generated from modules/nixos/build-fleet.nix (single source of
+  # truth for maxJobs/systems/speedFactor/publicHostKey per worker).
+  myBuildSubmitter.enable = true;
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {

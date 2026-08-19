@@ -15,6 +15,7 @@
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/build-worker.nix
+    ../../modules/nixos/build-submitter.nix
   ];
 
   myPullDeploy = {
@@ -34,54 +35,16 @@
   myBuildWorker = {
     enable = true;
     acGated = true;
-    # TODO before deploying: confirm the real AC supply node name via
-    # `ls /sys/class/power_supply/` on thinkpad — "AC" is a guess.
+    # confirmed live on thinkpad, 2026-08-19
     acPowerSupplyName = "AC";
     authorizedKeys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMqCpIC0zswd04rbRZU+DYx3T0BXzIvpZB6Z6fvlrFZH nix-builder@thinkpad"
     ];
   };
-  sops.secrets.builder_key_homelab = { };
-  sops.secrets.builder_key_torrent = { };
-  nix.distributedBuilds = true;
-  nix.buildMachines = [
-    {
-      hostName = "torrent";
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_torrent.path;
-      protocol = "ssh-ng";
-      # TODO before deploying: torrent has no sshd/host key yet — its
-      # SSH host key is generated on first boot with sshd enabled
-      # (which this change itself turns on), so it can't be pinned
-      # until right after that first deploy. Leave unset (TOFU) until
-      # then, then fetch via
-      # `ssh-keyscan torrent | grep ed25519 | awk '{print $3}' | base64 -w0`
-      # and pin it in a follow-up commit.
-      systems = [ "x86_64-linux" ];
-      maxJobs = 16; # confirmed live via `nproc` on torrent, 2026-08-19
-      speedFactor = 3;
-    }
-    {
-      hostName = "homelab";
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_homelab.path;
-      protocol = "ssh-ng";
-      # confirmed live via `ssh-keyscan homelab`, base64 -w0 of the full
-      # "ssh-ed25519 AAAA..." line (matches the .pub file format the
-      # nixpkgs option description expects — NOT base64 of just the
-      # key field), 2026-08-19
-      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUFYdS8wckJwR1VlUlVEbHh2KzZrV2dHVVFqQW44SUdOWjVJdG9KdURTK1oK";
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      # TODO confirm live via `nproc` on homelab before deploying — no
-      # admin SSH access from the working session that wired this up,
-      # ssh-keyscan (unauthenticated) worked but nproc requires login.
-      maxJobs = 8;
-      speedFactor = 2;
-    }
-  ];
+  # nix.distributedBuilds/nix.buildMachines/sops.secrets.builder_key_*
+  # generated from modules/nixos/build-fleet.nix (single source of
+  # truth for maxJobs/systems/speedFactor/publicHostKey per worker).
+  myBuildSubmitter.enable = true;
 
   # System installed pkgs
   environment.systemPackages =

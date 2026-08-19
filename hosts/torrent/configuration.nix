@@ -15,6 +15,7 @@
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/iso-autobuild.nix
     ../../modules/nixos/build-worker.nix
+    ../../modules/nixos/build-submitter.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
 
@@ -47,47 +48,10 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJlNXC+Q2BiJvRqBFkSffDHEzSt2QEQxQLezW5+SBwk3 nix-builder@torrent"
     ];
   };
-  sops.secrets.builder_key_homelab = { };
-  sops.secrets.builder_key_thinkpad = { };
-  nix.distributedBuilds = true;
-  nix.buildMachines = [
-    {
-      hostName = "homelab";
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_homelab.path;
-      protocol = "ssh-ng";
-      # confirmed live via `ssh-keyscan homelab`, base64 -w0 of the full
-      # "ssh-ed25519 AAAA..." line (matches the .pub file format the
-      # nixpkgs option description expects — NOT base64 of just the
-      # key field), 2026-08-19
-      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUFYdS8wckJwR1VlUlVEbHh2KzZrV2dHVVFqQW44SUdOWjVJdG9KdURTK1oK";
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      # TODO confirm live via `nproc` on homelab before deploying — no
-      # admin SSH access from the working session that wired this up,
-      # ssh-keyscan (unauthenticated) worked but nproc requires login.
-      maxJobs = 8;
-      speedFactor = 2;
-    }
-    {
-      hostName = "thinkpad";
-      sshUser = "nix-builder";
-      sshKey = config.sops.secrets.builder_key_thinkpad.path;
-      protocol = "ssh-ng";
-      # TODO before deploying: thinkpad has no sshd/host key yet (this
-      # change is what enables sshd there) — pin after first deploy via
-      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on thinkpad.
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-      # TODO confirm live via `nproc` on thinkpad before deploying
-      maxJobs = 4;
-      speedFactor = 1;
-    }
-  ];
+  # nix.distributedBuilds/nix.buildMachines/sops.secrets.builder_key_*
+  # generated from modules/nixos/build-fleet.nix (single source of
+  # truth for maxJobs/systems/speedFactor/publicHostKey per worker).
+  myBuildSubmitter.enable = true;
 
   # System installed pkgs
   environment.systemPackages =
