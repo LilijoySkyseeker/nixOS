@@ -120,20 +120,27 @@ NixOS
 
 ### Scheduled jobs (weekly timing)
 
-The update/cache/backup cascade is deliberately staggered across the week so
-nothing competes for the same host's CPU/disk/network at once. All times are
-`America/Los_Angeles`, homelab's `time.timeZone`.
+Every job below runs on its own independent systemd timer — nothing is
+chained via `onSuccess` — deliberately staggered one-per-day so no two land
+on the same host at once. The only hard rule: the Backblaze backup runs the
+day right after the one job that can reboot the host (`myAutoUpdate`'s
+switch), so a switch-triggered reboot gets a full day of headroom before a
+potentially multi-hour backup starts. All times are `America/Los_Angeles`,
+homelab's `time.timeZone`.
 
-| Day | Time  | Host             | Job                                     | What it does |
-|-----|-------|------------------|------------------------------------------|--------------|
-| Tue | 03:00 | homelab          | `flake-update-test` (`myAutoUpdate`)     | Bumps `flake.lock` on a branch, build-tests it, merges to `master` only if it builds. |
-| Wed | 03:00 | homelab          | `nixos-upgrade` (`myAutoUpdate`)         | Switches homelab to whatever's on `master`; reboots only if the kernel changed. |
-| Wed | ~03:0x | homelab         | `push-deploy-vps` → `cache-warm-thinkpad` → `cache-warm-torrent` | Chained via `onSuccess` off `nixos-upgrade`, one at a time (not parallel): builds+pushes vps's closure over SSH, then build-only compiles thinkpad's and torrent's closures so their *entire* closures — not just paths shared with homelab's own config — land in the harmonia cache. |
-| Thu | 03:00 | thinkpad, torrent | `pull-deploy` (`myPullDeploy`)          | Pulls `master`, build-tests, switches/boots. By now homelab has already built+cached this same `flake.lock` revision, so most/all of the closure substitutes from `http://homelab:5000` instead of building from source. |
-| Fri | 03:00 | homelab          | `restic-backups-backblazeWeekly`         | Weekly ZFS-snapshot-based backup to Backblaze via rclone (`--transfers 32`) — network/I/O heavy. Kept a full day clear of the Thu cache-serving window on purpose. |
-| daily | —   | all hosts        | `nh.clean` (`programs.nh.clean`)         | `--keep-since 7d --keep 7` — this is what bounds the binary cache to ~1 week: homelab's own kept generations GC-root everything a client could still substitute. |
-| continuous | — | homelab       | sanoid (minutely) / syncoid (hourly)     | ZFS snapshot + replication, independent of the above. |
-| `*:0/15` | — | homelab       | `health-check` (`myHealthAlerts`)        | Failed-unit/ZFS/SMART/backup-staleness checks → Discord webhook. |
+| Day | Time  | Host      | Job                                    | What it does |
+|-----|-------|-----------|------------------------------------------|--------------|
+| Tue | 03:00 | homelab   | `flake-update-test` (`myAutoUpdate`)     | Bumps `flake.lock` on a branch, build-tests it, merges to `master` only if it builds. Never reboots. |
+| Wed | 03:00 | homelab   | `nixos-upgrade` (`myAutoUpdate`)         | Switches homelab to whatever's on `master`; reboots only if the kernel changed — the one job in this chain that can restart the host. |
+| Thu | 03:00 | homelab   | `restic-backups-backblazeWeekly`         | Weekly ZFS-snapshot-based backup to Backblaze via rclone (`--transfers 32`) — network/I/O heavy. Placed the day right after Wed's possible-reboot switch, per the rule above. |
+| Fri | 03:00 | homelab   | `push-deploy-vps` (`myPushDeploy`)       | Builds vps's config locally and pushes+activates the closure over SSH. |
+| Sat | 03:00 | homelab   | `cache-warm-thinkpad` (`myNixCacheWarm`) | Build-only (never switches) compiles thinkpad's full closure so it lands in homelab's store/cache — not just paths shared with homelab's own config. |
+| Sat | 03:00 | homelab   | `cache-warm-torrent` (`myNixCacheWarm`)  | Same, for torrent's closure. Same day and time as thinkpad's — both queue through the same nix-daemon rather than being offset. |
+| Sun | 03:00 | thinkpad  | `pull-deploy` (`myPullDeploy`)           | Pulls `master`, build-tests, switches/boots — a day after Sat's cache-warm jobs, so its closure is already cached and substitutes from `http://homelab:5000` instead of building from source. |
+| Sun | 03:00 | torrent   | `pull-deploy` (`myPullDeploy`)           | Same, a day after Sat's cache-warm jobs. Same day as thinkpad's pull-deploy — different hosts, no conflict. |
+| daily | —   | all hosts | `nh.clean` (`programs.nh.clean`)         | `--keep-since 7d --keep 7` — this is what bounds the binary cache to ~1 week: homelab's own kept generations GC-root everything a client could still substitute. |
+| continuous | — | homelab | sanoid (minutely) / syncoid (hourly)   | ZFS snapshot + replication, independent of the above. |
+| `*:0/15` | — | homelab | `health-check` (`myHealthAlerts`)        | Failed-unit/ZFS/SMART/backup-staleness checks → Discord webhook. |
 
 vps is intentionally absent from the self-update rotation: homelab builds
 and pushes its closure (`myPushDeploy`) rather than vps building itself.

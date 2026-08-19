@@ -108,24 +108,18 @@
     signKeyPath = config.sops.secrets.homelab_nix_cache_sign_key.path;
   };
 
-  # build (never switch) thinkpad/torrent's own closures right after
-  # homelab's own switch succeeds, so their host-specific store paths
-  # (nvidia drivers, kde, etc. — not just what's shared with homelab's
-  # own config) are already cached before their Friday pull-deploy.
+  # build (never switch) thinkpad/torrent's own closures on their own
+  # staggered days, so their host-specific store paths (nvidia drivers,
+  # kde, etc. — not just what's shared with homelab's own config) are
+  # already cached before each one's pull-deploy day.
   myNixCacheWarm = {
     enable = true;
     flakeDir = "/etc/nixos";
-    hostAttrs = [
-      "thinkpad"
-      "torrent"
-    ];
+    jobs = {
+      thinkpad = "Sat 03:00";
+      torrent = "Sat 03:00";
+    };
   };
-  # chained rather than fired in parallel, so homelab does one build at a
-  # time instead of racing 3 concurrent nix builds right after its own
-  # switch: upgrade -> push vps -> warm thinkpad's cache -> warm torrent's.
-  systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
-  systemd.services."push-deploy-vps".onSuccess = [ "cache-warm-thinkpad.service" ];
-  systemd.services."cache-warm-thinkpad".onSuccess = [ "cache-warm-torrent.service" ];
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
@@ -165,7 +159,11 @@
       user = "root";
       paths = [ "/tmp/restic" ];
       timerConfig = {
-        OnCalendar = "Fri 03:00:00";
+        # the day right after myAutoUpdate.switchDates (Wed 03:00,
+        # which can reboot the host) so a switch-triggered reboot gets
+        # a full ~24h of headroom before this potentially-multi-hour
+        # backup starts, instead of racing it.
+        OnCalendar = "Thu 03:00:00";
         Persistent = true;
       };
       pruneOpts = [
@@ -321,11 +319,12 @@
   myAutoUpdate = {
     enable = true;
     hostAttr = "homelab";
-    # shifted a day earlier than a plain Wed/Thu split so the whole
-    # update→cache→pull-deploy chain lands clear of the Fri 03:00
-    # weekly Backblaze backup below (restic + rclone --transfers 32
-    # would otherwise compete for network bandwidth with thinkpad/
-    # torrent pulling from the cache at the same instant).
+    # see README.md's "Scheduled jobs" table for the full weekly
+    # cascade this is the anchor of — every downstream job (backup,
+    # vps push, cache warming, thinkpad/torrent pull-deploy) is spread
+    # across its own day of the week from here, independently
+    # scheduled rather than chained, so nothing bursts or competes for
+    # the same host's resources at once.
     updateDates = "Tue 03:00";
     switchDates = "Wed 03:00";
   };
@@ -345,10 +344,9 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
-    # dates left at its default (Thu 03:15) as a periodic fallback —
-    # the onSuccess wiring below is the primary trigger, right after
-    # homelab's own myAutoUpdate switch, so this reuses the same
-    # already-vetted master checkout instead of racing/duplicating it.
+    # own independent day, after homelab's own switch (Wed) has landed
+    # a vetted master, and clear of the Thu backup below.
+    dates = "Fri 03:00";
   };
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
@@ -364,7 +362,7 @@
       "zbackup/backup-bulk/homelab/storage-bulk" = 6;
       "zbackup/backup/homelab/state" = 6;
     };
-    # offsite restic backup runs weekly (Fri 03:00) and can now take up to
+    # offsite restic backup runs weekly (Thu 03:00) and can now take up to
     # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give
     # zero slack; 336h = 14 days gives a full week of slack past a
     # worst-case 1-week run before alerting on a missed/stuck run.
