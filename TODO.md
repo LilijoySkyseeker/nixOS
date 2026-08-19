@@ -68,7 +68,17 @@ items rather than letting them rot.
       to whichever machine initiates a given host's rebuild — fans out
       across the tailnet instead of always landing on one machine.
       Purely a build-time-distribution optimization, not required for
-      any host's correctness.
+      any host's correctness. Architecture decision 2026-08-18: each
+      worker gets one shared builder SSH keypair (per-worker, not
+      per-submitter→worker edge) — 4 secrets total (homelab, thinkpad,
+      torrent, future pi5) instead of 9, at the cost of losing
+      per-submitter attribution/revocation on a given worker (all of
+      that worker's authorized submitters share blast radius/rotation
+      for that one worker, though not mesh-wide). Possible future
+      security improvement: split to per-edge keys (one sops secret per
+      submitter→worker pair, matching the existing
+      homelab_vps_deploy_key convention) if that isolation becomes
+      worth the added secret count.
 
 - [ ] **2026-08-18: caddy hits a permission-denied race against the
       anubis unix socket right after vps reboots.** Found trawling
