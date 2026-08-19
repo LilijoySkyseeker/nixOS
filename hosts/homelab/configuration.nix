@@ -120,11 +120,12 @@
       "torrent"
     ];
   };
-  systemd.services.nixos-upgrade.onSuccess = [
-    "push-deploy-vps.service"
-    "cache-warm-thinkpad.service"
-    "cache-warm-torrent.service"
-  ];
+  # chained rather than fired in parallel, so homelab does one build at a
+  # time instead of racing 3 concurrent nix builds right after its own
+  # switch: upgrade -> push vps -> warm thinkpad's cache -> warm torrent's.
+  systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
+  systemd.services."push-deploy-vps".onSuccess = [ "cache-warm-thinkpad.service" ];
+  systemd.services."cache-warm-thinkpad".onSuccess = [ "cache-warm-torrent.service" ];
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
@@ -320,8 +321,13 @@
   myAutoUpdate = {
     enable = true;
     hostAttr = "homelab";
-    updateDates = "Wed 03:00";
-    switchDates = "Thu 03:00";
+    # shifted a day earlier than a plain Wed/Thu split so the whole
+    # update→cache→pull-deploy chain lands clear of the Fri 03:00
+    # weekly Backblaze backup below (restic + rclone --transfers 32
+    # would otherwise compete for network bandwidth with thinkpad/
+    # torrent pulling from the cache at the same instant).
+    updateDates = "Tue 03:00";
+    switchDates = "Wed 03:00";
   };
 
   # vps builds nothing itself anymore (myPullDeploy removed there — a

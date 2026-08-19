@@ -20,10 +20,12 @@
     enable = true;
     flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "thinkpad";
-    # a day after homelab's own switchDates (Thu 03:00, hosts/homelab/
+    # a day after homelab's own switchDates (Wed 03:00, hosts/homelab/
     # configuration.nix) so homelab has already built+cached this same
-    # flake.lock revision before thinkpad tries to substitute it.
-    dates = "Fri 03:00";
+    # flake.lock revision before thinkpad tries to substitute it. Kept
+    # clear of Fri 03:00 (homelab's weekly Backblaze backup, which
+    # competes for its network bandwidth) by design.
+    dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
