@@ -63,6 +63,83 @@ items rather than letting them rot.
       pools to redo) last, once the LUKS+TPM2 disko recipe is proven
       on the other two.
 
+      **Phase 3 — recovery plan.** FDE+TPM2 can end up *less*
+      recoverable than plaintext ZFS if the failure modes aren't
+      planned for up front (locked LUKS → can't reach the pool → can't
+      reach sops secrets → can't even rebuild the flake for that host).
+      Assumes thinkpad/torrent get syncoid+restic-to-B2 parity with
+      homelab (being architected separately) before Phase 2 lands on
+      them — Phase 2 shouldn't ship on a host that isn't backed up
+      offsite yet.
+
+      - *Software failure (bad rebuild, corrupted root, ransomware-ish
+        scenario)*: unaffected by encryption. homelab already rolls
+        zroot back to a blank snapshot every boot (impermanence);
+        thinkpad/torrent have sanoid snapshots + NixOS generation
+        rollback via the (post-Phase-1) signed boot entries. No new
+        recovery step needed here beyond re-signing/re-sealing if a
+        rollback changes measured boot state (see PCR note below).
+
+      - *TPM2 unseal failure* (motherboard swap, TPM cleared, BIOS
+        update shifts PCR values, TPM dies): never enroll a TPM2-only
+        LUKS slot — always keep a second passphrase/keyfile slot
+        (`systemd-cryptenroll` supports multiple slots per device) so
+        failure just falls back to a manual prompt instead of a
+        lockout. That recovery secret must NOT be sops-encrypted with
+        the host's own key (chicken-and-egg — it's the disk you can't
+        get into yet); escrow it instead as a printed/paper copy plus a
+        password-manager entry, or a keyfile on separate offline
+        encrypted media. Bind TPM2 sealing to a minimal PCR set (0, 2,
+        7, 11/12) — fewer PCRs means fewer false-positive lockouts from
+        routine firmware/kernel churn — and proactively
+        `systemd-cryptenroll --wipe-slot=tpm2` + re-enroll after any
+        change expected to shift PCRs (kernel bump, lanzaboote update,
+        firmware update), rather than discovering it at boot.
+
+      - *Secure Boot key loss*: recoverable, not a lockout — regenerate
+        with `sbctl create-keys`, re-enroll in firmware, re-sign the
+        current boot chain, then re-run `systemd-cryptenroll` to reseal
+        TPM2 against the new PCR7 values (one boot needs the passphrase
+        fallback in between). Add sbctl's key directory
+        (`/var/lib/sbctl` or `/etc/secureboot`, whichever this repo's
+        module resolves to) to each host's restic/persistence paths so
+        it isn't a single point of loss.
+
+      - *Hardware failure / full reinstall*: boot the existing rescue
+        ISO (`hosts/isoimage`, already carries disko/zfs/restic/rclone)
+        → disko re-provision from the flake with the LUKS layer set to
+        a **static passphrase/keyfile** at provision time (disko's LUKS
+        `content.settings` supports this) — no TPM dependency yet →
+        boot once, confirm `sbctl status`/lanzaboote enrolled clean on
+        the (repaired or replacement) hardware → only then
+        `systemd-cryptenroll --tpm2-device=auto` to add the TPM2 slot,
+        sealing against a confirmed-good state → `zfs receive` from the
+        syncoid backup pool (fast path) or `restic restore` from B2
+        (offsite/last-resort) to repopulate data. The rescue ISO can't
+        `zpool import` a pool sitting inside a still-locked LUKS
+        container, so LUKS must be unlocked manually (passphrase) as
+        the first step of any bare-metal recovery — the ISO should
+        carry or document access to the escrowed recovery keyfile
+        itself (encrypted to an offline/paper key, never to sops) so
+        the rescue flow never depends on secrets that live only inside
+        the volume it's trying to open.
+
+      - *sops/age chicken-and-egg on rebuild*: sops-nix decrypts using
+        an age identity derived from `/etc/ssh/ssh_host_ed25519_key`
+        (or the PC profile's generated key), which is regenerated fresh
+        on every reinstall unless explicitly preserved — a freshly
+        reprovisioned host cannot decrypt its own existing secrets.
+        Same pattern already documented for vps (`hosts/vps/README.md`
+        step 1): back up the actual host key material (not just note
+        that a key exists) so it can be restored to the new install
+        before the first `nixos-rebuild switch` that references
+        secrets; if the old key is truly gone, fall back to enrolling a
+        recovery/admin age key in `.sops.yaml` and re-encrypting from a
+        machine that still holds decryptable copies, then rotate.
+        Should extend the existing per-host key backup practice to
+        thinkpad/torrent/homelab explicitly once Phase 2 is scheduled,
+        not assume it's already covered.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
