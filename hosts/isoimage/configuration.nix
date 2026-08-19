@@ -26,6 +26,8 @@
     gptfdisk
     ntfs3g
     exfatprogs
+    cryptsetup # LUKS unlock/recovery-passphrase enrollment (TODO.md Phase 2/3)
+    sbctl # Secure Boot key re-enrollment during bare-metal recovery (see hosts/*/RECOVERY.md)
 
     # filesystem tools for whatever a target/failed disk is running
     e2fsprogs

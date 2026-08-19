@@ -43,36 +43,54 @@ items rather than letting them rot.
       a human on the actual hardware.
 
       **Phase 2 — LUKS + TPM2 auto-unlock on zroot (requires
-      reinstall/reprovision).** disko partitions the raw disk at
-      install time; there's no supported in-place "encrypt zroot"
-      path. Plan is: back up `/persist` + secrets + any zdata/zbackup
-      contents (homelab), wipe, reprovision via disko/nixos-anywhere
-      with a LUKS layer under zroot (`boot.initrd.luks.devices` +
-      `systemd-cryptenroll ... tpm2-device=auto`), restore. ZFS native
-      encryption was considered and rejected for the auto-unlock goal —
-      it has no built-in TPM2 path; getting there means maintaining a
-      bespoke initrd unit, vs. LUKS+systemd-cryptenroll being an
-      upstream-supported NixOS module. LUKS sits transparently under
-      ZFS/disko, so it doesn't complicate homelab's existing
-      rollback-to-blank-snapshot impermanence setup.
+      reinstall/reprovision).** **disko config landed** (`hosts/{homelab,
+      thinkpad,torrent}/disko.nix` — `luks` content type wraps each `zfs`
+      partition, verified against disko's own `lib/types/luks.nix` and
+      `example/luks-lvm.nix` source, not guessed; homelab's zdata/zbackup
+      HDDs included per the encrypt-everything decision below); not yet
+      run on any real disk. disko partitions the raw disk at install
+      time; there's no supported in-place "encrypt zroot" path, so this
+      still requires: back up `/persist` + secrets + any zdata/zbackup
+      contents (homelab), wipe, reprovision via disko/nixos-anywhere (now
+      prompting interactively per LUKS container for a passphrase, plus
+      auto-generating+printing a recovery passphrase via `enrollRecovery`
+      — see hosts/*/RECOVERY.md), restore. TPM2 enrollment
+      (`systemd-cryptenroll ... --tpm2-device=auto`) is a manual
+      post-install step once Secure Boot is confirmed working, not
+      something disko does. ZFS native encryption was considered and
+      rejected for the auto-unlock goal — it has no built-in TPM2 path;
+      getting there means maintaining a bespoke initrd unit, vs.
+      LUKS+systemd-cryptenroll being an upstream-supported NixOS module.
+      LUKS sits transparently under ZFS/disko, so it doesn't complicate
+      homelab's existing rollback-to-blank-snapshot impermanence setup.
 
       Since this reinstall is already mandatory, roll thinkpad and
-      torrent onto impermanence in the same pass — root/base system
+      torrent onto impermanence in the same pass — **config landed**
+      (`hosts/{thinkpad,torrent}/configuration.nix` +
+      `hosts/torrent/disko.nix` — torrent was missing the `local/state`
+      dataset thinkpad already had stubbed, added it). Root/base system
       config goes ephemeral (rolled back to a blank snapshot every
-      boot), **home directories stay persistent, not wiped**. Both
+      boot), **home directories stay persistent, not wiped** — both
       hosts already partition `local/home` as a separate ZFS dataset
-      from `local/root` in their current `disko.nix`, so this is a
-      clean retrofit of homelab's existing pattern rather than a new
-      one: add a `local/state` dataset (mirroring homelab's
-      `/nix/state`) for `environment.persistence` — `/etc/nixos`,
-      `/var/log`, service state dirs (sanoid, tailscale, docker if
-      used, etc.), `/etc/machine-id`, and the SSH host key/age identity
-      files needed to avoid the sops chicken-and-egg problem on every
-      boot, not just on reinstall — plus the initrd `zfs rollback -r
-      zroot/local/root@blank` unit homelab already runs. homelab is
-      already on impermanence, so no change needed there beyond
-      whatever Phase 2 does to its layout. vps is already impermanent
-      too (tmpfs root) and out of scope per Phase 1/2 above.
+      from `local/root`, so the rollback unit never touches it. Direct
+      retrofit of homelab's existing pattern: `environment.persistence`
+      on `/nix/state` for `/var/log`, service state dirs (sops-nix
+      generated identity, sanoid, NetworkManager, bluetooth, podman,
+      fprintd on thinkpad only), `/etc/machine-id`, and the SSH host
+      key files needed to avoid the sops chicken-and-egg problem on
+      every boot, not just reinstall — plus the initrd `zfs rollback -r
+      zroot/local/root@blank` unit homelab already runs. Neither host
+      needs `/etc/nixos` persisted (their flake checkout lives under
+      `/home/lilijoy/dotfiles`, already on the untouched `/home`
+      dataset, unlike homelab which persists its own local checkout).
+      `nix flake check` and `nixos-rebuild build` both verified clean
+      for thinkpad/torrent/homelab with all of Phase 1+2 config
+      combined. homelab is already on impermanence, so no change needed
+      there beyond whatever Phase 2 does to its layout. vps is already
+      impermanent too (tmpfs root) and out of scope per Phase 1/2
+      above. Also added `sbctl`/`cryptsetup` to the rescue ISO's package
+      list (`hosts/isoimage/configuration.nix`) — the Phase 3 runbooks
+      need both there and `sbctl` was missing.
 
       Must do Phase 1 before Phase 2 on a given host: the TPM2 unseal
       policy should bind to PCR 7 (Secure Boot state) and the UKI/boot

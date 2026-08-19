@@ -107,4 +107,51 @@
   };
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
+  fileSystems."/nix/state".neededForBoot = true;
+
+  # impermanence (TODO.md Phase 2: folded in alongside the LUKS
+  # reinstall since it's already mandatory). Root goes ephemeral,
+  # /home stays untouched — it's already its own zfs dataset
+  # (local/home in disko.nix), separate from local/root, so the
+  # rollback below never touches it. Mirrors homelab's existing
+  # pattern (hosts/homelab/configuration.nix); the flake checkout
+  # itself lives under /home/lilijoy/dotfiles (myPullDeploy above), so
+  # unlike homelab this host doesn't need /etc/nixos persisted.
+  boot.initrd = {
+    systemd = {
+      enable = true;
+      services.rollback = {
+        description = "Rollback root filesystem to a pristine state on boot";
+        wantedBy = [ "initrd.target" ];
+        after = [ "zfs-import-zroot.service" ];
+        before = [ "sysroot.mount" ];
+        path = with pkgs-stable; [ zfs ];
+        unitConfig.DefaultDependencies = "no";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          zfs rollback -r zroot/local/root@blank && echo "  >> >> ROLLBACK COMPLETE << <<"
+        '';
+      };
+    };
+  };
+  environment.persistence."/nix/state" = {
+    enable = true;
+    hideMounts = true;
+    directories = [
+      "/var/log"
+      "/var/lib/systemd/timers" # persistent timers across reboots
+      "/var/lib/nixos" # avoids uid/gid complaints on reboot
+      "/var/lib/sops-nix" # profiles/PC.nix's sops.age.generateKey identity
+      "/var/lib/sanoid" # snapshot state cache
+      "/var/lib/NetworkManager" # connection state
+      "/etc/NetworkManager/system-connections" # actual saved wifi/ethernet profiles
+      "/var/lib/bluetooth" # paired device keys
+      "/var/lib/containers" # podman/distrobox images, avoids re-pulling
+    ];
+    files = [
+      "/etc/machine-id"
+      "/etc/ssh/ssh_host_ed25519_key"
+      "/etc/ssh/ssh_host_ed25519_key.pub"
+    ];
+  };
 }

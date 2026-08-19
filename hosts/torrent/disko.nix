@@ -87,9 +87,18 @@
               mountpoint = "/nix";
               options."com.sun:auto-snapshot" = "false";
             };
+            "local/state" = {
+              # TODO.md Phase 2: impermanence retrofit — persistence
+              # target for environment.persistence in configuration.nix.
+              # thinkpad already had this dataset stubbed; torrent didn't.
+              type = "zfs_fs";
+              mountpoint = "/nix/state";
+              options."com.sun:auto-snapshot" = "false";
+            };
             "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
+              postCreateHook = "zfs snapshot zroot/local/root@blank";
               options."com.sun:auto-snapshot" = "false";
             };
             "local/home" = {
