@@ -48,6 +48,19 @@
         # 100.64.0.0/10 export CIDR.
         "hosts allow" = "100.64.0.0/10";
         "hosts deny" = "0.0.0.0/0";
+        # signing/encryption/NTLM hardening: partially redundant with
+        # WireGuard already encrypting+authenticating the whole tailnet,
+        # but free for a single modern SMB3 Android client and adds
+        # defense-in-depth against a compromised on-tailnet peer or a
+        # protocol-downgrade attempt.
+        "server signing" = "mandatory";
+        "smb encrypt" = "mandatory";
+        "ntlm auth" = "ntlmv2-only";
+        # shrinks RPC attack surface — no printer sharing use case here.
+        "load printers" = false;
+        "printing" = "bsd";
+        "printcap name" = "/dev/null";
+        "disable spoolss" = true;
       };
       storage = {
         path = "/storage";
@@ -57,6 +70,10 @@
         "create mask" = "0660";
         "directory mask" = "0770";
         browseable = true;
+        # a symlink under /storage pointing outside it must not let a
+        # client escape the share boundary.
+        "wide links" = false;
+        "follow symlinks" = false;
       };
       "storage-bulk" = {
         path = "/storage-bulk";
@@ -66,6 +83,8 @@
         "create mask" = "0660";
         "directory mask" = "0770";
         browseable = true;
+        "wide links" = false;
+        "follow symlinks" = false;
       };
     };
   };
@@ -83,6 +102,32 @@
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
+      # unlike samba-smbd, this unit only reads a secret file and calls
+      # two binaries — it doesn't need broad filesystem access, so it
+      # gets the full "always-safe" hardening stack (see
+      # feedback_systemd_hardening.md), not just NoNewPrivileges.
+      NoNewPrivileges = true;
+      PrivateTmp = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectClock = true;
+      ProtectControlGroups = true;
+      RestrictRealtime = true;
+      RestrictSUIDSGID = true;
+      LockPersonality = true;
+      MemoryDenyWriteExecute = true;
+      RestrictNamespaces = true;
+      SystemCallArchitectures = "native";
+      # the only paths this script actually writes to.
+      ReadWritePaths = [
+        "/var/lib/samba"
+        "/var/cache/samba"
+        "/var/log/samba"
+        "/var/lock/samba"
+      ];
     };
     script = ''
       pw=$(cat ${lib.escapeShellArg config.sops.secrets.homelab_samba_android_smb_password.path})
@@ -111,6 +156,7 @@
   # and getting one wrong silently breaks auth or logging.
   systemd.services.samba-smbd.serviceConfig = {
     NoNewPrivileges = true;
+    PrivateTmp = true;
     ProtectHome = true; # no /home directories are served over SMB
     ProtectKernelTunables = true;
     ProtectKernelModules = true;
