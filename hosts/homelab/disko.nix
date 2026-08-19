@@ -6,6 +6,16 @@
 
   # install command
   # disko-install --write-efi-boot-entries --flake 'github:lilijoyskyseeker/nixos#homelab' --disk nvme-a /dev/disk/by-id/ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512 --disk hdd-a /dev/disk/by-id/ata-HUH721212ALE601_8CH9J1UE --disk hdd-b /dev/disk/by-id/ata-HUH721212ALE601_8CJJUE6E --disk hdd-c /dev/disk/by-id/ata-HUH721212ALE601_8CK6DXTF  --disk hdd-d /dev/disk/by-id/ata-HUH721212ALE601_2AHDD1AY && zpool export -af
+  #
+  # NOTE (post-FDE): each disk's `luks` content block below has no
+  # passwordFile/keyFile set, so `askPassword` defaults true — this
+  # command will now interactively prompt for a passphrase per LUKS
+  # container (5 disks = 5 prompts; same passphrase each time is fine,
+  # they're independent LUKS headers) and print/pause for a QR-coded
+  # recovery passphrase per container via `enrollRecovery`. See
+  # hosts/homelab/RECOVERY.md for what to do with those recovery
+  # passphrases (escrow, not discard) and the post-install TPM2
+  # enrollment step this command does NOT do.
   # get hardware config command
   # nixos-generate-config --dir <dir> --no-filesystems
 
@@ -35,14 +45,41 @@
             zfs = {
               size = "100%";
               content = {
-                type = "zfs";
-                pool = "zroot";
+                # LUKS wraps the zfs partition rather than using ZFS
+                # native encryption: systemd-cryptenroll's TPM2 sealing
+                # is an upstream-supported NixOS module for LUKS, with
+                # no equivalent for native ZFS encryption (see
+                # TODO.md's FDE/Secure Boot/TPM2 entry). enrollRecovery
+                # has disko auto-generate a second, high-entropy
+                # passphrase slot at provision time (printed/QR'd for
+                # escrow) alongside whatever passphrase is typed
+                # interactively — never a TPM2-only slot, so a TPM
+                # failure/board swap always has a manual fallback. The
+                # TPM2 slot itself is enrolled post-install via
+                # `systemd-cryptenroll`, once Secure Boot (lanzaboote)
+                # is confirmed working — not here, disko has no TPM2
+                # primitive and sealing before Secure Boot is verified
+                # would seal against an untrusted boot chain.
+                type = "luks";
+                name = "zroot-crypt";
+                enrollRecovery = true;
+                settings.allowDiscards = true; # SSD
+                content = {
+                  type = "zfs";
+                  pool = "zroot";
+                };
               };
             };
           };
         };
       };
-      dataHdd = id: {
+      # zdata/zbackup (bulk storage + local backup mirror, both on spinning
+      # HDDs) get the same LUKS treatment as zroot — per-user decision, the
+      # theft threat model covers bulk storage the same as the OS disk, not
+      # just zroot. `name` must be unique per disk (each HDD is its own LUKS
+      # container, mirrored at the zpool layer above LUKS, same as the
+      # unencrypted layout was mirrored above the raw partitions).
+      dataHdd = name: id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
         content = {
@@ -50,13 +87,18 @@
           partitions.zfs = {
             size = "100%";
             content = {
-              type = "zfs";
-              pool = "zdata";
+              type = "luks";
+              inherit name;
+              enrollRecovery = true;
+              content = {
+                type = "zfs";
+                pool = "zdata";
+              };
             };
           };
         };
       };
-      backupHdd = id: {
+      backupHdd = name: id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
         content = {
@@ -64,8 +106,13 @@
           partitions.zfs = {
             size = "100%";
             content = {
-              type = "zfs";
-              pool = "zbackup";
+              type = "luks";
+              inherit name;
+              enrollRecovery = true;
+              content = {
+                type = "zfs";
+                pool = "zbackup";
+              };
             };
           };
         };
@@ -77,12 +124,12 @@
         nvme-a = rootSsd 1 "ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512";
 
         # Data pool disks
-        hdd-a = dataHdd "ata-HUH721212ALE601_8CH9J1UE";
-        hdd-b = dataHdd "ata-HUH721212ALE601_8CJJUE6E";
+        hdd-a = dataHdd "zdata-a-crypt" "ata-HUH721212ALE601_8CH9J1UE";
+        hdd-b = dataHdd "zdata-b-crypt" "ata-HUH721212ALE601_8CJJUE6E";
 
         # Backup pool disks
-        hdd-c = backupHdd "ata-HUH721212ALE601_8CK6DXTF";
-        hdd-d = backupHdd "ata-HUH721212ALE601_2AHDD1AY";
+        hdd-c = backupHdd "zbackup-c-crypt" "ata-HUH721212ALE601_8CK6DXTF";
+        hdd-d = backupHdd "zbackup-d-crypt" "ata-HUH721212ALE601_2AHDD1AY";
       };
 
       zpool = {
