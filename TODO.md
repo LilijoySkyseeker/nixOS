@@ -111,6 +111,113 @@ items rather than letting them rot.
       `profiles/server.nix`, alongside the existing root home-manager
       block) so `myAutoUpdate`'s commit step succeeds.
 
+- [ ] **2026-08-19: coordinate the 10 parallel homelab-blocked branch
+      sessions into a merge order** (planning only so far, no
+      pushes/merges/switches until explicitly approved). Homelab is
+      tied up running `restic-backups-backblazeWeekly` (a from-scratch
+      B2 backup after a deliberate bucket wipe, ~587GiB, was ~28.5%
+      done as of 2026-08-19 with an ETA of ~2.2 days), which several
+      other branches need to avoid disturbing mid-run since it reads
+      live ZFS snapshots. Status gathered by messaging each session
+      directly (git branch/worktree name, files touched, commit state,
+      overlaps):
+
+      - **backblaze homelab reset** (`worktree-b2-backup-reset`) — the
+        blocker. 3 commits already deployed live to homelab
+        (`ea562c4`, `560a635`, `edd8c1e`: B2 bucket-scope, lifecycle
+        rule, retention). 1 more commit held back deliberately
+        (`1977e94`, drops `Nice`/`CPUSchedulingPolicy` from the restic
+        unit) — build-verified safe but not deployed yet since
+        deploying would restart the in-progress backup. Land this
+        last commit (needs a real `nixos-rebuild switch`, not just
+        build) once the backup finishes or is otherwise judged safe to
+        restart.
+      - **wireguard ipv6 bug** (`worktree-vps-exit-node`) — done,
+        committed. One real change: `hosts/homelab/configuration.nix`
+        wg0 peer endpoint for vps, IPv6 literal → IPv4 literal (fixes
+        dead vps↔homelab tunnel breaking minecraft/factorio
+        reachability). Same file as backblaze-reset's changes but a
+        different stanza — already coordinated directly with that
+        session: rebase on top of master once backblaze-reset's
+        backup finishes and its commits land, deploy together in one
+        `switch` to avoid multiple restic-unit restarts.
+      - **minecraft geyser version update**
+        (`worktree-mc-geyser-nether-roof`) — done, 3 commits already
+        **pushed to origin** (not merged/deployed). Touches only
+        `services/minecraft.nix` (nether-roof fix, autopause,
+        VERSION pinned→LATEST) + new
+        `services/minecraft-geyser-config/Geyser-Fabric/config.yml`.
+        No overlap with anything else on this list — mergeable
+        independently, any time.
+      - **nix build cache setup** (`worktree-nix-cache`) — done,
+        build-clean on all 5 hosts, not yet pushed. Adds
+        `modules/nixos/nix-cache-{server,client,warm}.nix` (harmonia
+        over tailscale). **Conflict risk:** moved
+        `services.restic.backups.backblazeWeekly.timerConfig.OnCalendar`
+        from Fri 03:00 to Thu 03:00 in
+        `hosts/homelab/configuration.nix` — same block
+        backblaze-homelab-reset is editing; diff carefully before
+        merging, don't blind-merge. Also reshuffled
+        `myAutoUpdate`/`myPushDeploy`/`myPullDeploy` schedule days
+        across homelab/thinkpad/torrent. Flagged as a close relative
+        of **distributed nix builds setup** (not yet reported in) —
+        both add sections to the same three hosts'
+        `configuration.nix`; complementary in effect but should be
+        sequenced, not merged simultaneously.
+      - **zfs backups plus spaceguard** (`worktree-zfs-backup-push`) —
+        in progress, committed + build-clean on 3 hosts, not
+        merged/deployed. Blocked on the user generating 2 sops
+        secrets (SSH keypairs) before going live — a user step, not
+        technical. New `modules/nixos/{backup-push,zfs-space-guard}.nix`;
+        reshapes `hosts/homelab/disko.nix` zbackup dataset tree; new
+        backup-recv user + zfs delegation on homelab.
+        **Real overlap with zfs-pool-recovery-restore**: that branch
+        also touches homelab's `disko.nix` (LUKS-wraps zdata/zbackup)
+        and adds its own `modules/nixos/zfs-snapshots.nix` replacing
+        homelab's inline sanoid/syncoid block — the two need to diff
+        against each other before either merges. Lower urgency for
+        now since zfs-pool-recovery-restore's pool-affecting bits are
+        gated off (see below) and reinstall order puts homelab last.
+      - **zfs pool recovery restore** (`worktree-fde-secureboot-plan`)
+        — turned out to be a much larger secure-boot/LUKS/impermanence
+        reinstall project, not a narrow pool-recovery fix. All commits
+        already **pushed to origin**, build-verified per host. Adds
+        `modules/nixos/{secure-boot,zfs-support,zfs-snapshots,
+        zfs-root-impermanence,disko-luks-zfs,phase2-gate,
+        luks-stage2-unlock}.nix`, a `scripts/reinstall-host.sh`
+        orchestrator, lanzaboote flake input. Everything Phase-2
+        (LUKS/secure-boot/impermanence) is gated behind
+        `myPhase2.reinstalled`, defaulting false on all hosts — safe
+        to merge without changing live behavior. Reinstall order:
+        thinkpad → torrent → homelab (last), no reinstall has happened
+        yet on any host. Will coordinate with backblaze-homelab-reset
+        before any real pool-affecting action once homelab's turn
+        comes, well after this backup episode.
+      - **distributed nix builds setup, jellyfin gpu acceleration,
+        add samba smb share, verify crawler rate limiting** — status
+        not yet reported back as of this writing; nix-build-cache
+        already flagged distributed-nix-builds as a likely
+        `configuration.nix` sequencing conflict (same 3 hosts, same
+        files, complementary features).
+
+      **Working order once homelab is unblocked** (draft, pending the
+      remaining 4 reports and final user go-ahead):
+      1. backblaze-homelab-reset finishes/lands its held-back commit.
+      2. minecraft-geyser merges any time (no dependency).
+      3. wireguard-ipv6 rebases on master, deploys together with #1 in
+         one switch.
+      4. nix-build-cache and distributed-nix-builds-setup diff/rebase
+         against each other and against backblaze-reset's
+         `backblazeWeekly` OnCalendar change, then merge in an agreed
+         sequence (not simultaneously).
+      5. zfs-backups+spaceguard and zfs-pool-recovery-restore diff
+         `hosts/homelab/disko.nix` + sanoid/syncoid areas against each
+         other before either merges; zfs-pool-recovery-restore's
+         Phase-2 bits stay inert (`myPhase2.reinstalled=false`)
+         regardless of merge order.
+      6. samba, jellyfin-gpu, crawler-rate-limiting — pending status,
+         presumed independent unless they report otherwise.
+
 ## Done
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
