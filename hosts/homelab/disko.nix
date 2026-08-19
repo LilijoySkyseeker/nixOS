@@ -62,6 +62,12 @@
       # just zroot. `name` must be unique per disk (each HDD is its own LUKS
       # container, mirrored at the zpool layer above LUKS, same as the
       # unencrypted layout was mirrored above the raw partitions).
+      #
+      # initrdUnlock = false: these are stage-2 pools, not the root pool —
+      # opening them in initrd would add 4 extra passphrase prompts per
+      # boot and let a slow/faulted HDD hang stage 1 even though the
+      # NVMe-hosted zroot is healthy and reachable. Unlocked at stage 2
+      # instead via /etc/crypttab keyfiles wired below.
       dataHdd = name: id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
@@ -73,6 +79,7 @@
               inherit name;
               pool = "zdata";
               reinstalled = config.myPhase2.reinstalled;
+              initrdUnlock = false;
             };
           };
         };
@@ -88,6 +95,7 @@
               inherit name;
               pool = "zbackup";
               reinstalled = config.myPhase2.reinstalled;
+              initrdUnlock = false;
             };
           };
         };

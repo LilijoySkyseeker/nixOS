@@ -3,7 +3,6 @@
   pkgs-stable,
   lib,
   vars,
-  inputs,
   ...
 }:
 {
@@ -22,6 +21,7 @@
     ../../modules/nixos/zfs-support.nix
     ../../modules/nixos/zfs-snapshots.nix
     ../../modules/nixos/zfs-root-impermanence.nix
+    ../../modules/nixos/luks-stage2-unlock.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -381,6 +381,23 @@
   # proven on thinkpad first before landing here.
   mySecureBoot.enable = config.myPhase2.reinstalled;
 
+  # Stage-2 unlock for zdata/zbackup HDDs (modules/nixos/luks-stage2-unlock.nix
+  # — TODO.md Phase 2 / bug_004 fix). initrdUnlock=false in disko.nix for
+  # these 4 containers; keyfiles at /etc/cryptsetup-keys.d/<name>.key must
+  # be created + cryptsetup luksAddKey'd manually during reinstall (never
+  # authored by nix config — see hosts/homelab/RECOVERY.md), then covered
+  # by myZfsImpermanence.directories below.
+  myLuksStage2Unlock = {
+    enable = config.myPhase2.reinstalled;
+    containers = [
+      { name = "zdata-a-crypt"; device = "/dev/disk/by-partlabel/disk-hdd-a-zfs"; }
+      { name = "zdata-b-crypt"; device = "/dev/disk/by-partlabel/disk-hdd-b-zfs"; }
+      { name = "zbackup-c-crypt"; device = "/dev/disk/by-partlabel/disk-hdd-c-zfs"; }
+      { name = "zbackup-d-crypt"; device = "/dev/disk/by-partlabel/disk-hdd-d-zfs"; }
+    ];
+    zpools = [ "zdata" "zbackup" ];
+  };
+
   # zfs support (modules/nixos/zfs-support.nix)
   myZfsSupport = {
     enable = true;
@@ -426,6 +443,7 @@
     enable = config.myPhase2.reinstalled;
     directories = [
       "/etc/nixos"
+      { directory = "/etc/cryptsetup-keys.d"; mode = "0700"; } # zdata/zbackup stage-2 unlock keyfiles (myLuksStage2Unlock)
       "/var/log"
       "/var/lib/systemd/timers" # for systemd persistant timers during off time
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot

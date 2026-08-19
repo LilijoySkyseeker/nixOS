@@ -24,16 +24,25 @@
 # reprovisioned with a LUKS header would hang initrd on next boot.
 # Defaults false — callers must pass `config.myPhase2.reinstalled`
 # explicitly.
+#
+# `initrdUnlock` controls whether *this specific container* needs to be
+# open before sysroot.mount — true for the root pool's container, false
+# for any pool imported at stage 2 (e.g. homelab's zdata/zbackup HDDs).
+# A false container instead needs stage-2 unlock wiring (crypttab
+# keyfile) added by the caller, since disko itself has no such
+# mechanism — see hosts/homelab/disko.nix's dataHdd/backupHdd for the
+# stage-2 wiring this pairs with.
 {
   name, # unique LUKS container name (one per physical disk)
   pool, # target zpool name
   extraSettings ? { }, # e.g. { allowDiscards = true; } for SSDs
   reinstalled ? false, # only true once this disk was actually disko-installed with LUKS
+  initrdUnlock ? true, # false for non-root pools unlocked at stage 2 instead
 }:
 if reinstalled then
   {
     type = "luks";
-    inherit name;
+    inherit name initrdUnlock;
     enrollRecovery = true;
     settings = extraSettings;
     content = {

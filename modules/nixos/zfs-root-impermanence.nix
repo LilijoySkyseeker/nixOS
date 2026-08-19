@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs-stable,
   ...
 }:
 let
@@ -67,9 +66,19 @@ in
           services.rollback = {
             description = "Rollback root filesystem to a pristine state on boot";
             wantedBy = [ "initrd.target" ];
-            after = [ "zfs-import-zroot.service" ];
+            # Derived from rootDataset, not hardcoded — a caller with a
+            # non-zroot pool would otherwise order against a
+            # zfs-import-*.service unit that doesn't exist on their
+            # host, silently dropping the ordering guarantee (bug_003).
+            after = [ "zfs-import-${builtins.head (lib.splitString "/" cfg.rootDataset)}.service" ];
             before = [ "sysroot.mount" ];
-            path = with pkgs-stable; [ zfs ];
+            # config.boot.zfs.package, not pkgs-stable.zfs: on
+            # nixpkgs-unstable hosts (thinkpad/torrent), the kernel
+            # module comes from the unstable channel, so pinning the
+            # userspace zfs binary to stable risks a userspace/kmod
+            # IOCTL version mismatch once the two channels' zfs series
+            # diverge (bug_002).
+            path = [ config.boot.zfs.package ];
             unitConfig.DefaultDependencies = "no";
             serviceConfig.Type = "oneshot";
             script = ''

@@ -171,6 +171,24 @@ items rather than letting them rot.
       pools to redo) last, once the LUKS+TPM2 disko recipe is proven
       on the other two.
 
+      Safety gate (added after ultrareview caught a boot-brick risk):
+      `modules/nixos/phase2-gate.nix` adds `myPhase2.reinstalled`
+      (default `false` on all three hosts), which mySecureBoot,
+      myZfsImpermanence, and the LUKS wrapping in disko.nix are all
+      conditioned on — without it, pull-deploy's unattended
+      `operation = "boot"` would set a LUKS-expecting generation as
+      default before any disk actually has a LUKS header, hanging the
+      next reboot in initrd. Flip a host's flag to `true` only in the
+      same commit that reinstalls it.
+
+      TODO once all three hosts are reinstalled and confirmed booting
+      cleanly on the new layout: remove the `myPhase2.reinstalled`
+      flag and its `mkIf`/ternary usages entirely (phase2-gate.nix,
+      disko-luks-zfs.nix's `reinstalled` param, and the
+      `config.myPhase2.reinstalled` references in each host's
+      configuration.nix/disko.nix) — it's a temporary rollout gate, not
+      permanent config surface.
+
       **Phase 3 — recovery plan.** Step-by-step runbooks now exist at
       `hosts/homelab/RECOVERY.md`, `hosts/thinkpad/RECOVERY.md`,
       `hosts/torrent/RECOVERY.md` — exact commands (verified against
