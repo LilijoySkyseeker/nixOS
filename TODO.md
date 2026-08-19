@@ -30,6 +30,14 @@ items rather than letting them rot.
       1. On homelab (or anywhere with `nix`): `nix key generate-secret
          --key-name cache.homelab-1 > cache-key.secret`, then `nix key
          convert-secret-to-public < cache-key.secret` for the public half.
+      (Also added since the first pass: `myNixCacheWarm`
+      (`modules/nixos/nix-cache-warm.nix`) — homelab now build-only
+      pre-builds thinkpad's and torrent's own closures too, wired via
+      `systemd.services.nixos-upgrade.onSuccess` right after homelab's
+      own switch. Without this the cache only helped with paths
+      coincidentally shared with homelab's own build; host-specific
+      derivations — nvidia drivers, kde, etc. — would otherwise never
+      be built on homelab and so never cached.)
       2. Add the secret's contents as `homelab_nix_cache_sign_key` in
          `secrets/secrets.yaml` (manual sops edit — not something to do by
          having an agent touch the file directly, see repo convention).
