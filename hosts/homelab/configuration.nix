@@ -17,6 +17,7 @@
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
     ../../modules/nixos/nix-cache-server.nix
+    ../../modules/nixos/nix-cache-warm.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -106,6 +107,24 @@
     enable = true;
     signKeyPath = config.sops.secrets.homelab_nix_cache_sign_key.path;
   };
+
+  # build (never switch) thinkpad/torrent's own closures right after
+  # homelab's own switch succeeds, so their host-specific store paths
+  # (nvidia drivers, kde, etc. — not just what's shared with homelab's
+  # own config) are already cached before their Friday pull-deploy.
+  myNixCacheWarm = {
+    enable = true;
+    flakeDir = "/etc/nixos";
+    hostAttrs = [
+      "thinkpad"
+      "torrent"
+    ];
+  };
+  systemd.services.nixos-upgrade.onSuccess = [
+    "push-deploy-vps.service"
+    "cache-warm-thinkpad.service"
+    "cache-warm-torrent.service"
+  ];
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
@@ -325,7 +344,6 @@
     # homelab's own myAutoUpdate switch, so this reuses the same
     # already-vetted master checkout instead of racing/duplicating it.
   };
-  systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
