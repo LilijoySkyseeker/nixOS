@@ -83,7 +83,25 @@ items rather than letting them rot.
       pools to redo) last, once the LUKS+TPM2 disko recipe is proven
       on the other two.
 
-      **Phase 3 — recovery plan.** FDE+TPM2 can end up *less*
+      **Phase 3 — recovery plan (sketch only, needs full
+      architecting before Phase 2 ships on any host).** The bullets
+      below are the researched shape of the plan — mechanisms,
+      ordering, what to escrow — not yet a runbook someone could follow
+      under stress. Still needed: an actual step-by-step per-host
+      recovery doc (likely `hosts/<host>/RECOVERY.md`, mirroring the
+      README convention already used for setup docs) with exact
+      commands, not prose; a decision on where the escrowed LUKS
+      recovery keyfile and sbctl PKI backups physically live (this
+      session only named the categories — paper backup, password
+      manager, offline media — not which one, or where); and a dry run
+      of the full bare-metal sequence against a spare/test disk (or a
+      VM, per this repo's existing "test remote deploys in a VM first"
+      convention) before it's trusted as the real plan for a live host.
+      Do this architecting pass before Phase 2 reinstalls anything, not
+      after — the recovery path needs to exist and be verified before
+      the failure modes it's covering for become possible.
+
+      FDE+TPM2 can end up *less*
       recoverable than plaintext ZFS if the failure modes aren't
       planned for up front (locked LUKS → can't reach the pool → can't
       reach sops secrets → can't even rebuild the flake for that host).
