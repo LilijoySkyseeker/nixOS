@@ -56,13 +56,18 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_homelab.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
-      # `ssh-keyscan homelab | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # confirmed live via `ssh-keyscan homelab`, base64 -w0 of the full
+      # "ssh-ed25519 AAAA..." line (matches the .pub file format the
+      # nixpkgs option description expects — NOT base64 of just the
+      # key field), 2026-08-19
+      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUFYdS8wckJwR1VlUlVEbHh2KzZrV2dHVVFqQW44SUdOWjVJdG9KdURTK1oK";
       systems = [
         "x86_64-linux"
         "aarch64-linux"
       ];
-      # TODO confirm live via `nproc` on homelab before deploying
+      # TODO confirm live via `nproc` on homelab before deploying — no
+      # admin SSH access from the working session that wired this up,
+      # ssh-keyscan (unauthenticated) worked but nproc requires login.
       maxJobs = 8;
       speedFactor = 2;
     }
@@ -71,8 +76,9 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_thinkpad.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
-      # `ssh-keyscan thinkpad | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # TODO before deploying: thinkpad has no sshd/host key yet (this
+      # change is what enables sshd there) — pin after first deploy via
+      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on thinkpad.
       systems = [
         "x86_64-linux"
         "aarch64-linux"

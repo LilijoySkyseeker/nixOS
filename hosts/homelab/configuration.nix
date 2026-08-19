@@ -339,13 +339,13 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_torrent.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
-      # `ssh-keyscan torrent | grep ed25519 | awk '{print $3}' | base64 -w0`
-      # (left unset for now — falls back to SSH known_hosts TOFU, not
-      # the pinned host key this plan calls for).
+      # TODO before deploying: torrent has no sshd/host key yet (this
+      # change is what enables sshd there) — pin after first deploy via
+      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on torrent, or
+      # equivalently reconstruct from `ssh-keyscan torrent` (full
+      # "ssh-ed25519 AAAA..." line, NOT just the base64 field).
       systems = [ "x86_64-linux" ];
-      # TODO confirm live via `nproc` on torrent before deploying
-      maxJobs = 8;
+      maxJobs = 16; # confirmed live via `nproc` on torrent, 2026-08-19
       speedFactor = 3; # strongest
     }
     {
@@ -353,10 +353,9 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_thinkpad.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
-      # `ssh-keyscan thinkpad | grep ed25519 | awk '{print $3}' | base64 -w0`
-      # (left unset for now — falls back to SSH known_hosts TOFU, not
-      # the pinned host key this plan calls for).
+      # TODO before deploying: same chicken-and-egg as torrent above —
+      # pin after thinkpad's first deploy via
+      # `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub` on thinkpad.
       systems = [
         "x86_64-linux"
         "aarch64-linux"

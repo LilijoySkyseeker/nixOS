@@ -50,11 +50,15 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_torrent.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
+      # TODO before deploying: torrent has no sshd/host key yet — its
+      # SSH host key is generated on first boot with sshd enabled
+      # (which this change itself turns on), so it can't be pinned
+      # until right after that first deploy. Leave unset (TOFU) until
+      # then, then fetch via
       # `ssh-keyscan torrent | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # and pin it in a follow-up commit.
       systems = [ "x86_64-linux" ];
-      # TODO confirm live via `nproc` on torrent before deploying
-      maxJobs = 8;
+      maxJobs = 16; # confirmed live via `nproc` on torrent, 2026-08-19
       speedFactor = 3;
     }
     {
@@ -62,13 +66,18 @@
       sshUser = "nix-builder";
       sshKey = config.sops.secrets.builder_key_homelab.path;
       protocol = "ssh-ng";
-      # TODO before deploying: fetch and set publicHostKey via
-      # `ssh-keyscan homelab | grep ed25519 | awk '{print $3}' | base64 -w0`
+      # confirmed live via `ssh-keyscan homelab`, base64 -w0 of the full
+      # "ssh-ed25519 AAAA..." line (matches the .pub file format the
+      # nixpkgs option description expects — NOT base64 of just the
+      # key field), 2026-08-19
+      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUFYdS8wckJwR1VlUlVEbHh2KzZrV2dHVVFqQW44SUdOWjVJdG9KdURTK1oK";
       systems = [
         "x86_64-linux"
         "aarch64-linux"
       ];
-      # TODO confirm live via `nproc` on homelab before deploying
+      # TODO confirm live via `nproc` on homelab before deploying — no
+      # admin SSH access from the working session that wired this up,
+      # ssh-keyscan (unauthenticated) worked but nproc requires login.
       maxJobs = 8;
       speedFactor = 2;
     }
