@@ -174,6 +174,51 @@ items rather than letting them rot.
       active), or have `myAutoUpdate` skip switching while
       `restic-backups-backblazeWeekly.service` is active.
 
+- [ ] **2026-08-18: homelab backup/replication stack has several
+      compounding risks if the box is powered off for an extended
+      period (over a month), surfaced while reasoning through the full
+      backup reset/re-test.** Grouped as one item since they share a
+      root cause (everything below is `Persistent = true` and fires
+      its one missed catch-up run right at boot, all at once):
+      - **Boot-time contention pile-up**: sanoid (minutely), syncoid
+        (hourly), the restic weekly timer, and both `myAutoUpdate`
+        timers (fetch + switch) are all `Persistent = true` — after a
+        long outage they all queue their catch-up run around the same
+        time on boot, recreating (likely worse, since concentrated
+        instead of spread out) the resource-contention throttling
+        diagnosed live during this session (4 cores, load average
+        12-14, multiple ZFS-heavy jobs + restic upload all competing).
+      - **Compounds directly with the item above**: if the catch-up
+        `nixos-rebuild switch` lands while the catch-up restic backup
+        is still mid-run, the service gets killed and restarts from
+        scratch — more likely right after a long outage than during
+        normal weekly operation, since both are now racing on the same
+        boot instead of being naturally staggered.
+      - **Self-inflicted history loss from the `--keep-daily 2`
+        retention** we set this session (disaster-recovery-only, not
+        versioning, per explicit choice): once the first post-outage
+        backup succeeds, its prune step drops straight to the 2 most
+        recent backup-days, permanently discarding all pre-outage B2
+        history at that point. Intentional given the retention
+        philosophy, but worth having a documented awareness of before
+        it surprises someone during an actual recovery.
+      - **Syncoid resume-base pruning, same failure mode as before,
+        longer fuse**: the widened retention from `fbf547f` (hourly
+        168/7d, daily 14) gives a stuck syncoid target ~1-2 weeks of
+        slack now instead of ~1 day, but a target stuck that long
+        post-boot (plausible given the contention point above) would
+        still hit the exact "resume base pruned, forced full reseed"
+        failure that caused this whole reset project.
+      - **Unverified**: whether the B2 application key
+        (`homelab_backblaze_rclone_config` secret) has an expiration
+        date set on Backblaze's side. Couldn't check without exposing
+        the secret's contents; confirm on the B2 web console if this
+        needs certainty.
+      Needs: stagger/serialize the catch-up timers (e.g. `RandomizedDelaySec`
+      spread, or explicit ordering) so they don't all fire at once on
+      boot, and decide whether the auto-update-vs-backup conflict fix
+      above should also gate against this boot-time race specifically.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
