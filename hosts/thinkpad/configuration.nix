@@ -13,16 +13,25 @@
     ../../modules/nixos/kde.nix
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
+    ../../modules/nixos/nix-cache-client.nix
   ];
 
   myPullDeploy = {
     enable = true;
     flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "thinkpad";
-    dates = "Thu 03:00";
+    # a day after homelab's own switchDates (Thu 03:00, hosts/homelab/
+    # configuration.nix) so homelab has already built+cached this same
+    # flake.lock revision before thinkpad tries to substitute it.
+    dates = "Fri 03:00";
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
+  };
+
+  myNixCacheClient = {
+    enable = true;
+    publicKey = "cache.homelab-1:REPLACE_WITH_PUBLIC_KEY=";
   };
 
   # System installed pkgs

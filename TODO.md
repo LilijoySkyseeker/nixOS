@@ -11,6 +11,39 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-18: homelab nix binary cache — code lands on branch
+      `worktree-nix-cache`, blocked on one manual sops step before it can
+      build/deploy.** homelab already runs harmonia (`myNixCacheServer`,
+      `modules/nixos/nix-cache-server.nix`), tailscale-only
+      (`networking.firewall.interfaces.tailscale0.allowedTCPPorts`), so
+      thinkpad/torrent (`myNixCacheClient`,
+      `modules/nixos/nix-cache-client.nix`) can substitute already-built
+      store paths instead of rebuilding from source. Relies on the
+      *existing* `nh.clean` retention (`profiles/default.nix`,
+      `--keep-since 7d --keep 7`, daily) to bound the cache to ~1 week —
+      no separate GC-root/pinning logic was added, since homelab's own
+      kept generations already GC-root everything a client would need.
+      thinkpad/torrent's `myPullDeploy.dates` moved from `Thu 03:00` to
+      `Fri 03:00` (a day after homelab's `myAutoUpdate.switchDates`, also
+      `Thu 03:00`) so the cache is warm by the time they pull.
+      **Needs before this can build:**
+      1. On homelab (or anywhere with `nix`): `nix key generate-secret
+         --key-name cache.homelab-1 > cache-key.secret`, then `nix key
+         convert-secret-to-public < cache-key.secret` for the public half.
+      2. Add the secret's contents as `homelab_nix_cache_sign_key` in
+         `secrets/secrets.yaml` (manual sops edit — not something to do by
+         having an agent touch the file directly, see repo convention).
+      3. Replace the `REPLACE_WITH_PUBLIC_KEY` placeholder in both
+         `hosts/thinkpad/configuration.nix` and
+         `hosts/torrent/configuration.nix`'s `myNixCacheClient.publicKey`
+         with the real public key from step 1.
+      4. `nixos-rebuild build` all three hosts again to confirm, then
+         merge/deploy.
+      Verified: `nixos-rebuild build` for homelab fails only on the
+      missing secret (harmonia module itself evaluates/builds fine);
+      thinkpad and torrent both build clean already since their half has
+      no secret dependency.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [

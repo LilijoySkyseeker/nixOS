@@ -14,6 +14,7 @@
     ../../modules/nixos/pull-deploy.nix
     ../../modules/nixos/nfs-homelab-mounts.nix
     ../../modules/nixos/iso-autobuild.nix
+    ../../modules/nixos/nix-cache-client.nix
   ];
   home-manager.users.lilijoy.imports = [ ];
 
@@ -21,9 +22,17 @@
     enable = true;
     flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "torrent";
-    dates = "Thu 03:00";
+    # a day after homelab's own switchDates (Thu 03:00, hosts/homelab/
+    # configuration.nix) so homelab has already built+cached this same
+    # flake.lock revision before torrent tries to substitute it.
+    dates = "Fri 03:00";
     autoReboot = false;
     operation = "boot";
+  };
+
+  myNixCacheClient = {
+    enable = true;
+    publicKey = "cache.homelab-1:REPLACE_WITH_PUBLIC_KEY=";
   };
 
   # rebuild the recovery iso into ~/Downloads every time pull-deploy

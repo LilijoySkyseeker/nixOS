@@ -16,6 +16,7 @@
     ../../modules/nixos/auto-update.nix
     ../../modules/nixos/health-alerts.nix
     ../../modules/nixos/push-deploy.nix
+    ../../modules/nixos/nix-cache-server.nix
 
     ../../services/jellyfin.nix
     ../../services/minecraft.nix
@@ -92,6 +93,18 @@
       owner = "health-check";
       group = "health-check";
     };
+    # harmonia's systemd unit fetches this via LoadCredential (see
+    # nix-cache-server.nix), so it can stay root-only rather than being
+    # opened up to a group.
+    homelab_nix_cache_sign_key = { };
+  };
+
+  # harmonia binary cache, tailscale-only, so thinkpad/torrent can
+  # substitute already-built store paths instead of rebuilding from
+  # source when they pull-deploy the day after homelab's own switch.
+  myNixCacheServer = {
+    enable = true;
+    signKeyPath = config.sops.secrets.homelab_nix_cache_sign_key.path;
   };
 
   # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
