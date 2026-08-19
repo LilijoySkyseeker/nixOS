@@ -247,6 +247,23 @@ items rather than letting them rot.
       `backup/legion` is torrent's permanent target name when that
       lands.
 
+      **Reinstall automation (added 2026-08-19):** `scripts/reinstall-host.sh`
+      is a template orchestrator for the actual Phase 2 reinstalls —
+      backup (temporary, pre-reinstall data safety net), disko-install
+      via the recovery ISO, data restore, the (unavoidably manual)
+      Secure Boot BIOS Setup Mode step, and TPM2 enrollment. Config per
+      host lives in `scripts/hosts/<host>.conf`; `thinkpad.conf` is the
+      first instance. See `scripts/README.md`.
+
+      The `backup`/`restore` stages there are explicitly TEMPORARY —
+      a one-off syncoid push/pull to homelab's `zbackup/backup-bulk/<host>`
+      standing in for real automated backups, which are being built in
+      a separate session/branch (see the syncoid-backup dependency note
+      above). Once that lands and covers thinkpad/torrent, delete those
+      two stages from the script and restore from the real backup
+      system instead — don't let this temporary path calcify into the
+      permanent one.
+
       FDE+TPM2 can end up *less*
       recoverable than plaintext ZFS if the failure modes aren't
       planned for up front (locked LUKS → can't reach the pool → can't
