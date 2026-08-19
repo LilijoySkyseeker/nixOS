@@ -29,6 +29,16 @@
 # backups (being built separately — see TODO.md). Once thinkpad/torrent
 # are covered by that system, delete these two stages here and restore
 # from there instead.
+#
+# --dry-run: run any stage without touching disk state, ssh'ing
+# anywhere, or requiring physical presence — for testing the script's
+# plumbing (arg parsing, host-conf loading, command construction)
+# before trusting it against a real host. Logs every command it would
+# run instead of running it; auto-answers confirm/pause prompts; skips
+# the hostname self-check so you can dry-run any stage from your admin
+# machine. NOT a substitute for the real thing — it never contacts an
+# ISO, homelab, or a LUKS/TPM2 device, so it can't catch e.g. a wrong
+# IP, a stale ssh key, or a real disko failure.
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -36,7 +46,7 @@ source "$SCRIPTS_DIR/lib/common.sh"
 
 usage() {
   cat <<EOF
-Usage: $0 <stage> <host> [args...]
+Usage: $0 [--dry-run] <stage> <host> [args...]
 
 Stages:
   backup     <host>                run on the host, before wiping it
@@ -45,7 +55,8 @@ Stages:
   secureboot <host>                run on the freshly-installed host
   tpm2       <host>                run on the freshly-installed host
 
-See the header comment in this file for the full sequence.
+--dry-run logs what each stage would do instead of doing it. See the
+header comment in this file for the full sequence and dry-run caveats.
 EOF
   exit 1
 }
@@ -54,7 +65,13 @@ require_local_host() {
   local host="$1"
   local actual
   actual="$(hostname)"
-  [ "$actual" = "$host" ] || die "This stage must run locally on '$host', but this machine is '$actual'."
+  if [ "$actual" != "$host" ]; then
+    if dry; then
+      warn "[dry-run] this stage would normally require running on '$host' (this machine is '$actual') — continuing anyway."
+      return 0
+    fi
+    die "This stage must run locally on '$host', but this machine is '$actual'."
+  fi
 }
 
 stage_backup() {
@@ -66,8 +83,7 @@ stage_backup() {
 
   for ds in "${DATA_DATASETS[@]}"; do
     local leaf="${ds##*/}"
-    log "syncoid $ds -> ${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}"
-    run0 syncoid --no-privilege-elevation "$ds" "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}"
+    run_cmd run0 syncoid --no-privilege-elevation "$ds" "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}"
   done
 
   ok "Backup complete. Verify on homelab with: zfs list -r ${BACKUP_DATASET}"
@@ -92,11 +108,11 @@ stage_install() {
 
   confirm "About to WIPE the disk(s) above on $host (via $target) and disko-install the '$host' flake config. This is irreversible."
 
-  # -t: this is interactive — disko-install will prompt for a LUKS
-  # passphrase per container and print/pause on the QR-coded
-  # enrollRecovery passphrase (see hosts/$host/RECOVERY.md for what to
-  # do with those recovery passphrases — escrow, not discard).
-  ssh -t "${ssh_opts[@]}" "$target" -- \
+  # -t (ssh_tty_to): this is interactive — disko-install will prompt
+  # for a LUKS passphrase per container and print/pause on the
+  # QR-coded enrollRecovery passphrase (see hosts/$host/RECOVERY.md for
+  # what to do with those recovery passphrases — escrow, not discard).
+  ssh_tty_to "$target" \
     disko-install --write-efi-boot-entries \
     --flake "github:lilijoyskyseeker/nixos#${host}" \
     "${disk_args[@]}"
@@ -114,8 +130,7 @@ stage_restore() {
 
   for ds in "${DATA_DATASETS[@]}"; do
     local leaf="${ds##*/}"
-    log "syncoid ${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf} -> ${RESTORE_DATASET}"
-    run0 syncoid --no-privilege-elevation "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}" "${RESTORE_DATASET}"
+    run_cmd run0 syncoid --no-privilege-elevation "${HOMELAB_SSH}:${BACKUP_DATASET}/${leaf}" "${RESTORE_DATASET}"
   done
 
   ok "Restore complete. Next: run 'secureboot $host' locally on this host."
@@ -129,7 +144,11 @@ stage_secureboot() {
   pause "Once you've completed the BIOS Setup Mode enrollment and rebooted with Secure Boot re-enabled, come back here."
 
   log "sbctl status:"
-  sbctl status || true
+  if dry; then
+    log "[dry-run] would run: sbctl status"
+  else
+    sbctl status || true
+  fi
 
   confirm "Does the status above show Secure Boot enabled and your keys enrolled? Only continue if yes."
   ok "Secure Boot confirmed. Next: run 'tpm2 $host' locally on this host."
@@ -142,17 +161,30 @@ stage_tpm2() {
   warn "TPM2 enrollment binds to PCR7 (Secure Boot state) — only run this after Secure Boot is confirmed working (the 'secureboot' stage), never before. Sealing against an unverified boot chain defeats the point."
   confirm "Enroll a TPM2 keyslot on this host's root LUKS container? The existing interactive/recovery passphrase slots are kept, not replaced."
 
-  log "systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 on the root LUKS container"
-  run0 systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-partlabel/disk-nvme-a-zfs
+  run_cmd run0 systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-partlabel/disk-nvme-a-zfs
 
   ok "TPM2 enrolled. Reboot once to confirm auto-unlock works before relying on it."
   ok "Final step: on your dotfiles checkout, set myPhase2.reinstalled = true for $host in hosts/${host}/configuration.nix, nixos-rebuild build to confirm, then commit + push."
 }
 
+# --dry-run can appear anywhere in argv; strip it out and set DRY_RUN
+# (read by lib/common.sh's dry()) before parsing the positional args.
+args=()
+for a in "$@"; do
+  if [ "$a" = "--dry-run" ]; then
+    DRY_RUN=1
+  else
+    args+=("$a")
+  fi
+done
+set -- "${args[@]}"
+
 [ $# -ge 2 ] || usage
 STAGE="$1"
 HOST_ARG="$2"
 shift 2
+
+dry && warn "--dry-run: no disk, ssh, or hardware state will actually be touched."
 
 require_host_conf "$HOST_ARG"
 
