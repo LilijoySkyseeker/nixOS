@@ -49,6 +49,13 @@
       ALLOW_FLIGHT = "TRUE";
       SPAWN_PROTECTION = "FALSE";
       SEED = "3522075773609978693";
+      # pause the JVM (SIGSTOP) when no clients are connected, resuming on
+      # the next connection attempt (knockd watches for it on the
+      # container's eth0). Requires max-tick-time disabled below — the
+      # server watchdog would otherwise self-kill on resume, since a
+      # single tick spans however long the process was paused.
+      ENABLE_AUTOPAUSE = "TRUE";
+      MAX_TICK_TIME = "-1";
       MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
       MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
       MODRINTH_PROJECTS = ''
@@ -109,6 +116,9 @@
       "--cap-drop=ALL"
       "--cap-add=SETUID"
       "--cap-add=SETGID"
+      # knockd (autopause) sniffs the connection attempt that wakes the
+      # paused JVM back up; needs raw-socket access to do that.
+      "--cap-add=NET_RAW"
       "--security-opt=no-new-privileges:true"
     ];
   };
