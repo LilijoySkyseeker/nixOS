@@ -34,7 +34,7 @@
 
   myNixCacheClient = {
     enable = true;
-    publicKey = "cache.homelab-1:REPLACE_WITH_PUBLIC_KEY=";
+    publicKey = "cache.homelab-1:e9wEXPA6jHvotrbcPY1PHrUgOAVRjTWPYkUQBRu0X34=";
   };
 
   # System installed pkgs
