@@ -79,7 +79,46 @@ items rather than letting them rot.
       fprintd on thinkpad only), `/etc/machine-id`, and the SSH host
       key files needed to avoid the sops chicken-and-egg problem on
       every boot, not just reinstall — plus the initrd `zfs rollback -r
-      zroot/local/root@blank` unit homelab already runs. Neither host
+      zroot/local/root@blank` unit homelab already runs.
+
+      **Blank snapshot creation confirmed for all three hosts.** Checked
+      disko's actual create-phase ordering (`lib/default.nix`'s
+      `mkCreateOption` — `preCreateHook` → dataset create →
+      `postCreateHook`, run entirely before disko's separate mount
+      phase, which is what nixos-install/disko-install populates
+      afterward) — the `@blank` snapshot genuinely captures an empty
+      dataset, not a post-install-populated one, which is what makes
+      the rollback-to-blank pattern work at all (root boots empty every
+      time; the activation script regenerates `/etc` etc. from
+      `/nix/store`, and only what's explicitly in
+      `environment.persistence` survives). `local/root` has
+      `postCreateHook = "zfs snapshot zroot/local/root@blank"` in all
+      three hosts' `disko.nix` (homelab and thinkpad already had it;
+      added it to torrent alongside the new `local/state` dataset).
+
+      **GUI desktop/laptop persistence, researched against the pinned
+      nixpkgs source** (not assumed) for thinkpad/torrent, both running
+      SDDM+Plasma6 (`modules/nixos/kde.nix`): plasma6's own NixOS module
+      (`nixos/modules/services/desktop-managers/plasma6.nix` at this
+      flake's pinned `nixpkgs-unstable` rev) force-enables
+      `services.accounts-daemon` and defaults
+      `services.power-profiles-daemon`/`services.upower` on via
+      `config.powerManagement.enable` — none of that was in the first
+      persistence pass. Added `/var/lib/AccountsService` (SDDM greeter's
+      account icon/session/language picker — accounts-daemon is
+      force-enabled, not optional, so this isn't a maybe), `/var/lib/
+      upower` (battery history, most relevant on thinkpad), `/etc/cups`
+      (`services.printing`, profiles/PC.nix), `/var/lib/flatpak`
+      (`services.flatpak`, profiles/PC.nix — without persisting this,
+      every boot re-downloads Grayjay/BAR + runtimes from Flathub from
+      scratch since the declarative nix-flatpak reconciliation would
+      otherwise re-fetch on each ephemeral-root boot), and `/var/lib/
+      waydroid` (`virtualisation.waydroid`, profiles/PC.nix — multi-GB
+      Android container image, same re-provision-every-boot problem).
+      Considered and skipped: `power-profiles-daemon` itself has no
+      meaningful persistent state to preserve (profile selection isn't
+      written to disk); `colord` isn't enabled anywhere in this repo.
+      `nix flake check` verified clean with these additions. Neither host
       needs `/etc/nixos` persisted (their flake checkout lives under
       `/home/lilijoy/dotfiles`, already on the untouched `/home`
       dataset, unlike homelab which persists its own local checkout).
