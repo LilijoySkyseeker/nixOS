@@ -83,8 +83,20 @@ items rather than letting them rot.
       protocol + publicHostKey pinning, thinkpad's AC-power-gated
       availability via ac-power.target/battery-power.target, aarch64
       via Pi 5 native + binfmt-emulated fallback on all x86 workers
-      including thinkpad) recorded 2026-08-18 in
-      `.claude/plans/quirky-herding-teapot.md`.
+      including thinkpad, and pinning each worker's SSH host key via
+      `nix.buildMachines.*.publicHostKey` instead of TOFU) recorded
+      2026-08-18 in `.claude/plans/quirky-herding-teapot.md`.
+      **Separate repo-wide follow-up surfaced while designing this**:
+      `modules/nixos/push-deploy.nix:89` (`myPushDeploy`, used by
+      homelab→vps today) hardcodes
+      `NIX_SSHOPTS="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"`
+      — plain TOFU, not a pinned host key, for the exact same class of
+      tailnet-internal SSH connection the distributed-build design above
+      just hardened with `publicHostKey`. Worth adding an optional
+      `knownHostsFile`/pinned-host-key option to `myPushDeploy` (and
+      `myPullDeploy` if it has the same gap) to match, once the
+      distributed-build rollout validates the pinning approach works
+      well in practice.
       **Must comprehensively test after deployment, before treating this
       as done**: verify remote builds actually land on each worker (not
       silently falling back to local), confirm the AC-power gate on
