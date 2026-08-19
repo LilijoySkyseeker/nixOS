@@ -35,6 +35,10 @@ hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
 
 ## Before making changes
 
+- Before creating a new branch or worktree, `git fetch origin master &&
+  git pull origin master` (or fast-forward the local `master`) so the
+  new branch/worktree is cut from up-to-date `master`, not a stale
+  local copy.
 - Check which `nixpkgs` channel (stable vs unstable) a host uses in
   `flake.nix` before adding a module option — options can exist in one
   and not the other.
