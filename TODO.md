@@ -11,6 +11,18 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-20: deploy `new.factorio`** — merged to master
+      (`c7796c9`), not yet deployed. A second Factorio server
+      (`modules/services/factorio.nix`'s `factorio-new` container,
+      floating `stable` tag, fresh random world) alongside the
+      existing `old.factorio` (still pinned to the experimental
+      2.1.14 line). Needs: `nixos-rebuild switch` on homelab (brings
+      up the container) and vps (opens the 34198/udp DNAT/firewall/
+      ratelimit rules), then an `octodns-sync` run (or its hourly
+      timer) to push the new `old.factorio`/`new.factorio` A + SRV
+      records to Cloudflare. See `hosts/vps/README.md`'s Status
+      section.
+
 - [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
       content once the `zbackup` restructuring lands.** Currently a
       placeholder. `docs/architecture.md` now documents the two
@@ -144,11 +156,13 @@ items rather than letting them rot.
       reboot (holding off per the no-unconfirmed-local-restarts rule).
 
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
-      ports** (Minecraft 25565/19132, Factorio 34197). Currently
-      IPv4-only: `net.ipv6.conf.all.forwarding` is explicitly off on
-      the vps and there are no `ip6tables` DNAT rules for these ports,
-      so `minecraft`/`factorio`'s DNS records were made A-only
-      (`services/octodns.nix`) after a live bug where the AAAA records
+      ports** (Minecraft 25565/19132, Factorio 34197/34198 — the
+      latter added 2026-08-20 for `new.factorio`, same treatment
+      needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding` is
+      explicitly off on the vps and there are no `ip6tables` DNAT
+      rules for these ports, so `minecraft`/`factorio`'s DNS records
+      were made A-only (`modules/services/octodns.nix`) after a live
+      bug where the AAAA records
       advertised IPv6 reachability that didn't exist, silently
       breaking any client (confirmed: a Bedrock client) that prefers
       IPv6 when a hostname resolves to both. The apex still has an

@@ -163,19 +163,31 @@ provider's API token and switch Caddy's ACME config to use it.
 ## 5. Minecraft/Factorio forwarding
 
 `networking.nat.forwardPorts` in `configuration.nix` already forwards
-25565/tcp and 34197/udp to homelab's tunnel address
-(`10.100.0.2`) — no further config needed once the tunnel is up,
-just confirm the ports match `modules/services/minecraft.nix` /
-`modules/services/factorio.nix` if those ever change.
+25565/tcp and 34197/udp (`old.factorio`) and 34198/udp
+(`new.factorio`) to homelab's tunnel address (`10.100.0.2`) — no
+further config needed once the tunnel is up, just confirm the ports
+match `modules/services/minecraft.nix` / `modules/services/factorio.nix`
+if those ever change. Factorio's UDP protocol carries no hostname to
+route on, so the two Factorio servers need genuinely distinct ports —
+DNS SRV records (`_factorio._udp.old.factorio` /
+`_factorio._udp.new.factorio`, see `modules/services/octodns.nix`)
+are what let players connect with just the hostname anyway, no manual
+`:port` needed.
 
 ## Status
 
 Live and deployed on DigitalOcean since 2026-08-17: real
 `hardware-configuration.nix`, real domain/DNS (Cloudflare via octoDNS,
 synced from homelab), WireGuard tunnel to homelab up, Jellyfin/
-Minecraft/Factorio all verified reachable. `hosts/vps/configuration.nix`
+Minecraft/old.factorio all verified reachable. `hosts/vps/configuration.nix`
 no longer builds/evaluates locally — homelab's `myPushDeploy` builds
 and pushes finished closures instead (see that host's config).
+
+`new.factorio` (34198/udp, merged 2026-08-20) is not yet deployed —
+needs a `nixos-rebuild switch` on both homelab (brings up the
+`factorio-new` container) and vps (opens the forward/firewall/ratelimit
+rules), plus an `octodns-sync` run (or its hourly timer) to push the
+new DNS/SRV records to Cloudflare, before it's reachable.
 
 CrowdSec is enabled with a few community collections
 (`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)

@@ -10,7 +10,9 @@ is listed by whichever host needs it in `modules/flake/hosts.nix`. See
 
 - `copyparty-iso.nix` — no-auth whole-filesystem file server, for the
   recovery ISO only.
-- `factorio.nix` — Factorio dedicated server.
+- `factorio.nix` — Factorio dedicated servers: `old.factorio`
+  (experimental-branch pin, the long-running world) and `new.factorio`
+  (floating `stable` tag, a fresh random world), sharing mods/settings.
 - `jellyfin.nix` — Jellyfin media server, NVENC/NVDEC primary
   transcoder with Intel QSV/VAAPI fallback.
 - `minecraft.nix` — Minecraft server + Geyser Bedrock listener,
@@ -29,4 +31,8 @@ is listed by whichever host needs it in `modules/flake/hosts.nix`. See
 - `factorio.nix` re-patches `server-settings.json` fields on every
   container start, because the upstream factoriotools image only
   seeds that file once on first run — a stale image-seeded value
-  wouldn't otherwise get corrected.
+  wouldn't otherwise get corrected. Applies to both servers.
+- `new.factorio`'s mods directory is rsynced from `old.factorio`'s on
+  every container start (not a shared/bind-mounted directory) so it
+  can still update/add its own mods independently afterwards without
+  writing back into `old.factorio`'s volume.
