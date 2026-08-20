@@ -20,7 +20,14 @@ items rather than letting them rot.
       via derivation/closure diffing against pre-migration master).
       Full phased plan and gotchas at `docs/dendritic-migration-plan.md`.
       `AGENTS.md`/`README.md` "structure" sections updated to describe
-      the new layout as part of this merge.
+      the new layout as part of this merge. All 5 `nixosConfigurations`
+      evaluate cleanly and `nix flake check` passes; `vps` and
+      `homelab` were fully built (`nix-store --realise`) to confirm the
+      per-host specialArgs divergence (homelab's home-manager-stable
+      swap) survives realization. `thinkpad` and `torrent` were only
+      evaluated, not built, to stay within the migration session's time
+      budget — build (not switch) both before relying on them post-merge.
+      No host was switched during the migration itself.
 
 - [ ] **2026-08-20: `docs/` rewrite needed now that the dendritic
       migration above has landed.** `docs/architecture.md`,
@@ -48,6 +55,12 @@ items rather than letting them rot.
       `server.nix` -> `"profile-server"` — since that's exactly the
       kind of thing someone greps for and doesn't find. Needs: do the
       docs rewrite pass now that the migration is on master.
+
+- [ ] **2026-08-20: build+switch thinkpad and torrent after the
+      dendritic migration** (see entry above) — only `vps`/`homelab`
+      were fully built during the migration; `thinkpad`/`torrent` were
+      evaluated only. Build (not switch) both before relying on them,
+      then switch when ready.
 
 - [ ] **2026-08-18: verify jellyfin is still reachable after the new
       vps base HTTP rate limit deploys** (vps). Added a base
