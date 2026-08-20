@@ -111,3 +111,6 @@ unprompted.
 - **After every commit, print the full commit message back to the user**
   (e.g. via `git show -s --format=%B HEAD` or by echoing what was just
   written) so they can review it without having to run git themselves.
+- Once a branch's content has landed on `master`, prune it if safe (see
+  `docs/GIT_WORKFLOW.md`'s "Day to day" section) — don't leave merged
+  branches lying around.

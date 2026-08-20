@@ -61,6 +61,12 @@ Enforced by the `commit-msg` hook.
   trustworthy (e.g. a new service, a risky refactor of `profiles/`), branch,
   then merge (fast-forward preferred — rebase the branch onto `master` first)
   once it builds clean.
+- Once a branch's content has landed on `master`, prune it if safe: delete
+  the local branch (`git branch -d <branch>`, not `-D`, so it refuses if
+  unmerged) and the remote one (`git push origin --delete <branch>`) or via
+  `gh pr merge --delete-branch` if a PR was opened. Skip pruning if the
+  branch is still needed for reference (e.g. an open PR under discussion) or
+  if another machine/worktree might still be using it.
 - If two machines diverge (forgot to pull before committing elsewhere), rebase
   on pull is already the default — resolve any `flake.lock` conflict by
   regenerating it (`nix flake lock`) rather than hand-editing.
