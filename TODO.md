@@ -181,6 +181,11 @@ items rather than letting them rot.
       modules/services/hosts configs, opportunistic and
       non-obvious-only (not a mechanical every-file pass).
 
+      Phase 5 — root `README.md` rewrite. Deliberately last: do this
+      once Phases 1-3 exist so the README can link into real `docs/`
+      content instead of being written blind. **Architect this one
+      together with the user interactively, don't draft it solo.**
+
       2026-08-20: confirmed via Q&A that architecture.md,
       style-guide.md, procedures/* (minus disaster-recovery, see
       above), agents.md + the AGENTS.md trim, and all of Phase 2's
