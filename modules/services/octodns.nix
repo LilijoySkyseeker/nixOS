@@ -62,11 +62,56 @@
             value = vpsPublicIp;
           }
         ];
+        # factorio: kept as a plain alias to old.factorio for anything
+        # still pointed at the bare name — old.factorio/new.factorio below
+        # are the two real servers going forward (see
+        # modules/services/factorio.nix for old vs new).
         factorio = [
           {
             type = "A";
             ttl = 300;
             value = vpsPublicIp;
+          }
+        ];
+        "old.factorio" = [
+          {
+            type = "A";
+            ttl = 300;
+            value = vpsPublicIp;
+          }
+        ];
+        "new.factorio" = [
+          {
+            type = "A";
+            ttl = 300;
+            value = vpsPublicIp;
+          }
+        ];
+        # SRV records so players can connect with just the hostname (no
+        # ":port" suffix) — Factorio has supported DNS SRV lookup for this
+        # since 1.1.67.
+        "_factorio._udp.old.factorio" = [
+          {
+            type = "SRV";
+            ttl = 300;
+            value = {
+              priority = 0;
+              weight = 0;
+              port = 34197;
+              target = "old.factorio.${domainNoDot}.";
+            };
+          }
+        ];
+        "_factorio._udp.new.factorio" = [
+          {
+            type = "SRV";
+            ttl = 300;
+            value = {
+              priority = 0;
+              weight = 0;
+              port = 34198;
+              target = "new.factorio.${domainNoDot}.";
+            };
           }
         ];
       };
