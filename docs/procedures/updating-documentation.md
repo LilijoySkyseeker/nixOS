@@ -37,6 +37,56 @@ follow-up:
 If a change doesn't fall into any of the above, it probably doesn't
 need a doc update. Don't pad a README to have something to show.
 
+## Root `README.md` and `AGENTS.md`
+
+These two are the front door, not general-purpose docs, so they get a
+narrower trigger than the folder READMEs — don't let every small
+change bleed into them.
+
+- **`README.md`**: update the Hosts table when a host is added,
+  removed, or its role/purpose changes. Update the Layout section only
+  if the top-level directory structure itself changes (a new top-level
+  folder, one removed, or the divide between them changing meaning).
+  The Interesting stuff section is curated, not comprehensive — add to
+  it only when something genuinely worth showing off lands (ask
+  before adding on the user's behalf if it's not obvious; see
+  `TODO.md`'s docs-plan entry for how the last pass picked additions),
+  and don't let it grow into a changelog.
+- **`AGENTS.md`**: update when a command changes (new lint tool, a
+  build command's flags change), when the repo layout's fast-summary
+  bullets drift from `docs/architecture.md`'s real detail, or when a
+  new hard rule is established (the kind of thing that would otherwise
+  need re-explaining to every fresh agent session). Keep it a fast-load
+  summary — if a change needs more than a couple of sentences to
+  explain, that detail belongs in `docs/` with a link from here, not
+  inline in `AGENTS.md` itself.
+
+Both files are deliberately kept lean (see `docs/agents.md` and the
+root README's own intro) — resist the urge to grow them into full
+documentation. If something doesn't fit their scope, it belongs in
+`docs/` instead.
+
+## Flag issues immediately, don't let them sit
+
+Whenever a documentation issue is *noticed* but isn't being fixed
+right now — spotted mid-task, out of scope for the current change, or
+too large to fix inline — log it to `TODO.md`'s Active section
+immediately, the same session it was found in. Don't rely on memory or
+a mental note; write it down before moving on. Include:
+
+- What's stale or wrong, and where (file + what it currently says).
+- What triggered noticing it (what you were actually doing when you
+  found it).
+- Enough context that fixing it later doesn't require re-discovering
+  the problem from scratch.
+
+This mirrors how real incidents already get logged in `TODO.md` (see
+the "Done" section's crowdsec/caddy entries) — a documentation gap is
+the same kind of thing, just lower stakes. The `custom-packages/`
+reference was caught and fixed on the spot because it was small; if it
+had been bigger, it should have gotten a `TODO.md` entry instead of
+being fixed under time pressure or, worse, silently left alone.
+
 ## Periodic audit (narrative docs)
 
 `docs/architecture.md` and `docs/style-guide.md` describe things at a

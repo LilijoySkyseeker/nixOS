@@ -115,6 +115,12 @@ per-host composition table, and the `modules/` vs `services/` vs
   `docs/procedures/secret-rotation.md`. Keeping docs themselves in
   sync with the repo (routine updates, periodic audits, full rewrites
   after a structural refactor): `docs/procedures/updating-documentation.md`.
+- Noticed a documentation issue you're not fixing right now (spotted
+  mid-task, out of scope, or too big to fix inline)? Log it to
+  `TODO.md`'s Active section immediately, in the same session — don't
+  leave it to memory. See
+  `docs/procedures/updating-documentation.md`'s "Flag issues
+  immediately" section for what to include.
 
 ## Commit conventions
 

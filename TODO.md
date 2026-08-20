@@ -269,6 +269,19 @@ items rather than letting them rot.
       build-out). Linked from `AGENTS.md`'s docs pointers and
       procedures list.
 
+      **2026-08-20 second follow-up**: added two more pieces on
+      request. (1) A "Root `README.md` and `AGENTS.md`" section in
+      `docs/procedures/updating-documentation.md` — those two get a
+      narrower update trigger than the folder READMEs (front door, not
+      general docs), spelling out what actually warrants touching each
+      one so they don't bloat over time. (2) A "Flag issues
+      immediately" convention: when a documentation issue is noticed
+      but not fixed on the spot (out of scope, too big, mid-task), log
+      it to `TODO.md`'s Active section right away rather than trusting
+      memory — mirrors how real incidents already get logged here.
+      Pointed to from `AGENTS.md` directly so it's actionable, not just
+      buried in the procedure doc.
+
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
       `curl http://127.0.0.1:6060/metrics` (crowdsec's own prometheus
