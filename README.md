@@ -62,7 +62,21 @@ Known issues and incident history per host live in each host's own
 - **Bare-metal to booted, unattended.** `nixos-anywhere` + `disko` take
   a fresh machine from a rescue/kexec environment straight to a
   running, secrets-decrypting NixOS install, partitioning included.
+- **Secrets committed straight into the repo, safely.** `sops-nix`
+  keys every secret to a specific set of hosts by age key, so
+  `secrets/secrets.yaml` lives in git like any other file — encrypted,
+  checked into history, unreadable without a host's own key — with no
+  shared master password and no plaintext ever touching disk outside
+  the host decrypting it at boot.
 - **Two nixpkgs channels running side by side.** Desktops track
   bleeding-edge `nixpkgs-unstable`; `homelab` — running ZFS and
   long-lived game servers — is deliberately pinned to
   `nixpkgs-stable`, on purpose, in the same flake.
+- **Self-monitoring.** `homelab` runs periodic ZFS/SMART/systemd health
+  checks and pages a Discord webhook the moment something looks wrong,
+  instead of finding out about a failing disk or a dead service days
+  later.
+- **Nothing is imperative.** Every machine, from partitioning to the
+  services running on it, is described in Nix and reproduced from the
+  flake — there's no host with hand-run setup steps that only exist in
+  someone's memory.
