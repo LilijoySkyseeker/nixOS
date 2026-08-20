@@ -134,6 +134,47 @@ items rather than letting them rot.
       `profiles/server.nix`, alongside the existing root home-manager
       block) so `myAutoUpdate`'s commit step succeeds.
 
+- [ ] **2026-08-20: build out comprehensive repo documentation** (docs
+      architecture, planned via Q&A — see AskUserQuestion trail in
+      session for full rationale). Two prongs: a central `docs/`
+      folder for high-level material, and non-obvious "why" comments
+      inline in `.nix` configs. Audience is future-me/AI agents, not
+      external contributors. Root stays lean (`README.md`,
+      `AGENTS.md`, `TODO.md` only, each pointing into `docs/` rather
+      than duplicating it); `AGENTS.md` keeps its current fast-load
+      entrypoint role and links out for depth rather than being
+      merged away. Staleness strategy: folder-level docs live next to
+      the code they describe so change-with-code discipline is
+      natural; the more narrative `docs/architecture.md` and
+      `docs/style-guide.md` need an occasional manual audit instead
+      (added as a recurring check, not a one-off). Inline comments
+      stay non-obvious-only (workarounds, surprising constraints,
+      tradeoffs) — no broad completeness sweep.
+
+      Phase 1 — `docs/` skeleton: `docs/architecture.md` (how
+      hosts/profiles/modules/services compose — expands on README's
+      structure guide), `docs/style-guide.md` (Nix formatting/idiom
+      conventions, naming, when to use a module vs a profile vs a
+      service), `docs/agents.md` (AI-agent-specific depth, linked
+      from root `AGENTS.md`), `docs/procedures/` directory. Trim
+      `AGENTS.md` to point into these rather than re-deriving them.
+
+      Phase 2 — per-folder READMEs for everything that doesn't
+      already have one: `modules/nixos/`, `modules/home-manager/`,
+      `profiles/`, `services/`, `secrets/`, `custom-packages/`,
+      `files/` (`hosts/*/README.md` already exist and are the model
+      to follow).
+
+      Phase 3 — flesh out `docs/procedures/`: adding a new host,
+      adding a new service, secret rotation, disaster recovery.
+
+      Phase 4 — inline why-comment sweep across existing
+      modules/services/hosts configs, opportunistic and
+      non-obvious-only (not a mechanical every-file pass).
+
+      Not started yet — this entry is the plan, phases to be checked
+      off as they land.
+
 ## Done
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
