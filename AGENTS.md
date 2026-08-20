@@ -1,7 +1,16 @@
 # AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) and other AI
-agents when working with code in this repository.
+agents when working with code in this repository. It's a fast-load
+summary — for the deeper *why* behind these rules, and for anything not
+covered here, see `docs/`:
+
+- `docs/architecture.md` — how hosts/profiles/modules/services compose.
+- `docs/style-guide.md` — Nix conventions actually in use.
+- `docs/agents.md` — the reasoning behind the rules in this file.
+- `docs/procedures/` — runbooks (new host, new service, secret
+  rotation, disaster recovery).
+- `docs/GIT_WORKFLOW.md` — git hooks/conventions.
 
 ## What this is
 
@@ -34,6 +43,10 @@ unprompted.
 
 ## Repo layout
 
+Quick pointers — see `docs/architecture.md` for the full import chain,
+per-host composition table, and the `modules/` vs `services/` vs
+`profiles/` boundary explained in detail.
+
 - `flake.nix` — entry point. Defines inputs and the `nixosConfigurations`
   output, one entry per host. Each host is pinned to either
   `nixpkgs-stable` or `nixpkgs-unstable` — check which before assuming an
@@ -41,7 +54,7 @@ unprompted.
   pinned stable release yet).
 - `hosts/<name>/` — per-host `configuration.nix`, `hardware-configuration.nix`,
   and sometimes `disko.nix` (declarative partitioning) or a host-specific
-  README.
+  README (known-issues log, not general docs).
 - `profiles/` — shared config layered onto multiple hosts (`default.nix`
   applies to everything, `PC.nix`/`server.nix` are role-specific).
 - `modules/nixos/` and `modules/home-manager/` — reusable option modules.
@@ -98,6 +111,9 @@ unprompted.
   to reach the box at all) on a fresh install. See `hosts/vps/README.md`
   step 1. Never generate or stage that key material inside a tracked
   repo checkout, even gitignored — keep it entirely outside the repo.
+- Full new-host runbook: `docs/procedures/new-host.md`. New service:
+  `docs/procedures/new-service.md`. Secret rotation:
+  `docs/procedures/secret-rotation.md`.
 
 ## Commit conventions
 

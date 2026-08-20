@@ -193,6 +193,16 @@ items rather than letting them rot.
       in-progress elsewhere. Proceeding with Phases 1–2 plus the
       non-disaster-recovery parts of Phase 3.
 
+      **Phase 1 done (2026-08-20)**: `docs/architecture.md` (import
+      chain, per-host composition table, module/service/profile
+      boundary), `docs/style-guide.md` (nixfmt, the `my<Name>`
+      options-module convention, real why-comment examples), `docs/
+      agents.md` (the reasoning behind AGENTS.md's rules), `docs/
+      procedures/{new-host,new-service,secret-rotation}.md` written;
+      `docs/procedures/disaster-recovery.md` left as the agreed
+      placeholder. `AGENTS.md` trimmed to link into all of the above
+      rather than duplicating. Next: Phase 2 folder READMEs.
+
 ## Done
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
