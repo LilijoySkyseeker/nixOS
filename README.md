@@ -49,26 +49,20 @@ Known issues and incident history per host live in each host's own
 
 ## Interesting stuff
 
-- **Impermanence on `homelab`.** Root is wiped on every boot; anything
-  meant to survive is explicitly opted in via
-  [`environment.persistence`](./hosts/homelab/configuration.nix) —
-  forgetting to add a new stateful path here means it silently
-  vanishes on next reboot, not an error.
-- **Two nixpkgs channels, on purpose.** Most hosts track
-  `nixpkgs-unstable`; `homelab` is deliberately pinned to
-  `nixpkgs-stable` because it runs stateful services (ZFS, game
-  servers) where an unstable regression is costlier than missing a new
-  option for a while. See `docs/architecture.md`.
-- **The VPS is a decoy front, not the origin.** `vps` terminates public
-  traffic (Caddy, crowdsec, Anubis proof-of-work for bots) and tunnels
-  it back to `homelab` over WireGuard — `homelab` itself is never
-  directly reachable from the internet.
-- **Remote deploys build locally, not on the target.** Both
-  `nixos-anywhere` installs and ongoing `push`/`pull` deploys build the
-  closure on a beefier machine and ship it, rather than asking a small
-  VPS to compile its own config and risk OOMing mid-deploy.
-- **The Tailscale ACL is managed out-of-band.**
-  [`docs/tailscale-acl.json`](./docs/tailscale-acl.json) is a reference
-  copy of the tailnet policy actually configured in the Tailscale admin
-  console — not applied by Nix, and not auto-synced. Update it by hand
-  when the console policy changes.
+- **Impermanence on `homelab`.** Root is wiped on every boot — every
+  piece of state that survives is explicitly declared, not just
+  whatever happened to be lying around.
+- **Public edge, private origin.** `vps` fronts everything public
+  (Caddy, crowdsec, Anubis proof-of-work against bots) and tunnels
+  back to `homelab` over WireGuard. `homelab` itself is never directly
+  reachable from the internet.
+- **Zero-downtime remote deploys.** `homelab` builds and pushes
+  `vps`'s closure over the tailnet — the VPS never compiles its own
+  config, so a small droplet never has to risk OOMing mid-deploy.
+- **Bare-metal to booted, unattended.** `nixos-anywhere` + `disko` take
+  a fresh machine from a rescue/kexec environment straight to a
+  running, secrets-decrypting NixOS install, partitioning included.
+- **Two nixpkgs channels running side by side.** Desktops track
+  bleeding-edge `nixpkgs-unstable`; `homelab` — running ZFS and
+  long-lived game servers — is deliberately pinned to
+  `nixpkgs-stable`, on purpose, in the same flake.
