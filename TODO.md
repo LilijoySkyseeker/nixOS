@@ -162,18 +162,31 @@ items rather than letting them rot.
       Phase 2 — per-folder READMEs for everything that doesn't
       already have one: `modules/nixos/`, `modules/home-manager/`,
       `profiles/`, `services/`, `secrets/`, `custom-packages/`,
-      `files/` (`hosts/*/README.md` already exist and are the model
-      to follow).
+      `files/`. **Not** `hosts/*/README.md` — that's a known-issues
+      log, a different purpose, left as-is. Shared template recorded
+      in `docs/README-template.md`: Purpose, then an Inventory
+      section (one-liner per file — detail stays in the file's own
+      header comment, not duplicated in the README), then an optional
+      Gotchas section for non-obvious cross-cutting things, omitted
+      entirely when there's nothing to say.
 
       Phase 3 — flesh out `docs/procedures/`: adding a new host,
       adding a new service, secret rotation, disaster recovery.
+      **Disaster-recovery/reinstall procedures are already being
+      written by another session as of 2026-08-20 — leave that one
+      file as a placeholder stub (link/short note only) and don't
+      duplicate it; everything else in Phase 3 is open to write.**
 
       Phase 4 — inline why-comment sweep across existing
       modules/services/hosts configs, opportunistic and
       non-obvious-only (not a mechanical every-file pass).
 
-      Not started yet — this entry is the plan, phases to be checked
-      off as they land.
+      2026-08-20: confirmed via Q&A that architecture.md,
+      style-guide.md, procedures/* (minus disaster-recovery, see
+      above), agents.md + the AGENTS.md trim, and all of Phase 2's
+      folder READMEs are clear to write now — nothing else flagged as
+      in-progress elsewhere. Proceeding with Phases 1–2 plus the
+      non-disaster-recovery parts of Phase 3.
 
 ## Done
 
