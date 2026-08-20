@@ -8,18 +8,28 @@ the reasoning behind how it's put together.
 
 ## Layout
 
+This flake uses the **dendritic pattern**
+([flake-parts](https://flake.parts/) + [import-tree](https://github.com/vic/import-tree)):
+every `.nix` file under `modules/` registers *itself* into
+`flake.modules.nixos.<name>` or `flake.modules.homeManager.<name>`, instead
+of being manually added to some other file's `imports`. There's no single
+"list of every module" to keep in sync — the file tree under `modules/` *is*
+the registry.
+
 ```
-flake.nix                    # inputs + one nixosSystem per host
-hosts/<name>/configuration.nix   # host-specific config
-profiles/{default,PC,server}.nix # shared config, layered by machine role
-modules/{nixos,home-manager}/    # reusable option modules
-services/                    # one-off service configs (jellyfin, etc.)
-secrets/ + .sops.yaml         # sops-nix encrypted secrets
+flake.nix                          # thin entry point: flake-parts + import-tree ./modules
+modules/flake/                     # vars, pkgs, systems, and hosts.nix (composes all 5 hosts)
+hosts/<name>/configuration.nix     # host-local config only (hardware, hostname, disko)
+modules/profiles/{default,PC,server}.nix # shared config, layered by machine role
+modules/{nixos,home-manager,services}/   # reusable modules, one file = one flake.modules.* entry
+secrets/ + .sops.yaml               # sops-nix encrypted secrets
 ```
 
-Every folder above has its own README with a full inventory. For how
-it all fits together — import chains, a per-host breakdown, why
-`services/` and `modules/` are split the way they are — see
+`modules/flake/hosts.nix` is the file to check for "what does host X
+actually run" — it lists, per host, which `flake.modules.*` entries get
+pulled in. A module existing under `modules/` doesn't mean any host uses
+it; that's still decided by `hosts.nix`. Every folder above has its own
+README with a full inventory. For how it all fits together — see
 [`docs/architecture.md`](./docs/architecture.md).
 [`docs/style-guide.md`](./docs/style-guide.md) covers conventions
 (formatting, when a custom NixOS options module is worth writing vs. a
