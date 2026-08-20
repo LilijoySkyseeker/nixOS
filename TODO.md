@@ -203,7 +203,19 @@ items rather than letting them rot.
       placeholder. `AGENTS.md` trimmed to link into all of the above
       rather than duplicating. Next: Phase 2 folder READMEs.
 
-## Done
+      **Phase 2 done (2026-08-20)**: folder READMEs added for
+      `modules/nixos/`, `modules/home-manager/`, `profiles/`,
+      `services/`, `secrets/`, `files/`, following
+      `docs/README-template.md`'s Purpose/Inventory/Gotchas shape.
+      `custom-packages/` skipped — it doesn't exist in the repo (was a
+      stale reference in `AGENTS.md`/`README.md`, stripped from
+      `AGENTS.md`; `README.md`'s copy is Phase 5's problem). Notable
+      gotchas captured: `nfs-homelab-mounts.nix`'s gid must stay in
+      sync with `services/jellyfin.nix`'s group (cross-host coupling,
+      not Nix-enforced); `server.nix` doesn't import `default.nix`
+      itself, so every server host must import both. Next: Phase 3
+      remainder is already done (procedures written in Phase 1 except
+      disaster-recovery) — Phase 4 (inline why-comment sweep) is next.
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
