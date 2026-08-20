@@ -348,6 +348,87 @@ items rather than letting them rot.
       crawler-rate-limiting is the only branch fully live (vps, an
       unrelated host).
 
+      **2026-08-20: two more sessions found and folded in:**
+      - **documentation architecture planning** — complete and
+        **merged to master** (`a988a3b`): 5-phase repo-wide doc
+        build-out (new root README, per-folder READMEs, rewritten
+        AGENTS.md, `docs/README-template.md`,
+        `docs/procedures/updating-documentation.md`,
+        `docs/style-guide.md`, `docs/architecture.md`). No further
+        doc changes planned unless triggered by other branches
+        landing. Already coordinated the AGENTS.md/README.md overlap
+        directly with nelson-migration-dendritic-flake (not just
+        flagged, actually resolved and logged on both sides): the
+        dendritic branch's "Repo layout"/"Structure Guide" sections
+        win outright post-merge (written against the real post-reorg
+        structure); `docs/architecture.md` +
+        `docs/style-guide.md`'s module-organization sections are
+        this session's to rewrite once the migration lands, per
+        `docs/procedures/updating-documentation.md`'s "After a big
+        refactor" section; the four affected folder READMEs
+        (profiles/services/modules-nixos/modules-home-manager)
+        get git-mv'd with their directories, Purpose/Gotchas
+        rewritten by documentation-architecture-planning in that
+        same pass.
+
+        **Convention other branches should follow when their changes
+        touch docs** (per `docs/procedures/updating-documentation.md`):
+        if a branch adds/removes/renames a file in a folder that has
+        a README (`modules/nixos/`, `modules/home-manager/`,
+        `profiles/`, `services/`, `secrets/`, `files/`), update that
+        folder's Inventory line in the same commit; log any newly
+        discovered gotcha there too; log any noticed-but-unfixed doc
+        issue to TODO.md's Active section immediately. Root
+        `README.md`/`AGENTS.md` only get touched for host
+        additions/removals or genuinely new hard rules. Per-branch
+        doc-touch points already identified (self-verify against
+        your actual diff before updating — two sessions already
+        checked and found no update was actually needed for their
+        work): jellyfin-gpu-accel → `services/README.md`'s
+        jellyfin.nix NVENC/NVDEC line; minecraft-geyser →
+        `services/README.md`'s minecraft.nix/geyser-config lines
+        (**checked, still accurate, no update made**);
+        factorio-server-migration → `services/README.md`'s
+        server-settings.json re-patch gotcha (**checked, mechanism
+        unchanged, no update made** — flagged that dendritic-flake
+        should re-check this if their move to
+        `modules/services/factorio.nix` alters the mechanism);
+        zfs-backups+spaceguard / zfs-pool-recovery-restore →
+        `hosts/homelab/README.md`'s zdata-pool known-issue + Hardware
+        section, only if pool topology or the recurring-suspension
+        issue is actually touched (**zfs-backups+spaceguard checked,
+        doesn't apply to its dataset-tree-only changes, no update
+        made**); wireguard-ipv6 → maps to an existing `TODO.md`
+        Active entry, update in place when it lands;
+        crawler-rate-limiting → **already updated directly on master
+        (`bb1b589`)**, left open (not checked off) with a dated note
+        since the end-to-end jellyfin-load check is still blocked on
+        wg0; distributed-nix-builds-setup → maps to the existing
+        "layer distributed builders across the tailnet" TODO.md entry
+        (actual compute distribution via nix.buildMachines), update
+        in place; nix-build-cache → **correction**: initially
+        mis-relayed as mapping to the same entry as
+        distributed-nix-builds-setup — nix-build-cache pushed back
+        correctly, checked the source themselves: harmonia binary
+        cache is a different, complementary mechanism (pre-built
+        substitutes vs. distributed compute), not the same feature.
+        Will add its own separate TODO.md entry when it merges,
+        cross-referenced with the distributed-builders entry rather
+        than folded into it; backblaze-homelab-reset → **checked**,
+        no update needed (all changes are edits to an existing file's
+        body, not add/remove/rename, so the Inventory trigger doesn't
+        apply; already has inline why-comments for each non-obvious
+        decision, satisfying the other two triggers);
+        add-samba-smb-share → no existing doc coverage, routine
+        Inventory update if it adds a new `services/*.nix` file.
+      - **uninstall nelson plugin** (`worktree-remove-nelson-gitignore`)
+        — unrelated to homelab/nix config: Nelson Claude Code plugin
+        uninstall. Only repo change: one-line `.gitignore` edit
+        (dropped the dead `.nelson/` entry), committed and pushed
+        (`74bc644`). Trivial, no overlap with anything — safe to
+        merge any time, doesn't need to wait on the dendritic-flake
+        migration or anything else in this queue.
+
 ## Done
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
