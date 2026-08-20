@@ -1,6 +1,6 @@
 # secrets
 
-sops-encrypted secrets. See `docs/procedures/secret-rotation.md` for
+sops-encrypted secrets. See `docs/procedures/secrets.md` for
 adding/removing recipients or rotating values, and the repo-root
 `.sops.yaml` for the recipient key list and `path_regex` this folder is
 governed by.

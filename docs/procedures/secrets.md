@@ -1,13 +1,63 @@
-# Secret rotation
+# Secrets: storage, rotation, and agent interaction
 
-No dedicated rotation script or automation exists — this is a manual,
-low-frequency operation. See the "Manual secret management" convention:
-never edit `secrets/secrets.yaml` directly outside `sops
-secrets/secrets.yaml`; if a secret value needs to change, give the user
-the exact `sops` invocation to run rather than trying to script around
-the encrypted file directly.
+## Storage model
 
-## Adding a recipient (new host, or rotating a compromised host's key)
+Secrets live in `secrets/*.{yaml,json,env,ini}` (currently just
+`secrets/secrets.yaml`), encrypted with [sops](https://github.com/getsops/sops)
+against per-host/per-purpose age keys declared as named anchors in
+`.sops.yaml`. `sops-nix` decrypts them at activation time on each host
+that has a matching key (see `sops.age.keyFile` / `sops.secrets.*` in
+the relevant host/profile modules) — plaintext only ever exists
+in-memory on the target host, never in the repo. The pre-commit hook
+(`.githooks/pre-commit`) blocks committing a `secrets.yaml` without a
+`sops:` metadata block, private key blocks, age secret keys, and a few
+common live-token patterns (AWS, Slack, GitHub) as a backstop — it is
+not a substitute for the rules below, just a last-resort catch.
+
+## How agents (LLMs) must interact with secrets
+
+These rules apply to Claude Code and any other AI agent working in
+this repo, not just human contributors:
+
+- **Never edit `secrets/secrets.yaml` (or any `secrets/*` file)
+  directly.** All edits go through `sops secrets/secrets.yaml`, which
+  handles decrypt-edit-reencrypt atomically. Editing the ciphertext
+  directly (including via a script, `sed`, or writing decrypted
+  content back out) corrupts it or defeats the encryption.
+- **Never decrypt a secret value to inspect it**, even for debugging
+  — no `sops -d`, no `sops exec-env`, no reading a runtime-decrypted
+  path under `/run/secrets`. If a secret's value needs to be checked
+  or changed, tell the user the exact command to run themselves (e.g.
+  `sops secrets/secrets.yaml`, or `sops -d --extract '["key"]'
+  secrets/secrets.yaml` if they need just one value) rather than
+  running it. This holds even when troubleshooting a live incident —
+  the risk is the value ending up in the agent's context/transcript,
+  not just in a file.
+- **Never stage plaintext secret material inside the repo checkout**,
+  even in a gitignored location or a worktree — keep generated key
+  material (e.g. a pre-generated host SSH key for a fresh install, see
+  `docs/procedures/new-host.md`) entirely outside the repo tree.
+- **When a new service needs a new secret**, don't invent a value or a
+  placeholder in a tracked file. Tell the user the key name to add
+  (following the existing flat-key naming in `secrets/secrets.yaml`,
+  e.g. `<host-or-service>_<purpose>`) and the `sops` command to add it,
+  and reference the new key from the Nix module via
+  `sops.secrets.<name>` — the module change itself (wiring the secret
+  in) is normal code an agent can write; only the secret *value* is
+  off-limits.
+- **Adding/removing recipients is fine for an agent to do directly**
+  (it's a `.sops.yaml` edit plus `sops updatekeys`, never touches
+  plaintext) — see below.
+- If a secret is suspected compromised, don't attempt remediation
+  beyond flagging it and pointing at "Rotating a secret's actual
+  value" below — value rotation always goes through the user.
+
+## Rotation runbooks
+
+No dedicated rotation script or automation exists beyond what's below
+— this is a manual, low-frequency operation.
+
+### Adding a recipient (new host, or rotating a compromised host's key)
 
 1. Get the host's age public key (via `ssh-to-age` from its SSH host
    key, or from `sops.age.keyFile` if it already has one).
@@ -19,7 +69,7 @@ the encrypted file directly.
    command needed — it doesn't touch the plaintext values, just who
    can decrypt them.
 
-## Removing a recipient (decommissioning a host, revoking access)
+### Removing a recipient (decommissioning a host, revoking access)
 
 Same shape in reverse: remove the key/anchor from `.sops.yaml`, then
 run `sops updatekeys secrets/secrets.yaml` again. Note this does not
@@ -28,7 +78,7 @@ decrypt access removed may already have decrypted copies on disk from
 before revocation. If that matters (compromised host, not just routine
 decommissioning), rotate the actual secret values too (see below).
 
-## Rotating a secret's actual value
+### Rotating a secret's actual value
 
 There's no tooling for this beyond the editor workflow: run `sops
 secrets/secrets.yaml`, change the value, save. Anyone who still has

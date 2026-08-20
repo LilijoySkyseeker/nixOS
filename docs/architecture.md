@@ -177,7 +177,7 @@ module-organization boundary above:
   `homelab_backblaze_rclone_config` sops secret even though this job
   is weekly — a leftover from before a rename, documented inline as a
   trap: don't "fix" the name without also updating the secret (secrets
-  aren't edited directly — see `docs/procedures/secret-rotation.md`).
+  aren't edited directly — see `docs/procedures/secrets.md`).
 - **Local replication: sanoid + syncoid, ZFS-native.** `sanoid` takes
   frequent/hourly/daily snapshots of the working datasets
   (`zroot/local/state`, `zdata/storage/{storage,storage-bulk}`) and a
@@ -210,5 +210,5 @@ Encrypted with sops-nix. `.sops.yaml` maps named recipient keys (one
 per host/purpose, as YAML anchors) to a `path_regex` covering
 `secrets/*.{yaml,json,env,ini}`. Never edit `secrets/secrets.yaml`
 directly outside `sops secrets/secrets.yaml` — see
-`docs/procedures/secret-rotation.md`. Unaffected by the dendritic
+`docs/procedures/secrets.md`. Unaffected by the dendritic
 migration — `secrets/` didn't move.

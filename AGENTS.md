@@ -22,6 +22,8 @@ A flake-based NixOS/home-manager dotfiles configuration managing multiple
 hosts (`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage` — see
 `nixosConfigurations` in `flake.nix`). Secrets are encrypted with sops-nix
 (see `.sops.yaml`, `secrets/secrets.yaml`) — never commit plaintext secrets.
+Agents: never edit `secrets/*` directly or decrypt values yourself, even
+to debug — see `docs/procedures/secrets.md` for the full policy.
 
 ## Commands
 
@@ -280,7 +282,7 @@ central "list of every module" to scan — the registry *is* the file tree.
   repo checkout, even gitignored — keep it entirely outside the repo.
 - Full new-host runbook: `docs/procedures/new-host.md`. New service:
   `docs/procedures/new-service.md`. Secret rotation:
-  `docs/procedures/secret-rotation.md`. Connecting to a remote host —
+  `docs/procedures/secrets.md`. Connecting to a remote host —
   key model, which hosts are Tailscale-only, the `vps-deploy` forced-
   command account: `docs/procedures/remote-access.md`. Backups on
   homelab (restic->Backblaze, sanoid/syncoid->`zbackup`; restore is
