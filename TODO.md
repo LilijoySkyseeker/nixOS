@@ -21,7 +21,11 @@ items rather than letting them rot.
       ratelimit rules), then an `octodns-sync` run (or its hourly
       timer) to push the new `old.factorio`/`new.factorio` A + SRV
       records to Cloudflare. See `hosts/vps/README.md`'s Status
-      section.
+      section. Once deployed, verify: `new.factorio` reachable by
+      hostname alone (SRV lookup, untested — first real use of SRV
+      records in this repo) and by `:34198`, `docker-factorio-new`'s
+      preStart actually rsyncs `old.factorio`'s mods on a real start,
+      and `old.factorio` (34197) still works unaffected.
 
 - [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
       content once the `zbackup` restructuring lands.** Currently a
