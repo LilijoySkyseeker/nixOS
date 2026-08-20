@@ -259,6 +259,34 @@ items rather than letting them rot.
          rebases its small thinkpad/torrent bit on top after — both
          still gated on backup/pool-sequencing clearance.
 
+      **2026-08-20: order changed — dendritic flake migration now
+      goes FIRST, not last.** Reasoning: waiting to verify the queue
+      before their planned rebase, checked `origin/master` directly
+      (not memory) and found: only 3 of the original 10 had actually
+      landed (jellyfin-gpu-accel `d80c538`, minecraft-geyser
+      `3270eae`, crawler-rate-limiting `1edea5b`) — the other 7 were
+      still unmerged, so the "dead-last" plan wasn't close to ready.
+      Also found master had independently picked up two large merges
+      from sessions outside this coordination entirely: a
+      documentation overhaul (new root/per-folder READMEs, rewritten
+      AGENTS.md) and a neovim/tmux IDE-upgrade — both of which would
+      have added to the dendritic branch's eventual rebase pain since
+      it also heavily rewrites AGENTS.md/README.md. Given the queue
+      wasn't clear anyway and the conflict surface was only growing,
+      user decided to flip the order: **dendritic-flake merges to
+      master first**, then every other in-flight branch
+      (backblaze-homelab-reset, wireguard-ipv6, factorio-server-
+      migration, samba, zfs-backups+spaceguard,
+      zfs-pool-recovery-restore, nix-build-cache,
+      distributed-nix-builds) rebases onto the new
+      `modules/{profiles,services}/` layout instead of the old
+      `profiles/`/`services/` paths, and onto the trimmed
+      `hosts/*/configuration.nix` imports. All 8 affected sessions
+      notified and acknowledged; several noted they'll wait for
+      confirmation that the migration has actually landed before
+      attempting their own rebase (not just my word for it — same
+      "verify, don't trust relay" pattern as before).
+
       **2026-08-20: three more sessions joined, folded into this
       plan:**
       - **factorio server migration** (`worktree-factorio-new-server`)
