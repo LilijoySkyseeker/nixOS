@@ -258,9 +258,14 @@ central "list of every module" to scan — the registry *is* the file tree.
   `docs/procedures/new-service.md`. Secret rotation:
   `docs/procedures/secret-rotation.md`. Connecting to a remote host —
   key model, which hosts are Tailscale-only, the `vps-deploy` forced-
-  command account: `docs/procedures/remote-access.md`. Keeping docs
-  themselves in sync with the repo (routine updates, periodic audits,
-  full rewrites after a structural refactor):
+  command account: `docs/procedures/remote-access.md`. Backups on
+  homelab (restic->Backblaze, sanoid/syncoid->`zbackup`; restore is
+  still a placeholder): `docs/procedures/backup-restore.md`, mechanism
+  detail in `docs/architecture.md`. Which validation layer to reach
+  for and what's automated vs. manual:
+  `docs/procedures/testing-changes.md`. Keeping docs themselves in
+  sync with the repo (routine updates, periodic audits, full rewrites
+  after a structural refactor):
   `docs/procedures/updating-documentation.md`.
 - Noticed a documentation issue you're not fixing right now (spotted
   mid-task, out of scope, or too big to fix inline)? Log it to

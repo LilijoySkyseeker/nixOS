@@ -11,6 +11,26 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
+      content once the `zbackup` restructuring lands.** Currently a
+      placeholder. `docs/architecture.md` now documents the two
+      backup mechanisms that exist today (restic->Backblaze via
+      rclone; sanoid/syncoid->`zbackup`), but restore steps were
+      deliberately deferred — coordinated with the `zfs backups plus
+      spaceguard` session, which is mid-restructure: renaming the
+      `zbackup` dataset layout to a flat `zbackup/backup/<host>/<subdir>`
+      convention and adding syncoid push-backups from `torrent`/
+      `thinkpad` over Tailscale via a new scoped backup-recv/
+      backup-push user pair. A separate `zfs-pool-recovery-restore`
+      branch is also refactoring the inline `services.sanoid` block on
+      homelab into a new `modules/nixos/zfs-snapshots.nix` module
+      (same behavior, different file). Needs: once both land, write
+      `docs/procedures/backup-restore.md` for real (restic restore via
+      `restic-backblazeWeekly` wrapper; syncoid/zfs-receive restore
+      from `zbackup`), and update `docs/architecture.md`'s Backups
+      section to describe the final dataset layout instead of the
+      current in-flux one.
+
 - [x] **2026-08-20: dendritic flake migration (flake-parts +
       import-tree) landed on master.** `flake.nix` rewritten;
       `profiles/` -> `modules/profiles/`, `services/` ->

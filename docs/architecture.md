@@ -154,6 +154,56 @@ filename -> profile modules' own internal `imports`). Not duplicated
 here to avoid the two drifting out of sync — that section is the
 canonical version.
 
+## Backups (homelab)
+
+Two independent, unrelated backup paths, both defined inline in
+`hosts/homelab/configuration.nix` rather than factored into a module —
+worth knowing since neither is where you'd expect to look based on the
+module-organization boundary above:
+
+- **Offsite: restic -> Backblaze B2, via rclone.**
+  `services.restic.backups.backblazeWeekly` backs up a hardcoded
+  dataset list (`zroot/local/state`, `zdata/storage/storage`,
+  `zdata/storage/storage-bulk`) weekly. Uses rclone rather than
+  restic's native S3/B2 support because that combination didn't work
+  reliably with both the systemd service and the CLI wrapper
+  (`createWrapper = true`, for manual `restic-backblazeWeekly` runs).
+  `backupPrepareCommand`/`backupCleanupCommand` mount the most recent
+  ZFS snapshot of each dataset into `/tmp/restic` before the run and
+  unmount after, so restic backs up a consistent snapshot rather than
+  a live, possibly-changing filesystem. Runs at `Nice = 19` /
+  `CPUSchedulingPolicy = "idle"` so it never competes with foreground
+  work. The rclone remote is named `backblazeDaily` inside the
+  `homelab_backblaze_rclone_config` sops secret even though this job
+  is weekly — a leftover from before a rename, documented inline as a
+  trap: don't "fix" the name without also updating the secret (secrets
+  aren't edited directly — see `docs/procedures/secret-rotation.md`).
+- **Local replication: sanoid + syncoid, ZFS-native.** `sanoid` takes
+  frequent/hourly/daily snapshots of the working datasets
+  (`zroot/local/state`, `zdata/storage/{storage,storage-bulk}`) and a
+  longer-retention set on `zbackup`. `syncoid` replicates hourly from
+  the working datasets into `zbackup`, entirely independent of the
+  restic/Backblaze path above — same source data, different
+  destination and mechanism, no shared config between them. Needs
+  `destroy` in its `localTargetAllow` zfs delegation (beyond the
+  module's default set) so it can self-heal from a partial receive
+  whose source snapshot has already been pruned, rather than failing
+  every run forever.
+
+**The exact `zbackup` dataset layout is actively being restructured as
+of 2026-08-20** (a flat `zbackup/backup/<host>/<subdir>` convention,
+plus new push-backup capability from `torrent`/`thinkpad` over
+Tailscale) — see `TODO.md` for status before assuming the current
+mixed layout is final. A separate branch is also refactoring the
+inline `services.sanoid` block above into a dedicated
+`modules/nixos/zfs-snapshots.nix` module (same behavior, different
+file location) — check which has landed before linking to specific
+line numbers.
+
+**Restore is not yet documented** — see
+`docs/procedures/backup-restore.md`, currently a placeholder pending
+that work landing.
+
 ## Secrets
 
 Encrypted with sops-nix. `.sops.yaml` maps named recipient keys (one
