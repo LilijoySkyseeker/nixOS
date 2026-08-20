@@ -256,6 +256,19 @@ items rather than letting them rot.
       **All 5 phases complete.** Documentation plan closed out —
       moving this entry to Done.
 
+      **2026-08-20 follow-up**: the plan never actually documented how
+      to keep the docs themselves in sync — a real gap, noticed when
+      asked what procedures existed for it and found there weren't
+      any. Added `docs/procedures/updating-documentation.md`, covering
+      routine per-commit updates (folder README inventory/gotchas,
+      inline why-comments, host tables), a periodic opportunistic
+      audit for the narrative docs (`architecture.md`/
+      `style-guide.md`, no fixed schedule), and a plan for full docs
+      rewrites after a structural refactor (re-survey from scratch
+      rather than patch piecemeal, same shape as this original
+      build-out). Linked from `AGENTS.md`'s docs pointers and
+      procedures list.
+
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
       `curl http://127.0.0.1:6060/metrics` (crowdsec's own prometheus

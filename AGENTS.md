@@ -9,7 +9,8 @@ covered here, see `docs/`:
 - `docs/style-guide.md` — Nix conventions actually in use.
 - `docs/agents.md` — the reasoning behind the rules in this file.
 - `docs/procedures/` — runbooks (new host, new service, secret
-  rotation, disaster recovery).
+  rotation, disaster recovery, keeping this documentation itself
+  up to date).
 - `docs/GIT_WORKFLOW.md` — git hooks/conventions.
 
 ## What this is
@@ -111,7 +112,9 @@ per-host composition table, and the `modules/` vs `services/` vs
   repo checkout, even gitignored — keep it entirely outside the repo.
 - Full new-host runbook: `docs/procedures/new-host.md`. New service:
   `docs/procedures/new-service.md`. Secret rotation:
-  `docs/procedures/secret-rotation.md`.
+  `docs/procedures/secret-rotation.md`. Keeping docs themselves in
+  sync with the repo (routine updates, periodic audits, full rewrites
+  after a structural refactor): `docs/procedures/updating-documentation.md`.
 
 ## Commit conventions
 
