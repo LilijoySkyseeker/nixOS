@@ -282,6 +282,19 @@ items rather than letting them rot.
       Pointed to from `AGENTS.md` directly so it's actionable, not just
       buried in the procedure doc.
 
+      **2026-08-20 third follow-up**: added Hardware sections to
+      `hosts/homelab/README.md` and `hosts/vps/README.md`, and a new
+      `docs/procedures/remote-access.md`. Hardware facts gathered live
+      via root SSH (not guessed): homelab is a repurposed MSI GL62M
+      7RD laptop (i5-7300HQ, 16GB RAM, GTX 1050 Mobile + Intel HD 630,
+      256GB SATA SSD boot disk, 4x 12TB USB-attached HGST drives in two
+      2-disk ZFS mirrors); vps is a 1 vCPU / 1GB RAM / 25GB disk
+      DigitalOcean droplet. `remote-access.md` documents the shared
+      `vars.publicSshKeys` admin-key model, that `vps` is
+      Tailscale-only (no public port 22, confirmed by config comments),
+      and the `vps-deploy` forced-command account used by
+      `myPushDeploy`. Linked from `AGENTS.md`.
+
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
       `curl http://127.0.0.1:6060/metrics` (crowdsec's own prometheus

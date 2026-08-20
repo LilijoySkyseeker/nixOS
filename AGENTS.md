@@ -112,9 +112,12 @@ per-host composition table, and the `modules/` vs `services/` vs
   repo checkout, even gitignored — keep it entirely outside the repo.
 - Full new-host runbook: `docs/procedures/new-host.md`. New service:
   `docs/procedures/new-service.md`. Secret rotation:
-  `docs/procedures/secret-rotation.md`. Keeping docs themselves in
-  sync with the repo (routine updates, periodic audits, full rewrites
-  after a structural refactor): `docs/procedures/updating-documentation.md`.
+  `docs/procedures/secret-rotation.md`. Connecting to a remote host —
+  key model, which hosts are Tailscale-only, the `vps-deploy` forced-
+  command account: `docs/procedures/remote-access.md`. Keeping docs
+  themselves in sync with the repo (routine updates, periodic audits,
+  full rewrites after a structural refactor):
+  `docs/procedures/updating-documentation.md`.
 - Noticed a documentation issue you're not fixing right now (spotted
   mid-task, out of scope, or too big to fix inline)? Log it to
   `TODO.md`'s Active section immediately, in the same session — don't
