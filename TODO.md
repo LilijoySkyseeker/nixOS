@@ -63,6 +63,21 @@ items rather than letting them rot.
       it shouldn't trip either. No code change needed; the live-deploy
       check above still covers real-world confirmation.
 
+      **2026-08-20: deployed to the real vps droplet** (`nixos-rebuild
+      switch --target-host root@vps`, run directly from torrent since
+      homelab's push-deploy path wasn't needed for this). Confirmed
+      live: the new 80/443 rule is present in the `vps-ratelimit` raw
+      chain and has 0 packets matched/dropped — not blocking anything.
+      Full end-to-end check (a real jellyfin page load through it) is
+      still open, not because of this rule but because jellyfin's
+      anubis backend (`TARGET = "http://10.100.0.2:8096"`) rides the
+      same wg0 tunnel to homelab that's currently dead from an
+      unrelated, separately-tracked bug (see the wg0/IPv6 TODO entry
+      below) — confirmed via vps's own caddy access logs (502s/
+      timeouts after long waits, consistent with backend-unreachable,
+      not a firewall drop). Waiting on that fix to land, then do the
+      real browser-session check.
+
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
