@@ -17,14 +17,14 @@ services/                    # one-off service configs (jellyfin, etc.)
 secrets/ + .sops.yaml         # sops-nix encrypted secrets
 ```
 
-Every folder has its own README with a full inventory. The import
-chains, per-host breakdown, and the reasoning behind the
-`services/`/`modules/` split are in
-[`docs/architecture.md`](./docs/architecture.md). Conventions
-(formatting, when a custom options module is worth writing vs. a plain
-config file) are in [`docs/style-guide.md`](./docs/style-guide.md).
-Runbooks for adding a host, adding a service, or rotating a secret are
-in [`docs/procedures/`](./docs/procedures/).
+Every folder above has its own README with a full inventory. For how
+it all fits together — import chains, a per-host breakdown, why
+`services/` and `modules/` are split the way they are — see
+[`docs/architecture.md`](./docs/architecture.md).
+[`docs/style-guide.md`](./docs/style-guide.md) covers conventions
+(formatting, when a custom NixOS options module is worth writing vs. a
+plain config file). [`docs/procedures/`](./docs/procedures/) has
+runbooks for adding a host, adding a service, rotating a secret.
 
 ```bash
 nix develop     # or: direnv allow
@@ -49,16 +49,20 @@ Known issues and incident history per host live in each host's own
 
 ## Interesting stuff
 
-Root on `homelab` is wiped on every boot; state survives a reboot only
-if it's explicitly declared with impermanence, nothing survives by
-accident. `vps` fronts everything public (Caddy, crowdsec, Anubis
-proof-of-work against bots) and tunnels back to `homelab` over
-WireGuard, so `homelab` is never directly reachable from the internet.
-Deploys to `vps` are built on `homelab` and pushed over the tailnet, so
-the droplet never has to compile its own config and risk OOMing
-mid-deploy. New machines go from a rescue/kexec environment to a
-running, secrets-decrypting NixOS install with `nixos-anywhere` and
-`disko`, partitioning included, no manual steps. And two nixpkgs
-channels run side by side in the same flake: desktops track
-bleeding-edge `nixpkgs-unstable`, while `homelab` — running ZFS and
-long-lived game servers — is pinned to `nixpkgs-stable`.
+- **Impermanence on `homelab`.** Root is wiped on every boot — every
+  piece of state that survives is explicitly declared, not just
+  whatever happened to be lying around.
+- **Public edge, private origin.** `vps` fronts everything public
+  (Caddy, crowdsec, Anubis proof-of-work against bots) and tunnels
+  back to `homelab` over WireGuard. `homelab` itself is never directly
+  reachable from the internet.
+- **Zero-downtime remote deploys.** `homelab` builds and pushes
+  `vps`'s closure over the tailnet — the VPS never compiles its own
+  config, so a small droplet never has to risk OOMing mid-deploy.
+- **Bare-metal to booted, unattended.** `nixos-anywhere` + `disko` take
+  a fresh machine from a rescue/kexec environment straight to a
+  running, secrets-decrypting NixOS install, partitioning included.
+- **Two nixpkgs channels running side by side.** Desktops track
+  bleeding-edge `nixpkgs-unstable`; `homelab` — running ZFS and
+  long-lived game servers — is deliberately pinned to
+  `nixpkgs-stable`, on purpose, in the same flake.
