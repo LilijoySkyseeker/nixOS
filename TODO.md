@@ -217,6 +217,24 @@ items rather than letting them rot.
       remainder is already done (procedures written in Phase 1 except
       disaster-recovery) — Phase 4 (inline why-comment sweep) is next.
 
+      **Phase 4 done (2026-08-20)**: swept `hosts/vps/configuration.nix`
+      (crowdsec/caddy `logFormat`, syslog `labels.type`, iptables
+      hashlimit, anubis socket group, IPv6 forwarding scoping),
+      `services/octodns.nix` (AAAA/A-only split), `profiles/PC.nix`,
+      `profiles/server.nix`, `hosts/homelab/configuration.nix`
+      (`myPushDeploy`, ZFS snapshot mount/unmount for restic, the
+      backblazeDaily/backblazeWeekly rclone-remote-name mismatch), and
+      `modules/nixos/*.nix` for non-obvious decisions lacking a
+      why-comment, cross-checked against already-resolved TODO.md
+      "Done" incidents and git history so nothing speculative got
+      added. Result: no gaps found — every non-obvious decision in
+      the sampled areas already carries a why-comment from prior
+      incident-driven work, so no new comments were added this pass.
+      Consistent with the "opportunistic, non-obvious-only" policy —
+      not a mechanical every-file sweep, and nothing forced in just to
+      have something to show. Revisit opportunistically as new
+      non-obvious decisions land, not on a schedule.
+
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
       `curl http://127.0.0.1:6060/metrics` (crowdsec's own prometheus
