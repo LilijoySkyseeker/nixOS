@@ -1,128 +1,74 @@
 # Lilijoy's NixOS Machines
 
-See [GIT_WORKFLOW.md](./docs/GIT_WORKFLOW.md) for git hooks/conventions used in
-this repo (auto-configured by the flake's dev shell via direnv).
+A flake-based NixOS/home-manager configuration for five machines
+(`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage`), managed from one
+repo. Covers disko partitioning, sops-nix secrets, impermanence,
+home-manager, and a distributed multi-host flake setup. `docs/` has
+the reasoning behind how it's put together.
 
-## Structure Guide
+## Layout
 
-All configuration starts with [flake.nix](./flake.nix)
-
-```bash
-NixOS
-└── flake.nix
+```
+flake.nix                    # inputs + one nixosSystem per host
+hosts/<name>/configuration.nix   # host-specific config
+profiles/{default,PC,server}.nix # shared config, layered by machine role
+modules/{nixos,home-manager}/    # reusable option modules
+services/                    # one-off service configs (jellyfin, etc.)
+secrets/ + .sops.yaml         # sops-nix encrypted secrets
 ```
 
-where the inputs of the system, the different host configurations, and universal
-variables are defined.
-
-Then it progresses to each host with its base
-[configuration.nix](./hosts/homelab/configuration.nix) (homelab as the example)
-
-```bash
-NixOS
-└── hosts
-    └── homelab
-        └── configuration.nix
-```
-
-where the host specific configuration is held. Things like hostname, timezone,
-system services, etc. Anything that only this hosts needs and is not shared is
-defined here.
-
-Some specific configuration is split into separate files to make organization
-easier and is imported in the main
-[configuration.nix](./hosts/homelab/configuration.nix).
+Every folder above has its own README with a full inventory. For how
+it all fits together — import chains, a per-host breakdown, why
+`services/` and `modules/` are split the way they are — see
+[`docs/architecture.md`](./docs/architecture.md).
+[`docs/style-guide.md`](./docs/style-guide.md) covers conventions
+(formatting, when a custom NixOS options module is worth writing vs. a
+plain config file). [`docs/procedures/`](./docs/procedures/) has
+runbooks for adding a host, adding a service, rotating a secret.
 
 ```bash
-NixOS
-└── hosts
-    └── homelab
-        ├── configuration.nix
-        ├── disko.nix
-        └── hardware-configuration.nix
+nix develop     # or: direnv allow
+nixos-rebuild build --flake .#<host>
 ```
 
-In this case, the
-[hardware-configuration.nix](./hosts/homelab/hardware-configuration.nix) which
-is auto generated during system installation is left alone. Alongside that is
-[disko.nix](./hosts/homelab/disko.nix) which manages disk partitioning and
-formatting using [disko](https://github.com/nix-community/disko/).
-
-Then it progresses to the shared profiles by importing
-[default.nix](./profiles/default.nix) and one or more of the others.
-
-```bash
-NixOS
-└── profiles
-    ├── default.nix
-    ├── PC.nix
-    └── server.nix
-```
-
-These profiles contain the configuration that is shared with other hosts,
-[default.nix](./profiles/default.nix) in particular contains configuration that
-is shared universally amongst all hosts. The other profiles are based on the
-role the host is taking.
-
-These profiles and the individual host
-[configuration.nix](./hosts/homelab/configuration.nix) import modules and
-services that have been split apart for organization.
-
-```bash
-NixOS
-├── modules
-│   ├── home-manager
-│   │   ├── gnome.nix
-│   │   ├── kde.nix
-│   │   └── tooling.nix
-│   └── nixos
-│       ├── beets.nix
-│       ├── copypartymount.nix
-│       ├── gnome.nix
-│       ├── kde.nix
-│       ├── tooling.nix
-│       ├── virtual-machines.nix
-│       ├── winapps.nix
-│       └── wooting.nix
-└── services
-    ├── copyparty.nix
-    ├── factorio.nix
-    ├── jellyfin.nix
-    ├── minecraft.nix
-    ├── nextcloud.nix
-    ├── rss.nix
-    ├── samba.nix
-    └── webdav.nix
-```
-
-These are simply self contained collections of configuration for a specific
-task. The [modules](./modules) are for local configuration. While
-[services](./services) are for anything being served to LAN or WAN.
-
-What's left is a section for custom packages, standalone files, and encrypted
-secret management with [sops-nix](https://github.com/Mic92/sops-nix).
-
-```bash
-NixOS
-├── custom-packages
-│   └── tpm-fido
-│       └── package.nix
-├── files
-│   ├── ffkbV4.vil
-│   ├── gruvbox-dark-rainbow.png
-│   └── S2721Q.icm
-├── secrets
-│   └── secrets.yaml
-└── .sops.yaml
-```
+The dev shell wires up git hooks and `pull.rebase true` automatically.
+See [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md).
 
 ## Hosts
 
-## Interesting Stuff
+| Host | Role | Purpose |
+|---|---|---|
+| `thinkpad` | Desktop | Secondary laptop. |
+| `torrent` | Desktop | Primary desktop. |
+| `homelab` | Server | Home server: media (Jellyfin), game servers, NFS, DNS automation, backups. |
+| `vps` | Server | Public-facing edge: reverse proxy, WireGuard tunnel back to homelab, DDoS/bot mitigation. |
+| `isoimage` | Standalone | Bootable recovery/install ISO, outside the normal profile hierarchy. |
 
-- [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
-  [Impermanence](https://github.com/nix-community/impermanence)
-- [tailscale-acl.json](./docs/tailscale-acl.json) is a reference copy of the
-  tailnet ACL policy, which is actually managed in the Tailscale admin
-  console (not applied by Nix) — keep it in sync manually when the console
-  policy changes.
+Known issues and incident history per host live in each host's own
+`hosts/<name>/README.md`.
+
+## Interesting stuff
+
+- **Impermanence on `homelab`.** Root is wiped on every boot; anything
+  meant to survive is explicitly opted in via
+  [`environment.persistence`](./hosts/homelab/configuration.nix) —
+  forgetting to add a new stateful path here means it silently
+  vanishes on next reboot, not an error.
+- **Two nixpkgs channels, on purpose.** Most hosts track
+  `nixpkgs-unstable`; `homelab` is deliberately pinned to
+  `nixpkgs-stable` because it runs stateful services (ZFS, game
+  servers) where an unstable regression is costlier than missing a new
+  option for a while. See `docs/architecture.md`.
+- **The VPS is a decoy front, not the origin.** `vps` terminates public
+  traffic (Caddy, crowdsec, Anubis proof-of-work for bots) and tunnels
+  it back to `homelab` over WireGuard — `homelab` itself is never
+  directly reachable from the internet.
+- **Remote deploys build locally, not on the target.** Both
+  `nixos-anywhere` installs and ongoing `push`/`pull` deploys build the
+  closure on a beefier machine and ship it, rather than asking a small
+  VPS to compile its own config and risk OOMing mid-deploy.
+- **The Tailscale ACL is managed out-of-band.**
+  [`docs/tailscale-acl.json`](./docs/tailscale-acl.json) is a reference
+  copy of the tailnet policy actually configured in the Tailscale admin
+  console — not applied by Nix, and not auto-synced. Update it by hand
+  when the console policy changes.
