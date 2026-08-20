@@ -259,6 +259,55 @@ items rather than letting them rot.
          rebases its small thinkpad/torrent bit on top after — both
          still gated on backup/pool-sequencing clearance.
 
+      **2026-08-20: three more sessions joined, folded into this
+      plan:**
+      - **factorio server migration** (`worktree-factorio-new-server`)
+        — done, committed locally (`520987f`), not pushed/merged.
+        Adds a second `factorio-new` oci-container in
+        `services/factorio.nix`, additive-only vps port/firewall
+        entries for UDP 34198, new octodns A/SRV records, and one new
+        homelab persistence-dir entry (`/srv/factorio/new`). No real
+        conflict with anything already on this list; the persistence
+        entry is just a note for whoever sequences the next homelab
+        rebuild after the backup — not a conflict with the
+        in-progress backup itself since unmerged.
+      - **nelson migration dendritic flake**
+        (`worktree-nelson-dendritic-plan`) — a repo-wide restructuring
+        to flake-parts + import-tree. Functionally done and verified
+        equivalent to master via derivation/closure diffing, but NOT
+        merged (awaiting user go-ahead). Scope: `flake.nix` fully
+        rewritten, `flake.lock` gets new inputs, `profiles/` and
+        `services/` **moved** to `modules/profiles/` and
+        `modules/services/` (git renames, every file also rewritten),
+        every host's `configuration.nix` imports list trimmed, new
+        `modules/flake/{vars,pkgs,systems,hosts,devshell}.nix`. 50
+        files changed (+3088/-2577). **High blast radius** — direct
+        conflicts flagged with jellyfin-gpu-accel
+        (`services/jellyfin.nix` moved), minecraft-geyser
+        (`services/minecraft.nix` + geyser-config dir moved),
+        factorio-server-migration (`services/factorio.nix` moved);
+        likely conflicts with distributed-nix-builds/nix-build-cache
+        (`flake.nix` rewritten) and anything touching
+        `hosts/*/configuration.nix` imports (zfs-backups+spaceguard,
+        zfs-pool-recovery-restore, backblaze-homelab-reset,
+        wireguard-ipv6, crawler-rate-limiting — though for most of
+        these only the imports section changed, not the config body).
+        add-samba-smb-share's new `services/samba.nix` would need to
+        land under `modules/services/` post-migration or go unscanned
+        by import-tree. **Recommendation from that session (heads-up
+        sent to all affected sessions, most have acknowledged and are
+        holding without self-rebasing): merge this dead-last (after
+        every other branch lands, one rebase) or dead-first (everyone
+        else rebases onto it) — not merged in the middle of the other
+        9+.** User hasn't picked which yet.
+      - **nelson security review** — read-only audit, no branch, no
+        code changes, clean tree on master. Has a *proposed but not
+        yet applied* plan to split `.sops.yaml` into per-host secret
+        scoping — worth a second look later since zfs-backups
+        +spaceguard, samba, and distributed-nix-builds all add new
+        sops secrets to the current single `.sops.yaml`, but nothing
+        actioned yet so no current conflict.
+
       Nothing has been switched on homelab yet in this round;
       crawler-rate-limiting is the only branch fully live (vps, an
       unrelated host).
