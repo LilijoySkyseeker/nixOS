@@ -11,6 +11,21 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-20: verify the wg0 IPv4-endpoint fix survives a real
+      IPv6 address rotation on homelab.** `hosts/homelab/configuration.nix`'s
+      wg0 peer now points at vps's stable IPv4 (`137.184.45.18:51820`)
+      instead of vps's IPv6 literal, fixing a bug where the tunnel died
+      silently whenever homelab's RFC4941 privacy IPv6 address rotated
+      (confirmed live: 0% ping both directions despite
+      `persistentKeepalive`). Deployed as part of this merge. The fix
+      itself is straightforward (IPv4 doesn't rotate), but hasn't been
+      watched through an actual homelab IPv6 address rotation yet —
+      confirm `wg show wg0` keeps a fresh handshake and
+      jellyfin/minecraft/factorio stay reachable across the next one or
+      two rotations (homelab's privacy addresses appear to rotate on
+      the order of hours-to-a-day, based on the two different addresses
+      already observed during this investigation).
+
 - [ ] **2026-08-20: deploy `new.factorio`** — merged to master
       (`c7796c9`), not yet deployed. A second Factorio server
       (`modules/services/factorio.nix`'s `factorio-new` container,
