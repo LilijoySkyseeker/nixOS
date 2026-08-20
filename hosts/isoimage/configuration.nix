@@ -10,7 +10,6 @@
   imports = [
     "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
     "${modulesPath}/installer/cd-dvd/channel.nix"
-    ../../services/copyparty-iso.nix
   ];
   nixpkgs.hostPlatform = "x86_64-linux";
 

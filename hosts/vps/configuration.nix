@@ -146,11 +146,6 @@ in
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/health-alerts.nix
   ];
 
   # Set your time zone.

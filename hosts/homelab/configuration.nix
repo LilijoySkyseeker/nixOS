@@ -9,19 +9,6 @@
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/auto-update.nix
-    ../../modules/nixos/health-alerts.nix
-    ../../modules/nixos/push-deploy.nix
-
-    ../../services/jellyfin.nix
-    ../../services/minecraft.nix
-    ../../services/factorio.nix
-    ../../services/octodns.nix
-    ../../services/nfs.nix
   ];
 
   # System installed pkgs

@@ -9,10 +9,6 @@
     ./hardware-configuration.nix
     ./nvidia.nix
     ./disko.nix
-    ../../profiles/PC.nix
-    ../../modules/nixos/kde.nix
-    ../../modules/nixos/pull-deploy.nix
-    ../../modules/nixos/nfs-homelab-mounts.nix
   ];
 
   myPullDeploy = {
