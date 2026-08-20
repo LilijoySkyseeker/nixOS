@@ -63,8 +63,6 @@ per-host composition table, and the `modules/` vs `services/` vs
 - `services/` — NixOS service configs for things run on the homelab
   (jellyfin, copyparty, factorio, etc.), imported by whichever host needs
   them.
-- `custom-packages/` — packages/overlays not in nixpkgs. Must be wired
-  into `flake.nix` or a host to actually be used.
 - `files/` — static assets (keyboard layouts, EQ profiles, images). Many
   of these are consumed by external tools (VIA/Vial, Picard, monitor ICC
   profile loaders) rather than by Nix — don't assume "not referenced from
