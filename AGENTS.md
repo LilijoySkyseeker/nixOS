@@ -231,6 +231,27 @@ central "list of every module" to scan — the registry *is* the file tree.
   change (e.g. compare against `git stash` / previous commit).
 - Don't build or switch a live host's configuration remotely — that's
   the user's call, not something to run unprompted.
+- Never restart or reboot the user's local machine (`torrent`) without
+  explicit confirmation first, even to fix something like a crashed
+  system service (nix-daemon, etc.) — work around it instead (e.g.
+  build on a different host over SSH) or ask the user to restart it
+  themselves. Treat it as a hard-confirm action, same tier as
+  `git push --force` or `rm -rf`.
+- Never install or invoke the real `sudo` binary/package on any managed
+  host — all hosts alias `sudo` to `run0`
+  (`security.run0.enableSudoAlias`) and `security.sudo.enable = false`
+  on server-class hosts confirms real sudo is intentionally absent. For
+  a `nologin`-shelled system user where run0-aliased sudo can't switch
+  (e.g. `crowdsec`), use `runuser -u <user> --` instead. See
+  `docs/style-guide.md`'s Security hardening section.
+- Before running a `nixos-anywhere` install or similar remote deploy
+  against real hardware/cloud, validate the config change in a local
+  NixOS VM first when feasible (`nix build
+  .#nixosConfigurations.<host>.config.system.build.vm`) — cloud
+  installs are slow/costly to iterate on, a local VM boots in under a
+  minute and reproduces most boot/activation/service behavior. Clean
+  up VM scratch artifacts (qcow2/log files, leftover qemu processes)
+  once done.
 - When installing with `nixos-anywhere`, build on the local machine
   rather than the remote target whenever possible (leave
   `--build-on-remote` unset). Remote targets, especially small/cheap
