@@ -27,7 +27,10 @@
 
   # home-manager
   home-manager.users.root = {
-    imports = [ ../modules/home-manager/tooling.nix ];
+    imports = [
+      ../modules/home-manager/tooling.nix
+      ../modules/home-manager/tmux.nix
+    ];
     home.stateVersion = "23.11";
     home.username = "root";
     programs.home-manager.enable = true;

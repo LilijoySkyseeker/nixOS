@@ -144,7 +144,7 @@
     imports = [
       ../modules/home-manager/tooling.nix
       ../modules/home-manager/virt-manager.nix
-      ../modules/home-manager/terminal.nix
+      ../modules/home-manager/kitty.nix
       inputs.plover-flake.homeManagerModules.plover
     ];
     home = {
