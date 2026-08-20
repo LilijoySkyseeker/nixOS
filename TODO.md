@@ -256,13 +256,39 @@ items rather than letting them rot.
       first instance. See `scripts/README.md`.
 
       The `backup`/`restore` stages there are explicitly TEMPORARY —
-      a one-off syncoid push/pull to homelab's `zbackup/backup-bulk/<host>`
-      standing in for real automated backups, which are being built in
-      a separate session/branch (see the syncoid-backup dependency note
+      a one-off syncoid push/pull to homelab's `zbackup/backup/<host>`
+      (renamed 2026-08-20 to match the zfs-backups+spaceguard session's
+      flattened convention — not deployed to homelab yet as of this
+      writing, so confirm the live path before trusting it) standing
+      in for real automated backups, which are being built in a
+      separate session/branch (see the syncoid-backup dependency note
       above). Once that lands and covers thinkpad/torrent, delete those
       two stages from the script and restore from the real backup
       system instead — don't let this temporary path calcify into the
       permanent one.
+
+      **Cross-branch coordination (2026-08-20):** diffed/dry-run-merge-
+      tested against the zfs-backups+spaceguard branch — homelab's
+      disko.nix and configuration.nix merge clean (non-overlapping
+      regions: their zbackup dataset/syncoid work vs. this branch's
+      LUKS wrapping/module refactor). Real conflicts are mechanical
+      only — thinkpad/torrent configuration.nix `imports` list ordering
+      and TODO.md itself, both expected from two branches touching the
+      same hosts, neither semantic. Agreed order: zfs-backups+spaceguard
+      merges first (once its own backblaze-homelab-reset dependency
+      clears), this branch rebases on top before its own (much later)
+      homelab reinstall work lands.
+
+      Also flagged: a separate "nelson migration dendritic flake"
+      session is doing a repo-wide restructuring (flake.nix rewrite,
+      profiles/+services/ moved into modules/, every host's imports
+      list trimmed) — functionally verified but not yet merged as of
+      2026-08-20. Likely low practical impact on this branch (Phase 2
+      work is new modules/nixos/*.nix files, not moved paths, and
+      still gated inert), but expect it to touch every host config file
+      this branch also touches — recommended to land dead-last or
+      dead-first relative to other branches rather than in the middle.
+      Re-check for rebase conflicts against it before merging.
 
       FDE+TPM2 can end up *less*
       recoverable than plaintext ZFS if the failure modes aren't
