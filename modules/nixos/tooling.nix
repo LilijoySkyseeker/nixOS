@@ -61,8 +61,25 @@
           };
           markdown.enable = true;
           bash.enable = true;
+          python.enable = true;
+          typescript.enable = true;
+          rust.enable = true;
+          go.enable = true;
+          lua.enable = true;
+          json.enable = true;
+          yaml.enable = true;
+          html.enable = true;
+          css.enable = true;
+          docker.enable = true;
         };
         lsp.formatOnSave = true;
+        lsp.trouble.enable = true;
+        debugger = {
+          nvim-dap = {
+            enable = true;
+            ui.enable = true;
+          };
+        };
         maps = {
           normal = {
             "j".action = "gj";
@@ -86,7 +103,9 @@
         };
         git = {
           enable = true;
+          neogit.enable = true;
         };
+        filetree.neo-tree.enable = true;
         telescope.enable = true;
         autocomplete.nvim-cmp.enable = true;
         autopairs.nvim-autopairs.enable = true;
