@@ -11,6 +11,35 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-20: `docs/` needs a full rewrite once the dendritic
+      flake migration (flake-parts + import-tree) lands.** A parallel
+      session (worktree-nelson-dendritic-plan) is rewriting
+      `flake.nix` and moving `profiles/` -> `modules/profiles/` and
+      `services/` -> `modules/services/`, replacing the current plain
+      `imports` chain with self-registering `flake.modules.*`. All of
+      the docs work landed today (`docs/architecture.md`,
+      `docs/style-guide.md`, root `README.md`, `AGENTS.md`, and the
+      `modules/nixos/`, `modules/home-manager/`, `profiles/`,
+      `services/` folder READMEs) documents the *current* pre-migration
+      layout and will be factually wrong once that merges — the
+      import-chain description, per-host composition table, and
+      module/service/profile boundary explanation all assume plain
+      imports, not flake.modules registration. Coordinated with that
+      session directly (cross-session message) before their rebase;
+      agreed plan: once their migration merges, treat it as a
+      structural refactor per `docs/procedures/updating-documentation.md`'s
+      "After a big refactor" section — re-survey the new structure
+      from scratch and rewrite `docs/architecture.md`'s
+      import-chain/composition sections, `docs/style-guide.md`'s
+      module-organization section, and the moved folder READMEs'
+      Purpose/Gotchas (git-mv the READMEs with their folders, keep
+      Inventory lists since file contents aren't changing, per that
+      session's "no functional changes" claim). Whoever's post-merge
+      `AGENTS.md`/README "structure" section is closer to the real
+      dendritic layout should win outright rather than being hand-
+      merged with the pre-migration version. Needs: watch for that
+      migration landing on master, then do the docs rewrite pass.
+
 - [ ] **2026-08-18: verify jellyfin is still reachable after the new
       vps base HTTP rate limit deploys** (vps). Added a base
       per-source-IP `iptables` `hashlimit` rule covering caddy's
