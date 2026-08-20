@@ -11,34 +11,43 @@ items rather than letting them rot.
 
 ## Active
 
-- [ ] **2026-08-20: `docs/` needs a full rewrite once the dendritic
-      flake migration (flake-parts + import-tree) lands.** A parallel
-      session (worktree-nelson-dendritic-plan) is rewriting
-      `flake.nix` and moving `profiles/` -> `modules/profiles/` and
-      `services/` -> `modules/services/`, replacing the current plain
-      `imports` chain with self-registering `flake.modules.*`. All of
-      the docs work landed today (`docs/architecture.md`,
-      `docs/style-guide.md`, root `README.md`, `AGENTS.md`, and the
-      `modules/nixos/`, `modules/home-manager/`, `profiles/`,
-      `services/` folder READMEs) documents the *current* pre-migration
-      layout and will be factually wrong once that merges — the
-      import-chain description, per-host composition table, and
-      module/service/profile boundary explanation all assume plain
-      imports, not flake.modules registration. Coordinated with that
-      session directly (cross-session message) before their rebase;
-      agreed plan: once their migration merges, treat it as a
-      structural refactor per `docs/procedures/updating-documentation.md`'s
-      "After a big refactor" section — re-survey the new structure
-      from scratch and rewrite `docs/architecture.md`'s
-      import-chain/composition sections, `docs/style-guide.md`'s
-      module-organization section, and the moved folder READMEs'
-      Purpose/Gotchas (git-mv the READMEs with their folders, keep
-      Inventory lists since file contents aren't changing, per that
-      session's "no functional changes" claim). Whoever's post-merge
-      `AGENTS.md`/README "structure" section is closer to the real
-      dendritic layout should win outright rather than being hand-
-      merged with the pre-migration version. Needs: watch for that
-      migration landing on master, then do the docs rewrite pass.
+- [x] **2026-08-20: dendritic flake migration (flake-parts +
+      import-tree) landed on master.** `flake.nix` rewritten;
+      `profiles/` -> `modules/profiles/`, `services/` ->
+      `modules/services/`; plain `imports` chains replaced by
+      self-registering `flake.modules.nixos.*` /
+      `flake.modules.homeManager.*`. No functional changes (verified
+      via derivation/closure diffing against pre-migration master).
+      Full phased plan and gotchas at `docs/dendritic-migration-plan.md`.
+      `AGENTS.md`/`README.md` "structure" sections updated to describe
+      the new layout as part of this merge.
+
+- [ ] **2026-08-20: `docs/` rewrite needed now that the dendritic
+      migration above has landed.** `docs/architecture.md`,
+      `docs/style-guide.md`, and the `modules/nixos/`,
+      `modules/home-manager/`, `profiles/`, `services/` folder READMEs
+      (written earlier today, before the migration merged) still
+      document the *pre-migration* plain-`imports` layout and are now
+      factually wrong — the import-chain description, per-host
+      composition table, and module/service/profile boundary
+      explanation all assume plain imports, not `flake.modules`
+      registration. Coordinated directly with the migration session
+      before their rebase; agreed plan per
+      `docs/procedures/updating-documentation.md`'s "After a big
+      refactor" section: re-survey the new structure from scratch and
+      rewrite `docs/architecture.md`'s import-chain/composition
+      sections and `docs/style-guide.md`'s module-organization section;
+      git-mv the four folder READMEs to their new locations
+      (`modules/profiles/README.md`, `modules/services/README.md`,
+      already following their folders in the migration commit) and
+      rewrite their Purpose/Gotchas prose, keeping Inventory lists
+      since file contents didn't change. Also call out explicitly (not
+      just via a file listing) that a few registration keys don't
+      match filenames 1:1 — e.g. `profiles/PC.nix` ->
+      `"profile-pc"`, `default.nix` -> `"profile-default"`,
+      `server.nix` -> `"profile-server"` — since that's exactly the
+      kind of thing someone greps for and doesn't find. Needs: do the
+      docs rewrite pass now that the migration is on master.
 
 - [ ] **2026-08-18: verify jellyfin is still reachable after the new
       vps base HTTP rate limit deploys** (vps). Added a base
