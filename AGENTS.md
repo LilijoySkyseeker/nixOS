@@ -7,6 +7,9 @@ covered here, see `docs/`:
 
 - `docs/architecture.md` — how hosts/profiles/modules/services compose.
 - `docs/style-guide.md` — Nix conventions actually in use.
+- `docs/hardening.md` — security-hardening conventions (sudo/run0,
+  dedicated service users, systemd sandboxing, SSH lockdown, swap,
+  rate-limiting).
 - `docs/agents.md` — the reasoning behind the rules in this file.
 - `docs/procedures/` — runbooks (new host, new service, secret
   rotation, disaster recovery, keeping this documentation itself
@@ -243,7 +246,7 @@ central "list of every module" to scan — the registry *is* the file tree.
   on server-class hosts confirms real sudo is intentionally absent. For
   a `nologin`-shelled system user where run0-aliased sudo can't switch
   (e.g. `crowdsec`), use `runuser -u <user> --` instead. See
-  `docs/style-guide.md`'s Security hardening section.
+  `docs/hardening.md`.
 - Before running a `nixos-anywhere` install or similar remote deploy
   against real hardware/cloud, validate the config change in a local
   NixOS VM first when feasible (`nix build

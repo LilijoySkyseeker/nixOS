@@ -25,7 +25,7 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
 5. If the service writes state on an impermanence host (currently
    homelab), check the new state paths against that host's
    persistence list before deploying.
-6. Apply the security-hardening conventions in `docs/style-guide.md`
+6. Apply the security-hardening conventions in `docs/hardening.md`
    (dedicated service user, systemd sandboxing, etc.) by default, not
    just when asked.
 
