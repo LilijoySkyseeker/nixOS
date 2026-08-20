@@ -294,12 +294,20 @@ items rather than letting them rot.
         these only the imports section changed, not the config body).
         add-samba-smb-share's new `services/samba.nix` would need to
         land under `modules/services/` post-migration or go unscanned
-        by import-tree. **Recommendation from that session (heads-up
-        sent to all affected sessions, most have acknowledged and are
-        holding without self-rebasing): merge this dead-last (after
-        every other branch lands, one rebase) or dead-first (everyone
-        else rebases onto it) — not merged in the middle of the other
-        9+.** User hasn't picked which yet.
+        by import-tree. **User decision (2026-08-20): dead-last.**
+        This branch merges only after every other in-flight branch
+        (backblaze-homelab-reset, wireguard-ipv6, minecraft-geyser
+        switch, jellyfin-gpu-accel switch, nix-build-cache,
+        distributed-nix-builds, samba, zfs-backups+spaceguard,
+        zfs-pool-recovery-restore, factorio-server-migration) has
+        landed on master — one rebase at the end, resolved as a pure
+        file-move/reorg rather than N-way. All affected sessions
+        notified and acknowledged; several correctly noted they still
+        need their own user's explicit go-ahead before merging (a
+        relayed instruction from this session isn't authorization in
+        their own session). No change to any other branch's own
+        blocking status — this only fixes where the dendritic branch
+        sits in the queue.
       - **nelson security review** — read-only audit, no branch, no
         code changes, clean tree on master. Has a *proposed but not
         yet applied* plan to split `.sops.yaml` into per-host secret
