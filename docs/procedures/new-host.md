@@ -7,14 +7,19 @@ shape; the vps README has the gotchas for a specific real deploy
 
 ## Steps
 
-1. Create `hosts/<name>/configuration.nix`, importing whichever
-   `profiles/*.nix` and `modules/`/`services/*.nix` the host needs (see
-   `docs/architecture.md` for how existing hosts are composed). Add a
+1. Create `hosts/<name>/configuration.nix` with genuinely host-local
+   config only (hostname, hardware config, disko) — it no longer
+   imports profiles or shared modules by path. Add a
    `hosts/<name>/hardware-configuration.nix` placeholder — it gets
    overwritten by the real one in step 4.
-2. Add a `nixosConfigurations.<name>` entry to `flake.nix`, picking
-   `nixpkgs-stable` or `nixpkgs-unstable` and matching `specialArgs`
-   pattern to an existing host on the same channel.
+2. Add a `flake.nixosConfigurations.<name>` entry to
+   `modules/flake/hosts.nix`, picking `nixpkgs-stable` or
+   `nixpkgs-unstable`, matching `specialArgs` pattern to an existing
+   host on the same channel, and listing whichever `flake.modules.nixos.*`
+   registration keys the host needs in its `modules = [ ... ]` list
+   (see `docs/architecture.md` for how existing hosts are composed and
+   `AGENTS.md`'s "Navigating" section for how to find a module's actual
+   registration key).
 3. Before the target is reachable over SSH via a sops-decrypted secret
    (e.g. Tailscale), pre-generate that host's SSH host key **outside
    the repo checkout, even gitignored** — never stage key material

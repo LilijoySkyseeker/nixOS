@@ -44,7 +44,9 @@ Enforced by the `commit-msg` hook.
   false positives.
 - **commit-msg** — enforces the Conventional Commits format above.
 - **pre-push** — for every host under `hosts/` whose config changed in the
-  commits being pushed (directly, or via `profiles/`, `modules/`, `services/`,
+  commits being pushed (directly, or via `modules/` — which covers
+  `modules/nixos/`, `modules/home-manager/`, `modules/profiles/`,
+  `modules/services/`, and `modules/flake/` alike — or
   `flake.nix`/`flake.lock`), runs `nixos-rebuild build --flake .#<host>`
   before allowing the push. This never switches a running system — it only
   builds. Bypass with `git push --no-verify` if you know what you're doing
@@ -58,7 +60,7 @@ Enforced by the `commit-msg` hook.
 - Test with `nixos-rebuild build`/`dry-build` before committing anything that
   changes a host's config; only `switch` when you intend to deploy.
 - For something you want to iterate on across multiple commits before it's
-  trustworthy (e.g. a new service, a risky refactor of `profiles/`), branch,
+  trustworthy (e.g. a new service, a risky refactor of `modules/profiles/`), branch,
   then merge (fast-forward preferred — rebase the branch onto `master` first)
   once it builds clean.
 - Once a branch's content has landed on `master`, prune it if safe: delete

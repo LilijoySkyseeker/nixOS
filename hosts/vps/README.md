@@ -121,7 +121,7 @@ A disk with only `systemd-boot`'s UEFI ESP (no legacy-bootable MBR
 code) leaves nothing for that BIOS stage to find; confirmed via the
 DigitalOcean recovery console hanging at "Booting from Hard Disk..."
 on an install with `boot.loader.systemd-boot` (the default in
-`profiles/default.nix`). `hosts/vps/configuration.nix` overrides to
+`modules/profiles/default.nix`). `hosts/vps/configuration.nix` overrides to
 `boot.loader.grub` in legacy BIOS mode instead, and `disko.nix` has a
 small unformatted `EF02` partition for GRUB's `core.img` plus a real
 ext4 `/boot` partition (disko auto-populates `boot.loader.grub.devices`
@@ -149,11 +149,12 @@ wg genkey | tee homelab-private.key | wg pubkey > homelab-public.key
 
 ## 4. DNS + TLS
 
-The domain is a single Nix value (`vars.domain` in `flake.nix`) shared
-between Caddy's `virtualHosts` here and `services/octodns.nix`'s
-generated zone data — set it once, both pick it up. See
-`services/octodns.nix` for the DNS side (octoDNS + Cloudflare, applied
-by a timer on homelab, no checked-in YAML). Caddy will get ACME certs
+The domain is a single Nix value (`flake.vars.domain` in
+`modules/flake/vars.nix`) shared between Caddy's `virtualHosts` here
+and `modules/services/octodns.nix`'s generated zone data — set it
+once, both pick it up. See `modules/services/octodns.nix` for the DNS
+side (octoDNS + Cloudflare, applied by a timer on homelab, no
+checked-in YAML). Caddy will get ACME certs
 automatically via HTTP-01 once DNS resolves and ports 80/443 are
 reachable — no extra config needed unless you want DNS-01 (e.g. for
 wildcard certs), in which case populate `vps_caddy_env` with the DNS
@@ -164,8 +165,8 @@ provider's API token and switch Caddy's ACME config to use it.
 `networking.nat.forwardPorts` in `configuration.nix` already forwards
 25565/tcp and 34197/udp to homelab's tunnel address
 (`10.100.0.2`) — no further config needed once the tunnel is up,
-just confirm the ports match `services/minecraft.nix` /
-`services/factorio.nix` if those ever change.
+just confirm the ports match `modules/services/minecraft.nix` /
+`modules/services/factorio.nix` if those ever change.
 
 ## Status
 

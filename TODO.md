@@ -29,32 +29,29 @@ items rather than letting them rot.
       budget — build (not switch) both before relying on them post-merge.
       No host was switched during the migration itself.
 
-- [ ] **2026-08-20: `docs/` rewrite needed now that the dendritic
-      migration above has landed.** `docs/architecture.md`,
-      `docs/style-guide.md`, and the `modules/nixos/`,
-      `modules/home-manager/`, `profiles/`, `services/` folder READMEs
-      (written earlier today, before the migration merged) still
-      document the *pre-migration* plain-`imports` layout and are now
-      factually wrong — the import-chain description, per-host
-      composition table, and module/service/profile boundary
-      explanation all assume plain imports, not `flake.modules`
-      registration. Coordinated directly with the migration session
-      before their rebase; agreed plan per
-      `docs/procedures/updating-documentation.md`'s "After a big
-      refactor" section: re-survey the new structure from scratch and
-      rewrite `docs/architecture.md`'s import-chain/composition
-      sections and `docs/style-guide.md`'s module-organization section;
-      git-mv the four folder READMEs to their new locations
-      (`modules/profiles/README.md`, `modules/services/README.md`,
-      already following their folders in the migration commit) and
-      rewrite their Purpose/Gotchas prose, keeping Inventory lists
-      since file contents didn't change. Also call out explicitly (not
-      just via a file listing) that a few registration keys don't
-      match filenames 1:1 — e.g. `profiles/PC.nix` ->
-      `"profile-pc"`, `default.nix` -> `"profile-default"`,
-      `server.nix` -> `"profile-server"` — since that's exactly the
-      kind of thing someone greps for and doesn't find. Needs: do the
-      docs rewrite pass now that the migration is on master.
+- [x] **2026-08-20: `docs/` rewrite for the dendritic migration —
+      done.** Rewrote `docs/architecture.md` (registration model,
+      `modules/flake/hosts.nix` as the composition point with a
+      real per-host module-list table, profile/module-organization
+      boundary updated to the `flake.modules.*` mechanism) and
+      `docs/style-guide.md` (the `my<Name>` options convention kept as
+      before, plus a new "Registration key vs. filename" section
+      calling out the `profiles/PC.nix` -> `"profile-pc"` /
+      `default.nix` -> `"profile-default"` / `server.nix` ->
+      `"profile-server"` mismatches explicitly, not just via a file
+      listing). Also swept and fixed stale pre-migration path
+      references found along the way in `AGENTS.md`, `docs/agents.md`,
+      `docs/README-template.md`, `docs/procedures/{new-host,
+      new-service,updating-documentation,remote-access}.md`,
+      `docs/GIT_WORKFLOW.md` (confirmed the pre-push hook itself isn't
+      broken — its `modules/` pattern already covers the nested
+      `modules/profiles/`/`modules/services/` paths, only the doc text
+      was stale), `modules/{nixos,profiles,services}/README.md`, and
+      `files/README.md`. `modules/profiles/README.md` and
+      `modules/services/README.md` had already been git-mv'd by the
+      migration itself — only their prose needed the registration-
+      mechanism rewrite, not a move. `nix flake check` still passes
+      (docs-only change).
 
 - [ ] **2026-08-20: build+switch thinkpad and torrent after the
       dendritic migration** (see entry above) — only `vps`/`homelab`

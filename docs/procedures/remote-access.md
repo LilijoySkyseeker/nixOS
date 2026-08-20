@@ -6,13 +6,15 @@ each host.
 ## Key model
 
 There's one shared set of admin public keys —
-`vars.publicSshKeys` in `flake.nix` — installed as
+`flake.vars.publicSshKeys` in `modules/flake/vars.nix` — installed as
 `users.users.root.openssh.authorizedKeys.keys` on every host that
 accepts interactive admin SSH (`homelab`, `vps`, `isoimage`). Currently
 three keys: the thinkpad's, torrent's, and a hardware YubIKey
 (`sk-ssh-ed25519@openssh.com`, resident/FIDO2). Adding a new admin
 machine means appending its public key to that one list in
-`flake.nix` — it propagates to every host on next deploy, there's no
+`modules/flake/vars.nix` — it propagates to every host on next deploy
+(each host reads it via `config.flake.vars`, passed through as the
+`vars` `specialArg` — see `modules/flake/hosts.nix`), there's no
 per-host key list to maintain separately.
 
 Every host's `services.openssh` sets `PermitRootLogin =

@@ -11,8 +11,8 @@ this repo.
 
 ## Inventory
 
-- `gruvbox-dark-rainbow.png` — used directly in `profiles/PC.nix` as a
-  stylix/wallpaper image. The one file in this folder actually
+- `gruvbox-dark-rainbow.png` — used directly in `modules/profiles/PC.nix`
+  as a stylix/wallpaper image. The one file in this folder actually
   referenced from `.nix`.
 - `doio.vil`, `ffkb.vil`, `sval_ColemakDH_WIP.vil`,
   `sval_HD-G_ORIGINAL.vil`, `sval_HD-N.vil` — VIA/Vial keyboard layout

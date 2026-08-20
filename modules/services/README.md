@@ -1,10 +1,10 @@
-# services
+# modules/services
 
 One-off NixOS service configs, mostly for things run on homelab. No
-options surface — imported directly by whichever host's
-`configuration.nix` needs them. See `docs/architecture.md` for the
-`modules/` vs `services/` boundary and `docs/procedures/new-service.md`
-for adding one.
+options surface — each registers as `flake.modules.nixos.<name>` and
+is listed by whichever host needs it in `modules/flake/hosts.nix`. See
+`docs/architecture.md` for the module-organization boundary and
+`docs/procedures/new-service.md` for adding one.
 
 ## Inventory
 

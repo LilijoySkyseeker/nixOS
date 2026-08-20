@@ -104,10 +104,11 @@ discipline. There's no fixed schedule; do this opportunistically when:
   reasons — a light pass costs little once you're already there.
 
 The check itself: re-read the doc against the current
-`flake.nix`/`hosts/*/configuration.nix`/`profiles/*.nix`, and fix
-whatever's drifted. Log what was found and fixed in `TODO.md` if it
-was non-trivial, the same way Phase 4's why-comment sweep did, so
-there's a record of when the last audit happened and what it caught.
+`modules/flake/hosts.nix`/`hosts/*/configuration.nix`/`modules/profiles/*.nix`,
+and fix whatever's drifted. Log what was found and fixed in `TODO.md`
+if it was non-trivial, the same way Phase 4's why-comment sweep did,
+so there's a record of when the last audit happened and what it
+caught.
 
 ## After a big refactor
 
@@ -115,22 +116,26 @@ A refactor that changes the shape of the repo — not just what's in a
 file, but which files/folders exist and how they compose — makes the
 routine per-commit updates insufficient, because the *structure* the
 docs describe has changed, not just its contents. Examples: splitting
-`profiles/` into more/fewer roles, moving what's in `services/` into
-proper `modules/nixos/` options modules, changing how hosts are pinned
-across nixpkgs channels, restructuring the secrets layout.
+`modules/profiles/` into more/fewer roles, changing how hosts are
+pinned across nixpkgs channels, restructuring the secrets layout, or
+(already happened once, see `TODO.md`'s 2026-08-20 entry) migrating
+the whole composition mechanism, as the dendritic flake-parts +
+import-tree migration did — moving `profiles/`/`services/` under
+`modules/` and replacing plain `imports` chains with self-registering
+`flake.modules.*`.
 
 When that happens, don't patch `docs/architecture.md` piecemeal —
 treat it like the original docs effort and redo it properly:
 
 1. **Re-survey the repo from scratch** the same way the original Phase
-   1/2 passes did: read the actual `flake.nix`, every
-   `hosts/*/configuration.nix`, every `profiles/*.nix`, and the new
-   folder structure, rather than editing the old doc's assumptions in
-   place. A structural refactor is exactly the situation where the old
-   doc's framing may no longer be the right framing, not just its
-   facts.
-2. **Rewrite `docs/architecture.md`'s import chain, per-host table, and
-   module/service/profile boundary sections** to match the new
+   1/2 passes did: read the actual `flake.nix`/composition entry
+   point, every `hosts/*/configuration.nix`, every module-organization
+   file, and the new folder structure, rather than editing the old
+   doc's assumptions in place. A structural refactor is exactly the
+   situation where the old doc's framing may no longer be the right
+   framing, not just its facts.
+2. **Rewrite `docs/architecture.md`'s composition-mechanism, per-host
+   table, and module-organization boundary sections** to match the new
    structure — don't leave old sections half-updated.
 3. **Re-check `docs/style-guide.md`** for conventions the refactor
    invalidated (e.g. if the `my<Name>` options-module convention

@@ -1,16 +1,21 @@
 # Folder README template
 
 Shared shape for per-folder READMEs added under Phase 2 of the docs plan
-(see `TODO.md`) — `modules/nixos/`, `modules/home-manager/`, `profiles/`,
-`services/`, `secrets/`, `custom-packages/`, `files/`. Not used for
-`hosts/*/README.md`, which is a known-issues log, a different purpose.
+(see `TODO.md`) — originally `modules/nixos/`, `modules/home-manager/`,
+`profiles/`, `services/`, `secrets/`, `files/` (`custom-packages/` never
+existed, see `TODO.md`). `profiles/` and `services/` moved under
+`modules/` in the later dendritic flake migration; their READMEs moved
+with them (`modules/profiles/README.md`, `modules/services/README.md`).
+Not used for `hosts/*/README.md`, which is a known-issues log, a
+different purpose.
 
 ```markdown
 # <folder path>
 
 <One or two sentences: what this folder is for, and the rule for what
-belongs in it vs. a neighboring folder (e.g. modules/ vs profiles/ vs
-services/ — when does something belong here instead of there).>
+belongs in it vs. a neighboring folder (e.g. modules/nixos/ vs
+modules/profiles/ vs modules/services/ — when does something belong
+here instead of there).>
 
 ## Inventory
 

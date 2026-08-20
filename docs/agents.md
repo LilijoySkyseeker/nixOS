@@ -44,12 +44,14 @@ what the line does doesn't — skip those.
 
 ## Where to look before assuming
 
-- Before assuming a module is "live," check it's actually reachable
-  from some host's import chain — see `docs/architecture.md`.
+- Before assuming a module is "live," check its `flake.modules.*` key
+  is actually listed in `modules/flake/hosts.nix` — see
+  `docs/architecture.md`. Existing in the tree and being picked up by
+  `import-tree` is not the same as being used by any host.
 - Before assuming a file in `files/` is dead because nothing in `.nix`
   references it, check whether it's consumed by an external tool
   (VIA/Vial, Picard, an ICC profile loader) instead — see `AGENTS.md`.
 - Before adding an options surface to a new module, check
   `docs/style-guide.md`'s `my<Name>` convention and whether a plain
-  `services/*.nix` file would actually be simpler for a single-host
-  consumer.
+  `modules/services/*.nix` file would actually be simpler for a
+  single-host consumer.

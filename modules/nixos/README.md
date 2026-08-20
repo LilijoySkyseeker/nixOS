@@ -30,6 +30,6 @@ are plain config wired directly to upstream NixOS options.
 ## Gotchas
 
 - `nfs-homelab-mounts.nix`'s `multimedia` gid must stay in sync with
-  `services/jellyfin.nix`'s group — an NFS `sec=sys` cross-host
+  `modules/services/jellyfin.nix`'s group — an NFS `sec=sys` cross-host
   coupling that isn't enforced by Nix itself. If one side's gid
   changes, the other needs updating too.

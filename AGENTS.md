@@ -44,11 +44,9 @@ unprompted.
 
 ## Repo layout — dendritic flake organization
 
-See `docs/architecture.md` for the full import chain, per-host
-composition table, and the `modules/` vs `services/` vs `profiles/`
-boundary explained in narrative detail (subject to a post-migration
-rewrite per the `TODO.md` entry tracking that — the summary below is
-already accurate to the current structure).
+See `docs/architecture.md` for the full registration model, per-host
+composition table, and module-organization boundary explained in
+narrative detail — updated for the current dendritic structure.
 
 This flake uses the **dendritic pattern** (flake-parts + import-tree):
 every `.nix` file under `modules/` self-registers into
@@ -169,7 +167,7 @@ central "list of every module" to scan — the registry *is* the file tree.
   ```
   Reusing the name `config` for both would silently read the wrong
   object — this bit us once during the migration
-  (`services/jellyfin.nix`, `modules/nixos/nfs-homelab-mounts.nix`), and
+  (`modules/services/jellyfin.nix`, `modules/nixos/nfs-homelab-mounts.nix`), and
   it fails loudly at eval time with an unrelated-looking error ("attribute
   'flake' missing"), not a clear "you shadowed config" message.
 - **`flake.modules` isn't a built-in flake-parts option.** It only exists
