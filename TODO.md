@@ -134,7 +134,10 @@ items rather than letting them rot.
       `profiles/server.nix`, alongside the existing root home-manager
       block) so `myAutoUpdate`'s commit step succeeds.
 
-- [ ] **2026-08-20: build out comprehensive repo documentation** (docs
+
+## Done
+
+- [x] **2026-08-20: build out comprehensive repo documentation** (docs
       architecture, planned via Q&A — see AskUserQuestion trail in
       session for full rationale). Two prongs: a central `docs/`
       folder for high-level material, and non-obvious "why" comments
@@ -234,6 +237,24 @@ items rather than letting them rot.
       not a mechanical every-file sweep, and nothing forced in just to
       have something to show. Revisit opportunistically as new
       non-obvious decisions land, not on a schedule.
+
+      **Phase 5 done (2026-08-20)**: root `README.md` rewritten,
+      architected interactively with the user rather than drafted
+      solo as planned. Replaced the stale structure-walkthrough
+      (referenced a `custom-packages/` folder and module/service files
+      that no longer exist, empty "Hosts" and "Interesting Stuff"
+      sections) with: a concise intro, a layout summary linking into
+      `docs/architecture.md`/`docs/style-guide.md`/`docs/procedures/`,
+      a real per-host table, and an "Interesting stuff" highlights
+      section (impermanence, the stable/unstable channel split, the
+      vps-as-decoy-front design, local-build-not-remote deploys, the
+      out-of-band Tailscale ACL). Deliberately written for a human
+      audience (not agent-facing) per explicit user direction — no
+      agent-safety caveats or reachability-checking instructions,
+      those stay in `AGENTS.md`/`docs/agents.md` where they belong.
+
+      **All 5 phases complete.** Documentation plan closed out —
+      moving this entry to Done.
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via
