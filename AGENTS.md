@@ -1,12 +1,36 @@
 # AGENTS.md
 
-Guide for AI agents (and humans) working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) and other AI
+agents when working with code in this repository.
 
 ## What this is
 
 A flake-based NixOS/home-manager dotfiles configuration managing multiple
-hosts. Secrets are encrypted with sops-nix (see `.sops.yaml`,
-`secrets/secrets.yaml`) — never commit plaintext secrets.
+hosts (`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage` — see
+`nixosConfigurations` in `flake.nix`). Secrets are encrypted with sops-nix
+(see `.sops.yaml`, `secrets/secrets.yaml`) — never commit plaintext secrets.
+
+## Commands
+
+Enter the dev shell first (`nix develop`, or `direnv allow` — `.envrc` is
+already `use flake`); it also wires up git hooks (`core.hooksPath
+.githooks`) and `pull.rebase true` via its `shellHook`.
+
+- Build (never switch) a host to check it evaluates/compiles:
+  `nixos-rebuild build --flake .#<host>` (e.g. `.#homelab`, `.#vps`,
+  `.#thinkpad`, `.#torrent`). Use `dry-build` to skip realizing the
+  closure. This is the closest thing this repo has to a test suite —
+  there's no separate unit test runner.
+- Whole-flake check: `nix flake check --no-build`.
+- Lint: `statix check .` and `deadnix .`. Format: `nixfmt <file>`.
+- Shell scripts (`.githooks/*`): `shellcheck` / `shfmt`.
+- Readable diff between the current system and a built closure before
+  ever switching: `nvd diff /run/current-system <new-closure-path>`.
+- Remote installs: `nixos-anywhere --flake .#<host> root@<ip>` (see
+  "Before making changes" below for build-locality caveats).
+
+Never run `nixos-rebuild switch` or push a build to a live remote host
+unprompted.
 
 ## Repo layout
 
