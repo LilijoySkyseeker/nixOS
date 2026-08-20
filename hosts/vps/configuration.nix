@@ -402,7 +402,9 @@ in
   # handshake — defense-in-depth against a future break of the
   # asymmetric crypto, standard WireGuard hardening advice. Same file
   # content needed verbatim on both ends (see hosts/homelab/configuration.nix).
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  sops.secrets.wireguard_vps_homelab_psk = {
+    sopsFile = ../../secrets/shared-vps-homelab.yaml;
+  };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;

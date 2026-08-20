@@ -400,8 +400,11 @@
   # initiates, nothing needs to be reachable inbound at home.
   sops.secrets.homelab_wireguard_private_key = { };
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
-  # hosts/vps/configuration.nix's peer entry.
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  # hosts/vps/configuration.nix's peer entry. Lives in the shared file since
+  # both homelab and vps need to decrypt it (see modules/profiles/default.nix).
+  sops.secrets.wireguard_vps_homelab_psk = {
+    sopsFile = ../../secrets/shared-vps-homelab.yaml;
+  };
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;

@@ -150,8 +150,21 @@
       };
 
       # sops-nix support, secret managment
+      #
+      # Secrets are split per-host so a compromised host's age key can only
+      # decrypt secrets that host actually needs, instead of every secret in
+      # the repo. `secrets/legacy.yaml` holds entries with no current nix
+      # consumer (see secrets/README.md) and stays decryptable by every host
+      # until they're claimed or pruned.
       sops = {
-        defaultSopsFile = ../../secrets/secrets.yaml;
+        defaultSopsFile =
+          {
+            homelab = ../../secrets/homelab.yaml;
+            vps = ../../secrets/vps.yaml;
+            thinkpad = ../../secrets/pc.yaml;
+            torrent = ../../secrets/pc.yaml;
+          }
+          .${config.networking.hostName} or ../../secrets/legacy.yaml;
         defaultSopsFormat = "yaml";
       };
 
