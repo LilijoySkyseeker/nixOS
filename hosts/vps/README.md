@@ -13,6 +13,17 @@ publicly.
 homelab/tailnet-only. Only jellyfin, minecraft, and factorio are meant
 to be public.
 
+## Hardware
+
+DigitalOcean droplet (KVM, `vda`/virtio disk):
+
+- **CPU**: 1 vCPU (`DO-Regular`)
+- **RAM**: 1GB, plus a 482MB zram swap device
+- **Disk**: 25GB virtio (`vda`)
+- **Network**: `ens3` (public IP + a private DigitalOcean VPC
+  address), `ens4` (a second private network), plus `wg0` and
+  `tailscale0`
+
 This is a scaffold — several things still need real values before it
 deploys:
 

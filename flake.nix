@@ -28,6 +28,10 @@
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
+    plasma-manager.url = "github:nix-community/plasma-manager";
+    plasma-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    plasma-manager.inputs.home-manager.follows = "home-manager";
+
     # for comma index
     nix-index-database.url = "github:nix-community/nix-index-database";
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -39,99 +43,17 @@
     # provides the services.copyparty NixOS module used on hosts/isoimage
     copyparty.url = "github:9001/copyparty";
     copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    import-tree.url = "github:vic/import-tree";
   };
 
   outputs =
-    inputs@{ nixpkgs-unstable, nixpkgs-stable, ... }:
-    let
-      vars = {
-        # root access ssh keys
-        publicSshKeys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad" # thinkpad
-          "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6pG0Y9QdCBRJZKpCD62U3uXl5Lz/bE0ifWLbhZ4q9o lilijoy@torrent" # torrent
-
-        ];
-        username = "lilijoy";
-        # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
-        # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
-        domain = "skyseekerlabs.net.";
-      };
-      pkgs-unstable = import inputs.nixpkgs-unstable {
-        system = "x86_64-linux";
-        config = {
-          allowUnfree = true;
-          permittedInsecurePackages = [
-            "electron-39.8.10"
-          ];
-        };
-      };
-      pkgs-stable = import inputs.nixpkgs-stable {
-        system = "x86_64-linux";
-        config = {
-          permittedInsecurePackages = [ "" ];
-          allowUnfree = true;
-        };
-      };
-    in
-    {
-      devShells.x86_64-linux.default = import ./devshell.nix { inherit pkgs-unstable; };
-
-      nixosConfigurations = {
-        #==================================================
-        thinkpad = nixpkgs-unstable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
-          modules = [ ./hosts/thinkpad/configuration.nix ];
-        };
-        #==================================================
-        torrent = nixpkgs-unstable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
-          modules = [ ./hosts/torrent/configuration.nix ];
-        };
-        #==================================================
-        homelab = nixpkgs-stable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-            # use the home-manager release matching nixpkgs-stable to avoid a version mismatch
-            inputs = inputs // { home-manager = inputs.home-manager-stable; };
-          };
-          modules = [ ./hosts/homelab/configuration.nix ];
-        };
-        #==================================================
-        vps = nixpkgs-unstable.lib.nixosSystem {
-          specialArgs = {
-            inherit
-              inputs
-              pkgs-unstable
-              pkgs-stable
-              vars
-              ;
-          };
-          modules = [ ./hosts/vps/configuration.nix ];
-        };
-        #==================================================
-        isoimage = nixpkgs-unstable.lib.nixosSystem {
-          specialArgs = { inherit inputs pkgs-unstable vars; };
-          modules = [ ./hosts/isoimage/configuration.nix ];
-        };
-      };
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.flake-parts.flakeModules.modules
+        (inputs.import-tree ./modules)
+      ];
     };
 }

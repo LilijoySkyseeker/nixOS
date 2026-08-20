@@ -146,11 +146,6 @@ in
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/health-alerts.nix
   ];
 
   # Set your time zone.
@@ -501,6 +496,26 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
+
+    # base rate limit for caddy's public HTTP(S) entry point (80/443),
+    # so every current and future caddy virtualHost gets a floor of
+    # per-source-IP abuse protection here, at the netfilter layer,
+    # instead of needing it configured per-service — jellyfin today is
+    # the only one with any protection at all (anubis' PoW challenge),
+    # and that's app-specific to it, not something new vhosts get for
+    # free. 120/minute (2/sec sustained) with a 60-request burst is
+    # generous enough for a real browser's page-load connection burst
+    # (esp. once anubis' PoW challenge round-trips are counted) while
+    # still meaningfully throttling scanners/bots hitting this host
+    # directly by IP — in line with published guidance for public web
+    # entry points, which runs from ~100/min (tight) to ~600/min
+    # (loose); this sits at the tight end since jellyfin is the only
+    # real destination behind it today. Same caveat as the game-port
+    # rules above: a floor against scanning/flooding, not full DDoS
+    # mitigation.
+    iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
+      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
+      --hashlimit-mode srcip --hashlimit-name http-new -j DROP
   '';
 
   # profiles/default.nix sets useRoutingFeatures = "both" for every
