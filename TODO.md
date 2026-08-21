@@ -11,6 +11,29 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-21: `flake-update-test.service` (myAutoUpdate,
+      `modules/nixos/auto-update.nix`) crashed on homelab and left
+      orphaned state.** Discovered while deploying the zfs-backup-push
+      work: homelab's `/etc/nixos` checkout was sitting on the
+      `auto-update` branch with an uncommitted `flake.lock` bump
+      (`nix flake update` had run, but `git commit -am "chore:
+      automated flake.lock update"` failed). `systemctl status
+      flake-update-test.service` showed the actual error — root has no
+      git identity configured on homelab: `fatal: unable to
+      auto-detect email address (got 'root@homelab.(none)')`. Crashed
+      2026-08-19 03:01, `flake-update-test.timer` presumably retried
+      since (weekly per `updateDates`) and would keep failing the same
+      way every time until fixed. Needs: set `git config --global
+      user.email`/`user.name` for root on homelab (or pass `-c
+      user.email=... -c user.name=...` directly in the service's git
+      invocations in `modules/nixos/auto-update.nix`, which would be
+      the more declarative fix — avoids relying on interactive/imperative
+      root home-directory state that impermanence would wipe anyway).
+      The orphaned `auto-update` branch + uncommitted `flake.lock` on
+      homelab itself also needs manual cleanup (stash or discard the
+      lockfile diff, checkout back to `master`) — not yet done, was
+      about to when this was deferred to file as a tracked TODO instead.
+
 - [ ] **2026-08-18: migrate torrent and thinkpad to impermanence.**
       Agreed as a prerequisite for eventually shrinking their zfs-backup
       scope (see the zfs-backups item below) — both hosts currently
