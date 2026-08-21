@@ -161,7 +161,13 @@
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
                   stale_key="backup-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"
-                  newest=$(zfs list -t snapshot -H -p -o creation -s creation ${lib.escapeShellArg dataset} 2>/dev/null | tail -1)
+                  # `|| true`: under `set -e -o pipefail`, `zfs list` on a
+                  # dataset that doesn't exist yet at all (not just empty of
+                  # snapshots — e.g. a push-backup target before its first
+                  # ever sync) exits non-zero and would abort this whole
+                  # script instead of falling through to the "$newest" empty
+                  # check below, which already handles that case correctly.
+                  newest=$(zfs list -t snapshot -H -p -o creation -s creation ${lib.escapeShellArg dataset} 2>/dev/null | tail -1) || true
                   if [ -z "$newest" ]; then
                     notify "$stale_key" "Backup staleness check failed" "${dataset}: no snapshots found (dataset missing or empty)"
                   else
