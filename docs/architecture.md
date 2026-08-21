@@ -163,8 +163,9 @@ module-organization boundary above:
 
 - **Offsite: restic -> Backblaze B2, via rclone.**
   `services.restic.backups.backblazeWeekly` backs up a hardcoded
-  dataset list (`zroot/local/state`, `zdata/storage/storage`,
-  `zdata/storage/storage-bulk`) weekly. Uses rclone rather than
+  dataset list (`zroot/local/state`, `zdata/storage/storage` —
+  `storage-bulk` was dropped from this list, it's too large to be
+  worth the offsite cost) weekly. Uses rclone rather than
   restic's native S3/B2 support because that combination didn't work
   reliably with both the systemd service and the CLI wrapper
   (`createWrapper = true`, for manual `restic-backblazeWeekly` runs).
