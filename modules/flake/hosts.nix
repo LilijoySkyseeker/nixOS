@@ -61,6 +61,7 @@ in
         nixosModules.factorio
         nixosModules.octodns
         nixosModules.nfs
+        nixosModules.samba
       ];
     };
     #==================================================

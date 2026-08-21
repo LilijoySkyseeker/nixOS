@@ -22,6 +22,10 @@ is listed by whichever host needs it in `modules/flake/hosts.nix`. See
   `/storage-bulk`.
 - `octodns.nix` — DNS zone management; zone data is Nix-rendered, keyed
   off `vars.domain` from `flake.nix`.
+- `samba.nix` — tailnet-only SMB share of the same `/storage` and
+  `/storage-bulk` datasets as `nfs.nix`, for Android clients (no usable
+  native NFS client). Declarative sops-managed password via a
+  `samba-user-provision` systemd unit.
 
 ## Gotchas
 

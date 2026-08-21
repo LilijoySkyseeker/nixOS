@@ -4,8 +4,9 @@
     { ... }:
     {
       # nfs server — tailnet-only file share for /storage and /storage-bulk
-      # (the same datasets previously served by copyparty). Linux clients only,
-      # so NFSv4 is sufficient — no Samba/SMB needed.
+      # (the same datasets previously served by copyparty). NFSv4 covers Linux
+      # clients; Android has no usable native NFS client, so it's served the
+      # same datasets separately over Samba (see samba.nix).
       services.nfs.server = {
         enable = true;
         exports = ''
