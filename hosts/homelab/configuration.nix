@@ -9,19 +9,6 @@
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/auto-update.nix
-    ../../modules/nixos/health-alerts.nix
-    ../../modules/nixos/push-deploy.nix
-
-    ../../services/jellyfin.nix
-    ../../services/minecraft.nix
-    ../../services/factorio.nix
-    ../../services/octodns.nix
-    ../../services/nfs.nix
   ];
 
   # System installed pkgs
@@ -62,6 +49,27 @@
 
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
+
+  # GPU hardware acceleration — this box is a dual-GPU laptop (MSI):
+  # Intel HD 630 iGPU (card2/renderD129) + Nvidia GTX 1050 Mobile
+  # (card1/renderD128, currently on nouveau). Nvidia gets the proprietary
+  # driver so jellyfin can use NVENC/NVDEC; Intel's VAAPI/QSV stack is also
+  # enabled so its render node is usable as a fallback (see services/jellyfin.nix).
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs-stable; [
+      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
+      vpl-gpu-rt
+    ];
+  };
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.nvidia = {
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
+    open = false;
+    modesetting.enable = true;
+    nvidiaSettings = false; # headless, no GUI settings app needed
+  };
 
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
@@ -113,7 +121,7 @@
       rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
       #       mount all the most recent backups in a temp folder for restic to trawl
       backupPrepareCommand = ''
-        datasets="zroot/local/state zdata/storage/storage zdata/storage/storage-bulk"
+        datasets="zroot/local/state zdata/storage/storage"
 
         for dataset in $datasets; do
           snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
@@ -135,9 +143,15 @@
         OnCalendar = "Fri 03:00:00";
         Persistent = true;
       };
+      # this job runs weekly, so "--keep-daily" here really means "keep
+      # the last N runs" (one snapshot lands per day-with-a-run, not per
+      # calendar day) — 2 keeps roughly the last 2 weekly cycles. This is
+      # a disaster-recovery copy only, not a versioning history (ZFS
+      # snapshots/sanoid already cover that), so a short window is
+      # intentional.
       pruneOpts = [
         "--retry-lock 15m"
-        "--keep-daily 30"
+        "--keep-daily 2"
       ];
       runCheck = true;
       checkOpts = [
@@ -157,9 +171,15 @@
       bash
     ];
     serviceConfig = {
-      # backup is always lowest priority to not effect running processes
-      Nice = 19;
-      CPUSchedulingPolicy = "idle";
+      # previously Nice=19 + CPUSchedulingPolicy="idle" (SCHED_IDLE) to
+      # avoid impacting other services. Removed: SCHED_IDLE is the
+      # lowest possible Linux scheduling class, only running when the
+      # CPU is otherwise fully idle -- on this 4-core box with typical
+      # load average ~12-14 (jellyfin/game servers/syncoid all
+      # concurrent), that starved restic/rclone almost completely,
+      # observed throttling a full backup to ~2MiB/s even though
+      # neither the network link nor Backblaze itself was the
+      # bottleneck. Normal scheduling lets it compete fairly instead.
       # this service mounts/unmounts ZFS snapshots into a shared /tmp
       # (that's why PrivateTmp is already forced off below) and needs
       # real mount(8) access — ProtectSystem/namespace restrictions
@@ -181,6 +201,14 @@
       # weekly timer, but long enough for a run to actually finish.
       TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeWeekly";
+      # declaratively (re)assert the B2 bucket's lifecycle rule every run,
+      # since it's cloud-side state with no other source of truth: with
+      # b2-hard-delete=false, restic's own prunes (--keep-daily 30) only
+      # hide old versions rather than deleting them, so this purges hidden
+      # versions after 1 day — a short safety buffer, not a retention
+      # policy (restic's prune already governs what data is kept).
+      # Idempotent: safe to re-set on every run.
+      ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # only reached on success (ExecStartPost doesn't run after a failed
       # ExecStart), so its mtime is proof a backup actually completed.
       ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
@@ -462,7 +490,17 @@
         # vps
         publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
-        endpoint = "[2604:a880:4:1d0:0:3:5045:8000]:51820";
+        # IPv4 literal, not vps's IPv6 address — confirmed live this
+        # tunnel silently died for hours despite persistentKeepalive:
+        # homelab's own outbound IPv6 addresses are RFC4941 "temporary
+        # dynamic" privacy addresses that rotate periodically, and once
+        # one rotated, the vps side's auto-learned endpoint for this
+        # peer went stale (source-address roaming only relearns from a
+        # freshly-arriving packet, and nothing forced one). vps's IPv4
+        # (137.184.45.18, ens3 — see hosts/vps/configuration.nix) is
+        # static and is what every other IPv4-only piece of this path
+        # (game-port DNAT/SNAT/rate-limits) already keys off of.
+        endpoint = "137.184.45.18:51820";
         allowedIPs = [ "10.100.0.1/32" ];
         # CGNAT mappings expire without periodic traffic; keep the
         # tunnel (and the vps's route back to us) alive.

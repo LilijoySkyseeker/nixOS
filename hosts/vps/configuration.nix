@@ -146,11 +146,6 @@ in
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/health-alerts.nix
   ];
 
   # Set your time zone.
@@ -182,7 +177,14 @@ in
   networking.useDHCP = lib.mkDefault true;
   services.cloud-init = {
     enable = true;
-    network.enable = true;
+    # network.enable is deliberately left off (default false): it would
+    # only flip on systemd.network.enable, which conflicts with dhcpcd
+    # (useDHCP/useNetworkd=false above) per NixOS's own eval warning. It
+    # buys nothing here anyway — cloud_init_modules below excludes the
+    # network-config stage ("write-network-config"/"migrator"), so
+    # cloud-init never actually renders any networkd config; the DO
+    # hypervisor handshake documented above comes from cloud-init running
+    # at all (cloud-init-local/cloud-init services), not from this flag.
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
@@ -445,7 +447,12 @@ in
       {
         destination = "10.100.0.2:34197";
         proto = "udp";
-        sourcePort = 34197;
+        sourcePort = 34197; # old.factorio
+      }
+      {
+        destination = "10.100.0.2:34198";
+        proto = "udp";
+        sourcePort = 34198; # new.factorio
       }
     ];
   };
@@ -501,6 +508,31 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
+
+    # new.factorio: same thresholds/reasoning as old.factorio above.
+    iptables -t raw -A vps-ratelimit -p udp --dport 34198 \
+      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
+      --hashlimit-mode srcip --hashlimit-name factorio-new-flood -j DROP
+
+    # base rate limit for caddy's public HTTP(S) entry point (80/443),
+    # so every current and future caddy virtualHost gets a floor of
+    # per-source-IP abuse protection here, at the netfilter layer,
+    # instead of needing it configured per-service — jellyfin today is
+    # the only one with any protection at all (anubis' PoW challenge),
+    # and that's app-specific to it, not something new vhosts get for
+    # free. 120/minute (2/sec sustained) with a 60-request burst is
+    # generous enough for a real browser's page-load connection burst
+    # (esp. once anubis' PoW challenge round-trips are counted) while
+    # still meaningfully throttling scanners/bots hitting this host
+    # directly by IP — in line with published guidance for public web
+    # entry points, which runs from ~100/min (tight) to ~600/min
+    # (loose); this sits at the tight end since jellyfin is the only
+    # real destination behind it today. Same caveat as the game-port
+    # rules above: a floor against scanning/flooding, not full DDoS
+    # mitigation.
+    iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
+      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
+      --hashlimit-mode srcip --hashlimit-name http-new -j DROP
   '';
 
   # profiles/default.nix sets useRoutingFeatures = "both" for every
@@ -511,6 +543,22 @@ in
   # Narrowing to "client" here stops that forced-on IPv6 forwarding
   # (IPv4 forwarding stays on regardless, via the nat module — that
   # one's intentional, it's what makes the homelab DNAT work).
+  #
+  # (Tried making this box a tailscale exit node — advertise-exit-node
+  # plus dropping this override to let both IPv4/IPv6 forwarding turn
+  # on. Reverted by request. Two things worth knowing if this gets
+  # revisited: 1) a tailscale exit node bundles 0.0.0.0/0 and ::/0
+  # together — there's no CLI flag to advertise only the IPv4 default
+  # route, so an exit node here would need real working IPv6
+  # forwarding, not just an IPv4-only one, or opted-in clients get
+  # silently broken IPv6 rather than a clean fallback. 2) enabling
+  # IPv6 forwarding here was NOT what broke the vps<->homelab
+  # wireguard tunnel/game servers during that experiment — that was a
+  # separate, pre-existing bug: the tunnel's endpoint was pinned to
+  # vps's IPv6 literal, which silently died whenever homelab's
+  # RFC4941 privacy IPv6 address rotated. Fixed independently by
+  # pointing that endpoint at vps's stable IPv4 instead — see
+  # hosts/homelab/configuration.nix's wg0 peer entry.)
   services.tailscale.useRoutingFeatures = lib.mkForce "client";
 
   # this box never needs to forward IPv6 (nat/forwardPorts above is

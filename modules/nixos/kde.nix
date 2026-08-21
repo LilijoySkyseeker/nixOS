@@ -1,23 +1,27 @@
-{ pkgs-stable, pkgs-unstable, ... }:
+{ ... }:
 {
-  # KDE Plasma
-  services.xserver.enable = true;
-  services.displayManager.sddm.enable = true;
-  services.displayManager.sddm.wayland.enable = true;
-  services.desktopManager.plasma6.enable = true;
+  flake.modules.nixos.kde =
+    { pkgs-stable, pkgs-unstable, ... }:
+    {
+      # KDE Plasma
+      services.xserver.enable = true;
+      services.displayManager.sddm.enable = true;
+      services.displayManager.sddm.wayland.enable = true;
+      services.desktopManager.plasma6.enable = true;
 
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-      xdg-desktop-portal
-      kdePackages.xdg-desktop-portal-kde
-    ])
-    ++ (with pkgs-stable; [
-      kdePackages.filelight # kde disk usage
-      qalculate-qt
-      kile
-    ]);
+      # System installed pkgs
+      environment.systemPackages =
+        (with pkgs-unstable; [
+          xdg-desktop-portal
+          kdePackages.xdg-desktop-portal-kde
+        ])
+        ++ (with pkgs-stable; [
+          kdePackages.filelight # kde disk usage
+          qalculate-qt
+          kile
+        ]);
 
-  # kde partition manager
-  programs.partition-manager.enable = true;
+      # kde partition manager
+      programs.partition-manager.enable = true;
+    };
 }

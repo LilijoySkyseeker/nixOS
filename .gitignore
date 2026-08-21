@@ -2,6 +2,7 @@ result
 result-*
 .direnv/
 .claude/worktrees/
+.nelson/
 
 # never track pre-generated host SSH keys (see hosts/vps/README.md,
 # step 1) — these belong outside the repo entirely, this is a backstop

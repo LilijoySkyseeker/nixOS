@@ -13,6 +13,17 @@ publicly.
 homelab/tailnet-only. Only jellyfin, minecraft, and factorio are meant
 to be public.
 
+## Hardware
+
+DigitalOcean droplet (KVM, `vda`/virtio disk):
+
+- **CPU**: 1 vCPU (`DO-Regular`)
+- **RAM**: 1GB, plus a 482MB zram swap device
+- **Disk**: 25GB virtio (`vda`)
+- **Network**: `ens3` (public IP + a private DigitalOcean VPC
+  address), `ens4` (a second private network), plus `wg0` and
+  `tailscale0`
+
 This is a scaffold — several things still need real values before it
 deploys:
 
@@ -110,7 +121,7 @@ A disk with only `systemd-boot`'s UEFI ESP (no legacy-bootable MBR
 code) leaves nothing for that BIOS stage to find; confirmed via the
 DigitalOcean recovery console hanging at "Booting from Hard Disk..."
 on an install with `boot.loader.systemd-boot` (the default in
-`profiles/default.nix`). `hosts/vps/configuration.nix` overrides to
+`modules/profiles/default.nix`). `hosts/vps/configuration.nix` overrides to
 `boot.loader.grub` in legacy BIOS mode instead, and `disko.nix` has a
 small unformatted `EF02` partition for GRUB's `core.img` plus a real
 ext4 `/boot` partition (disko auto-populates `boot.loader.grub.devices`
@@ -138,11 +149,12 @@ wg genkey | tee homelab-private.key | wg pubkey > homelab-public.key
 
 ## 4. DNS + TLS
 
-The domain is a single Nix value (`vars.domain` in `flake.nix`) shared
-between Caddy's `virtualHosts` here and `services/octodns.nix`'s
-generated zone data — set it once, both pick it up. See
-`services/octodns.nix` for the DNS side (octoDNS + Cloudflare, applied
-by a timer on homelab, no checked-in YAML). Caddy will get ACME certs
+The domain is a single Nix value (`flake.vars.domain` in
+`modules/flake/vars.nix`) shared between Caddy's `virtualHosts` here
+and `modules/services/octodns.nix`'s generated zone data — set it
+once, both pick it up. See `modules/services/octodns.nix` for the DNS
+side (octoDNS + Cloudflare, applied by a timer on homelab, no
+checked-in YAML). Caddy will get ACME certs
 automatically via HTTP-01 once DNS resolves and ports 80/443 are
 reachable — no extra config needed unless you want DNS-01 (e.g. for
 wildcard certs), in which case populate `vps_caddy_env` with the DNS
@@ -151,21 +163,45 @@ provider's API token and switch Caddy's ACME config to use it.
 ## 5. Minecraft/Factorio forwarding
 
 `networking.nat.forwardPorts` in `configuration.nix` already forwards
-25565/tcp and 34197/udp to homelab's tunnel address
-(`10.100.0.2`) — no further config needed once the tunnel is up,
-just confirm the ports match `services/minecraft.nix` /
-`services/factorio.nix` if those ever change.
+25565/tcp and 34197/udp (`old.factorio`) and 34198/udp
+(`new.factorio`) to homelab's tunnel address (`10.100.0.2`) — no
+further config needed once the tunnel is up, just confirm the ports
+match `modules/services/minecraft.nix` / `modules/services/factorio.nix`
+if those ever change. Factorio's UDP protocol carries no hostname to
+route on, so the two Factorio servers need genuinely distinct ports —
+DNS SRV records (`_factorio._udp.old.factorio` /
+`_factorio._udp.new.factorio`, see `modules/services/octodns.nix`)
+are what let players connect with just the hostname anyway, no manual
+`:port` needed.
 
 ## Status
 
 Live and deployed on DigitalOcean since 2026-08-17: real
 `hardware-configuration.nix`, real domain/DNS (Cloudflare via octoDNS,
 synced from homelab), WireGuard tunnel to homelab up, Jellyfin/
-Minecraft/Factorio all verified reachable. `hosts/vps/configuration.nix`
+Minecraft/old.factorio all verified reachable. `hosts/vps/configuration.nix`
 no longer builds/evaluates locally — homelab's `myPushDeploy` builds
 and pushes finished closures instead (see that host's config).
+
+`new.factorio` (34198/udp, merged 2026-08-20) is not yet deployed —
+needs a `nixos-rebuild switch` on both homelab (brings up the
+`factorio-new` container) and vps (opens the forward/firewall/ratelimit
+rules), plus an `octodns-sync` run (or its hourly timer) to push the
+new DNS/SRV records to Cloudflare, before it's reachable.
 
 CrowdSec is enabled with a few community collections
 (`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)
 but nothing beyond that has been tuned — worth reviewing its default
 scenarios/decisions periodically as it sees more real traffic.
+
+Per-source-IP rate limiting (`iptables` `hashlimit`, raw-table
+`vps-ratelimit` chain in `configuration.nix`) now covers every public
+entry point, not just the game ports: minecraft (15/min), bedrock
+(1000/sec), factorio (2000/sec each), and — added 2026-08-18, deployed
+and verified 2026-08-20 — a base 120/min (burst 60) rule on caddy's
+80/443, so any current or future caddy vhost gets floor protection
+automatically instead of relying on jellyfin's anubis PoW alone.
+Confirmed against source that known-good crawlers (Google, Bing,
+etc.) aren't affected — anubis's default policy already allow-lists
+them by verified IP range, and the new limit sits well above real
+crawl rates.
