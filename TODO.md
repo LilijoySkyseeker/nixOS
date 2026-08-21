@@ -32,22 +32,50 @@ items rather than letting them rot.
       that syncs it into passdb.tdb on every boot/activation before
       samba-smbd starts, auto-restarted on secret rotation via
       sops-nix's `restartUnits` — no manual `smbpasswd` step needed
-      anymore. Build-tested (`nixos-rebuild build --flake .#homelab`)
-      but not yet deployed/switched or tested from an actual Android
-      device. Needs: deploy to homelab, then connect from an Android
-      SMB client (Material Files / Solid Explorer / CX File Explorer)
-      via `homelab.<tailnet>.ts.net` or the Tailscale IP, port 445, and
-      confirm read-write actually lands with `multimedia` group
-      ownership. Also smoke-test the tailnet-only lockdown post-deploy:
-      confirm port 445 is unreachable from homelab's LAN NIC/off-tailnet
-      (e.g. `nc -zv <homelab-LAN-IP> 445` from a machine that's on the
-      LAN but not the tailnet should fail/time out — both the
-      `tailscale0`-scoped firewall rule and smb.conf's `hosts allow =
-      100.64.0.0/10` / `hosts deny = 0.0.0.0/0` should independently
-      block it), and do the same check for NFS's port 2049 while at it
-      (it has the equivalent `100.64.0.0/10` export CIDR plus the same
-      firewall interface scoping, but was never actually smoke-tested
-      end-to-end either).
+      anymore. `server signing`/`smb encrypt` mandatory, `ntlm auth =
+      ntlmv2-only`, spoolss/printer sharing disabled, and
+      `wide links`/`follow symlinks = no` on both shares were added on
+      top for defense-in-depth (commit c140108); `samba-user-provision`
+      and `samba-smbd` both carry this repo's standard systemd
+      hardening flags (`ProtectSystem=strict` on the provisioner,
+      `NoNewPrivileges`/`Protect*`/`RestrictNamespaces`/`PrivateTmp` on
+      smbd — full `ProtectSystem=strict` deliberately left off smbd
+      itself, judged too likely to silently break auth/logging without
+      enumerating every path it touches). Build-tested
+      (`nixos-rebuild build --flake .#homelab`) but not yet
+      deployed/switched. Testing needed once deployed:
+      - [ ] Connect from an Android SMB client (Material Files / Solid
+            Explorer / CX File Explorer) to `homelab.<tailnet>.ts.net`
+            or the Tailscale IP, port 445, and confirm read/write to
+            both `/storage` and `/storage-bulk`.
+      - [ ] Confirm files written from Android land with `multimedia`
+            group ownership and the configured `0660`/`0770` masks.
+      - [ ] Confirm `smb encrypt = mandatory`/`server signing =
+            mandatory` don't reject the Android client (some older SMB
+            clients fail closed against mandatory signing/encryption —
+            check the client actually connects, not just that the
+            server accepts the config).
+      - [ ] Smoke-test the tailnet-only lockdown: confirm port 445 is
+            unreachable from homelab's LAN NIC/off-tailnet (e.g. `nc
+            -zv <homelab-LAN-IP> 445` from a machine that's on the LAN
+            but not the tailnet should fail/time out) — both the
+            `tailscale0`-scoped firewall rule and smb.conf's `hosts
+            allow = 100.64.0.0/10` / `hosts deny = 0.0.0.0/0` should
+            independently block it.
+      - [ ] Do the same off-tailnet unreachability check for NFS's port
+            2049 (has the equivalent `100.64.0.0/10` export CIDR plus
+            the same firewall interface scoping, but was never actually
+            smoke-tested end-to-end either).
+      - [ ] Confirm `samba-user-provision.service` actually ran
+            successfully on boot (`systemctl status
+            samba-user-provision.service`) and `smbclient -L
+            localhost -U android-smb` authenticates with the sops-set
+            password.
+      - [ ] After confirming the above, rotate the password once (edit
+            the sops secret, redeploy) and confirm
+            `samba-user-provision.service` restarts automatically via
+            sops-nix's `restartUnits` and the new password takes
+            effect without a manual `smbpasswd` step.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
