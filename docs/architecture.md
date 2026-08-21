@@ -75,6 +75,17 @@ baseline, packages common to every host). It is not auto-applied;
 every host that wants it is listed with `"profile-default"` in
 `modules/flake/hosts.nix`.
 
+Every host carrying `"profile-default"` (directly, or via `"profile-pc"`
+which imports it — see below) also gets `comma`
+(`programs.nix-index-database.comma.enable = true;`, same file): run
+`comma <tool> [args]` (alias `,`) to fetch and run a tool from nixpkgs
+in a throwaway shell without installing it — e.g. `comma lsusb -t` if
+`lsusb` isn't already on the system. Fish's command-not-found handler
+(`modules/home-manager/tooling.nix`) also auto-invokes `comma` when you
+type an unknown command name directly. Not available on `isoimage` —
+it doesn't import `"profile-default"` at all (its own minimal
+`hosts.nix` module list is just `copyparty-iso`).
+
 `modules/profiles/PC.nix` (`"profile-pc"`) and
 `modules/profiles/server.nix` (`"profile-server"`) are role bundles:
 
