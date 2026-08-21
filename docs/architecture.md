@@ -189,20 +189,44 @@ module-organization boundary above:
   module's default set) so it can self-heal from a partial receive
   whose source snapshot has already been pruned, rather than failing
   every run forever.
+- **Remote push replication: `torrent`/`thinkpad` -> `zbackup` over
+  Tailscale, via `myBackupPush`** (`modules/nixos/backup-push.nix`).
+  Each source host runs its own hourly `syncoid` push (dedicated
+  `backup-push` user, `zfs allow`-scoped to `send,bookmark,hold,release`
+  on just its own source datasets — never root) to a dedicated
+  `backup-recv` user on homelab (`zfs allow`-scoped to just its two
+  `zbackup/backup/<host>` subtrees, SSH key `restrict`-flagged). Uses
+  `--create-bookmark` so a long-offline source (a laptop asleep for
+  weeks, or a desktop off on vacation) doesn't force a full resend once
+  local retention prunes past the last pushed snapshot — the bookmark
+  preserves the incremental base independently. Gated by a
+  Tailscale-reachability check so an offline source no-ops instead of
+  failing. Paired with `myZfsSpaceGuard`
+  (`modules/nixos/zfs-space-guard.nix`) on the source hosts, which
+  auto-prunes oldest local snapshots under free-space pressure (both
+  hosts carry large, churny game libraries under `zroot/local/home`)
+  plus a manual `zfs-emergency-prune.service` escape hatch — safe
+  alongside the bookmark above since local pruning doesn't affect
+  replication continuity.
 
-**The exact `zbackup` dataset layout is actively being restructured as
-of 2026-08-20** (a flat `zbackup/backup/<host>/<subdir>` convention,
-plus new push-backup capability from `torrent`/`thinkpad` over
-Tailscale) — see `TODO.md` for status before assuming the current
-mixed layout is final. A separate branch is also refactoring the
-inline `services.sanoid` block above into a dedicated
-`modules/nixos/zfs-snapshots.nix` module (same behavior, different
-file location) — check which has landed before linking to specific
-line numbers.
+**`zbackup` dataset layout**: flat `zbackup/backup/<host>/<subdir>`
+convention for everything — `homelab` (`storage`, `storage-bulk`,
+`state`), `thinkpad`/`torrent` (`home`, `root`). No `backup`-vs-
+`backup-bulk` split (an earlier iteration of this had one, removed:
+the offsite restic job never reads from `zbackup` at all, so isolating
+"not offsite-eligible" data there wasn't doing anything functional).
+**Code merged 2026-08-21, not yet deployed to any real host** — see
+`TODO.md` for the remaining live-pool sequencing (a dataset rename
+that must land atomically with the deploy) and rollout checklist. A
+separate branch is also refactoring the inline `services.sanoid` block
+above into a dedicated `modules/nixos/zfs-snapshots.nix` module (same
+behavior, different file location, not yet landed as of this writing)
+— check which has landed before linking to specific line numbers.
 
 **Restore is not yet documented** — see
 `docs/procedures/backup-restore.md`, currently a placeholder pending
-that work landing.
+the layout above actually deploying (so it documents the real thing,
+not one still in flux).
 
 ## Secrets
 

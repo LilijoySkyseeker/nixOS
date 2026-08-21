@@ -66,6 +66,39 @@ items rather than letting them rot.
       Code committed on branch `worktree-zfs-backup-push`; **not yet
       deployed to any real host.**
 
+      **Merged onto master 2026-08-21** (commit `dff4450`, branch not
+      yet pushed to origin): rebased this whole feature onto the
+      dendritic flake-parts restructuring that landed on master in the
+      meantime (`flake.nix` rewrite, `profiles/`/`services/` moved into
+      `modules/`, host `imports` replaced by named-module wiring in
+      `modules/flake/hosts.nix`). `backup-push.nix` and
+      `zfs-space-guard.nix` converted to the
+      `flake.modules.nixos."<name>"` wrapper format and wired into
+      torrent's/thinkpad's module lists there. `hosts/homelab/disko.nix`
+      and `hosts/homelab/configuration.nix` merged with **zero
+      conflicts** — confirmed non-overlapping with the dendritic changes
+      and with `zfs-pool-recovery-restore`'s LUKS work via an earlier
+      dry-run merge test. Verified post-merge: `nixos-rebuild build`
+      (not switch) succeeds for all three hosts, and `nix flake check`
+      passes for the whole flake (all 5 nixosConfigurations). **Still
+      not deployed/switched anywhere, and this branch is still
+      unpushed** — only a local merge commit so far.
+
+      **New hard blocker from the merge**: `secrets/secrets.yaml` had a
+      real conflict — both this branch (torrent/thinkpad backup-push
+      keys) and master (a samba password from another branch) added new
+      secrets in the same spot. The per-key encrypted values merged
+      safely as a plain union (each is an independent ciphertext), but
+      the file's `sops:` metadata (`lastmodified`/`mac` — a MAC over the
+      *entire file's* contents) could not be hand-merged; master's copy
+      was kept as a placeholder and **is now stale**. Before trusting
+      this file for anything (including the build steps below, which
+      already worked because Nix doesn't verify the mac at eval time —
+      but real secret *decryption* on a target host will fail once the
+      mismatch is caught), the user must run
+      `sops updatekeys secrets/secrets.yaml` themselves (not done here —
+      never edit sops files directly) to produce a fresh valid mac.
+
       **Live pool note**: none of the above touches the live homelab
       pool — disko.nix is install-time only, and I'm not running zfs
       commands against a live host without you present. Two things need
@@ -115,6 +148,23 @@ items rather than letting them rot.
       together — not done automatically.
 
       Checklist to finish rollout:
+      - [ ] **BLOCKING, do this first**: run `sops updatekeys
+            secrets/secrets.yaml` to refresh the stale mac left by the
+            master-merge conflict resolution above. Nothing that reads
+            real secrets on a target host should be trusted until this
+            is done — a `nixos-rebuild build` succeeding is not proof
+            this is fine, since Nix doesn't verify the sops mac at eval
+            time, only `sops`/`sops-install-secrets` do, at activation.
+      - [ ] Push this branch to origin (`worktree-zfs-backup-push`) —
+            not yet pushed; the merge onto the dendritic restructuring
+            only exists as a local commit (`dff4450`) so far. Coordinate
+            with `zfs-pool-recovery-restore` per the earlier agreement
+            (their thinkpad/torrent import-list conflicts, expected to
+            be mechanical) once this is up.
+      - [ ] Re-verify `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
+            and `nix flake check` one more time immediately before the
+            actual deploy, in case anything else landed on master in
+            the meantime.
       - [x] Generate `torrent_backup_push_key` and
             `thinkpad_backup_push_key` ed25519 keypairs. (2026-08-19)
       - [x] Add both private keys to `secrets/secrets.yaml` via `sops
@@ -135,7 +185,20 @@ items rather than letting them rot.
             isn't time-sensitive and can happen whenever.
       - [ ] Deploy homelab first (creates `backup-recv` user + zfs
             delegation + `backup/{thinkpad,torrent}` containers under
-            `zbackup`).
+            `zbackup`). Since this is also the first real *switch*
+            (not just build) since the dendritic-flake rebase, treat it
+            as testing that restructuring too, not just this feature:
+            watch the switch output for anything unexpected in units
+            unrelated to backups (jellyfin GPU accel, samba, wireguard
+            IPv6 endpoint fix, etc. all landed in the same merge).
+      - [ ] After homelab's switch, spot-check that services *unrelated*
+            to this feature came up fine too (`systemctl --failed`,
+            `systemctl status jellyfin caddy` or equivalents) — a bad
+            module-wrapper conversion elsewhere in the dendritic
+            migration could regress something this branch's build-only
+            testing wouldn't have caught (build succeeding proves
+            evaluation is fine, not that every service activates
+            cleanly).
       - [ ] Deploy torrent and thinkpad; watch
             `systemctl status backup-push-torrent.service` /
             `journalctl -u backup-push-torrent` for the first real push
