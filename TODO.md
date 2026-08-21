@@ -11,16 +11,22 @@ items rather than letting them rot.
 
 ## Active
 
-- [ ] **2026-08-20: verify the wg0 IPv4-endpoint fix survives a real
-      IPv6 address rotation on homelab.** `hosts/homelab/configuration.nix`'s
-      wg0 peer now points at vps's stable IPv4 (`137.184.45.18:51820`)
-      instead of vps's IPv6 literal, fixing a bug where the tunnel died
-      silently whenever homelab's RFC4941 privacy IPv6 address rotated
-      (confirmed live: 0% ping both directions despite
-      `persistentKeepalive`). Deployed as part of this merge. The fix
-      itself is straightforward (IPv4 doesn't rotate), but hasn't been
-      watched through an actual homelab IPv6 address rotation yet —
-      confirm `wg show wg0` keeps a fresh handshake and
+- [ ] **2026-08-20: deploy the wg0 IPv4-endpoint fix to homelab, then
+      verify it survives a real IPv6 address rotation.**
+      `hosts/homelab/configuration.nix`'s wg0 peer now points at vps's
+      stable IPv4 (`137.184.45.18:51820`) instead of vps's IPv6
+      literal, fixing a bug where the tunnel died silently whenever
+      homelab's RFC4941 privacy IPv6 address rotated (confirmed live:
+      0% ping both directions despite `persistentKeepalive`). Merged to
+      master, **not yet deployed** — the real homelab host is still
+      running the old (broken) config until this switch happens.
+      Deploy plan: `nixos-rebuild switch --flake .#homelab` (or via
+      whatever push-deploy path is standard now), then confirm `wg show
+      wg0` shows a fresh handshake and jellyfin/minecraft/factorio are
+      reachable through it. Testing (do after deploy, not before): the
+      fix itself is straightforward (IPv4 doesn't rotate), but hasn't
+      been watched through an actual homelab IPv6 address rotation yet
+      — confirm `wg show wg0` keeps a fresh handshake and
       jellyfin/minecraft/factorio stay reachable across the next one or
       two rotations (homelab's privacy addresses appear to rotate on
       the order of hours-to-a-day, based on the two different addresses
