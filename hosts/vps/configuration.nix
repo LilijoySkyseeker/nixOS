@@ -177,7 +177,14 @@ in
   networking.useDHCP = lib.mkDefault true;
   services.cloud-init = {
     enable = true;
-    network.enable = true;
+    # network.enable is deliberately left off (default false): it would
+    # only flip on systemd.network.enable, which conflicts with dhcpcd
+    # (useDHCP/useNetworkd=false above) per NixOS's own eval warning. It
+    # buys nothing here anyway — cloud_init_modules below excludes the
+    # network-config stage ("write-network-config"/"migrator"), so
+    # cloud-init never actually renders any networkd config; the DO
+    # hypervisor handshake documented above comes from cloud-init running
+    # at all (cloud-init-local/cloud-init services), not from this flag.
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
