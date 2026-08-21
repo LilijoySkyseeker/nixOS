@@ -325,7 +325,7 @@
   users.groups.backup-recv = { };
 
   systemd.services.backup-recv-zfs-allow = {
-    description = "Delegate zfs receive permissions on backup-bulk/{torrent,thinkpad} to backup-recv";
+    description = "Delegate zfs receive permissions on backup/{torrent,thinkpad} to backup-recv";
     after = [ "zfs-import-zbackup.service" ];
     wantedBy = [ "multi-user.target" ];
     # not gated in front of sshd: if this ever fails (e.g. zbackup import
@@ -335,11 +335,17 @@
     serviceConfig.Type = "oneshot";
     serviceConfig.RemainAfterExit = true;
     # zfs allow is idempotent — safe to re-run every activation/boot.
-    # backup-bulk, not backup: torrent/thinkpad home datasets carry large
-    # game libraries that are not offsite-eligible (see disko.nix).
+    # `zfs allow` requires the target dataset to already exist, but
+    # disko.nix declaring it doesn't create it on a live pool (disko is
+    # install-time only) — and a source host's first syncoid push is
+    # what would normally create it via `zfs receive`, a chicken-and-egg
+    # problem the very first time. `zfs create -p` first (skipped if it
+    # already exists) breaks that cycle idempotently.
     script = ''
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/torrent
-      zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy zbackup/backup/thinkpad
+      for dataset in zbackup/backup/torrent zbackup/backup/thinkpad; do
+        zfs list -H "$dataset" >/dev/null 2>&1 || zfs create -p "$dataset"
+        zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy "$dataset"
+      done
     '';
   };
 
