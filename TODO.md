@@ -155,12 +155,18 @@ items rather than letting them rot.
             is done — a `nixos-rebuild build` succeeding is not proof
             this is fine, since Nix doesn't verify the sops mac at eval
             time, only `sops`/`sops-install-secrets` do, at activation.
-      - [ ] Push this branch to origin (`worktree-zfs-backup-push`) —
-            not yet pushed; the merge onto the dendritic restructuring
-            only exists as a local commit (`dff4450`) so far. Coordinate
-            with `zfs-pool-recovery-restore` per the earlier agreement
-            (their thinkpad/torrent import-list conflicts, expected to
-            be mechanical) once this is up.
+      - [x] Push this branch to origin and merge into `master`.
+            (2026-08-21) Pushed `worktree-zfs-backup-push`, then fast-
+            forward merged straight into `master` (`7706eca..a03ce7c`,
+            no merge commit needed — this branch already contained all
+            of master's history from the earlier rebase). The
+            repo's pre-push hook build-tested every affected host
+            (isoimage, torrent, vps, thinkpad, homelab) on both pushes;
+            all succeeded. Still no `nixos-rebuild switch` run anywhere
+            — code is live on `master` but not deployed to any real
+            host yet. `zfs-pool-recovery-restore` can now rebase their
+            branch on top whenever they're ready (small mechanical
+            import-list conflicts expected, per the earlier dry-run).
       - [ ] Re-verify `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
             and `nix flake check` one more time immediately before the
             actual deploy, in case anything else landed on master in
