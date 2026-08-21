@@ -116,44 +116,6 @@ items rather than letting them rot.
       evaluated only. Build (not switch) both before relying on them,
       then switch when ready.
 
-- [ ] **2026-08-18: verify jellyfin is still reachable after the new
-      vps base HTTP rate limit deploys** (vps). Added a base
-      per-source-IP `iptables` `hashlimit` rule covering caddy's
-      80/443 entry point (120/min, burst 60, `vps-ratelimit` raw
-      chain in `hosts/vps/configuration.nix`) so every caddy vhost
-      gets floor protection, not just jellyfin's anubis PoW. Once
-      deployed to the real droplet, confirm a normal browser session
-      against `jellyfin.skyseekerlabs.net` (including the anubis PoW
-      round-trip) still loads cleanly and isn't tripping the new
-      limit under real usage.
-
-      Checked good-crawler impact against source (not just assumption):
-      the jellyfin anubis instance has no `policy` customization, so
-      per the module's `mkPolicyFile` logic it falls back to Anubis's
-      built-in default policy, which imports `crawlers/_allow-good.yaml`
-      and `ALLOW`s known-good crawlers (Google/Bing/Apple/DuckDuckGo/
-      Qwant/Internet Archive/Kagi/Marginalia/Mojeek) by their verified
-      IP ranges — those bypass the PoW challenge entirely. The new
-      120/min-burst-60 iptables layer is separate and sits well above
-      documented real-world crawl rates from a single source IP, so
-      it shouldn't trip either. No code change needed; the live-deploy
-      check above still covers real-world confirmation.
-
-      **2026-08-20: deployed to the real vps droplet** (`nixos-rebuild
-      switch --target-host root@vps`, run directly from torrent since
-      homelab's push-deploy path wasn't needed for this). Confirmed
-      live: the new 80/443 rule is present in the `vps-ratelimit` raw
-      chain and has 0 packets matched/dropped — not blocking anything.
-      Full end-to-end check (a real jellyfin page load through it) is
-      still open, not because of this rule but because jellyfin's
-      anubis backend (`TARGET = "http://10.100.0.2:8096"`) rides the
-      wg0 tunnel to homelab, which had an unrelated, separately-tracked
-      bug (see the wg0 IPv6-rotation TODO entry above) — confirmed via
-      vps's own caddy access logs (502s/timeouts after long waits,
-      consistent with backend-unreachable, not a firewall drop). The
-      fix is merged to master but not yet deployed to the real homelab
-      host; do the real browser-session check once it's deployed.
-
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
       `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
@@ -258,6 +220,28 @@ items rather than letting them rot.
 
 
 ## Done
+
+- [x] **2026-08-18: vps base HTTP rate limit for caddy's 80/443 entry
+      point — done and verified.** Previously only the DNAT'd game
+      ports (minecraft/factorio) had per-source-IP `iptables`
+      `hashlimit` rate limiting; caddy's public HTTP entry had none at
+      the netfilter layer, so only jellyfin (via anubis' PoW) had any
+      protection and new vhosts would inherit nothing. Added a floor
+      rule to the same `vps-ratelimit` raw-table chain covering
+      80/443 (120/min, burst 60, `srcip` mode) in
+      `hosts/vps/configuration.nix`, so every current/future caddy
+      vhost gets baseline abuse protection automatically. Checked
+      good-crawler impact against source rather than assumption:
+      anubis's default policy (no local customization) already
+      `ALLOW`s known-good crawlers (Google/Bing/Apple/DuckDuckGo/
+      Qwant/Internet Archive/Kagi/Marginalia/Mojeek) by verified IP
+      range, bypassing the PoW challenge entirely, and real crawl
+      rates from a single IP sit well under the new limit. Deployed
+      to the real droplet (`nixos-rebuild switch --target-host
+      root@vps`) and confirmed live: the rule matched 0
+      packets/drops in production. End-to-end jellyfin reachability
+      (blocked briefly by an unrelated dead wg0 tunnel to homelab,
+      since fixed) manually confirmed working by the user 2026-08-20.
 
 - [x] **2026-08-20: build out comprehensive repo documentation** (docs
       architecture, planned via Q&A — see AskUserQuestion trail in

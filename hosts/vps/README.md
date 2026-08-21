@@ -193,3 +193,15 @@ CrowdSec is enabled with a few community collections
 (`crowdsecurity/linux`, `crowdsecurity/sshd`, `crowdsecurity/caddy`)
 but nothing beyond that has been tuned — worth reviewing its default
 scenarios/decisions periodically as it sees more real traffic.
+
+Per-source-IP rate limiting (`iptables` `hashlimit`, raw-table
+`vps-ratelimit` chain in `configuration.nix`) now covers every public
+entry point, not just the game ports: minecraft (15/min), bedrock
+(1000/sec), factorio (2000/sec each), and — added 2026-08-18, deployed
+and verified 2026-08-20 — a base 120/min (burst 60) rule on caddy's
+80/443, so any current or future caddy vhost gets floor protection
+automatically instead of relying on jellyfin's anubis PoW alone.
+Confirmed against source that known-good crawlers (Google, Bing,
+etc.) aren't affected — anubis's default policy already allow-lists
+them by verified IP range, and the new limit sits well above real
+crawl rates.
