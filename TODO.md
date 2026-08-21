@@ -82,11 +82,30 @@ items rather than letting them rot.
             homelab itself, `ip route get <own-LAN-IP>` resolved to
             `dev lo`; the LAN-vs-tailscale test from a genuinely
             separate host is the one that counts, and it passed.)
-      - [ ] Still needed: connect from an actual Android SMB client
-            (Material Files / Solid Explorer / CX File Explorer) to
-            `homelab.<tailnet>.ts.net` or the Tailscale IP, port 445 —
-            `smbclient` proves the server side works correctly, but the
-            real app/UI on-device is still unverified.
+      - [x] Connected from an actual Android device — CX File Explorer,
+            over Tailscale (`100.98.142.41:445`) — and confirmed
+            genuine two-way read/write: created `test.txt` on-device,
+            server-side `echo "hello world" > /storage/test.txt`
+            (ownership stayed `android-smb:multimedia`, confirming the
+            file was the same one the app created, not a new one), and
+            the updated content showed up back on the device after
+            refresh. End-to-end confirmed working.
+            (Two FOSS clients were tried first and ruled out along the
+            way, not app/config bugs: **Material Files** — connection
+            attempts never reached the server at all, confirmed via
+            zero smbd log entries and zero firewall packet/byte counts
+            across multiple exact-timestamped retries; root cause
+            unconfirmed, suspected app-side state bug, not a server
+            config issue. **Ghost Commander** — correctly rejected by
+            the server for being SMB1/2-only, real jcifs library, no
+            SMB3 support; server's `server min protocol = SMB3` working
+            as intended. **SambaLite** (Play Store + F-Droid, Apache
+            2.0, SMBJ-based, explicit SMB2/3 support) was researched
+            and recommended as the best remaining FOSS option but not
+            yet tried, since CX File Explorer — proprietary, not
+            FOSS — already confirmed the server side works correctly.
+            Worth trying SambaLite for daily use if a FOSS client is
+            wanted going forward.)
       - [ ] Still needed: rotate the password once (edit the sops
             secret — user does this, not Claude — then redeploy) and
             confirm `samba-user-provision.service` restarts
