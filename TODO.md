@@ -43,41 +43,72 @@ items rather than letting them rot.
       `NoNewPrivileges`/`Protect*`/`RestrictNamespaces`/`PrivateTmp` on
       smbd — full `ProtectSystem=strict` deliberately left off smbd
       itself, judged too likely to silently break auth/logging without
-      enumerating every path it touches). Build-tested
-      (`nixos-rebuild build --flake .#homelab`) but not yet
-      deployed/switched. Testing needed once deployed:
-      - [ ] Connect from an Android SMB client (Material Files / Solid
-            Explorer / CX File Explorer) to `homelab.<tailnet>.ts.net`
-            or the Tailscale IP, port 445, and confirm read/write to
-            both `/storage` and `/storage-bulk`.
-      - [ ] Confirm files written from Android land with `multimedia`
-            group ownership and the configured `0660`/`0770` masks.
-      - [ ] Confirm `smb encrypt = mandatory`/`server signing =
-            mandatory` don't reject the Android client (some older SMB
-            clients fail closed against mandatory signing/encryption —
-            check the client actually connects, not just that the
-            server accepts the config).
-      - [ ] Smoke-test the tailnet-only lockdown: confirm port 445 is
-            unreachable from homelab's LAN NIC/off-tailnet (e.g. `nc
-            -zv <homelab-LAN-IP> 445` from a machine that's on the LAN
-            but not the tailnet should fail/time out) — both the
-            `tailscale0`-scoped firewall rule and smb.conf's `hosts
-            allow = 100.64.0.0/10` / `hosts deny = 0.0.0.0/0` should
-            independently block it.
-      - [ ] Do the same off-tailnet unreachability check for NFS's port
-            2049 (has the equivalent `100.64.0.0/10` export CIDR plus
-            the same firewall interface scoping, but was never actually
-            smoke-tested end-to-end either).
-      - [ ] Confirm `samba-user-provision.service` actually ran
-            successfully on boot (`systemctl status
-            samba-user-provision.service`) and `smbclient -L
-            localhost -U android-smb` authenticates with the sops-set
-            password.
-      - [ ] After confirming the above, rotate the password once (edit
-            the sops secret, redeploy) and confirm
-            `samba-user-provision.service` restarts automatically via
-            sops-nix's `restartUnits` and the new password takes
-            effect without a manual `smbpasswd` step.
+      enumerating every path it touches). **Deployed to homelab
+      2026-08-21** (`nixos-rebuild switch --target-host root@homelab`)
+      — see "homelab auto-update raced a manual deploy" incident note
+      below for what happened during the first attempt. Testing done
+      post-deploy (from `smbclient`, a real SMB3 client, run both
+      locally on homelab and remotely over the tailnet — not yet from
+      an actual Android device/app):
+      - [x] `samba-user-provision.service` ran successfully
+            (`Added user android-smb.` in its journal) and
+            `samba-smbd.service` is active
+            (`smbd: ready to serve connections...`).
+      - [x] `smbclient -L localhost -U android-smb` authenticates with
+            the sops-set password and lists both `storage` and
+            `storage-bulk`.
+      - [x] Read/write confirmed on `/storage`: created a dir + file,
+            listed real existing share content (confirms it's serving
+            the actual dataset, not empty), landed with
+            `android-smb:multimedia` ownership, `0660`/`0770`+setgid
+            masks — matches config exactly. Cleaned up afterward.
+      - [x] `smb encrypt = mandatory`/`server signing = mandatory`
+            didn't reject `smbclient` — since Samba refuses a
+            connection outright if a client can't negotiate mandatory
+            signing/encryption, successful read/write is direct proof
+            both were in effect for this client.
+      - [x] Tailnet-only lockdown smoke-tested for real (not just
+            firewall-rule inspection): confirmed default-deny via
+            `iptables -L nixos-fw` (`nixos-fw-log-refuse` catches
+            everything not explicitly accepted) plus `-i tailscale0`
+            scoping on both ports, then verified live from a separate
+            LAN machine (`torrent`, also on homelab's 192.168.1.0/24) —
+            explicit connections to homelab's **LAN IP**
+            (`192.168.1.154`) on ports 445 and 2049 both timed out /
+            unreachable; the same ports on homelab's **Tailscale IP**
+            (`100.98.142.41`) connected successfully. (First attempt
+            gave a false "reachable" result for the LAN IP — turned out
+            to be a self-connect-via-loopback artifact when tested from
+            homelab itself, `ip route get <own-LAN-IP>` resolved to
+            `dev lo`; the LAN-vs-tailscale test from a genuinely
+            separate host is the one that counts, and it passed.)
+      - [ ] Still needed: connect from an actual Android SMB client
+            (Material Files / Solid Explorer / CX File Explorer) to
+            `homelab.<tailnet>.ts.net` or the Tailscale IP, port 445 —
+            `smbclient` proves the server side works correctly, but the
+            real app/UI on-device is still unverified.
+      - [ ] Still needed: rotate the password once (edit the sops
+            secret — user does this, not Claude — then redeploy) and
+            confirm `samba-user-provision.service` restarts
+            automatically via sops-nix's `restartUnits` and the new
+            password takes effect without a manual `smbpasswd` step.
+
+      **Incident note (2026-08-21):** the first deploy attempt landed
+      correctly, but `nixos-upgrade.service` (homelab's scheduled
+      auto-update job, normally `Thu 03:00` — this run was off-schedule,
+      cause unconfirmed) started *before* the manual deploy and finished
+      *after* it, activating its own build from homelab's local
+      `/etc/nixos` checkout (stale — predates even the dendritic
+      migration) and silently reverting the manual switch. That
+      auto-update run itself then failed (exit 4) once its own
+      switch-to-configuration hit conflicting unit state. No data loss,
+      no failed *service* beyond `nixos-upgrade.service` itself, no
+      reboot needed — waited for it to fully finish, then redeployed
+      cleanly. Separately worth noting: homelab's local `/etc/nixos` is
+      still on an old commit (`e8b3458`) with uncommitted `flake.lock`
+      changes and an untracked `hosts/android/` directory — worth
+      reconciling so the next scheduled auto-update run doesn't build
+      from stale/dirty state again.
 - [ ] **2026-08-20: test the Geyser/Minecraft changes on homelab once
       deployed.** `services/minecraft.nix` (merged to master at
       `3270eae`, **not yet deployed**) now sets Geyser's
