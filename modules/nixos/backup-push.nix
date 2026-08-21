@@ -99,6 +99,12 @@
             Type = "oneshot";
             User = "backup-push";
             NoNewPrivileges = true;
+            # backup-push is a system user with no real $HOME — without a
+            # writable, persistent place to keep known_hosts,
+            # StrictHostKeyChecking=accept-new has nowhere to record the
+            # accepted key and fails verification even on the very first
+            # connection (confirmed live: "Host key verification failed").
+            StateDirectory = "backup-push-${hostName}";
             # tailscale ping actually exercises the tunnel (not just ARP/ICMP
             # to a routed IP), so this also fails closed if tailscaled itself
             # is down (e.g. right after boot, before it's come up) — either
@@ -111,7 +117,7 @@
           };
           script = ''
             set -euo pipefail
-            export SYNCOID_SSHOPTION="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"
+            export SYNCOID_SSHOPTION="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/var/lib/backup-push-${hostName}/known_hosts"
 
             ${lib.concatStringsSep "\n" (
               lib.mapAttrsToList (source: target: ''
