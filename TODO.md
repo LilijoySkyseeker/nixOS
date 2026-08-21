@@ -189,22 +189,35 @@ items rather than letting them rot.
             for this branch (see the detailed caution above) — the
             other dataset cleanup (legion/other/superseded placeholders)
             isn't time-sensitive and can happen whenever.
-      - [ ] Deploy homelab first (creates `backup-recv` user + zfs
-            delegation + `backup/{thinkpad,torrent}` containers under
-            `zbackup`). Since this is also the first real *switch*
-            (not just build) since the dendritic-flake rebase, treat it
-            as testing that restructuring too, not just this feature:
-            watch the switch output for anything unexpected in units
-            unrelated to backups (jellyfin GPU accel, samba, wireguard
-            IPv6 endpoint fix, etc. all landed in the same merge).
-      - [ ] After homelab's switch, spot-check that services *unrelated*
-            to this feature came up fine too (`systemctl --failed`,
-            `systemctl status jellyfin caddy` or equivalents) — a bad
-            module-wrapper conversion elsewhere in the dendritic
-            migration could regress something this branch's build-only
-            testing wouldn't have caught (build succeeding proves
-            evaluation is fine, not that every service activates
-            cleanly).
+      - [x] Deploy homelab. **Done 2026-08-21.** Live deploy surfaced
+            and fixed two real bugs the build-only testing couldn't
+            have caught (both committed): `backup-recv-zfs-allow.service`
+            failed because `zfs allow` needs its target dataset to
+            already exist — `zbackup/backup/torrent` had never been
+            created (no push has run yet), a chicken-and-egg problem on
+            first deploy, fixed with a `zfs create -p` pre-step; and
+            `health-check.service`'s `backupStaleness` loop crashed
+            entirely under `set -e -o pipefail` the first time it hit a
+            genuinely nonexistent dataset (vs. one that just has no
+            snapshots yet), fixed with `|| true` to let the existing
+            empty-string handling take over. Also found and fixed
+            (separately, pre-existing, unrelated to this feature):
+            homelab's `/etc/nixos` checkout was stuck on an orphaned
+            `auto-update` branch from a crashed `flake-update-test`
+            run — cleaned up live with explicit go-ahead (see the
+            myAutoUpdate git-identity TODO item above) — and
+            `secrets/secrets.yaml` needed a real `sops --ignore-mac
+            --rotate --in-place` (plain `sops updatekeys` alone doesn't
+            touch the mac) to fix the stale mac left by the earlier
+            merge conflict resolution; verified by running
+            `sops-install-secrets` directly against the built manifest
+            before trusting it live. Post-switch: `systemctl --failed`
+            clean, `current-system` matches the verified build,
+            `backup-recv` user + `zfs allow` delegation on
+            `zbackup/backup/{torrent,thinkpad}` confirmed correct,
+            `storage-bulk` rename confirmed intact (2.26T + full
+            snapshot history), unrelated services from the same merge
+            (jellyfin, etc.) unaffected.
       - [ ] Deploy torrent and thinkpad; watch
             `systemctl status backup-push-torrent.service` /
             `journalctl -u backup-push-torrent` for the first real push
