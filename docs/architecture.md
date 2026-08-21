@@ -80,9 +80,7 @@ which imports it — see below) also gets `comma`
 (`programs.nix-index-database.comma.enable = true;`, same file): run
 `comma <tool> [args]` (alias `,`) to fetch and run a tool from nixpkgs
 in a throwaway shell without installing it — e.g. `comma lsusb -t` if
-`lsusb` isn't already on the system. Fish's command-not-found handler
-(`modules/home-manager/tooling.nix`) also auto-invokes `comma` when you
-type an unknown command name directly. Not available on `isoimage` —
+`lsusb` isn't already on the system. Not available on `isoimage` —
 it doesn't import `"profile-default"` at all (its own minimal
 `hosts.nix` module list is just `copyparty-iso`).
 
