@@ -94,7 +94,7 @@ in
         volumes = [
           "/srv/minecraft/vanilla-plus:/data"
           # overlays Geyser-Fabric/config.yml into /data/config on every start
-          # (itzg's /config sync); see services/minecraft-geyser-config for why.
+          # (itzg's /config sync); see modules/services/minecraft-geyser-config for why.
           "${./minecraft-geyser-config}:/config:ro"
         ];
         # container hardening: no capabilities beyond what a JVM needs (none)
