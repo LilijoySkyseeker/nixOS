@@ -11,6 +11,58 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-21: torrent's initial full backup send to homelab is
+      throughput-limited to ~20-40MB/s — root-caused while it was
+      in progress, no changes made yet.** Investigated live during
+      torrent's first-ever `myBackupPush` run (3.13TB initial `zfs
+      send`). Ruled out: network (confirmed direct LAN peer connection
+      via `tailscale status --json`'s `CurAddr: 192.168.1.154:41641` —
+      not relayed through DERP), CPU (modest usage on both ends), and
+      raw disk bandwidth (`zpool iostat -v zbackup` showed each mirror
+      disk only doing ~20MB/s, well under HDD capability). Actual
+      causes, roughly by impact:
+      1. **`zbackup`'s 2 disks (and `zdata`'s other 2) are all USB
+         2.0 High-Speed (480 Mbps, confirmed via `lsblk -o TRAN` =
+         `usb` and `/sys/bus/usb/devices/*/speed` = `480`), sharing
+         one hub on a single upstream link** (`1-6.1`-`1-6.4`). That's
+         a hard ~40-60MB/s ceiling across *all four* drives combined —
+         not per-drive — which lines up almost exactly with the
+         measured aggregate write rate. This is very likely the same
+         physical enclosure/hub/cabling behind the pre-existing
+         `hosts/homelab/README.md` "zdata pool: recurring I/O
+         suspensions" known issue — same drives, same USB link, same
+         symptom class (command timeouts/resets), not necessarily two
+         separate problems.
+      2. **Real USB-level faults recurring on the same link**:
+         `dmesg` shows `uas_eh_abort_handler`/`uas_eh_device_reset_handler`
+         and `stat urb: status -71` across multiple drives (`sdb`,
+         `sdc`, `sdd`, `sde`) at multiple points in time (including
+         within the hour, and again from 5+ days ago) — not a one-off.
+         Worth a physical inspection of the enclosure/hub/cable at
+         some point, separate from any software fix.
+      3. **`services.sanoid.interval = "minutely"` recursively walking
+         all of `zbackup`** (`"zbackup" = { use_template = "backup";
+         recursive = "yes"; }`, `hosts/homelab/configuration.nix`)
+         adds real seek contention on top of an already
+         bandwidth-starved USB link — confirmed via `zpool iostat -w
+         zbackup`'s latency histogram showing a real tail of read/write
+         ops taking 2-8 *seconds*, not just milliseconds, consistent
+         with interleaved random (sanoid's metadata enumeration) and
+         sequential (the receive stream) I/O thrashing the same two
+         physical disks. Even with `autosnap = "no"` on the backup
+         template, sanoid still enumerates every existing snapshot
+         every 60s to evaluate `autoprune` — real work against a tree
+         that includes 168+ historical snapshots on `storage-bulk`
+         alone.
+      Not fixed — diagnosis only, explicitly requested not to change
+      anything mid-transfer. If/when revisited: consider a real
+      USB 3.0 (SuperSpeed) link or SATA/HBA passthrough for this
+      enclosure (addresses #1 and possibly #2), and/or loosening
+      `zbackup`'s sanoid cadence off the global `minutely` interval
+      since it's a receive-only target that never autosnaps anyway
+      (addresses #3) — but both are real infra/config changes that
+      need their own separate decision, not bundled into this.
+
 - [ ] **2026-08-18: migrate torrent and thinkpad to impermanence.**
       Agreed as a prerequisite for eventually shrinking their zfs-backup
       scope (see the zfs-backups item below) — both hosts currently
