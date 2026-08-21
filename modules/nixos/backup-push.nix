@@ -117,7 +117,6 @@
           };
           script = ''
             set -euo pipefail
-            export SYNCOID_SSHOPTION="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/var/lib/backup-push-${hostName}/known_hosts"
 
             ${lib.concatStringsSep "\n" (
               lib.mapAttrsToList (source: target: ''
@@ -126,6 +125,8 @@
                   --no-sync-snap \
                   --create-bookmark \
                   --sshkey=${cfg.identityFile} \
+                  --sshoption=StrictHostKeyChecking=accept-new \
+                  --sshoption=UserKnownHostsFile=/var/lib/backup-push-${hostName}/known_hosts \
                   --identifier=${lib.escapeShellArg (builtins.replaceStrings [ "/" ] [ "_" ] source)} \
                   ${lib.escapeShellArg source} \
                   ${lib.escapeShellArg "${cfg.targetHost}:${target}"}
