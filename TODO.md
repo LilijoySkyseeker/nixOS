@@ -11,6 +11,20 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-20: test the Geyser/Minecraft changes on homelab once
+      deployed.** `services/minecraft.nix` (merged to master at
+      `3270eae`, **not yet deployed**) now sets Geyser's
+      `above-bedrock-nether-building: true` (fixes Bedrock players
+      softlocking above the Nether roof — confirm with a live Bedrock
+      client), `ENABLE_AUTOPAUSE`/`MAX_TICK_TIME=-1`/`--cap-add=NET_RAW`
+      (confirm the container actually pauses when empty and resumes
+      cleanly on the next connection, and that the watchdog doesn't
+      fire on resume), and `VERSION = "LATEST"` instead of a pinned
+      `26.2` (confirm the modded stack — Geyser, Floodgate,
+      DistantHorizons, etc. — still starts cleanly on whatever version
+      resolves, since none of `MODRINTH_PROJECTS` pins a mod version).
+      None of this has been tested against the running container yet.
+
 - [ ] **2026-08-20: deploy the wg0 IPv4-endpoint fix to homelab, then
       verify it survives a real IPv6 address rotation.**
       `hosts/homelab/configuration.nix`'s wg0 peer now points at vps's
