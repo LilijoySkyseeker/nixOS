@@ -9,20 +9,6 @@
   imports = [
     ./hardware-configuration.nix
     ./disko.nix
-
-    ../../profiles/default.nix
-    ../../profiles/server.nix
-
-    ../../modules/nixos/auto-update.nix
-    ../../modules/nixos/health-alerts.nix
-    ../../modules/nixos/push-deploy.nix
-
-    ../../services/jellyfin.nix
-    ../../services/minecraft.nix
-    ../../services/factorio.nix
-    ../../services/octodns.nix
-    ../../services/nfs.nix
-    ../../services/samba.nix
   ];
 
   # System installed pkgs
@@ -63,6 +49,27 @@
 
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
+
+  # GPU hardware acceleration — this box is a dual-GPU laptop (MSI):
+  # Intel HD 630 iGPU (card2/renderD129) + Nvidia GTX 1050 Mobile
+  # (card1/renderD128, currently on nouveau). Nvidia gets the proprietary
+  # driver so jellyfin can use NVENC/NVDEC; Intel's VAAPI/QSV stack is also
+  # enabled so its render node is usable as a fallback (see services/jellyfin.nix).
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs-stable; [
+      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
+      vpl-gpu-rt
+    ];
+  };
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.nvidia = {
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
+    open = false;
+    modesetting.enable = true;
+    nvidiaSettings = false; # headless, no GUI settings app needed
+  };
 
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
@@ -403,7 +410,17 @@
         # vps
         publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
-        endpoint = "[2604:a880:4:1d0:0:3:5045:8000]:51820";
+        # IPv4 literal, not vps's IPv6 address — confirmed live this
+        # tunnel silently died for hours despite persistentKeepalive:
+        # homelab's own outbound IPv6 addresses are RFC4941 "temporary
+        # dynamic" privacy addresses that rotate periodically, and once
+        # one rotated, the vps side's auto-learned endpoint for this
+        # peer went stale (source-address roaming only relearns from a
+        # freshly-arriving packet, and nothing forced one). vps's IPv4
+        # (137.184.45.18, ens3 — see hosts/vps/configuration.nix) is
+        # static and is what every other IPv4-only piece of this path
+        # (game-port DNAT/SNAT/rate-limits) already keys off of.
+        endpoint = "137.184.45.18:51820";
         allowedIPs = [ "10.100.0.1/32" ];
         # CGNAT mappings expire without periodic traffic; keep the
         # tunnel (and the vps's route back to us) alive.

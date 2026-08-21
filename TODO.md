@@ -12,8 +12,10 @@ items rather than letting them rot.
 ## Active
 
 - [ ] **2026-08-18: verify Android SMB share end-to-end** (homelab,
-      `services/samba.nix`, commits c5c0f0e..24c4913). Added Samba
-      alongside the existing NFS export (`services/nfs.nix`) so
+      `modules/services/samba.nix`, commits c5c0f0e..24c4913, moved to
+      the dendritic `modules/services/` layout during the
+      worktree-android-smb-share rebase). Added Samba alongside the
+      existing NFS export (`modules/services/nfs.nix`) so
       Android — which has no usable native NFS client — can reach
       `/storage` and `/storage-bulk` read-write over the tailnet.
       Firewall/interface scoping mirrors nfs.nix (tailscale0 only, port
@@ -76,6 +78,124 @@ items rather than letting them rot.
             `samba-user-provision.service` restarts automatically via
             sops-nix's `restartUnits` and the new password takes
             effect without a manual `smbpasswd` step.
+- [ ] **2026-08-20: test the Geyser/Minecraft changes on homelab once
+      deployed.** `services/minecraft.nix` (merged to master at
+      `3270eae`, **not yet deployed**) now sets Geyser's
+      `above-bedrock-nether-building: true` (fixes Bedrock players
+      softlocking above the Nether roof — confirm with a live Bedrock
+      client), `ENABLE_AUTOPAUSE`/`MAX_TICK_TIME=-1`/`--cap-add=NET_RAW`
+      (confirm the container actually pauses when empty and resumes
+      cleanly on the next connection, and that the watchdog doesn't
+      fire on resume), and `VERSION = "LATEST"` instead of a pinned
+      `26.2` (confirm the modded stack — Geyser, Floodgate,
+      DistantHorizons, etc. — still starts cleanly on whatever version
+      resolves, since none of `MODRINTH_PROJECTS` pins a mod version).
+      None of this has been tested against the running container yet.
+
+- [ ] **2026-08-20: deploy the wg0 IPv4-endpoint fix to homelab, then
+      verify it survives a real IPv6 address rotation.**
+      `hosts/homelab/configuration.nix`'s wg0 peer now points at vps's
+      stable IPv4 (`137.184.45.18:51820`) instead of vps's IPv6
+      literal, fixing a bug where the tunnel died silently whenever
+      homelab's RFC4941 privacy IPv6 address rotated (confirmed live:
+      0% ping both directions despite `persistentKeepalive`). Merged to
+      master, **not yet deployed** — the real homelab host is still
+      running the old (broken) config until this switch happens.
+      Deploy plan: `nixos-rebuild switch --flake .#homelab` (or via
+      whatever push-deploy path is standard now), then confirm `wg show
+      wg0` shows a fresh handshake and jellyfin/minecraft/factorio are
+      reachable through it. Testing (do after deploy, not before): the
+      fix itself is straightforward (IPv4 doesn't rotate), but hasn't
+      been watched through an actual homelab IPv6 address rotation yet
+      — confirm `wg show wg0` keeps a fresh handshake and
+      jellyfin/minecraft/factorio stay reachable across the next one or
+      two rotations (homelab's privacy addresses appear to rotate on
+      the order of hours-to-a-day, based on the two different addresses
+      already observed during this investigation).
+
+- [ ] **2026-08-20: deploy `new.factorio`** — merged to master
+      (`c7796c9`), not yet deployed. A second Factorio server
+      (`modules/services/factorio.nix`'s `factorio-new` container,
+      floating `stable` tag, fresh random world) alongside the
+      existing `old.factorio` (still pinned to the experimental
+      2.1.14 line). Needs: `nixos-rebuild switch` on homelab (brings
+      up the container) and vps (opens the 34198/udp DNAT/firewall/
+      ratelimit rules), then an `octodns-sync` run (or its hourly
+      timer) to push the new `old.factorio`/`new.factorio` A + SRV
+      records to Cloudflare. See `hosts/vps/README.md`'s Status
+      section. Once deployed, verify: `new.factorio` reachable by
+      hostname alone (SRV lookup, untested — first real use of SRV
+      records in this repo) and by `:34198`, `docker-factorio-new`'s
+      preStart actually rsyncs `old.factorio`'s mods on a real start,
+      and `old.factorio` (34197) still works unaffected.
+
+- [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
+      content once the `zbackup` restructuring lands.** Currently a
+      placeholder. `docs/architecture.md` now documents the two
+      backup mechanisms that exist today (restic->Backblaze via
+      rclone; sanoid/syncoid->`zbackup`), but restore steps were
+      deliberately deferred — coordinated with the `zfs backups plus
+      spaceguard` session, which is mid-restructure: renaming the
+      `zbackup` dataset layout to a flat `zbackup/backup/<host>/<subdir>`
+      convention and adding syncoid push-backups from `torrent`/
+      `thinkpad` over Tailscale via a new scoped backup-recv/
+      backup-push user pair. A separate `zfs-pool-recovery-restore`
+      branch is also refactoring the inline `services.sanoid` block on
+      homelab into a new `modules/nixos/zfs-snapshots.nix` module
+      (same behavior, different file). Needs: once both land, write
+      `docs/procedures/backup-restore.md` for real (restic restore via
+      `restic-backblazeWeekly` wrapper; syncoid/zfs-receive restore
+      from `zbackup`), and update `docs/architecture.md`'s Backups
+      section to describe the final dataset layout instead of the
+      current in-flux one.
+
+- [x] **2026-08-20: dendritic flake migration (flake-parts +
+      import-tree) landed on master.** `flake.nix` rewritten;
+      `profiles/` -> `modules/profiles/`, `services/` ->
+      `modules/services/`; plain `imports` chains replaced by
+      self-registering `flake.modules.nixos.*` /
+      `flake.modules.homeManager.*`. No functional changes (verified
+      via derivation/closure diffing against pre-migration master).
+      Full phased plan and gotchas at `docs/dendritic-migration-plan.md`.
+      `AGENTS.md`/`README.md` "structure" sections updated to describe
+      the new layout as part of this merge. All 5 `nixosConfigurations`
+      evaluate cleanly and `nix flake check` passes; `vps` and
+      `homelab` were fully built (`nix-store --realise`) to confirm the
+      per-host specialArgs divergence (homelab's home-manager-stable
+      swap) survives realization. `thinkpad` and `torrent` were only
+      evaluated, not built, to stay within the migration session's time
+      budget — build (not switch) both before relying on them post-merge.
+      No host was switched during the migration itself.
+
+- [x] **2026-08-20: `docs/` rewrite for the dendritic migration —
+      done.** Rewrote `docs/architecture.md` (registration model,
+      `modules/flake/hosts.nix` as the composition point with a
+      real per-host module-list table, profile/module-organization
+      boundary updated to the `flake.modules.*` mechanism) and
+      `docs/style-guide.md` (the `my<Name>` options convention kept as
+      before, plus a new "Registration key vs. filename" section
+      calling out the `profiles/PC.nix` -> `"profile-pc"` /
+      `default.nix` -> `"profile-default"` / `server.nix` ->
+      `"profile-server"` mismatches explicitly, not just via a file
+      listing). Also swept and fixed stale pre-migration path
+      references found along the way in `AGENTS.md`, `docs/agents.md`,
+      `docs/README-template.md`, `docs/procedures/{new-host,
+      new-service,updating-documentation,remote-access}.md`,
+      `docs/GIT_WORKFLOW.md` (confirmed the pre-push hook itself isn't
+      broken — its `modules/` pattern already covers the nested
+      `modules/profiles/`/`modules/services/` paths, only the doc text
+      was stale), `modules/{nixos,profiles,services}/README.md`, and
+      `files/README.md`. `modules/profiles/README.md` and
+      `modules/services/README.md` had already been git-mv'd by the
+      migration itself — only their prose needed the registration-
+      mechanism rewrite, not a move. `nix flake check` still passes
+      (docs-only change).
+
+- [ ] **2026-08-20: build+switch thinkpad and torrent after the
+      dendritic migration** (see entry above) — only `vps`/`homelab`
+      were fully built during the migration; `thinkpad`/`torrent` were
+      evaluated only. Build (not switch) both before relying on them,
+      then switch when ready.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
@@ -104,11 +224,13 @@ items rather than letting them rot.
       reboot (holding off per the no-unconfirmed-local-restarts rule).
 
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
-      ports** (Minecraft 25565/19132, Factorio 34197). Currently
-      IPv4-only: `net.ipv6.conf.all.forwarding` is explicitly off on
-      the vps and there are no `ip6tables` DNAT rules for these ports,
-      so `minecraft`/`factorio`'s DNS records were made A-only
-      (`services/octodns.nix`) after a live bug where the AAAA records
+      ports** (Minecraft 25565/19132, Factorio 34197/34198 — the
+      latter added 2026-08-20 for `new.factorio`, same treatment
+      needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding` is
+      explicitly off on the vps and there are no `ip6tables` DNAT
+      rules for these ports, so `minecraft`/`factorio`'s DNS records
+      were made A-only (`modules/services/octodns.nix`) after a live
+      bug where the AAAA records
       advertised IPv6 reachability that didn't exist, silently
       breaking any client (confirmed: a Bedrock client) that prefers
       IPv6 when a hostname resolves to both. The apex still has an
@@ -154,7 +276,211 @@ items rather than letting them rot.
       traffic until anubis's socket exists with the right group perms
       already applied.
 
+- [ ] **2026-08-19: `octodns-sync.service` failing on homelab —
+      transient DNS resolution error.** Found during a read-only log
+      trawl through homelab (checked against exposed services in
+      `hosts/homelab/configuration.nix`; no signs of compromise, SSH
+      and service access all traced to known keys/tailnet/LAN). Job
+      failed with `requests.exceptions.ConnectionError` /
+      `NameResolutionError` trying to reach `api.cloudflare.com`
+      (`Failed to resolve 'api.cloudflare.com' ... Temporary failure
+      in name resolution`). Timer retries hourly so this may self-heal,
+      but worth confirming it isn't recurring (e.g. flaky upstream
+      resolver, or the service starting before network-online.target).
+
+- [ ] **2026-08-19: `flake-update-test.service` failing on homelab —
+      root has no git identity configured.** Found during the same log
+      trawl. The update-branch step fails with `fatal: unable to
+      auto-detect email address (got 'root@homelab.(none)')` right
+      after the flake inputs are bumped, because `git config
+      --global user.email`/`user.name` were never set for root on
+      homelab. Needs: set a git identity for root declaratively (e.g.
+      via `home-manager.users.root.programs.git` in
+      `profiles/server.nix`, alongside the existing root home-manager
+      block) so `myAutoUpdate`'s commit step succeeds.
+
+
 ## Done
+
+- [x] **2026-08-18: vps base HTTP rate limit for caddy's 80/443 entry
+      point — done and verified.** Previously only the DNAT'd game
+      ports (minecraft/factorio) had per-source-IP `iptables`
+      `hashlimit` rate limiting; caddy's public HTTP entry had none at
+      the netfilter layer, so only jellyfin (via anubis' PoW) had any
+      protection and new vhosts would inherit nothing. Added a floor
+      rule to the same `vps-ratelimit` raw-table chain covering
+      80/443 (120/min, burst 60, `srcip` mode) in
+      `hosts/vps/configuration.nix`, so every current/future caddy
+      vhost gets baseline abuse protection automatically. Checked
+      good-crawler impact against source rather than assumption:
+      anubis's default policy (no local customization) already
+      `ALLOW`s known-good crawlers (Google/Bing/Apple/DuckDuckGo/
+      Qwant/Internet Archive/Kagi/Marginalia/Mojeek) by verified IP
+      range, bypassing the PoW challenge entirely, and real crawl
+      rates from a single IP sit well under the new limit. Deployed
+      to the real droplet (`nixos-rebuild switch --target-host
+      root@vps`) and confirmed live: the rule matched 0
+      packets/drops in production. End-to-end jellyfin reachability
+      (blocked briefly by an unrelated dead wg0 tunnel to homelab,
+      since fixed) manually confirmed working by the user 2026-08-20.
+
+- [x] **2026-08-20: build out comprehensive repo documentation** (docs
+      architecture, planned via Q&A — see AskUserQuestion trail in
+      session for full rationale). Two prongs: a central `docs/`
+      folder for high-level material, and non-obvious "why" comments
+      inline in `.nix` configs. Audience is future-me/AI agents, not
+      external contributors. Root stays lean (`README.md`,
+      `AGENTS.md`, `TODO.md` only, each pointing into `docs/` rather
+      than duplicating it); `AGENTS.md` keeps its current fast-load
+      entrypoint role and links out for depth rather than being
+      merged away. Staleness strategy: folder-level docs live next to
+      the code they describe so change-with-code discipline is
+      natural; the more narrative `docs/architecture.md` and
+      `docs/style-guide.md` need an occasional manual audit instead
+      (added as a recurring check, not a one-off). Inline comments
+      stay non-obvious-only (workarounds, surprising constraints,
+      tradeoffs) — no broad completeness sweep.
+
+      Phase 1 — `docs/` skeleton: `docs/architecture.md` (how
+      hosts/profiles/modules/services compose — expands on README's
+      structure guide), `docs/style-guide.md` (Nix formatting/idiom
+      conventions, naming, when to use a module vs a profile vs a
+      service), `docs/agents.md` (AI-agent-specific depth, linked
+      from root `AGENTS.md`), `docs/procedures/` directory. Trim
+      `AGENTS.md` to point into these rather than re-deriving them.
+
+      Phase 2 — per-folder READMEs for everything that doesn't
+      already have one: `modules/nixos/`, `modules/home-manager/`,
+      `profiles/`, `services/`, `secrets/`, `custom-packages/`,
+      `files/`. **Not** `hosts/*/README.md` — that's a known-issues
+      log, a different purpose, left as-is. Shared template recorded
+      in `docs/README-template.md`: Purpose, then an Inventory
+      section (one-liner per file — detail stays in the file's own
+      header comment, not duplicated in the README), then an optional
+      Gotchas section for non-obvious cross-cutting things, omitted
+      entirely when there's nothing to say.
+
+      Phase 3 — flesh out `docs/procedures/`: adding a new host,
+      adding a new service, secret rotation, disaster recovery.
+      **Disaster-recovery/reinstall procedures are already being
+      written by another session as of 2026-08-20 — leave that one
+      file as a placeholder stub (link/short note only) and don't
+      duplicate it; everything else in Phase 3 is open to write.**
+
+      Phase 4 — inline why-comment sweep across existing
+      modules/services/hosts configs, opportunistic and
+      non-obvious-only (not a mechanical every-file pass).
+
+      Phase 5 — root `README.md` rewrite. Deliberately last: do this
+      once Phases 1-3 exist so the README can link into real `docs/`
+      content instead of being written blind. **Architect this one
+      together with the user interactively, don't draft it solo.**
+
+      2026-08-20: confirmed via Q&A that architecture.md,
+      style-guide.md, procedures/* (minus disaster-recovery, see
+      above), agents.md + the AGENTS.md trim, and all of Phase 2's
+      folder READMEs are clear to write now — nothing else flagged as
+      in-progress elsewhere. Proceeding with Phases 1–2 plus the
+      non-disaster-recovery parts of Phase 3.
+
+      **Phase 1 done (2026-08-20)**: `docs/architecture.md` (import
+      chain, per-host composition table, module/service/profile
+      boundary), `docs/style-guide.md` (nixfmt, the `my<Name>`
+      options-module convention, real why-comment examples), `docs/
+      agents.md` (the reasoning behind AGENTS.md's rules), `docs/
+      procedures/{new-host,new-service,secret-rotation}.md` written;
+      `docs/procedures/disaster-recovery.md` left as the agreed
+      placeholder. `AGENTS.md` trimmed to link into all of the above
+      rather than duplicating. Next: Phase 2 folder READMEs.
+
+      **Phase 2 done (2026-08-20)**: folder READMEs added for
+      `modules/nixos/`, `modules/home-manager/`, `profiles/`,
+      `services/`, `secrets/`, `files/`, following
+      `docs/README-template.md`'s Purpose/Inventory/Gotchas shape.
+      `custom-packages/` skipped — it doesn't exist in the repo (was a
+      stale reference in `AGENTS.md`/`README.md`, stripped from
+      `AGENTS.md`; `README.md`'s copy is Phase 5's problem). Notable
+      gotchas captured: `nfs-homelab-mounts.nix`'s gid must stay in
+      sync with `services/jellyfin.nix`'s group (cross-host coupling,
+      not Nix-enforced); `server.nix` doesn't import `default.nix`
+      itself, so every server host must import both. Next: Phase 3
+      remainder is already done (procedures written in Phase 1 except
+      disaster-recovery) — Phase 4 (inline why-comment sweep) is next.
+
+      **Phase 4 done (2026-08-20)**: swept `hosts/vps/configuration.nix`
+      (crowdsec/caddy `logFormat`, syslog `labels.type`, iptables
+      hashlimit, anubis socket group, IPv6 forwarding scoping),
+      `services/octodns.nix` (AAAA/A-only split), `profiles/PC.nix`,
+      `profiles/server.nix`, `hosts/homelab/configuration.nix`
+      (`myPushDeploy`, ZFS snapshot mount/unmount for restic, the
+      backblazeDaily/backblazeWeekly rclone-remote-name mismatch), and
+      `modules/nixos/*.nix` for non-obvious decisions lacking a
+      why-comment, cross-checked against already-resolved TODO.md
+      "Done" incidents and git history so nothing speculative got
+      added. Result: no gaps found — every non-obvious decision in
+      the sampled areas already carries a why-comment from prior
+      incident-driven work, so no new comments were added this pass.
+      Consistent with the "opportunistic, non-obvious-only" policy —
+      not a mechanical every-file sweep, and nothing forced in just to
+      have something to show. Revisit opportunistically as new
+      non-obvious decisions land, not on a schedule.
+
+      **Phase 5 done (2026-08-20)**: root `README.md` rewritten,
+      architected interactively with the user rather than drafted
+      solo as planned. Replaced the stale structure-walkthrough
+      (referenced a `custom-packages/` folder and module/service files
+      that no longer exist, empty "Hosts" and "Interesting Stuff"
+      sections) with: a concise intro, a layout summary linking into
+      `docs/architecture.md`/`docs/style-guide.md`/`docs/procedures/`,
+      a real per-host table, and an "Interesting stuff" highlights
+      section (impermanence, the stable/unstable channel split, the
+      vps-as-decoy-front design, local-build-not-remote deploys, the
+      out-of-band Tailscale ACL). Deliberately written for a human
+      audience (not agent-facing) per explicit user direction — no
+      agent-safety caveats or reachability-checking instructions,
+      those stay in `AGENTS.md`/`docs/agents.md` where they belong.
+
+      **All 5 phases complete.** Documentation plan closed out —
+      moving this entry to Done.
+
+      **2026-08-20 follow-up**: the plan never actually documented how
+      to keep the docs themselves in sync — a real gap, noticed when
+      asked what procedures existed for it and found there weren't
+      any. Added `docs/procedures/updating-documentation.md`, covering
+      routine per-commit updates (folder README inventory/gotchas,
+      inline why-comments, host tables), a periodic opportunistic
+      audit for the narrative docs (`architecture.md`/
+      `style-guide.md`, no fixed schedule), and a plan for full docs
+      rewrites after a structural refactor (re-survey from scratch
+      rather than patch piecemeal, same shape as this original
+      build-out). Linked from `AGENTS.md`'s docs pointers and
+      procedures list.
+
+      **2026-08-20 second follow-up**: added two more pieces on
+      request. (1) A "Root `README.md` and `AGENTS.md`" section in
+      `docs/procedures/updating-documentation.md` — those two get a
+      narrower update trigger than the folder READMEs (front door, not
+      general docs), spelling out what actually warrants touching each
+      one so they don't bloat over time. (2) A "Flag issues
+      immediately" convention: when a documentation issue is noticed
+      but not fixed on the spot (out of scope, too big, mid-task), log
+      it to `TODO.md`'s Active section right away rather than trusting
+      memory — mirrors how real incidents already get logged here.
+      Pointed to from `AGENTS.md` directly so it's actionable, not just
+      buried in the procedure doc.
+
+      **2026-08-20 third follow-up**: added Hardware sections to
+      `hosts/homelab/README.md` and `hosts/vps/README.md`, and a new
+      `docs/procedures/remote-access.md`. Hardware facts gathered live
+      via root SSH (not guessed): homelab is a repurposed MSI GL62M
+      7RD laptop (i5-7300HQ, 16GB RAM, GTX 1050 Mobile + Intel HD 630,
+      256GB SATA SSD boot disk, 4x 12TB USB-attached HGST drives in two
+      2-disk ZFS mirrors); vps is a 1 vCPU / 1GB RAM / 25GB disk
+      DigitalOcean droplet. `remote-access.md` documents the shared
+      `vars.publicSshKeys` admin-key model, that `vps` is
+      Tailscale-only (no public port 22, confirmed by config comments),
+      and the `vps-deploy` forced-command account used by
+      `myPushDeploy`. Linked from `AGENTS.md`.
 
 - [x] **2026-08-18: confirmed + fixed — crowdsec was never actually
       banning anything on vps.** Root cause found via

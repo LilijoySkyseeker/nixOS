@@ -1,128 +1,92 @@
 # Lilijoy's NixOS Machines
 
-See [GIT_WORKFLOW.md](./docs/GIT_WORKFLOW.md) for git hooks/conventions used in
-this repo (auto-configured by the flake's dev shell via direnv).
+A flake-based NixOS/home-manager configuration for five machines
+(`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage`), managed from one
+repo. Covers disko partitioning, sops-nix secrets, impermanence,
+home-manager, and a distributed multi-host flake setup. `docs/` has
+the reasoning behind how it's put together.
 
-## Structure Guide
+## Layout
 
-All configuration starts with [flake.nix](./flake.nix)
+This flake uses the **dendritic pattern**
+([flake-parts](https://flake.parts/) + [import-tree](https://github.com/vic/import-tree)):
+every `.nix` file under `modules/` registers *itself* into
+`flake.modules.nixos.<name>` or `flake.modules.homeManager.<name>`, instead
+of being manually added to some other file's `imports`. There's no single
+"list of every module" to keep in sync — the file tree under `modules/` *is*
+the registry.
 
-```bash
-NixOS
-└── flake.nix
+```
+flake.nix                          # thin entry point: flake-parts + import-tree ./modules
+modules/flake/                     # vars, pkgs, systems, and hosts.nix (composes all 5 hosts)
+hosts/<name>/configuration.nix     # host-local config only (hardware, hostname, disko)
+modules/profiles/{default,PC,server}.nix # shared config, layered by machine role
+modules/{nixos,home-manager,services}/   # reusable modules, one file = one flake.modules.* entry
+secrets/ + .sops.yaml               # sops-nix encrypted secrets
 ```
 
-where the inputs of the system, the different host configurations, and universal
-variables are defined.
-
-Then it progresses to each host with its base
-[configuration.nix](./hosts/homelab/configuration.nix) (homelab as the example)
-
-```bash
-NixOS
-└── hosts
-    └── homelab
-        └── configuration.nix
-```
-
-where the host specific configuration is held. Things like hostname, timezone,
-system services, etc. Anything that only this hosts needs and is not shared is
-defined here.
-
-Some specific configuration is split into separate files to make organization
-easier and is imported in the main
-[configuration.nix](./hosts/homelab/configuration.nix).
+`modules/flake/hosts.nix` is the file to check for "what does host X
+actually run" — it lists, per host, which `flake.modules.*` entries get
+pulled in. A module existing under `modules/` doesn't mean any host uses
+it; that's still decided by `hosts.nix`. Every folder above has its own
+README with a full inventory. For how it all fits together — see
+[`docs/architecture.md`](./docs/architecture.md).
+[`docs/style-guide.md`](./docs/style-guide.md) covers conventions
+(formatting, when a custom NixOS options module is worth writing vs. a
+plain config file). [`docs/procedures/`](./docs/procedures/) has
+runbooks for adding a host, adding a service, rotating a secret.
 
 ```bash
-NixOS
-└── hosts
-    └── homelab
-        ├── configuration.nix
-        ├── disko.nix
-        └── hardware-configuration.nix
+nix develop     # or: direnv allow
+nixos-rebuild build --flake .#<host>
 ```
 
-In this case, the
-[hardware-configuration.nix](./hosts/homelab/hardware-configuration.nix) which
-is auto generated during system installation is left alone. Alongside that is
-[disko.nix](./hosts/homelab/disko.nix) which manages disk partitioning and
-formatting using [disko](https://github.com/nix-community/disko/).
-
-Then it progresses to the shared profiles by importing
-[default.nix](./profiles/default.nix) and one or more of the others.
-
-```bash
-NixOS
-└── profiles
-    ├── default.nix
-    ├── PC.nix
-    └── server.nix
-```
-
-These profiles contain the configuration that is shared with other hosts,
-[default.nix](./profiles/default.nix) in particular contains configuration that
-is shared universally amongst all hosts. The other profiles are based on the
-role the host is taking.
-
-These profiles and the individual host
-[configuration.nix](./hosts/homelab/configuration.nix) import modules and
-services that have been split apart for organization.
-
-```bash
-NixOS
-├── modules
-│   ├── home-manager
-│   │   ├── gnome.nix
-│   │   ├── kde.nix
-│   │   └── tooling.nix
-│   └── nixos
-│       ├── beets.nix
-│       ├── copypartymount.nix
-│       ├── gnome.nix
-│       ├── kde.nix
-│       ├── tooling.nix
-│       ├── virtual-machines.nix
-│       ├── winapps.nix
-│       └── wooting.nix
-└── services
-    ├── copyparty.nix
-    ├── factorio.nix
-    ├── jellyfin.nix
-    ├── minecraft.nix
-    ├── nextcloud.nix
-    ├── rss.nix
-    ├── samba.nix
-    └── webdav.nix
-```
-
-These are simply self contained collections of configuration for a specific
-task. The [modules](./modules) are for local configuration. While
-[services](./services) are for anything being served to LAN or WAN.
-
-What's left is a section for custom packages, standalone files, and encrypted
-secret management with [sops-nix](https://github.com/Mic92/sops-nix).
-
-```bash
-NixOS
-├── custom-packages
-│   └── tpm-fido
-│       └── package.nix
-├── files
-│   ├── ffkbV4.vil
-│   ├── gruvbox-dark-rainbow.png
-│   └── S2721Q.icm
-├── secrets
-│   └── secrets.yaml
-└── .sops.yaml
-```
+The dev shell wires up git hooks and `pull.rebase true` automatically.
+See [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md).
 
 ## Hosts
 
-## Interesting Stuff
+| Host | Role | Purpose |
+|---|---|---|
+| `thinkpad` | Desktop | Secondary laptop. |
+| `torrent` | Desktop | Primary desktop. |
+| `homelab` | Server | Home server: media (Jellyfin), game servers, NFS, DNS automation, backups. |
+| `vps` | Server | Public-facing edge: reverse proxy, WireGuard tunnel back to homelab, DDoS/bot mitigation. |
+| `isoimage` | Standalone | Bootable recovery/install ISO, outside the normal profile hierarchy. |
 
-- [Impermanence](./hosts/homelab/configuration.nix#L323) for `homelab` using
-  [Impermanence](https://github.com/nix-community/impermanence)
-- [tailscale-acl.json](./docs/tailscale-acl.json) is a reference copy of the
-  tailnet ACL policy, which is actually managed in the Tailscale admin
-  console (not applied by Nix) — keep it in sync manually when the console
-  policy changes.
+Known issues and incident history per host live in each host's own
+`hosts/<name>/README.md`.
+
+## Interesting stuff
+
+- **Impermanence on `homelab`.** Root is wiped on every boot — every
+  piece of state that survives is explicitly declared, not just
+  whatever happened to be lying around.
+- **Public edge, private origin.** `vps` fronts everything public
+  (Caddy, crowdsec, Anubis proof-of-work against bots) and tunnels
+  back to `homelab` over WireGuard. `homelab` itself is never directly
+  reachable from the internet.
+- **Zero-downtime remote deploys.** `homelab` builds and pushes
+  `vps`'s closure over the tailnet — the VPS never compiles its own
+  config, so a small droplet never has to risk OOMing mid-deploy.
+- **Bare-metal to booted, unattended.** `nixos-anywhere` + `disko` take
+  a fresh machine from a rescue/kexec environment straight to a
+  running, secrets-decrypting NixOS install, partitioning included.
+- **Secrets committed straight into the repo, safely.** `sops-nix`
+  keys every secret to a specific set of hosts by age key, so
+  `secrets/secrets.yaml` lives in git like any other file — encrypted,
+  checked into history, unreadable without a host's own key — with no
+  shared master password and no plaintext ever touching disk outside
+  the host decrypting it at boot.
+- **Two nixpkgs channels running side by side.** Desktops track
+  bleeding-edge `nixpkgs-unstable`; `homelab` — running ZFS and
+  long-lived game servers — is deliberately pinned to
+  `nixpkgs-stable`, on purpose, in the same flake.
+- **Self-monitoring.** `homelab` runs periodic ZFS/SMART/systemd health
+  checks and pages a Discord webhook the moment something looks wrong,
+  instead of finding out about a failing disk or a dead service days
+  later.
+- **Nothing is imperative.** Every machine, from partitioning to the
+  services running on it, is described in Nix and reproduced from the
+  flake — there's no host with hand-run setup steps that only exist in
+  someone's memory.
