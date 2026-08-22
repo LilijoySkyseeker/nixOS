@@ -54,14 +54,37 @@ items rather than letting them rot.
          every 60s to evaluate `autoprune` — real work against a tree
          that includes 168+ historical snapshots on `storage-bulk`
          alone.
+      4. **Root cause of the hour-to-hour rate fluctuation, confirmed
+         2026-08-21 ~21:00 via a temporary non-invasive correlation
+         trace** (2-min samples of `zpool iostat`, cross-referenced
+         with `systemctl status` on the local syncoid units — removed
+         after the transfer, not left running): homelab's own three
+         local `syncoid` jobs (`syncoid-zdata-storage-storage[-bulk]`,
+         `syncoid-zroot-local-state`, all hourly) were confirmed
+         **`active (running)` continuously for ~2 hours** (since
+         19:01:26, still running at the 21:00 check) — competing with
+         torrent's transfer for the same USB-bandwidth-capped pool the
+         entire time. These are normally-fast incremental syncs that
+         finish in seconds, but with the USB link already saturated by
+         torrent's initial full send, they get starved too, run long
+         enough to blow past their next hourly trigger, and end up
+         running back-to-back instead of going idle between runs — a
+         compounding effect where torrent's big transfer slows the
+         local jobs, and the local jobs competing for bandwidth slows
+         torrent right back. The aggregate pool write rate itself
+         (~33-48MB/s, near the #1 USB ceiling) stayed fairly
+         consistent throughout — what fluctuates is how that fixed
+         bandwidth splits between torrent's stream and these 3
+         concurrent local jobs.
       Not fixed — diagnosis only, explicitly requested not to change
       anything mid-transfer. If/when revisited: consider a real
       USB 3.0 (SuperSpeed) link or SATA/HBA passthrough for this
-      enclosure (addresses #1 and possibly #2), and/or loosening
-      `zbackup`'s sanoid cadence off the global `minutely` interval
-      since it's a receive-only target that never autosnaps anyway
-      (addresses #3) — but both are real infra/config changes that
-      need their own separate decision, not bundled into this.
+      enclosure (addresses #1, #2, and #4 all at once — the local-job
+      contention only compounds because #1's ceiling is so low), and/or
+      loosening `zbackup`'s sanoid cadence off the global `minutely`
+      interval since it's a receive-only target that never autosnaps
+      anyway (addresses #3) — but both are real infra/config changes
+      that need their own separate decision, not bundled into this.
 
 - [ ] **2026-08-18: migrate torrent and thinkpad to impermanence.**
       Agreed as a prerequisite for eventually shrinking their zfs-backup
