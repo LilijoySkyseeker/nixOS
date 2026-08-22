@@ -467,6 +467,37 @@ items rather than letting them rot.
       preStart actually rsyncs `old.factorio`'s mods on a real start,
       and `old.factorio` (34197) still works unaffected.
 
+      **2026-08-21: reported unreachable from an actual game client —
+      needs investigation.** Everything checked so far looks healthy,
+      which makes this confusing:
+      - `factorio-new` container on homelab: up 7h, in-game
+        (`ServerMultiplayerManager` state `InGame`), authenticated with
+        Factorio's auth server, and registered on the public matching
+        server (`MatchingServer.cpp: Matching server game '1232520' has
+        been created`) at `97.206.73.106:34198` per its own logs.
+      - `new.factorio.skyseekerlabs.net` resolves correctly to the vps
+        (`137.184.45.18`), and a UDP probe (`nc -u -z -v`) to
+        `:34198` got no ICMP unreachable back.
+      - Despite both of the above, the user reports the client cannot
+        actually connect/join.
+      Not yet checked: whether the vps's DNAT/firewall/ratelimit rules
+      for 34198 (`hosts/vps/configuration.nix`, added alongside 34197's)
+      are actually correct and were deployed — the "needs
+      `nixos-rebuild switch` on homelab and vps" step above may not
+      actually be done yet despite the container running (the container
+      could be up on homelab while the vps-side forwarding was never
+      switched); the SRV-record lookup (`_factorio._udp.new.factorio`,
+      first real use of SRV in this repo) is also still unverified and a
+      plausible culprit if the client resolves via SRV rather than the
+      plain A record; and a UDP `nc` probe getting no ICMP-unreachable is
+      not proof the DNAT rule itself is forwarding traffic all the way
+      through to homelab (only that *something* on the path isn't
+      actively rejecting it). Needs real triage: confirm vps's
+      `iptables`/DNAT rules for 34198 are live (`iptables -t nat -L
+      PREROUTING`), confirm wg0 tunnel from vps to homelab is up and
+      carrying this traffic, and test an actual client join rather than
+      just a raw port probe.
+
 - [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
       content once the `zbackup` restructuring lands.** Currently a
       placeholder. `docs/architecture.md` now documents the two
