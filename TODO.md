@@ -11,6 +11,59 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
+      dataset) is now stuck — needs a decision, not further automated
+      action.** The initial full send (below) finished transferring
+      all ~3.13TB successfully, but the *same* syncoid invocation then
+      tried to also send a trailing incremental to catch up to the
+      latest snapshot, and that failed: the base snapshot it needed
+      (`zroot/local/home@autosnap_2026-08-20_22:00:02_hourly`) had
+      already been pruned by torrent's own local sanoid retention
+      (`hourly=24` ≈ 24h) during the ~38-40h transfer — a run this
+      long outlasts that retention window. Because the run didn't
+      fully succeed, syncoid never reached its "create bookmark" step
+      either (that only happens after a clean finish), so there's now
+      **no bookmark and no matching snapshot** between source and the
+      already-populated 3.08T target. Confirmed live: re-running the
+      service now fails immediately with `Target zbackup/backup/
+      torrent/home exists but has no snapshots matching with
+      zroot/local/home! ... Cowardly refusing to destroy your existing
+      target.` — syncoid won't auto-resolve this by design.
+      **Needs a decision**: either force a full resend (syncoid would
+      destroy the existing homelab-side target and re-transfer all
+      ~3.13TB from scratch, another ~38-40h at the observed rate), or
+      leave the Aug 20 snapshot as the backup state for now and decide
+      later. Not resolved automatically — deliberately left for the
+      user. The `root` dataset's push (second syncoid call in the same
+      script, sequential after `home`) never even ran this attempt
+      since the script failed on `home` first — its state is unknown/
+      unattempted, not separately confirmed broken.
+      **Underlying fix needed regardless of the decision above**:
+      torrent's local sanoid retention (`hourly=24`, inline
+      `services.sanoid.settings.template_working` in
+      `hosts/torrent/configuration.nix` — still the pre-dendritic
+      inline shape as of this writing, not yet the
+      `modules/nixos/zfs-snapshots.nix` module) is too short for how
+      long a large `myBackupPush` initial/catch-up send can take. The
+      same trap will recur on any future large resend (e.g. after a
+      forced full resend here, or on thinkpad's own first push) unless
+      either the source retention window is widened well past the
+      realistic worst-case transfer time, or `myBackupPush`/syncoid
+      usage changes to guarantee a bookmark lands even when the
+      trailing incremental step fails (e.g. splitting the full-send
+      and incremental-catchup into separate syncoid invocations so a
+      bookmark is created after the (more reliable) full send succeeds,
+      independent of whether the smaller incremental afterward does).
+      Also separately confirmed live (2026-08-23) during this
+      troubleshooting: an earlier `run0 nixos-rebuild switch` deploy
+      step for a prior fix (the `--sshoption` fix, see the fluctuation
+      item below) was verified only via a manual bypass test and never
+      actually switched into the running system — the live service
+      kept running the old broken script for ~2 days until this was
+      caught. Worth remembering as a process gotcha: manually verifying
+      a fix in isolation is not the same as confirming it's actually
+      deployed and taking effect through the real service path.
+
 - [ ] **2026-08-21: torrent's initial full backup send to homelab is
       throughput-limited to ~20-40MB/s — root-caused while it was
       in progress, no changes made yet.** Investigated live during
