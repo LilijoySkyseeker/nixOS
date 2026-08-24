@@ -3,6 +3,7 @@
   pkgs-stable,
   lib,
   config,
+  vars,
   ...
 }:
 {
@@ -73,31 +74,6 @@
     "intel_pstate=active"
   ];
 
-  # zfs snapshots
-  services.sanoid = {
-    enable = true;
-    extraArgs = [ "--verbose" ];
-    interval = "minutely";
-    settings = {
-      "zroot/local/root".use_template = "working";
-      "zroot/local/home".use_template = "working";
-      template_working = {
-        frequent_period = 1;
-        frequently = 59;
-        hourly = 24;
-        daily = 1;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "yes";
-        autoprune = "yes";
-      };
-    };
-  };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
-  };
-
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];
   services.zfs = {
@@ -108,19 +84,42 @@
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
 
-  # zfs snapshot backups to homelab
-  sops.secrets.thinkpad_backup_push_key = {
-    owner = "backup-push"; # readable only by the dedicated backup-push user, not root-wide
-  };
-  myBackupPush = {
+  # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
+  # sanoid + the syncoid-based myBackupPush). Passive side -- see the
+  # equivalent block in hosts/torrent/configuration.nix for the reasoning.
+  #
+  # This is the host with the strongest case for flipping to push
+  # (myZrepl.push.targets): it is a laptop whose online windows are short
+  # and unpredictable, and a 15m puller can miss them. Left on pull for
+  # now because it is also the host most likely to be compromised, and
+  # pull is what denies a compromised source the ability to destroy its
+  # own backup history. Revisit if coverage proves insufficient in
+  # practice rather than pre-emptively.
+  myZrepl = {
     enable = true;
-    targetHost = "backup-recv@homelab";
-    identityFile = config.sops.secrets.thinkpad_backup_push_key.path;
-    datasets = {
-      "zroot/local/home" = "zbackup/backup/thinkpad/home";
-      "zroot/local/root" = "zbackup/backup/thinkpad/root";
+    serve = {
+      enable = true;
+      datasets = [
+        "zroot/local/home"
+        "zroot/local/root"
+      ];
+      clients.homelab.publicKey = vars.zreplPullerKey;
     };
   };
+
+  # sshd exists on this host solely to carry zrepl's stdinserver
+  # transport: tailnet-only, root login forced-commands-only, and no other
+  # root keys present. See hosts/torrent/configuration.nix for detail.
+  services.openssh = {
+    enable = true;
+    openFirewall = false;
+    settings = {
+      PermitRootLogin = "forced-commands-only";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+    };
+  };
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
   # auto snapshot pruning at low disk space
   # manual `systemctl start zfs-emergency-prune.service`

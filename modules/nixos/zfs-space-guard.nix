@@ -22,17 +22,24 @@
           ];
           description = ''
             Datasets to watch and prune. Only their own zfs-list-t-snapshot
-            history is touched — sanoid's autoprune elsewhere still owns
-            normal retention; this only kicks in when free space actually
-            gets tight, or when the manual emergency service is run.
+            history is touched — zrepl's keep rules still own normal
+            retention; this only kicks in when free space actually gets
+            tight, or when the manual emergency service is run.
 
             Safe to prune aggressively even below what a future incremental
-            backup needs: if myBackupPush.datasets covers the same dataset
-            with --create-bookmark enabled, the bookmark left behind after
-            each successful push preserves the incremental base regardless
-            of which snapshots get destroyed locally afterward. Pruning
-            before any backup has ever succeeded loses that safety net and
-            forces the next push to fall back to a full send.
+            backup needs: zrepl's replication cursor preserves the
+            incremental base regardless of which snapshots get destroyed
+            locally afterward. Pruning before any replication has ever
+            succeeded loses that safety net and forces a full send.
+
+            Note this cannot free space held by zrepl's own holds. Under
+            the default guarantee_resumability protection zrepl holds the
+            snapshots an interrupted transfer would need to resume from, so
+            `zfs destroy` on those fails (the script tolerates that and
+            moves on). That is a small, bounded set — the replication
+            cursor plus any in-flight step — so it does not meaningfully
+            limit what this can reclaim, but it does mean a dataset with an
+            actively-stalled replication keeps a floor of held snapshots.
           '';
         };
 
@@ -67,7 +74,7 @@
           path = [ pkgs.zfs ];
           serviceConfig = {
             Type = "oneshot";
-            User = "root"; # zfs destroy needs the same authority sanoid's own autoprune already runs with
+            User = "root"; # zfs destroy needs the same authority zrepl's own pruner already runs with
           };
           script = ''
             set -uo pipefail

@@ -58,16 +58,25 @@
           type = lib.types.attrsOf lib.types.int;
           default = { };
           example = {
-            "zbackup/backup/homelab/storage" = 6;
-            "zbackup/backup-bulk/homelab/storage-bulk" = 6;
+            "zbackup/backup/homelab/zdata/storage/storage" = 6;
+            "zbackup/backup/torrent/zroot/local/home" = 336;
           };
           description = ''
             ZFS datasets to check for backup staleness, mapped to the maximum
             age in hours their newest snapshot may reach before alerting. Catches
-            a syncoid target that's stuck (e.g. failing every run without making
-            progress) even though each individual failed run is already covered
-            by the failed-units check — this instead measures whether the backup
-            data itself is actually advancing.
+            a replication target that's stuck (e.g. failing every run without
+            making progress) even though each individual failed run is already
+            covered by the failed-units check — this instead measures whether the
+            backup data itself is actually advancing.
+
+            This matters more under zrepl than it did under syncoid: zrepl is a
+            single long-running daemon, so an individual job erroring does not
+            put a systemd unit into the "failed" state the way a per-job oneshot
+            unit did. Snapshot age is the reliable signal that replication has
+            stopped advancing.
+
+            Note zrepl receives into <root_fs>/<full source dataset path>, so
+            these are deep paths, not the short target names syncoid used.
           '';
         };
 
@@ -156,8 +165,8 @@
             ''}
 
             ${lib.optionalString (cfg.backupStaleness != { }) ''
-              # backup snapshot staleness (catches a syncoid target stuck making
-              # no progress, distinct from an individual run failing)
+              # backup snapshot staleness (catches a replication target stuck
+              # making no progress, distinct from an individual run failing)
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
                   stale_key="backup-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"

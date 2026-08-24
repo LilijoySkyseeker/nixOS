@@ -11,46 +11,75 @@ items rather than letting them rot.
 
 ## Active
 
-- [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Agreed
-      architecture (single daemon per host, `services.zrepl.settings`
-      freeform YAML — the NixOS module is a thin ~10-line passthrough,
-      no abstraction to lean on):
-      - **homelab**: one `sink` job (`ssh+stdinserver`, `root_fs =
-        "zbackup/backup"`, zrepl auto-splits per client identity into
-        `zbackup/backup/{torrent,thinkpad}` — replaces the
-        `backup-recv` user + `zfs allow` delegation with forced-command
-        `authorized_keys` entries) plus a local `push`+`sink` job pair
-        (zrepl's `connect.type=local`/matching `listener_name`, no
-        ssh/tcp) replacing the current in-host `services.syncoid` pulls
-        for `zdata/storage/{storage,storage-bulk}` and
-        `zroot/local/state` → `zbackup/backup/homelab/*`. Replaces
-        `services.sanoid`/`services.syncoid` entirely in
-        `hosts/homelab/configuration.nix`.
-      - **torrent/thinkpad**: new shared module
-        (`modules/nixos/zrepl-push.nix`, replacing
-        `modules/nixos/backup-push.nix`'s `myBackupPush`) rendering one
-        `push` job each, `ssh+stdinserver` to homelab,
-        `replication.protection.{initial,incremental} = true` — this
-        holds-based protection is what prevents the exact failure mode
-        below (a long transfer's trailing incremental failing and
-        leaving no valid resume point).
-      - `modules/nixos/zfs-space-guard.nix` and
-        `modules/nixos/health-alerts.nix` logic is tool-agnostic
-        (works on raw `zfs list`/pool capacity) — only comment text
-        needs updating, no functional changes.
-      - Deploy order: homelab first, then torrent (whose first zrepl
-        replication run doubles as the fresh full send resolving the
-        stuck-incident entry below), then thinkpad. VM-test each per
-        `feedback_test_remote_deploys_in_vm` before any real switch.
-        Remove `backup-push.nix`/`backup-recv` user and confirm zero
-        remaining `sanoid|syncoid` refs only after all three hosts are
-        confirmed running zrepl through a burn-in period.
-      Tracked as Claude tasks #1-#9 this session (verify zrepl YAML
-      syntax against source first, not just docs prose, per
-      `feedback_oss_source_first` — the sink multi-client root_fs
-      templating and local-transport job pairing in particular need
-      confirming against the pinned v0.7.0 source before writing real
-      config). Not started — design/planning only so far.
+- [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
+      written and building on branch `worktree-zrepl-migration-plan`;
+      **not deployed to any host yet.** One shared module
+      (`modules/nixos/zrepl.nix`, option namespace `myZrepl`) covers
+      every role: `serve` (passive source), `pull`, `push`, `sink`, and
+      `local` (same-host). Transport is pluggable
+      (`ssh+stdinserver`/`tcp`/`tls`/`local`) via `myZrepl.defaultTransport`,
+      currently `ssh+stdinserver`. Retention lives in three shared named
+      presets (`retention.{fast,working,archive}`) translated from the
+      old sanoid templates, so hosts declare datasets, not policy.
+
+      **Topology is pull, not push** (changed from the original plan
+      after reading the source). zrepl's receiving endpoint exposes
+      `DestroySnapshots` bounded only to the caller's own subtree
+      (`internal/endpoint/endpoint.go:1058`), and `keep_receiver` is
+      evaluated by the pruner on the *active* side
+      (`internal/daemon/pruner/pruner.go:115`) — i.e. in a push setup the
+      retention policy for homelab's copy lives in a config file on the
+      source host. So a compromised torrent/thinkpad could delete its own
+      backup history. Under pull, homelab dials out, the sources are
+      passive, and a compromised source has no RPC handle on homelab at
+      all. `myZrepl.push` remains available per-host for a machine whose
+      online windows a puller would miss; thinkpad is the candidate if
+      15m pull coverage proves too sparse in practice.
+
+      **Consequences that need care at deploy time:**
+      - **zbackup layout changes.** zrepl extends `root_fs` with the
+        *full* source dataset path (`subroot.MapToLocal`), so backups
+        land at `zbackup/backup/torrent/zroot/local/home`, not
+        `zbackup/backup/torrent/home`. `myHealthAlerts.backupStaleness`
+        paths on homelab were updated to match. Existing received data
+        sits at the old paths and will not be reused — torrent is a
+        fresh full send anyway (see the stuck-backup item below);
+        thinkpad's existing copy likewise needs a fresh send or a manual
+        `zfs rename` into the new shape.
+      - **torrent and thinkpad now run sshd**, which they did not before.
+        Required because pull means homelab dials *into* them. Locked
+        down: tailnet-only (`openFirewall = false` plus a
+        `firewall.interfaces.tailscale0` rule), `PermitRootLogin =
+        "forced-commands-only"`, and the only root key on either host is
+        the zrepl forced command. Verified in the built
+        `authorized_keys`: one `command="... zrepl stdinserver
+        homelab",restrict` entry and nothing else.
+      - **Snapshot cadence relaxed from minutely to 15m.** Under zrepl a
+        push/local job replicates after each snapshot, and homelab's
+        zbackup USB contention is already a known problem (see the
+        throughput item below) — minutely snapshot-plus-replicate would
+        make it worse.
+      - **Migration is non-destructive to existing history.** Grid keep
+        rules are regex-scoped to zrepl's own `zrepl_` prefix, so
+        existing sanoid `autosnap_*` snapshots are never considered for
+        pruning. They age out under nothing once sanoid is gone and need
+        one manual cleanup pass eventually.
+
+      **Manual steps required before deploying (secrets are yours per
+      `feedback_secrets_manual`):**
+      1. Generate an ed25519 keypair on homelab for pulling.
+      2. Add the private half to `secrets/secrets.yaml` as
+         `homelab_zrepl_key` — homelab currently fails to build without
+         it (everything else evaluates; this is the only blocker).
+      3. Paste the public half over the `REPLACE-ME` placeholder in
+         `modules/flake/vars.nix`'s `zreplPullerKey`.
+
+      Deploy order: homelab first, then torrent, then thinkpad. VM-test
+      each per `feedback_test_remote_deploys_in_vm` before any real
+      switch. `modules/nixos/backup-push.nix` and homelab's
+      `backup-recv` user/`zfs allow` service are already deleted in this
+      branch, so there is no syncoid fallback once deployed — verify in
+      a VM first.
 
 - [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
       dataset) is now stuck — needs a decision, not further automated

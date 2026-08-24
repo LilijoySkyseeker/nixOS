@@ -135,15 +135,17 @@
           };
           options.ashift = "12"; # IMPORTANT
           datasets = {
-            # Flat "backup/<host>/<subdir>" tree — one convention for
-            # everything (no more backup vs backup-bulk split: restic's
-            # offsite job never reads from zbackup at all regardless, so
-            # that split wasn't doing anything functionally). All pure
-            # containers; real data lives in the children underneath,
-            # created either by the local syncoid pulls below or by the
-            # remote hosts' syncoid pushes (home/root aren't declared
-            # here — they don't exist yet, syncoid creates them on first
-            # push).
+            # "backup/<host>/..." tree — one convention for everything (no
+            # more backup vs backup-bulk split: restic's offsite job never
+            # reads from zbackup at all regardless, so that split wasn't
+            # doing anything functionally). All pure containers; real data
+            # lives in the children underneath, created by zrepl on first
+            # receive and so not declared here.
+            #
+            # Note zrepl receives into <root_fs>/<full source dataset
+            # path>, so the real children are deeper than the old syncoid
+            # names: e.g. backup/torrent/zroot/local/home, not
+            # backup/torrent/home.
             "backup" = {
               type = "zfs_fs";
               options.mountpoint = "none"; # "none" needs option.mountpoint
