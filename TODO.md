@@ -28,8 +28,19 @@ items rather than letting them rot.
       on a peer. `zbackup`'s layout changed to
       `zbackup/backup/<host>/<full source dataset path>`.
 
-      Remaining: VM-test each host, then deploy homelab → torrent →
-      thinkpad. torrent's first pull doubles as the fresh full send that
+      VM-tested (2026-08-24): all three hosts boot with `zrepl.service`
+      started, and a new two-node NixOS VM test
+      (`nix build .#checks.x86_64-linux.zrepl-replication`) exercises a
+      real pull over the forced-command SSH transport. That test found
+      and fixed a bug `zrepl configcheck` cannot catch: receiving jobs
+      were missing `recv.placeholder.encryption`, which would have failed
+      every remote pull on first receive with no syncoid left to fall
+      back on.
+
+      Remaining: deploy homelab → torrent → thinkpad. Before switching
+      homelab, confirm `zbackup/backup/{homelab,thinkpad,torrent}` exist
+      — zrepl does not create `root_fs`, and disko only creates datasets
+      when formatting a disk. torrent's first pull doubles as the fresh full send that
       resolves the stuck-backup incident below. thinkpad's existing copy
       sits at old paths and needs a fresh send or a manual `zfs rename`.
       Once burnt in, turn off `myZrepl.preserveLegacySnapshots` and clear

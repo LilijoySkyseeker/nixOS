@@ -21,6 +21,32 @@ Code complete. All three hosts build; `zrepl configcheck` passes on each
 (it runs at build time via `myZrepl.validateConfig`). **Nothing is
 deployed** — no host has been switched.
 
+Testing done since the first handoff (2026-08-24, second session):
+
+- All three hosts build `system.build.vm` and boot to a login prompt with
+  `zrepl.service` started. The only unit that fails in those VMs is
+  `smartd` on every host, plus (on homelab) sops-dependent units,
+  impermanence rollback, and the docker/wireguard units — all artifacts of
+  a VM with no real pool, no host key, and no network, none zrepl-related.
+- `tests/zrepl-replication.nix` is a new two-node NixOS VM test with real
+  zpools, wired up as `checks.zrepl-replication` in
+  `modules/flake/checks.nix`. Booting a host proves the daemon starts;
+  this proves a pull actually moves data. Run it with
+  `nix build .#checks.x86_64-linux.zrepl-replication`. All eight
+  subtests pass.
+
+**The test found a real bug, now fixed.** Every receiving job was missing
+`recv.placeholder.encryption`. Receiving `zroot/local/home` into
+`zbackup/backup/torrent` requires zrepl to create `zroot` and
+`zroot/local` as placeholder datasets first, and it refuses to unless
+that property is set — zrepl's default is `unspecified`, which fails the
+receive. `zrepl configcheck` accepts the config either way, so
+`validateConfig` could never have caught it: **every remote pull would
+have failed on first receive after deploy**, with sanoid/syncoid already
+removed and no fallback. Fixed by `myZrepl.placeholderEncryption`
+(default `off`; `zbackup` is unencrypted). See `docs/backups.md`'s
+Gotchas.
+
 Commits on the branch, oldest first:
 
 | Commit | What |
@@ -50,12 +76,18 @@ Decisions the user made explicitly — don't relitigate without asking:
 
 ## Remaining work
 
-1. **VM-test each host** before any real switch (repo convention —
-   `docs/procedures/workflow.md`). Worth exercising specifically: the local
-   `source`+`pull` pair on homelab, a forced-command SSH connection from
-   homelab into a source, and an interrupted transfer leaving a resumable
-   state.
+1. ~~**VM-test each host**~~ — done, see State above. Two things the new
+   test deliberately does *not* cover, because they need either a
+   single-host pool pair or a way to sever a transfer mid-stream: the
+   local `source`+`pull` pair on homelab, and an interrupted transfer
+   leaving a resumable state. Both are still unexercised.
 2. **Deploy homelab first** — torrent and thinkpad need it reachable.
+   Before switching, confirm `zbackup/backup/{homelab,thinkpad,torrent}`
+   all exist (`zfs list`). zrepl does not create `root_fs`, and disko
+   only creates datasets when formatting a disk, so a container missing
+   from an already-installed pool fails every pull for that remote with
+   `root_fs does not exist`. The VM test caught this; see
+   `docs/backups.md`.
 3. **Then torrent.** Its first pull is the fresh full send that resolves
    the stranded-backup incident in `TODO.md`. Expect it to take a long time
    (~40h was observed for ~3.13TB over this hardware).
@@ -67,7 +99,8 @@ Decisions the user made explicitly — don't relitigate without asking:
    out while that guard is on.
 6. **Delete this file**, and drop the "not yet deployed" caveats from
    `docs/backups.md`, `docs/architecture.md`, and
-   `docs/procedures/backup-restore.md`.
+   `docs/procedures/backup-restore.md`. Keep `tests/` and
+   `modules/flake/checks.nix` — those are not session state.
 
 ## Watch for
 

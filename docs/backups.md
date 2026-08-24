@@ -91,6 +91,21 @@ zbackup/backup/thinkpad/zroot/local/{home,root}
 `myHealthAlerts.backupStaleness` on homelab keys off these paths — update
 both together.
 
+**zrepl does not create `root_fs` itself.** It creates children beneath it,
+but the container dataset must already exist or every pull for that remote
+fails with `root_fs does not exist` and nothing else in the log explains
+why. `zbackup/backup/{homelab,thinkpad,torrent}` are declared in
+`hosts/homelab/disko.nix`, but disko only creates datasets when it formats
+a disk — a `nixos-rebuild switch` on an already-installed host will not
+add a missing one. Before deploying a new pull remote, check on homelab:
+
+```
+zfs list -o name zbackup/backup/homelab zbackup/backup/thinkpad zbackup/backup/torrent
+```
+
+and `zfs create -o mountpoint=none -o com.sun:auto-snapshot=false <name>`
+for any that is missing.
+
 ## Gotchas
 
 These each cost real investigation; none are obvious from the config.
@@ -141,6 +156,20 @@ These each cost real investigation; none are obvious from the config.
   is the real boundary instead: the key can run exactly
   `zrepl stdinserver <identity>` and the identity is fixed server-side, so
   a source host cannot claim to be a different one.
+- **Receiving jobs must declare `recv.placeholder.encryption`.** Because
+  `root_fs` is extended with the full source path, receiving
+  `zroot/local/home` means zrepl first creates `zroot` and `zroot/local`
+  on the receiver as *placeholders*. Creating one requires knowing what
+  to do with the encryption property, and the config default is
+  `unspecified` (`PlaceholderRecvOptions`, `internal/config/config.go`),
+  which fails the receive with "placeholder filesystem encryption
+  handling is unspecified in receiver config". Crucially `zrepl
+  configcheck` accepts the file either way, so the build-time validation
+  below cannot catch this — it only appears on a real receive. Valid
+  values are `inherit` and `off`
+  (`placeholdercreationencryptionproperty_enumer.go`);
+  `myZrepl.placeholderEncryption` defaults to `off` because `zbackup` is
+  not encrypted. This is covered by the `zrepl-replication` VM test.
 - **The config is validated at build time.** zrepl parses with
   `UnmarshalStrict`, so a stray or misspelled key is a hard startup
   failure. `myZrepl.validateConfig` (default on) runs `zrepl configcheck`
@@ -196,5 +225,8 @@ systemd's `failed` state.
 
 ## Restore
 
-Not yet documented — `docs/procedures/backup-restore.md` is a placeholder
-pending the layout above being deployed and stable.
+See `docs/procedures/backup-restore.md` for the restore paths out of both
+`zbackup` and Backblaze. It is written from the mechanics and has not yet
+been exercised against a deployed copy of the layout above — verify each
+step's output as you go, and correct that doc once a real restore has been
+done.
