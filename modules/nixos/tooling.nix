@@ -44,7 +44,7 @@
                 xclip.enable = true;
                 xsel.enable = true;
               };
-              #         registers = "unnamed,unnamedplus";
+              registers = "unnamedplus";
             };
             undoFile = {
               enable = true;
