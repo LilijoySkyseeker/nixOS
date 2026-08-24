@@ -22,6 +22,32 @@ items rather than letting them rot.
       presets (`retention.{fast,working,archive}`) translated from the
       old sanoid templates, so hosts declare datasets, not policy.
 
+      **Every host runs a local `snap` job** (`myZrepl.snap`, on by
+      default, covering every dataset the host declares for replication).
+      It owns snapshotting and a local prune *ceiling*
+      (`retention.ceiling`, ~32 days / ~90 snapshots), and depends on no
+      peer. This closes the one real weakness of pull topology: since the
+      puller owns `keep_sender`, a source host whose puller is
+      unreachable would otherwise never prune — ~8.6k snapshots per
+      dataset per month at a 5m cadence. The ceiling is deliberately
+      slacker than `retention.source` so the puller's stricter rules are
+      what actually prune in normal operation; it only bites after a real
+      outage. Caveat: a snap job has no replication cursor, so a
+      `not_replicated` rule is inert there — after a long enough outage
+      it can drop snapshots that were never replicated. Replication
+      itself stays safe via zrepl's holds and the cursor bookmark.
+
+      With snapshotting moved to the snap job, `serve` and `local-source`
+      switch to `snapshotting: manual`. Push jobs deliberately keep their
+      own snapshotting: `modePush.RunPeriodic` is just `snapper.Run`
+      (`internal/daemon/job/active.go:135`) and `PushJob` has no interval
+      field, so a manual snapshotter would leave a push job replicating
+      only on `zrepl signal wakeup`. For the same reason homelab's local
+      replication is a `source`+`pull` pair over the local transport
+      rather than `push`+`sink` — pull carries its own interval, so
+      snapshot cadence (5m) and how hard local replication leans on the
+      USB-contended zbackup pool (15m) are separate knobs.
+
       **Topology is pull, not push** (changed from the original plan
       after reading the source). zrepl's receiving endpoint exposes
       `DestroySnapshots` bounded only to the caller's own subtree

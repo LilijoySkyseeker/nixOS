@@ -165,12 +165,55 @@
 
       # ---- job builders, one per role ------------------------------
 
+      # Every dataset this host owns, however it is replicated. Used to
+      # default the snap job's coverage so a host declares its datasets
+      # once and cannot accidentally leave one unsnapshotted.
+      ownedDatasets = lib.unique (
+        cfg.serve.datasets
+        ++ cfg.local.datasets
+        ++ lib.concatMap (t: t.datasets) (lib.attrValues cfg.push.targets)
+      );
+
+      snapEnabled = cfg.snap.enable && cfg.snap.datasets != [ ];
+
+      # When a snap job owns snapshotting, every other job that would
+      # otherwise snapshot the same datasets must stand down, or the
+      # datasets get two independent snapshot streams.
+      ownedSnapshotting = if snapEnabled then { type = "manual"; } else mkSnapshotting;
+
+      # Local snapshotting and local pruning, beholden to no peer.
+      #
+      # This is what keeps a host self-sufficient while whatever it
+      # replicates to is unreachable. Under pull the puller owns
+      # retention (keep_sender lives in the puller's config), so a source
+      # host whose puller is down does not prune at all -- at a 5m
+      # cadence that is ~8.6k snapshots per dataset per month. This job
+      # bounds that locally.
+      #
+      # It is a ceiling, not the primary policy: retention.ceiling is
+      # deliberately more generous than retention.source, so in normal
+      # operation the puller's stricter rules decide and this never bites.
+      # That ordering matters because a snap job has no replication
+      # cursor -- zrepl substitutes alwaysUpToDateReplicationCursorHistory
+      # (internal/daemon/job/snapjob.go), which makes a not_replicated
+      # rule inert here -- so this pruner *can* destroy snapshots that
+      # were never replicated. Keeping it slack means it only does so
+      # after an outage long enough that the alternative was unbounded
+      # growth.
+      snapJob = lib.optional snapEnabled {
+        type = "snap";
+        name = "snapshots";
+        filesystems = mkFilesystems cfg.snap.datasets;
+        snapshotting = mkSnapshotting;
+        pruning.keep = cfg.snap.keep;
+      };
+
       serveJob = lib.optional cfg.serve.enable {
         type = "source";
         name = "serve";
         serve = mkServe cfg.serve;
         filesystems = mkFilesystems cfg.serve.datasets;
-        snapshotting = mkSnapshotting;
+        snapshotting = ownedSnapshotting;
       };
 
       pullJobs = lib.mapAttrsToList (name: r: {
@@ -185,6 +228,14 @@
         pruning = mkPruning r.keepSender r.keepReceiver;
       }) cfg.pull.remotes;
 
+      # NOTE: push jobs deliberately keep their own snapshotting even when
+      # a snap job exists. A push job's replication is driven *solely* by
+      # its snapshotter -- modePush.RunPeriodic is just snapper.Run
+      # (internal/daemon/job/active.go:135) and PushJob has no interval
+      # field -- so handing snapshotting to a snap job would leave the
+      # push job replicating only on a manual `zrepl signal wakeup`.
+      # Pull jobs have no such coupling (modePull.RunPeriodic has its own
+      # interval loop), which is why pull is the default topology.
       pushJobs = lib.mapAttrsToList (name: t: {
         type = "push";
         name = "push-${name}";
@@ -201,31 +252,40 @@
         root_fs = cfg.sink.rootFs;
       };
 
-      # Same-host replication needs a matching push/sink pair joined by a
-      # listener name -- zrepl's "local" transport, no ssh or tcp involved.
+      # Same-host replication over zrepl's "local" transport -- a matching
+      # source/pull pair joined by a listener name, no ssh or tcp.
+      #
+      # Deliberately source+pull rather than push+sink. A push job's
+      # replication cadence is welded to its snapshot cadence (see the
+      # note on pushJobs above), which would mean replicating to the
+      # backup pool every 5m purely because that is how often we snapshot.
+      # Pull carries its own interval, so snapshot frequency and how hard
+      # this leans on the (I/O-starved) target pool are separate knobs.
       localJobs = lib.optionals cfg.local.enable [
         {
-          type = "sink";
-          name = "local-sink";
+          type = "source";
+          name = "local-source";
           serve = {
             type = "local";
             listener_name = cfg.local.listenerName;
           };
-          root_fs = cfg.local.rootFs;
+          filesystems = mkFilesystems cfg.local.datasets;
+          snapshotting = ownedSnapshotting;
         }
         {
-          type = "push";
-          name = "local-push";
+          type = "pull";
+          name = "local-pull";
           connect = {
             type = "local";
             listener_name = cfg.local.listenerName;
-            # sink appends this to root_fs, so it becomes the per-host
-            # directory component under cfg.local.rootFs.
             client_identity = cfg.local.clientIdentity;
             dial_timeout = "10s";
           };
-          filesystems = mkFilesystems cfg.local.datasets;
-          snapshotting = mkSnapshotting;
+          # Spelled out in full: pull jobs don't append a client identity
+          # the way a sink would, so this carries the per-host component
+          # itself.
+          root_fs = "${cfg.local.rootFs}/${cfg.local.clientIdentity}";
+          interval = cfg.local.interval;
           pruning = mkPruning cfg.local.keepSender cfg.local.keepReceiver;
         }
       ];
@@ -238,7 +298,7 @@
             format = "human";
           }
         ];
-        jobs = serveJob ++ pullJobs ++ pushJobs ++ sinkJob ++ localJobs;
+        jobs = snapJob ++ serveJob ++ pullJobs ++ pushJobs ++ sinkJob ++ localJobs;
       };
 
       configFile = yamlFormat.generate "zrepl.yml" settings;
@@ -494,6 +554,23 @@
             '';
           };
 
+          ceiling = lib.mkOption {
+            type = lib.types.str;
+            default = "1x1h(keep=all) | 48x1h | 30x1d";
+            description = ''
+              Upper bound enforced locally by the snap job, independent of
+              any peer: an hour at full granularity, hourly for two days,
+              daily for a month. ~90 snapshots, ~32 day window.
+
+              Intentionally slacker than retention.source so that in
+              normal operation the puller's stricter rules are what
+              actually prune, and this only takes effect once a peer has
+              been unreachable long enough that the alternative is
+              unbounded growth. Whatever the outage length, snapshot count
+              stops at ~90 rather than climbing at ~8.6k/month.
+            '';
+          };
+
           archive = lib.mkOption {
             type = lib.types.str;
             default = "168x1h | 30x1d | 12x30d";
@@ -513,6 +590,56 @@
               between them and are then freed -- add a leading
               1x1h(keep=all) if fine-grained recent history is wanted on
               the target too.
+            '';
+          };
+        };
+
+        # ---- local snapshotting + local prune ceiling ---------------
+        snap = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = ''
+              Give this host a `snap` job owning snapshotting and a local
+              prune ceiling for every dataset it owns, so neither depends
+              on a peer being reachable.
+
+              On by default, and on for every host rather than only the
+              roaming ones, because the failure it prevents is not
+              laptop-specific: any host whose peer is unreachable long
+              enough will otherwise accumulate snapshots without bound.
+
+              When on, the serve and local-source jobs switch to
+              `snapshotting: manual` so the datasets aren't snapshotted
+              twice. Push jobs are exempt -- their replication is driven
+              by their snapshotter, so they must keep it.
+            '';
+          };
+
+          datasets = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = ownedDatasets;
+            defaultText = lib.literalExpression "every dataset named by serve.datasets, local.datasets or push.targets.*.datasets";
+            description = ''
+              Datasets to snapshot and locally prune. Defaults to every
+              dataset this host owns, so declaring a dataset for
+              replication is enough to get it snapshotted.
+            '';
+          };
+
+          keep = lib.mkOption {
+            type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
+            default = [ (gridRule cfg.retention.ceiling) ] ++ keepProtected;
+            defaultText = lib.literalExpression "the retention.ceiling grid, plus the protected-snapshot rules";
+            description = ''
+              Keep rules for the local prune ceiling.
+
+              Note a `not_replicated` rule would be inert here: snap jobs
+              have no replication cursor, so zrepl treats every snapshot
+              as replicated (alwaysUpToDateReplicationCursorHistory in
+              internal/daemon/job/snapjob.go). Protection against pruning
+              a still-needed incremental base comes from zrepl's holds and
+              the cursor bookmark, not from this rule set.
             '';
           };
         };
@@ -784,7 +911,18 @@
           listenerName = lib.mkOption {
             type = lib.types.str;
             default = "localsink";
-            description = "Name joining this host's local push and sink jobs.";
+            description = "Name joining this host's local source and pull jobs.";
+          };
+
+          interval = lib.mkOption {
+            type = lib.types.str;
+            default = "15m";
+            description = ''
+              How often to replicate this host's own datasets into its
+              backup pool. Separate from snapshot.interval on purpose --
+              snapshots are cheap and local, whereas each replication run
+              costs I/O on the target pool.
+            '';
           };
 
           keepSender = keepSenderOption (

@@ -174,6 +174,13 @@
   #
   # It also replicates its own datasets into zbackup over zrepl's local
   # transport, replacing the three hourly syncoid jobs that used to do it.
+  #
+  # Snapshotting itself belongs to the module's snap job (on by default,
+  # covering every dataset named below), not to any replication job, so it
+  # keeps running regardless of what any peer is doing. Local replication
+  # therefore runs on its own interval rather than firing every time a
+  # snapshot is taken -- which matters here because zbackup sits behind a
+  # contended USB link.
   sops.secrets.homelab_zrepl_key = { };
   myZrepl = {
     enable = true;

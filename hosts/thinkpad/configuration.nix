@@ -88,13 +88,18 @@
   # sanoid + the syncoid-based myBackupPush). Passive side -- see the
   # equivalent block in hosts/torrent/configuration.nix for the reasoning.
   #
-  # This is the host with the strongest case for flipping to push
-  # (myZrepl.push.targets): it is a laptop whose online windows are short
-  # and unpredictable, and a 15m puller can miss them. Left on pull for
-  # now because it is also the host most likely to be compromised, and
-  # pull is what denies a compromised source the ability to destroy its
-  # own backup history. Revisit if coverage proves insufficient in
-  # practice rather than pre-emptively.
+  # Being a laptop, this host spends the most time unreachable, so the
+  # module's snap job matters most here: snapshotting and a local prune
+  # ceiling run on-box and do not wait for homelab. A month away costs
+  # nothing -- the replication cursor bookmark survives, so the next pull
+  # resumes incrementally rather than resending.
+  #
+  # That removes what would otherwise be the strongest argument for
+  # flipping this host to push (myZrepl.push.targets): under pull the
+  # puller owns retention, so without a snap job an unreachable homelab
+  # would mean no pruning at all here. Pull is kept because this is also
+  # the host most likely to be compromised, and pull is what denies a
+  # compromised source the ability to destroy its own backup history.
   myZrepl = {
     enable = true;
     serve = {

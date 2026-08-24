@@ -66,12 +66,15 @@
   # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
   # sanoid + the syncoid-based myBackupPush).
   #
-  # This host is the passive side: it snapshots locally and answers
-  # homelab's pulls, but never initiates a connection and holds no
-  # credential for homelab. Retention of these snapshots is decided by
-  # homelab's pull job (keep_sender), so a compromise here cannot delete
-  # backup history. myZfsSpaceGuard still bounds local growth if homelab
-  # is unreachable long enough for pruning to stall.
+  # This host is the passive side of replication: it answers homelab's
+  # pulls but never initiates a connection and holds no credential for
+  # homelab. Backup retention is decided by homelab's pull job
+  # (keep_sender), so a compromise here cannot delete backup history.
+  #
+  # Snapshotting and a local prune ceiling are handled on-box by the
+  # module's snap job, independent of homelab being reachable -- without
+  # that, an extended homelab outage would mean no pruning here at all,
+  # since under pull the puller owns retention.
   myZrepl = {
     enable = true;
     serve = {
