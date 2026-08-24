@@ -3,7 +3,7 @@
 No scaffolding or generator exists for this — it's a plain file
 following the pattern already in `modules/services/` (`jellyfin.nix`,
 `copyparty-iso.nix`, `factorio.nix`, `minecraft.nix`, `octodns.nix`,
-`nfs.nix`).
+`nfs.nix`, `samba.nix`).
 
 1. Create `modules/services/<name>.nix`, registering as
    `flake.modules.nixos.<name> = { ... }: { ... };`. Unless the config
@@ -30,6 +30,6 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    just when asked.
 
 There's no service-specific README requirement — one-line entries in
-`modules/services/README.md`'s inventory (see
-`docs/README-template.md`) are enough unless the service has
-non-obvious gotchas worth a longer note.
+`modules/services/README.md`'s inventory are enough unless the service
+has non-obvious gotchas worth a longer note (see that file's own
+"Gotchas" section for the shape).
