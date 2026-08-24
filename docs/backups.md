@@ -68,7 +68,15 @@ Snapshot interval is a uniform **5m** on all three hosts
 (`myZrepl.snapshot.interval`). Replication runs on its own schedule —
 **15m** for every pull job, including homelab's local one. The two are
 deliberately separate: snapshots are cheap and local, whereas each
-replication run costs I/O on a pool sitting behind a contended USB link.
+replication run costs I/O on a pool sitting behind a USB link.
+
+That link was the binding constraint when these intervals were chosen: all
+four drives shared one USB 2.0 (480 Mbps) upstream, a hard ~40-60MB/s
+ceiling across the lot. Replacing the enclosure's cable on 2026-08-23 moved
+them to USB 3.0 (5000 Mbps) and the recurring `uas_eh_*` faults stopped, so
+the 15m interval and the tiered `archive` grid are now conservative rather
+than forced. They have not been re-tuned; see `hosts/homelab/README.md` for
+how to check the link is still negotiating 5000.
 
 `ceiling` is deliberately slacker than `source` so that in normal running
 the puller's stricter rules are what actually prune; the ceiling only takes
@@ -109,6 +117,29 @@ for any that is missing.
 ## Gotchas
 
 These each cost real investigation; none are obvious from the config.
+
+- **A receive-only pool is imported by nothing unless you say so.**
+  nixpkgs generates a `zfs-import-<pool>.service` only for pools something
+  references — a `fileSystems` entry, or `boot.zfs.extraPools`. Every
+  `zbackup` dataset is `mountpoint = "none"` on purpose (a backup target
+  should mount nothing), so no `fileSystems` entry names it and no import
+  unit was ever generated; `zdata` gets one only because `/storage` and
+  `/storage-bulk` live on it. disko does not cover this — it emits no
+  import units at all and only creates datasets at *format* time. homelab
+  ran for ~23h after a reboot with `zbackup` simply exported and every job
+  failing `dataset does not exist`. Hence the explicit
+  `boot.zfs.extraPools = [ "zbackup" ]` in `hosts/homelab/configuration.nix`.
+  Any future backup-target pool needs the same. Check with
+  `ls $(nixos-rebuild build --flake .#<host> >/dev/null && readlink -f result)/etc/systemd/system | grep zfs-import`.
+- **Received datasets inherit properties from their parent container.**
+  The module does not set `send.properties`, and zrepl's default is off, so
+  nothing about the source's `mountpoint`/`canmount` travels in the stream.
+  Received filesystems therefore take their mountpoint by inheritance from
+  the `root_fs` container — which is exactly why every container in
+  `disko.nix` is `mountpoint = "none"`. A container that has drifted to a
+  real mountpoint (an old pre-flatten one, say) will silently give every
+  dataset received under it a mountpoint too. Check with
+  `zfs list -o name,mountpoint -r zbackup` before a first receive.
 
 - **A grid rule condemns foreign snapshots, it does not ignore them.**
   `KeepGrid` puts every snapshot failing its regex onto its *destroy* list

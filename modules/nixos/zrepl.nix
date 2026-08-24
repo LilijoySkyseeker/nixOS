@@ -566,8 +566,11 @@
 
               This is 3x the snapshot rate of the sanoid setup it replaces
               (which ran minutely) and so a net reduction in metadata churn
-              on homelab's USB-contended zbackup pool, where sanoid was
-              enumerating every snapshot every 60s.
+              on homelab's USB-attached zbackup pool, where sanoid was
+              enumerating every snapshot every 60s. That pool's link was
+              USB 2.0 when this was chosen; it is USB 3.0 since the
+              2026-08-23 cable change, so the pressure this relieves is
+              real but no longer acute.
             '';
           };
 

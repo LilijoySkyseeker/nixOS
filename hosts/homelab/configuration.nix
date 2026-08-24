@@ -163,6 +163,19 @@
     };
   };
 
+  # Import zbackup at boot.
+  #
+  # nixpkgs only generates a zfs-import-<pool>.service for pools something
+  # actually references -- a `fileSystems` entry, or this option. zdata gets
+  # one implicitly because /storage and /storage-bulk are mountpoints on it.
+  # Every zbackup dataset is `mountpoint = "none"` (see disko.nix) precisely
+  # because nothing should mount from the backup pool, so nothing referenced
+  # it and nothing imported it: after the 2026-08-23 reboot zbackup simply
+  # stayed exported and every replication job failed for ~23h with
+  # "dataset does not exist". disko does not help here -- it only creates
+  # pools at format time and emits no import units at all.
+  boot.zfs.extraPools = [ "zbackup" ];
+
   # zfs snapshots + replication (zrepl; replaced sanoid+syncoid)
   #
   # homelab is the active side of every replication relationship here. It
@@ -180,7 +193,8 @@
   # keeps running regardless of what any peer is doing. Local replication
   # therefore runs on its own interval rather than firing every time a
   # snapshot is taken -- which matters here because zbackup sits behind a
-  # contended USB link.
+  # USB link (USB 2.0 and heavily contended until the 2026-08-23 cable
+  # change moved it to USB 3.0; see hosts/homelab/README.md).
   sops.secrets.homelab_zrepl_key = { };
   myZrepl = {
     enable = true;

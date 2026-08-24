@@ -11,6 +11,44 @@ items rather than letting them rot.
 
 ## Active
 
+- [x] **2026-08-24: `zbackup` was never imported at boot — backups had
+      been silently dead for ~23h. Fixed declaratively.** Found while
+      running the zrepl migration's pre-deploy check. homelab rebooted
+      Sun 2026-08-23 10:45 (for the USB cable change below); `zbackup`
+      did not come back, and every replication job since failed with
+      `dataset does not exist`. The pool itself was fine the whole time
+      — ONLINE, importable, no data errors.
+
+      **Cause:** nothing in the NixOS config ever imported it. nixpkgs
+      only emits a `zfs-import-<pool>.service` for a pool something
+      references — a `fileSystems` entry, or `boot.zfs.extraPools`.
+      `zdata` gets one implicitly because `/storage` and `/storage-bulk`
+      are mountpoints on it. Every `zbackup` dataset is
+      `mountpoint = "none"` by design (it is a receive-only target that
+      should mount nothing), so nothing referenced the pool and no unit
+      was ever generated. Confirmed against the built system, not
+      guessed: `ls result/etc/systemd/system/ | grep zfs-import` listed
+      only `zdata`. disko is not a fallback here — it emits no import
+      units at all (no `extraPools` anywhere in the pinned tree), and
+      only creates datasets at *format* time.
+
+      It survived earlier reboots only because someone had imported it
+      by hand. That is why this went unnoticed for so long.
+
+      **Fix:** `boot.zfs.extraPools = [ "zbackup" ];` in
+      `hosts/homelab/configuration.nix`, on the zrepl migration branch.
+      Verified: the rebuilt system now contains
+      `zfs-import-zbackup.service`, and the pool imports on a real
+      reboot.
+
+      **Worth noting as a class of bug:** a receive-only ZFS pool with
+      no mountpoints is invisible to every implicit import mechanism.
+      Any future backup-target pool needs `boot.zfs.extraPools`
+      explicitly. Also worth asking separately why ~23h of failed
+      replication units did not produce an alert that got acted on —
+      `myHealthAlerts` does cover failed units, so the gap is likely in
+      noticing, not in detecting.
+
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
       complete on branch `worktree-zrepl-migration-plan`; all three hosts
       build and pass `zrepl configcheck`. **Nothing is deployed.**
@@ -100,9 +138,31 @@ items rather than letting them rot.
       a fix in isolation is not the same as confirming it's actually
       deployed and taking effect through the real service path.
 
-- [ ] **2026-08-21: torrent's initial full backup send to homelab is
+- [x] **2026-08-21: torrent's initial full backup send to homelab is
       throughput-limited to ~20-40MB/s — root-caused while it was
-      in progress, no changes made yet.** Investigated live during
+      in progress. RESOLVED 2026-08-23 in hardware.**
+
+      **Resolution: the enclosure's USB cable was replaced.** All four
+      drives now enumerate at **5000 Mbps (USB 3.0 SuperSpeed)** on bus
+      2 behind the ASMedia ASM107x hub, up from 480 Mbps — confirmed
+      2026-08-24 via `/sys/bus/usb/devices/*/speed` showing `5000` for
+      all four `TerraMaster TDAS` entries. Cause #2's fault class is
+      gone with it: **zero** `uas_eh_*` / `stat urb: status -71` events
+      across the 23h since, versus the recurring multi-drive faults
+      documented below, and `zpool status -x` reports all pools
+      healthy. That single change addresses causes #1, #2 and #4 —
+      exactly as the "if/when revisited" note below predicted. Cause #3
+      (sanoid's minutely recursive walk) is moot: the zrepl migration
+      removes sanoid entirely.
+
+      Not re-tuned: the 15m replication interval and tiered `archive`
+      grid were chosen under the old ceiling and are now conservative
+      rather than forced. Left as-is deliberately — no measurement of
+      the new real-world rate yet. torrent's first zrepl pull will be
+      the first honest datapoint, and the old ~40h estimate for ~3.13TB
+      should be treated as an upper bound, not a prediction.
+
+      Original diagnosis, kept for the record: Investigated live during
       torrent's first-ever `myBackupPush` run (3.13TB initial `zfs
       send`). Ruled out: network (confirmed direct LAN peer connection
       via `tailscale status --json`'s `CurAddr: 192.168.1.154:41641` —
