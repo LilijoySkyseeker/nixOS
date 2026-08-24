@@ -36,6 +36,10 @@ e.g. `fix(homelab): correct impermanence persist path`.
 
 Enforced by the `commit-msg` hook.
 
+No `Co-Authored-By: Claude ...` or `Claude-Session:` trailer in commit
+messages — the git author/committer identity already records who/what made
+the commit, so both are redundant noise in history.
+
 ## Hooks
 
 - **pre-commit** — blocks commits containing an unencrypted `secrets.yaml`
