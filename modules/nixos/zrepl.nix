@@ -103,14 +103,17 @@
         inherit (cfg.snapshot) interval prefix;
       };
 
-      # Grid rules are regex-scoped to zrepl's own snapshot prefix on
-      # purpose. zrepl only destroys a snapshot when *no* keep rule keeps
-      # it, and a regex-scoped rule simply doesn't consider non-matching
-      # snapshots -- so pre-existing sanoid "autosnap_*" snapshots are
-      # kept indefinitely rather than swept up on the first run. That makes
-      # the sanoid -> zrepl cutover non-destructive to existing history;
-      # old snapshots age out under sanoid's rules until it is removed,
-      # then need one manual cleanup pass.
+      # Grid rules are regex-scoped to zrepl's own snapshot prefix.
+      #
+      # Careful with what that scoping means: it does NOT spare
+      # non-matching snapshots. KeepGrid puts every snapshot that fails
+      # the regex straight onto its destroy list
+      # (internal/pruning/keep_grid.go), and PruneSnapshots destroys a
+      # snapshot once *every* rule lists it
+      # (internal/pruning/pruning.go:39). So a lone grid rule condemns
+      # foreign snapshots rather than ignoring them. The regex only stops
+      # foreign snapshots from being counted as grid occupants and
+      # displacing zrepl's own. See legacyRule for the actual guard.
       gridRule = grid: {
         type = "grid";
         inherit grid;
@@ -124,6 +127,28 @@
       notReplicatedRule = {
         type = "not_replicated";
       };
+
+      # Transition guard for the sanoid -> zrepl cutover.
+      #
+      # Without this, the first prune after initial replication destroys
+      # every pre-existing sanoid snapshot: the replication cursor lands
+      # on a fresh zrepl_ snapshot, everything older is then treated as
+      # replicated ("all snapshots older than cursor are interpreted as
+      # replicated", internal/daemon/pruner/pruner.go:441), so
+      # not_replicated condemns them and the grid rule condemns them for
+      # failing the prefix regex -- unanimous, therefore destroyed.
+      #
+      # A keep rule matching the legacy prefix breaks that unanimity and
+      # holds them indefinitely. Turn it off (or drop the old snapshots by
+      # hand) once zrepl has enough history of its own to stand on.
+      legacyRule = {
+        type = "regex";
+        regex = "^${cfg.legacySnapshotPrefix}";
+      };
+
+      keepLegacy = lib.optional (
+        cfg.preserveLegacySnapshots && cfg.legacySnapshotPrefix != ""
+      ) legacyRule;
 
       mkPruning = keepSender: keepReceiver: {
         keep_sender = keepSender;
@@ -370,20 +395,45 @@
           description = "Run `zrepl configcheck` against the generated config at build time.";
         };
 
+        preserveLegacySnapshots = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Keep pre-zrepl snapshots (see legacySnapshotPrefix) instead of
+            letting the first prune destroy them. On by default so the
+            sanoid cutover doesn't take local snapshot history with it.
+
+            Turn off once zrepl has built up enough history of its own,
+            then destroy the leftovers by hand -- nothing ages them out
+            while this is on.
+          '';
+        };
+
+        legacySnapshotPrefix = lib.mkOption {
+          type = lib.types.str;
+          default = "autosnap_";
+          description = "Snapshot prefix of the tool zrepl replaced (sanoid's), protected while preserveLegacySnapshots is on.";
+        };
+
         snapshot = {
           interval = lib.mkOption {
             type = lib.types.str;
-            default = "15m";
+            default = "5m";
             description = ''
-              How often every snapshotting job on this host takes a
-              snapshot.
+              How often every snapshotting job takes a snapshot. Deliberately
+              uniform across all hosts -- one cadence to reason about rather
+              than a per-host matrix.
 
-              Note this is deliberately slower than the sanoid setup it
-              replaces (which ran a minutely timer). Under zrepl a push
-              job replicates after each snapshot, and homelab's zbackup
-              pool sits behind a shared USB 2.0 link whose contention is
-              already a documented problem -- minutely snapshot-plus-
-              replicate would make that worse for no real recovery benefit.
+              Note this also sets how often push jobs replicate, since an
+              active job replicates after each snapshot. Pull jobs are
+              exempt: they run on their own interval and simply collect
+              whatever snapshots accumulated, so a source host's cadence
+              does not drive network traffic.
+
+              This is 3x the snapshot rate of the sanoid setup it replaces
+              (which ran minutely) and so a net reduction in metadata churn
+              on homelab's USB-contended zbackup pool, where sanoid was
+              enumerating every snapshot every 60s.
             '';
           };
 
@@ -392,39 +442,47 @@
             default = "zrepl_";
             description = ''
               Prefix for snapshots zrepl creates. Also scopes every grid
-              keep rule, so zrepl never prunes snapshots it didn't take.
+              keep rule -- though note that scoping condemns foreign
+              snapshots rather than sparing them; see legacyRule.
             '';
           };
         };
 
         retention = {
-          fast = lib.mkOption {
+          source = lib.mkOption {
             type = lib.types.str;
-            default = "1x1h(keep=all) | 24x1h | 1x1d";
+            default = "1x1h(keep=all) | 48x1h | 7x1d";
             description = ''
-              Workstation working set: an hour at full granularity, a day
-              of hourlies, one daily. Matches what torrent and thinkpad ran
-              under sanoid (frequently=59, hourly=24, daily=1).
-            '';
-          };
+              Retention on whichever host owns the data, uniform across
+              every host: an hour at full 5m granularity, then hourly for
+              two days, then daily for a week.
 
-          working = lib.mkOption {
-            type = lib.types.str;
-            default = "1x1h(keep=all) | 168x1h | 14x1d";
-            description = ''
-              Server working set: an hour at full granularity, a week of
-              hourlies, a fortnight of dailies. Matches homelab's sanoid
-              template_working (hourly=168, daily=14).
+              ~67 snapshots, ~9 day window. The full-granularity hour is
+              the "undo an accidental rm" window; the 9 day tail means a
+              multi-day outage of the backup server doesn't immediately
+              leave the source as the only copy of recent history.
             '';
           };
 
           archive = lib.mkOption {
             type = lib.types.str;
-            default = "1x1h(keep=all) | 168x1h | 366x1d";
+            default = "168x1h | 30x1d | 12x30d";
             description = ''
-              Backup-target retention: a week of hourlies, a year of
-              dailies. Matches homelab's sanoid template_backup
-              (hourly=168, daily=366).
+              Retention for copies living on the backup target: hourly for
+              a week, daily for a month, monthly for a year.
+
+              ~210 snapshots, ~13 month reach. Tiering rather than a flat
+              wall of dailies buys longer reach for well under half the
+              snapshot count, which matters here because every prune walks
+              the whole list on a pool already short on I/O headroom.
+
+              No full-granularity bucket, so the source's 5m snapshots
+              collapse to one per hour shortly after arriving. They are
+              still sent (replication walks the snapshot chain), which
+              costs a little transient space for blocks that changed
+              between them and are then freed -- add a leading
+              1x1h(keep=all) if fine-grained recent history is wanted on
+              the target too.
             '';
           };
         };
@@ -541,10 +599,13 @@
                     description = "How often to attempt a pull from this remote.";
                   };
 
-                  keepSender = keepSenderOption [
-                    notReplicatedRule
-                    (gridRule cfg.retention.fast)
-                  ];
+                  keepSender = keepSenderOption (
+                    [
+                      notReplicatedRule
+                      (gridRule cfg.retention.source)
+                    ]
+                    ++ keepLegacy
+                  );
 
                   keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
                 };
@@ -576,10 +637,13 @@
                     description = "Datasets to snapshot and push. Append \"<\" to include children.";
                   };
 
-                  keepSender = keepSenderOption [
-                    notReplicatedRule
-                    (gridRule cfg.retention.fast)
-                  ];
+                  keepSender = keepSenderOption (
+                    [
+                      notReplicatedRule
+                      (gridRule cfg.retention.source)
+                    ]
+                    ++ keepLegacy
+                  );
 
                   keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
                 };
@@ -693,10 +757,13 @@
             description = "Name joining this host's local push and sink jobs.";
           };
 
-          keepSender = keepSenderOption [
-            notReplicatedRule
-            (gridRule cfg.retention.working)
-          ];
+          keepSender = keepSenderOption (
+            [
+              notReplicatedRule
+              (gridRule cfg.retention.source)
+            ]
+            ++ keepLegacy
+          );
 
           keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
         };

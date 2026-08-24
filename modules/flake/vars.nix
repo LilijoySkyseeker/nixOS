@@ -11,11 +11,7 @@
     # homelab_zrepl_key sops secret). Both source hosts pin this same key
     # to a forced `zrepl stdinserver` command in root's authorized_keys, so
     # it lives here rather than being repeated per host.
-    #
-    # REPLACE-ME: placeholder. Generate the keypair on homelab, add the
-    # private half to secrets.yaml as homelab_zrepl_key, and paste the
-    # public half here before deploying torrent or thinkpad.
-    zreplPullerKey = "ssh-ed25519 AAAAREPLACEMEREPLACEMEREPLACEMEREPLACEMEREPLACEME homelab-zrepl-pull";
+    zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHGCZd2jS1ZzBQckagi87/+h0musJxPpCkZvYFkmUzgi homelab-zrepl-pull";
     username = "lilijoy";
     # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
     # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
