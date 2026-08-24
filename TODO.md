@@ -12,121 +12,29 @@ items rather than letting them rot.
 ## Active
 
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
-      written and building on branch `worktree-zrepl-migration-plan`;
-      **not deployed to any host yet.** One shared module
-      (`modules/nixos/zrepl.nix`, option namespace `myZrepl`) covers
-      every role: `serve` (passive source), `pull`, `push`, `sink`, and
-      `local` (same-host). Transport is pluggable
-      (`ssh+stdinserver`/`tcp`/`tls`/`local`) via `myZrepl.defaultTransport`,
-      currently `ssh+stdinserver`. Retention lives in three shared named
-      presets (`retention.{fast,working,archive}`) translated from the
-      old sanoid templates, so hosts declare datasets, not policy.
+      complete on branch `worktree-zrepl-migration-plan`; all three hosts
+      build and pass `zrepl configcheck`. **Nothing is deployed.**
 
-      **Every host runs a local `snap` job** (`myZrepl.snap`, on by
-      default, covering every dataset the host declares for replication).
-      It owns snapshotting and a local prune *ceiling*
-      (`retention.ceiling`, ~32 days / ~90 snapshots), and depends on no
-      peer. This closes the one real weakness of pull topology: since the
-      puller owns `keep_sender`, a source host whose puller is
-      unreachable would otherwise never prune — ~8.6k snapshots per
-      dataset per month at a 5m cadence. The ceiling is deliberately
-      slacker than `retention.source` so the puller's stricter rules are
-      what actually prune in normal operation; it only bites after a real
-      outage. Caveat: a snap job has no replication cursor, so a
-      `not_replicated` rule is inert there — after a long enough outage
-      it can drop snapshots that were never replicated. Replication
-      itself stays safe via zrepl's holds and the cursor bookmark.
+      Design, retention, and the non-obvious zrepl behaviours are
+      documented in `docs/backups.md` — read that rather than
+      re-deriving. Restore steps in
+      `docs/procedures/backup-restore.md`. Session handoff with the
+      remaining steps in `HANDOFF.md`.
 
-      With snapshotting moved to the snap job, `serve` and `local-source`
-      switch to `snapshotting: manual`. Push jobs deliberately keep their
-      own snapshotting: `modePush.RunPeriodic` is just `snapper.Run`
-      (`internal/daemon/job/active.go:135`) and `PushJob` has no interval
-      field, so a manual snapshotter would leave a push job replicating
-      only on `zrepl signal wakeup`. For the same reason homelab's local
-      replication is a `source`+`pull` pair over the local transport
-      rather than `push`+`sink` — pull carries its own interval, so
-      snapshot cadence (5m) and how hard local replication leans on the
-      USB-contended zbackup pool (15m) are separate knobs.
+      Status in brief: one shared module (`modules/nixos/zrepl.nix`,
+      `myZrepl`) replaced sanoid, syncoid and `backup-push.nix`. Topology
+      is pull (homelab dials out; sources passive). Every host runs a
+      local `snap` job so snapshotting and a prune ceiling never depend
+      on a peer. `zbackup`'s layout changed to
+      `zbackup/backup/<host>/<full source dataset path>`.
 
-      **Topology is pull, not push** (changed from the original plan
-      after reading the source). zrepl's receiving endpoint exposes
-      `DestroySnapshots` bounded only to the caller's own subtree
-      (`internal/endpoint/endpoint.go:1058`), and `keep_receiver` is
-      evaluated by the pruner on the *active* side
-      (`internal/daemon/pruner/pruner.go:115`) — i.e. in a push setup the
-      retention policy for homelab's copy lives in a config file on the
-      source host. So a compromised torrent/thinkpad could delete its own
-      backup history. Under pull, homelab dials out, the sources are
-      passive, and a compromised source has no RPC handle on homelab at
-      all. `myZrepl.push` remains available per-host for a machine whose
-      online windows a puller would miss; thinkpad is the candidate if
-      15m pull coverage proves too sparse in practice.
-
-      **Consequences that need care at deploy time:**
-      - **zbackup layout changes.** zrepl extends `root_fs` with the
-        *full* source dataset path (`subroot.MapToLocal`), so backups
-        land at `zbackup/backup/torrent/zroot/local/home`, not
-        `zbackup/backup/torrent/home`. `myHealthAlerts.backupStaleness`
-        paths on homelab were updated to match. Existing received data
-        sits at the old paths and will not be reused — torrent is a
-        fresh full send anyway (see the stuck-backup item below);
-        thinkpad's existing copy likewise needs a fresh send or a manual
-        `zfs rename` into the new shape.
-      - **torrent and thinkpad now run sshd**, which they did not before.
-        Required because pull means homelab dials *into* them. Locked
-        down: tailnet-only (`openFirewall = false` plus a
-        `firewall.interfaces.tailscale0` rule), `PermitRootLogin =
-        "forced-commands-only"`, and the only root key on either host is
-        the zrepl forced command. Verified in the built
-        `authorized_keys`: one `command="... zrepl stdinserver
-        homelab",restrict` entry and nothing else.
-      - **Snapshot cadence: one uniform 5m interval across all three
-        hosts** (sanoid ran minutely, so this is a 3x reduction in
-        metadata churn on the USB-contended zbackup pool, not an
-        increase). Retention is two shared presets:
-        `retention.source` = `1x1h(keep=all) | 48x1h | 7x1d` — 5m for an
-        hour, hourly for 2 days, daily for a week (~67 snapshots, ~9
-        days); `retention.archive` = `168x1h | 30x1d | 12x30d` — hourly
-        for a week, daily for a month, monthly for a year (~210
-        snapshots, ~13 months). The tiered archive has *longer* reach
-        than the flat 366-daily grid it replaced while walking 61% fewer
-        snapshots per prune.
-      - **The cutover WOULD have destroyed all existing sanoid
-        snapshots** — corrected before it shipped, but worth recording
-        because the reasoning is non-obvious. Regex-scoping a grid rule
-        does not spare foreign snapshots: `KeepGrid` puts every
-        non-matching snapshot on its *destroy* list
-        (`internal/pruning/keep_grid.go`), and `PruneSnapshots` destroys
-        anything all rules list (`internal/pruning/pruning.go:39`).
-        Combined with the pruner treating everything older than the
-        replication cursor as replicated
-        (`internal/daemon/pruner/pruner.go:441`), the first prune after
-        initial replication would have wiped every `autosnap_*` snapshot
-        on the source datasets. `myZrepl.preserveLegacySnapshots`
-        (default on) adds a `regex` keep rule for `^autosnap_` to break
-        that unanimity. Turn it off and destroy the leftovers by hand
-        once zrepl has its own history — nothing ages them out while it
-        is on.
-        Existing *received* data on zbackup (the old syncoid target
-        paths) is safe either way: the receiver-side pruner skips
-        filesystems with no counterpart on the sender
-        (`SkipNoCorrespondenceOnSender`, `pruner.go:405`).
-
-      **Manual steps required before deploying (secrets are yours per
-      `feedback_secrets_manual`):**
-      1. Generate an ed25519 keypair on homelab for pulling.
-      2. Add the private half to `secrets/secrets.yaml` as
-         `homelab_zrepl_key` — homelab currently fails to build without
-         it (everything else evaluates; this is the only blocker).
-      3. Paste the public half over the `REPLACE-ME` placeholder in
-         `modules/flake/vars.nix`'s `zreplPullerKey`.
-
-      Deploy order: homelab first, then torrent, then thinkpad. VM-test
-      each per `feedback_test_remote_deploys_in_vm` before any real
-      switch. `modules/nixos/backup-push.nix` and homelab's
-      `backup-recv` user/`zfs allow` service are already deleted in this
-      branch, so there is no syncoid fallback once deployed — verify in
-      a VM first.
+      Remaining: VM-test each host, then deploy homelab → torrent →
+      thinkpad. torrent's first pull doubles as the fresh full send that
+      resolves the stuck-backup incident below. thinkpad's existing copy
+      sits at old paths and needs a fresh send or a manual `zfs rename`.
+      Once burnt in, turn off `myZrepl.preserveLegacySnapshots` and clear
+      the leftover `autosnap_*` snapshots by hand — nothing ages them out
+      while it is on.
 
 - [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
       dataset) is now stuck — needs a decision, not further automated
