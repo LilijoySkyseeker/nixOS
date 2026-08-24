@@ -1,6 +1,7 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24.
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, updated the
+same day by a second session.
 
 **Delete this file once the branch is merged and deployed.** It is session
 state, not documentation — durable knowledge went into `docs/backups.md`.
@@ -11,7 +12,11 @@ state, not documentation — durable knowledge went into `docs/backups.md`.
   that are easy to get wrong. Every one of those gotchas cost real
   source-reading to establish; the file cites the zrepl source location for
   each so you can re-check rather than re-discover.
-- `docs/procedures/backup-restore.md` — restore paths.
+- `docs/procedures/backup-restore.md` — restore paths. Its clone-based
+  file recovery is now exercised by the VM test below, so that much of it
+  is known to work; the rollback and full-dataset paths still are not.
+- `docs/procedures/vm-testing.md` — how to run and extend the VM test
+  before you touch the module.
 - `TODO.md` — status and the two open incidents this migration interacts
   with (torrent's stranded backup, zbackup's USB throughput).
 
@@ -21,19 +26,21 @@ Code complete. All three hosts build; `zrepl configcheck` passes on each
 (it runs at build time via `myZrepl.validateConfig`). **Nothing is
 deployed** — no host has been switched.
 
-Testing done since the first handoff (2026-08-24, second session):
+Testing done since the first handoff:
 
 - All three hosts build `system.build.vm` and boot to a login prompt with
   `zrepl.service` started. The only unit that fails in those VMs is
   `smartd` on every host, plus (on homelab) sops-dependent units,
   impermanence rollback, and the docker/wireguard units — all artifacts of
   a VM with no real pool, no host key, and no network, none zrepl-related.
+  Those runs were one-off verification and left nothing behind.
 - `tests/zrepl-replication.nix` is a new two-node NixOS VM test with real
   zpools, wired up as `checks.zrepl-replication` in
   `modules/flake/checks.nix`. Booting a host proves the daemon starts;
   this proves a pull actually moves data. Run it with
-  `nix build .#checks.x86_64-linux.zrepl-replication`. All eight
-  subtests pass.
+  `nix build .#checks.x86_64-linux.zrepl-replication` — all seven
+  subtests pass. **Run it before touching the module**, and read
+  `docs/procedures/vm-testing.md` first if you plan to extend it.
 
 **The test found a real bug, now fixed.** Every receiving job was missing
 `recv.placeholder.encryption`. Receiving `zroot/local/home` into
@@ -57,6 +64,10 @@ Commits on the branch, oldest first:
 | `b788f12` | protect impermanence `@blank` snapshots |
 | `c30de35` | per-host `snap` job; homelab local push+sink → source+pull |
 | `c5c03f5` | documentation |
+| `e93c78c` | first session handoff |
+| `f32566e` | **fix:** `recv.placeholder.encryption` on receiving jobs |
+| `0c65b39` | the two-node replication VM test |
+| `77fd4ac` | placeholder-encryption and `root_fs` findings documented |
 
 ## What was decided, and why
 
@@ -80,7 +91,8 @@ Decisions the user made explicitly — don't relitigate without asking:
    test deliberately does *not* cover, because they need either a
    single-host pool pair or a way to sever a transfer mid-stream: the
    local `source`+`pull` pair on homelab, and an interrupted transfer
-   leaving a resumable state. Both are still unexercised.
+   leaving a resumable state. Both are still unexercised, so homelab's
+   local replication gets its first real run at deploy time.
 2. **Deploy homelab first** — torrent and thinkpad need it reachable.
    Before switching, confirm `zbackup/backup/{homelab,thinkpad,torrent}`
    all exist (`zfs list`). zrepl does not create `root_fs`, and disko
@@ -99,8 +111,11 @@ Decisions the user made explicitly — don't relitigate without asking:
    out while that guard is on.
 6. **Delete this file**, and drop the "not yet deployed" caveats from
    `docs/backups.md`, `docs/architecture.md`, and
-   `docs/procedures/backup-restore.md`. Keep `tests/` and
-   `modules/flake/checks.nix` — those are not session state.
+   `docs/procedures/backup-restore.md`. Keep `tests/`,
+   `modules/flake/checks.nix`, and `docs/procedures/vm-testing.md` —
+   those are documentation and regression cover, not session state. The
+   test in particular guards edits still on the roadmap (item 5 below,
+   and the untested tcp/tls transports).
 
 ## Watch for
 
@@ -119,6 +134,11 @@ Decisions the user made explicitly — don't relitigate without asking:
 - **A long outage means a long catch-up.** zrepl replays every intermediate
   snapshot rather than jumping to the newest, so a host offline for weeks
   produces a chain of send steps on reconnect.
+- **A valid zrepl config can still be wrong.** `zrepl configcheck` — and
+  therefore `myZrepl.validateConfig` — only checks that the YAML parses
+  into known keys. It accepted the missing `recv.placeholder.encryption`
+  that would have failed every pull. Treat a green build as evidence
+  about syntax only; for behaviour, run the VM test.
 - **Deploying is not the same as verifying.** `TODO.md` records a prior
   incident where a fix was verified in isolation but never actually
   switched into the running system, and the broken service kept running for
@@ -126,9 +146,10 @@ Decisions the user made explicitly — don't relitigate without asking:
 
 ## Not done, deliberately
 
-- No restore has been performed against the new layout, so
-  `docs/procedures/backup-restore.md` is written from mechanics and flagged
-  as unverified.
+- No restore has been performed against *real* data. The VM test does
+  exercise `backup-restore.md`'s clone-a-snapshot file recovery against
+  the new layout and it works, but the rollback and full-dataset-restore
+  paths remain written-from-mechanics and unverified.
 - `myZrepl.sink` and `myZrepl.push` are implemented but unused — they exist
   so a future roaming host can opt into push without reworking the module.
 - The `tcp` and `tls` transports are wired but untested.

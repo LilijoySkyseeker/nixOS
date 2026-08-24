@@ -176,6 +176,16 @@ These each cost real investigation; none are obvious from the config.
   against the generated YAML during `nixos-rebuild build`, turning that
   into a build error rather than an activation failure on the target host.
 
+## Testing a change to this subsystem
+
+`tests/zrepl-replication.nix` (`nix build
+.#checks.x86_64-linux.zrepl-replication`) boots a source and a puller with
+real zpools and exercises a real replication. Reach for it whenever you
+touch `modules/nixos/zrepl.nix` or a host's `myZrepl` block: several of
+the gotchas above produce a config that `zrepl configcheck` happily
+accepts, so a build proves nothing about them. See
+`docs/procedures/vm-testing.md`.
+
 ## Behaviour when a host is offline
 
 A source host that is off takes no snapshots and accumulates nothing;

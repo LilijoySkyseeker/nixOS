@@ -44,6 +44,8 @@ consolidated in one place rather than scattered per-topic.
   installs are slow/costly to iterate on, a local VM boots in under a
   minute and reproduces most boot/activation/service behavior. Clean up VM
   scratch artifacts (qcow2/log files, leftover qemu processes) once done.
+  Full guide, including which unit failures are just VM artifacts and can
+  be ignored: `docs/procedures/vm-testing.md`.
 - **Build locally, not on the remote target.** For `nixos-anywhere`, leave
   `--build-on-remote` unset; for `nixos-rebuild --target-host`, leave
   `--build-host` unset. Small/cheap remote targets (a VPS) can be memory- or

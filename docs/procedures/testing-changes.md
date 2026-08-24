@@ -37,7 +37,8 @@ each check actually catches, and when to reach for it.
    puller pair with real zpools because `nixos-rebuild build` can only
    prove the generated zrepl YAML *parses*, never that a pull lands
    data. Add one when a change's failure mode is runtime-only and the
-   blast radius justifies the wait.
+   blast radius justifies the wait. How to write and debug one, and the
+   traps involved: `docs/procedures/vm-testing.md`.
 5. **`nvd diff /run/current-system <new-closure-path>`** — a readable
    diff between what's currently running and a built-but-not-switched
    closure. Use this before ever switching a live host, to see exactly

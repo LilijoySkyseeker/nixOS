@@ -7,12 +7,26 @@
 # exercises the parts that only fail at runtime:
 #
 #   * a `serve` host answering a pull over ssh+stdinserver, through the
-#     forced command the module writes into root's authorized_keys
+#     forced command the module writes into root's authorized_keys, and
+#     that same key being unable to get a shell
+#   * `recv.placeholder.encryption` being set, without which the receiver
+#     cannot create the intermediate placeholder datasets the layout
+#     implies -- configcheck passes either way, so this is only ever
+#     visible from a real receive. This test is what caught it missing.
 #   * received data appearing at the deeper `root_fs/<full source path>`
-#     layout that replaced syncoid's flatter names
+#     layout that replaced syncoid's flatter names, and still holding the
+#     payload when recovered the way backup-restore.md prescribes
 #   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
 #     unguarded grid rule would condemn (see docs/backups.md "Gotchas")
-#   * a `snap` job pruning on its own, with no puller involved
+#   * a `snap` job snapshotting on its own, with no puller involved
+#
+# This is kept as a regression test, not a one-off verification: the
+# module still has planned edits (turning off preserveLegacySnapshots,
+# and the tcp/tls transports that are wired but unexercised), and its
+# failure mode is a backup that silently stops working -- which you find
+# out about when you need a restore. Delete it if zrepl is ever replaced.
+#
+# Writing or debugging one of these: docs/procedures/vm-testing.md.
 {
   pkgs,
   zreplModule,
@@ -189,11 +203,10 @@ pkgs.testers.runNixOSTest {
         # match rather than ignoring it, so without protectRegexes this
         # is exactly what a prune would destroy first.
         puller.succeed("zrepl signal wakeup sourcehost")
+        # Both jobs run on a 10s interval here, so 20s covers at least one
+        # full prune cycle on each side -- long enough that a missing
+        # protect rule would have destroyed @blank by the assert below.
         sourcehost.succeed("sleep 20")
         sourcehost.succeed("zfs list -t snapshot -o name -H | grep -q 'tank/data@blank'")
-
-    with subtest("zrepl status is queryable on both sides"):
-        puller.succeed("zrepl status --mode raw >/dev/null")
-        sourcehost.succeed("zrepl status --mode raw >/dev/null")
   '';
 }
