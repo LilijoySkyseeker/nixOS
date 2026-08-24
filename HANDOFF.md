@@ -33,10 +33,17 @@ Verified live on homelab after the switch:
 - Rollback point if needed: **generation 328**
   (`/nix/store/y29czmvha5chc1nfarfcjyzhvi8b1hhs-...`).
 
-Expected-but-not-yet-observed at time of writing: the `local-pull` job
-runs on a **15m** interval, so the new-layout datasets
-(`zbackup/backup/homelab/zdata/storage/storage`, etc.) had not been
-created yet. **First thing to check on resume** — see "Next steps".
+**Local replication has since been confirmed working in production**
+(checked 13:45 PDT, ~3h45m after the switch). This was the first real run
+of the local `source`+`pull` pair, which the VM test does not cover:
+
+```
+zbackup/backup/homelab/zdata/storage/storage-bulk   1.62T   (in flight)
+```
+
+It is still transferring `storage-bulk` (2.07T at source). `storage` and
+`zroot/local/state` have not started yet — the job works one dataset at a
+time. So the local pair is **proven**, but not yet **complete**.
 
 The `torrent` and `thinkpad` pull jobs **will fail** until those hosts are
 deployed; they have no `sshd`/zrepl `serve` yet. That is expected, not a
@@ -72,24 +79,45 @@ All four enclosure drives now enumerate at **5000 Mbps (USB 3.0)** on bus
 recurring multi-drive faults previously documented. `zpool status -x`:
 all pools healthy.
 
+**Measured under real load, 2026-08-24 13:45**, during homelab's local
+replication: `zpool iostat -v zbackup` shows ~245-261 MB/s of aggregate
+device bandwidth, i.e. **~122-130 MB/s of actual data** (each mirror disk
+writes the full copy, so the pool row is the sum of the two). This agrees
+independently with the dataset growth rate: 1.62T received in ~3h45m is
+~124 MB/s.
+
+Compare the old measurement in `TODO.md`: ~20MB/s per mirror disk,
+~40MB/s aggregate. **That is roughly a 6x improvement**, and it is the
+first hard number since the cable change.
+
 This closes `TODO.md`'s 2026-08-21 throughput incident and means **the
-~40h estimate for torrent's 3.13TB send is an upper bound, not a
-prediction.** The 15m replication interval and tiered `archive` grid were
-chosen under the old ceiling and are now conservative rather than forced;
-they have deliberately **not** been re-tuned (no measurement yet).
+~40h estimate for torrent's 3.13TB send is badly out of date.** At
+~125 MB/s, ~3.13TB is on the order of **7-8 hours**, not 40. Treat that
+as the new working estimate, still unproven for a remote (SSH-transported)
+pull as opposed to this local one.
+
+The 15m replication interval and tiered `archive` grid were chosen under
+the old ceiling and are now conservative rather than forced; they have
+deliberately **not** been re-tuned.
 
 ## BLOCKER — zbackup does not have room for both layouts
 
 This is the most important thing on this page and it was not anticipated
 in the original plan.
 
-`zbackup` is 10.9T, currently **5.98T used / 4.80T available**, all of it
-the **old syncoid layout**:
+`zbackup` is 10.9T. At the moment of the switch it was 5.98T used / 4.80T
+free, all of it the **old syncoid layout**:
 
 ```
 zbackup/backup/homelab/{state,storage,storage-bulk}   2.90T
 zbackup/backup/torrent/home                           3.08T   (stranded)
 ```
+
+**This is getting worse in real time.** homelab's local replication is
+writing the new layout alongside the old one right now — by 13:45 the pool
+was already **7.60T alloc / 3.30T free**, down from 4.80T free at 10:02,
+and `storage-bulk` was not finished. Expect roughly **2.0-2.2T free** once
+homelab's local replication completes.
 
 zrepl writes to **different paths** (`<root_fs>/<full source dataset
 path>`), so it will not reuse any of that. It needs roughly:
@@ -102,8 +130,10 @@ thinkpad zroot/local/{home,root}                                   unknown
 ```
 
 **~6.05T needed vs ~4.80T free — it does not fit.** homelab's own local
-replication alone (~2.92T) fits, but torrent's first pull will fill the
-pool and fail partway.
+replication alone (~2.92T) fits, and is completing now. torrent's ~3.13T
+then has only ~2.0-2.2T to land in, so **torrent's first pull will fill
+the pool and fail partway** unless space is freed first. Do not start
+torrent before resolving this.
 
 The old datasets must be destroyed to make room. That is a **destructive,
 user-only decision** and was deliberately not done. Note that
@@ -164,6 +194,15 @@ auto-updaters deploy the zrepl config rather than reverting it.
   mountpoint. Fix before thinkpad's first receive:
   `zfs set mountpoint=none zbackup/backup/thinkpad`
   (attempted this session; blocked by the tooling's safety classifier).
+- **Benign-looking prune errors during a long transfer.** The `snapshots`
+  job logs `target could not destroy snapshots ... it's being held` for
+  snapshots the in-flight replication holds
+  (`zfs holds` shows tag `zrepl_STEP_J_local-source`). This is zrepl
+  working as designed — the step hold stops the snapshotter's ceiling
+  prune from destroying a snapshot mid-send — and it should clear once the
+  transfer finishes and the hold is released. **Worth re-checking after
+  homelab's local replication completes**; if the error persists with no
+  transfer running, it is a stuck hold and needs looking at, not ignoring.
 - **Leftover containers** slated for deletion in `TODO.md` still exist:
   `zbackup/backup-bulk/*`, `zbackup/backup/{legion,other}`. All 96K
   placeholders. Untouched — deletion is a user decision.
@@ -173,22 +212,28 @@ auto-updaters deploy the zrepl config rather than reverting it.
 
 ## Next steps, in order
 
-1. **Confirm homelab's local replication actually ran.** It is on a 15m
-   interval and had not fired when this was written:
+1. **Wait for homelab's local replication to finish.** It was mid-flight
+   on `storage-bulk` at 13:45 and still had `storage` (486G) and
+   `zroot/local/state` (170G) to go. Check:
    ```
    zfs list -r zbackup/backup/homelab
+   zpool list -o name,alloc,free zbackup
    journalctl -u zrepl.service --since -1h | grep -iE 'error|fail'
    ```
-   Expect new datasets at `zbackup/backup/homelab/zdata/storage/storage`,
-   `.../storage-bulk`, `.../zroot/local/state`. This is the **first real
-   run of the local `source`+`pull` pair**, which the VM test does not
-   cover — so it deserves an actual look, not an assumption.
-2. **Reboot homelab** (the user authorised this) to prove
-   `zfs-import-zbackup.service` imports the pool automatically. This is
-   the only way to verify the fix for finding #1. After the reboot,
-   re-stop the three timers.
+   Done when all three new-layout datasets exist under
+   `zbackup/backup/homelab/{zdata/storage/...,zroot/local/state}` and the
+   pool write rate drops to idle.
+2. **Reboot homelab** — the user authorised this specifically for testing.
+   It proves `zfs-import-zbackup.service` imports the pool automatically,
+   which is the *only* way to verify the fix for finding #1 and the one
+   thing that remains unproven about it. **Deliberately deferred this
+   session: do not reboot mid-transfer.** Do it once step 1 is done. After
+   the reboot, verify `zpool list zbackup` shows the pool imported without
+   manual intervention, then re-stop the three timers (a reboot restarts
+   them, same as a switch).
 3. **Get a decision on the capacity blocker above** before touching
-   torrent. Nothing else can proceed without it.
+   torrent. Nothing else can proceed without it, and it is now urgent —
+   free space is being consumed as homelab's replication lands.
 4. **Deploy torrent**, then **thinkpad**, per the original plan. Build
    locally and push (`nixos-rebuild switch --flake .#<host>
    --target-host root@<host>`, `NIX_SSHOPTS` carrying the key) — do not

@@ -170,12 +170,23 @@ items rather than letting them rot.
       (sanoid's minutely recursive walk) is moot: the zrepl migration
       removes sanoid entirely.
 
+      **Measured 2026-08-24 13:45 under real load** (homelab's first
+      zrepl local replication, ~1.62T transferred): `zpool iostat -v
+      zbackup` shows ~245-261MB/s aggregate device bandwidth, i.e.
+      **~122-130MB/s of actual data** — each mirror disk writes the full
+      copy, so the pool row sums the two. Confirmed independently by
+      dataset growth: 1.62T in ~3h45m ≈ 124MB/s. Against the old
+      ~20MB/s-per-disk / ~40MB/s aggregate, that is **roughly 6x**.
+
+      Consequence: **the old ~40h estimate for torrent's ~3.13TB is badly
+      out of date.** At ~125MB/s it is on the order of 7-8h. Still
+      unproven for a *remote* SSH-transported pull as opposed to this
+      local one — torrent's first pull remains the honest datapoint for
+      that.
+
       Not re-tuned: the 15m replication interval and tiered `archive`
       grid were chosen under the old ceiling and are now conservative
-      rather than forced. Left as-is deliberately — no measurement of
-      the new real-world rate yet. torrent's first zrepl pull will be
-      the first honest datapoint, and the old ~40h estimate for ~3.13TB
-      should be treated as an upper bound, not a prediction.
+      rather than forced. Left as-is deliberately.
 
       Original diagnosis, kept for the record: Investigated live during
       torrent's first-ever `myBackupPush` run (3.13TB initial `zfs
