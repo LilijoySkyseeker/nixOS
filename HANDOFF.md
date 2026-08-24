@@ -405,4 +405,4 @@ Decisions the user made explicitly — don't relitigate without asking:
 | `416b140` | **fix:** import zbackup at boot; USB cable change documented |
 | `713824b` | homelab deploy, capacity blocker, and handoff recorded |
 | `a8f705d` | local replication proven; ~6x throughput measured |
-| (this one) | final handoff: resume pointer, exact commands, destroy-risk split |
+| `afe4a5a` | final handoff: resume pointer, exact commands, destroy-risk split |
