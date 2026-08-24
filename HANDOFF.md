@@ -7,6 +7,28 @@ same day by a third session, which **deployed homelab**.
 deployed.** It is session state, not documentation — durable knowledge
 went into `docs/backups.md`, `hosts/homelab/README.md` and `TODO.md`.
 
+## How to resume
+
+Everything is committed and pushed; nothing is left in a dirty tree.
+
+- Worktree: `/home/lilijoy/dotfiles/.claude/worktrees/zrepl-migration-plan`
+  (enter it with the `EnterWorktree` tool, `path:` that directory — do not
+  work from the main checkout).
+- Branch `worktree-zrepl-migration-plan`, pushed to `origin`. The working
+  tree was clean and `nixfmt --check` passed at handoff.
+- The branch is **not merged to master**. master still has sanoid/syncoid.
+- Sessions here run on `torrent`, which is where the builds were done.
+
+One-sentence prompt to start the next session with:
+
+> Continue the zrepl migration: enter the worktree at
+> `.claude/worktrees/zrepl-migration-plan` (branch
+> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — homelab is
+> deployed and its local replication was still running, so wait for that to
+> finish, then reboot homelab to verify the new `boot.zfs.extraPools`
+> import fix, and get my decision on freeing space on `zbackup` before
+> deploying torrent.
+
 ## Read these, don't re-derive
 
 - `docs/backups.md` — design, roles, retention, and the zrepl behaviours
@@ -44,6 +66,16 @@ zbackup/backup/homelab/zdata/storage/storage-bulk   1.62T   (in flight)
 It is still transferring `storage-bulk` (2.07T at source). `storage` and
 `zroot/local/state` have not started yet — the job works one dataset at a
 time. So the local pair is **proven**, but not yet **complete**.
+
+**Last observed state, 2026-08-24 13:48 PDT** (the final reading before
+this session ended — everything after this is unobserved):
+
+```
+zbackup                                            7.62T alloc / 3.29T free (69% cap)
+zbackup/backup/homelab/zdata/storage/storage-bulk  1.64T   (still growing)
+zrepl.service                                      active
+flake-update-test / nixos-upgrade / push-deploy-vps timers   inactive
+```
 
 The `torrent` and `thinkpad` pull jobs **will fail** until those hosts are
 deployed; they have no `sshd`/zrepl `serve` yet. That is expected, not a
@@ -136,17 +168,35 @@ the pool and fail partway** unless space is freed first. Do not start
 torrent before resolving this.
 
 The old datasets must be destroyed to make room. That is a **destructive,
-user-only decision** and was deliberately not done. Note that
-`zbackup/backup/torrent/home` (3.08T) is the stranded backup from
-`TODO.md`'s open incident — destroying it means accepting the fresh full
-send, which is what the plan already called for, but it is the user's
-call to make explicitly. Until then that 3.08T is the only backup of
-torrent's home that exists.
+user-only decision** and was deliberately not done.
 
-Suggested order once the user decides: let homelab's local replication
-land first (it fits), confirm the new-layout copies are good, destroy the
-old `backup/homelab/{state,storage,storage-bulk}`, and only then start
-torrent — destroying `backup/torrent/home` as part of that step.
+**The two halves carry very different risk — do not treat them alike:**
+
+- `backup/homelab/{state,storage,storage-bulk}` (2.90T) is now an
+  **orphan**. syncoid is gone from homelab, so nothing writes to it any
+  more; it is frozen at its last syncoid run. Once the new-layout copies
+  under `backup/homelab/zdata/...` and `.../zroot/local/state` are
+  complete, it is genuinely redundant and safe to destroy. **Low risk.**
+- `backup/torrent/home` (3.08T) is **not redundant**. torrent is still on
+  sanoid/syncoid and undeployed, so no new-layout copy of it exists at
+  all. Destroying it leaves **zero backup of torrent's home** for the
+  duration of the fresh full send (~7-8h at the newly measured rate).
+  That window is the real cost of the decision, and it is the user's to
+  accept. **Genuine risk — get an explicit yes.**
+
+Suggested order once the user decides:
+
+1. Let homelab's local replication finish (it fits in current free space).
+2. Verify the new-layout copies are complete and have snapshots
+   (`zfs list -t snapshot -r zbackup/backup/homelab/zdata`).
+3. Destroy the old `backup/homelab/{state,storage,storage-bulk}` — frees
+   ~2.90T, low risk, and on its own may be enough for torrent.
+4. Only if still short, and only with an explicit yes, destroy
+   `backup/torrent/home` before starting torrent's first pull.
+
+Step 3 alone takes free space to roughly **4.9-5.1T**, which already fits
+torrent's ~3.13T. **So step 4 may not be necessary at all** — check the
+numbers before asking the user to accept the risky half.
 
 ## Auto-updaters — paused, but the pause does NOT survive a switch
 
@@ -256,7 +306,41 @@ ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes root@homelab
 ```
 
 `lilijoy@homelab` is **not** authorised (publickey denied). torrent has no
-`sshd` until it is deployed. homelab has no `python3`.
+`sshd` until it is deployed. homelab has **no `python3`** — parse JSON
+locally or use shell tools there.
+
+On `torrent` itself you are the unprivileged user `lilijoy`; there is no
+root shell and `run0` needs interactive authentication, so anything
+requiring root on torrent has to be done by the user. Suggest they run it
+with a leading `!` in the prompt so the output lands in the session.
+
+### The exact deploy command that worked
+
+Run from the worktree on torrent. Builds locally and pushes the closure —
+`--build-host` is deliberately unset, per
+`docs/procedures/workflow.md`'s build-locality rule.
+
+```
+export NIX_SSHOPTS="-i /home/lilijoy/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes"
+nixos-rebuild switch --flake .#homelab --target-host root@homelab
+```
+
+Substitute `torrent` / `thinkpad` for the later deploys. Build-only first
+(`nixos-rebuild build --flake .#<host>`) is cheap and catches evaluation
+errors before touching the host.
+
+### Rolling homelab back
+
+Generation 328 is the pre-migration system. On homelab:
+
+```
+nixos-rebuild list-generations | head
+/nix/var/nix/profiles/system-328-link/bin/switch-to-configuration switch
+```
+
+Note that rolling back restores sanoid/syncoid but does **not** re-export
+`zbackup`, and the old generation lacks the `boot.zfs.extraPools` fix — so
+a rollback plus a reboot reintroduces the unimported-pool bug.
 
 ## What was decided, and why
 
@@ -319,3 +403,6 @@ Decisions the user made explicitly — don't relitigate without asking:
 | `77fd4ac` | placeholder-encryption and `root_fs` findings documented |
 | `b6fe659` | VM-testing guide |
 | `416b140` | **fix:** import zbackup at boot; USB cable change documented |
+| `713824b` | homelab deploy, capacity blocker, and handoff recorded |
+| `a8f705d` | local replication proven; ~6x throughput measured |
+| (this one) | final handoff: resume pointer, exact commands, destroy-risk split |
