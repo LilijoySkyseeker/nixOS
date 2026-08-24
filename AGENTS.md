@@ -20,10 +20,12 @@ encrypted with sops-nix.
 |---|---|
 | `docs/architecture.md` | How hosts/profiles/modules/services compose, the dendritic registration model, navigating "what does host X run," adding a new module, module-system gotchas. |
 | `docs/style-guide.md` | Nix conventions actually in use (formatting, `my<Name>` options pattern, comment style, naming). |
+| `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
 | `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). |
 | `docs/agents.md` | The reasoning *behind* the rules in this file and in `docs/procedures/workflow.md` — read when the summary alone isn't enough to act correctly. |
 | `docs/procedures/workflow.md` | Pre-work checks and hard-confirm rules (never switch/reboot/sudo unprompted, VM-test before real deploys, build locality). Read this before making any change. |
 | `docs/procedures/testing-changes.md` | Which validation layer to reach for (`nixfmt`/lint → `nix flake check` → `nixos-rebuild build` → `nvd diff` → switch) and what the git hooks already automate. |
+| `docs/procedures/backup-restore.md` | Getting data back out — file-level recovery, rollback, full dataset restore, and the offsite restic path. |
 | `docs/procedures/new-host.md` / `new-service.md` | Runbooks for adding a host or a service. |
 | `docs/procedures/secrets.md` | Secret rotation and the manual-secret-management policy — agents never edit or decrypt `secrets/*` themselves. |
 | `docs/procedures/remote-access.md` | SSH/Tailscale key model, which hosts are Tailscale-only, the `vps-deploy` account. |

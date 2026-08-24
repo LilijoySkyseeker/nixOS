@@ -46,9 +46,9 @@ key:
 
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
-| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `backup-push`, `zfs-space-guard` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `backup-push`, `zfs-space-guard` |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `jellyfin`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
+| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard` |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard` |
+| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `jellyfin`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
 | `isoimage` | unstable | `copyparty-iso` |
 
@@ -255,53 +255,43 @@ Two hosts are still structurally unusual, same as before the migration:
   `modules/flake/hosts.nix` for which `inputs.nixpkgs-*.lib.nixosSystem` a
   host uses before assuming a module option exists on it.
 
-## Backups (homelab)
+## Backups
 
-Three independent backup paths, none of them factored into
-`modules/services/` — worth knowing since that's where you'd expect to look
-based on the module-organization boundary above.
+Three independent paths, none of them factored into `modules/services/` —
+worth knowing since that's where you'd expect to look based on the
+module-organization boundary above.
 
-- **Offsite: restic -> Backblaze B2, via rclone**, inline in
-  `hosts/homelab/configuration.nix`. Weekly, backs up `zroot/local/state`
-  and `zdata/storage/storage` (not `storage-bulk` — too large to be worth
-  offsite cost) from a mounted ZFS snapshot rather than the live
-  filesystem, at idle priority. Uses rclone instead of restic's native
-  S3/B2 support (unreliable with this repo's systemd+CLI-wrapper setup).
-  The rclone remote is named `backblazeDaily` inside the
-  `homelab_backblaze_rclone_config` sops secret even though the job is
-  weekly — a leftover from before a rename; don't "fix" the name without
-  also updating the secret (secrets aren't edited directly — see
-  `docs/procedures/secrets.md`).
-- **Local replication: sanoid + syncoid, ZFS-native**, also inline in
-  `hosts/homelab/configuration.nix` (not yet a dedicated
-  `modules/nixos/zfs-snapshots.nix` module — in flight on a separate
-  branch). Snapshots the working datasets and replicates them hourly into
-  `zbackup`, entirely independent of the restic path above. Its
-  `localTargetAllow` delegation includes `destroy` so it can self-heal
-  from a partial receive instead of failing forever.
-- **Remote push replication: `torrent`/`thinkpad` -> `zbackup`**, via
-  `myBackupPush` (`modules/nixos/backup-push.nix`, registered
-  `"backup-push"`, listed for both hosts in `hosts.nix`). Each source
-  host's dedicated `backup-push` user (scoped `zfs allow`, never root)
-  pushes hourly over Tailscale to a dedicated `backup-recv` user on
-  homelab, using `--create-bookmark` so a long-offline source doesn't
-  force a full resend once local retention prunes past the last pushed
-  snapshot. Gated by a Tailscale-reachability check. Paired with
-  `myZfsSpaceGuard` (`modules/nixos/zfs-space-guard.nix`, also on both
-  hosts), which auto-prunes local snapshots under disk-space pressure.
+- **Offsite: restic -> Backblaze B2 via rclone**, inline in
+  `hosts/homelab/configuration.nix`. Weekly, from mounted ZFS snapshots.
+- **Local replication on homelab**: its own datasets -> `zbackup`, over
+  zrepl's in-process `local` transport.
+- **Remote replication**: `torrent`/`thinkpad` -> `zbackup` over SSH.
+  homelab **pulls**; the source hosts are passive and hold no credential
+  for homelab.
 
-`zbackup` uses a flat `zbackup/backup/<host>/<subdir>` layout for
-everything — no separate "bulk" tree.
+The latter two are both zrepl, configured by one shared module
+(`modules/nixos/zrepl.nix`, registered `"zrepl"`, listed for all three
+hosts). It replaced sanoid + syncoid and the former
+`modules/nixos/backup-push.nix`.
 
-**Deployed to `torrent`; not yet confirmed on `thinkpad`.** Torrent's
-initial `home` send is currently stuck — its source-side retention pruned
-the incremental base before the transfer finished, so no bookmark was
-created. See `TODO.md` for the live incident and the fix needed (source
-retention windows too short for a resend this size). Treat this section as
-the *design*; check `TODO.md` for current deployment status.
+**Full detail — roles, retention, the zrepl behaviours that are easy to get
+wrong, and offline behaviour — is in [`docs/backups.md`](backups.md).**
+Restore steps are in
+[`docs/procedures/backup-restore.md`](procedures/backup-restore.md).
 
-**Restore is not yet documented** — `docs/procedures/backup-restore.md` is
-a placeholder pending the layout above stabilizing.
+Two things worth knowing before touching anything nearby:
+
+- `zbackup`'s layout is `zbackup/backup/<host>/<full source dataset
+  path>` — zrepl extends `root_fs` with the whole source path, so it is
+  deeper than the old syncoid names (`.../torrent/zroot/local/home`, not
+  `.../torrent/home`). `myHealthAlerts.backupStaleness` keys off these.
+- zrepl destroys any snapshot it did not create unless a `regex` keep rule
+  matches it. `myZrepl.protectRegexes` (default `^blank$`) is what keeps
+  the impermanence rollback snapshots alive. See `docs/backups.md`'s
+  Gotchas before changing any retention rule.
+
+**Not yet deployed** — check `TODO.md` for current status before assuming
+any of this is live.
 
 ## Secrets
 

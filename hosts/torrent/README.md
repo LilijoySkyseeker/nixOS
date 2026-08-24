@@ -20,3 +20,20 @@ Primary desktop.
 - Speakers: A5+, Audioengine
 - Microphone: AT2020, Audio-Technica
 - Interface: RC-505MKII, BOSS
+
+## Backups
+
+Snapshots and replication are handled by zrepl — see
+[`docs/backups.md`](../../docs/backups.md).
+
+**This host now runs `sshd`, which it did not before.** It exists solely to
+carry zrepl's `ssh+stdinserver` transport, because homelab *pulls* from
+this host rather than being pushed to. It is locked down accordingly:
+tailnet-only (`openFirewall = false` plus a `tailscale0` firewall rule),
+`PermitRootLogin = "forced-commands-only"`, and the only key in root's
+`authorized_keys` is a forced command pinned to
+`zrepl stdinserver homelab`. Don't add unrestricted root keys here without
+reconsidering that posture.
+
+The impermanence migration has not happened on this host yet, and unlike
+thinkpad it has no `@blank` snapshots to preserve.
