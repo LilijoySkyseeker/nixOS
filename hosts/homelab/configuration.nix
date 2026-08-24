@@ -226,6 +226,12 @@
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
+
+    # homelab's own zrepl history is proven (local replication completed
+    # and verified 2026-08-24) -- the sanoid-era autosnap_ snapshots are
+    # no longer needed as a safety net and were destroyed by hand once
+    # this landed.
+    preserveLegacySnapshots = false;
   };
 
   # cpu power management
