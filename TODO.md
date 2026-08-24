@@ -54,16 +54,37 @@ items rather than letting them rot.
         the zrepl forced command. Verified in the built
         `authorized_keys`: one `command="... zrepl stdinserver
         homelab",restrict` entry and nothing else.
-      - **Snapshot cadence relaxed from minutely to 15m.** Under zrepl a
-        push/local job replicates after each snapshot, and homelab's
-        zbackup USB contention is already a known problem (see the
-        throughput item below) — minutely snapshot-plus-replicate would
-        make it worse.
-      - **Migration is non-destructive to existing history.** Grid keep
-        rules are regex-scoped to zrepl's own `zrepl_` prefix, so
-        existing sanoid `autosnap_*` snapshots are never considered for
-        pruning. They age out under nothing once sanoid is gone and need
-        one manual cleanup pass eventually.
+      - **Snapshot cadence: one uniform 5m interval across all three
+        hosts** (sanoid ran minutely, so this is a 3x reduction in
+        metadata churn on the USB-contended zbackup pool, not an
+        increase). Retention is two shared presets:
+        `retention.source` = `1x1h(keep=all) | 48x1h | 7x1d` — 5m for an
+        hour, hourly for 2 days, daily for a week (~67 snapshots, ~9
+        days); `retention.archive` = `168x1h | 30x1d | 12x30d` — hourly
+        for a week, daily for a month, monthly for a year (~210
+        snapshots, ~13 months). The tiered archive has *longer* reach
+        than the flat 366-daily grid it replaced while walking 61% fewer
+        snapshots per prune.
+      - **The cutover WOULD have destroyed all existing sanoid
+        snapshots** — corrected before it shipped, but worth recording
+        because the reasoning is non-obvious. Regex-scoping a grid rule
+        does not spare foreign snapshots: `KeepGrid` puts every
+        non-matching snapshot on its *destroy* list
+        (`internal/pruning/keep_grid.go`), and `PruneSnapshots` destroys
+        anything all rules list (`internal/pruning/pruning.go:39`).
+        Combined with the pruner treating everything older than the
+        replication cursor as replicated
+        (`internal/daemon/pruner/pruner.go:441`), the first prune after
+        initial replication would have wiped every `autosnap_*` snapshot
+        on the source datasets. `myZrepl.preserveLegacySnapshots`
+        (default on) adds a `regex` keep rule for `^autosnap_` to break
+        that unanimity. Turn it off and destroy the leftovers by hand
+        once zrepl has its own history — nothing ages them out while it
+        is on.
+        Existing *received* data on zbackup (the old syncoid target
+        paths) is safe either way: the receiver-side pruner skips
+        filesystems with no counterpart on the sender
+        (`SkipNoCorrespondenceOnSender`, `pruner.go:405`).
 
       **Manual steps required before deploying (secrets are yours per
       `feedback_secrets_manual`):**
