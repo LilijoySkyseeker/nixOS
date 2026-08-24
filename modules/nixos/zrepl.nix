@@ -113,7 +113,7 @@
       # (internal/pruning/pruning.go:39). So a lone grid rule condemns
       # foreign snapshots rather than ignoring them. The regex only stops
       # foreign snapshots from being counted as grid occupants and
-      # displacing zrepl's own. See legacyRule for the actual guard.
+      # displacing zrepl's own. See protectRule for the actual guard.
       gridRule = grid: {
         type = "grid";
         inherit grid;
@@ -128,27 +128,35 @@
         type = "not_replicated";
       };
 
-      # Transition guard for the sanoid -> zrepl cutover.
+      # Guard for snapshots zrepl must never destroy.
       #
-      # Without this, the first prune after initial replication destroys
-      # every pre-existing sanoid snapshot: the replication cursor lands
-      # on a fresh zrepl_ snapshot, everything older is then treated as
-      # replicated ("all snapshots older than cursor are interpreted as
-      # replicated", internal/daemon/pruner/pruner.go:441), so
-      # not_replicated condemns them and the grid rule condemns them for
-      # failing the prefix regex -- unanimous, therefore destroyed.
+      # This is not optional decoration -- without it zrepl deletes any
+      # snapshot it did not create. The pruner treats everything older
+      # than the replication cursor as replicated ("all snapshots older
+      # than cursor are interpreted as replicated",
+      # internal/daemon/pruner/pruner.go:441), so not_replicated condemns
+      # it; and a grid rule condemns every snapshot failing its prefix
+      # regex rather than ignoring it (internal/pruning/keep_grid.go).
+      # Both agreeing means destruction, since PruneSnapshots only spares
+      # a snapshot some rule actively keeps
+      # (internal/pruning/pruning.go:39).
       #
-      # A keep rule matching the legacy prefix breaks that unanimity and
-      # holds them indefinitely. Turn it off (or drop the old snapshots by
-      # hand) once zrepl has enough history of its own to stand on.
-      legacyRule = {
+      # A `regex` keep rule inverts that: it keeps what it matches and
+      # only lists non-matches for destruction
+      # (internal/pruning/keep_regex.go), so one matching rule is enough
+      # to hold a snapshot indefinitely. Matching is against the bare
+      # snapshot name, not pool/dataset@name (pruner.go:356).
+      protectRule = regex: {
         type = "regex";
-        regex = "^${cfg.legacySnapshotPrefix}";
+        inherit regex;
       };
 
-      keepLegacy = lib.optional (
-        cfg.preserveLegacySnapshots && cfg.legacySnapshotPrefix != ""
-      ) legacyRule;
+      keepProtected = map protectRule (
+        cfg.protectRegexes
+        ++ lib.optional (
+          cfg.preserveLegacySnapshots && cfg.legacySnapshotPrefix != ""
+        ) "^${cfg.legacySnapshotPrefix}"
+      );
 
       mkPruning = keepSender: keepReceiver: {
         keep_sender = keepSender;
@@ -395,6 +403,28 @@
           description = "Run `zrepl configcheck` against the generated config at build time.";
         };
 
+        protectRegexes = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "^blank$" ];
+          description = ''
+            Snapshots zrepl must never destroy, matched by regex against
+            the bare snapshot name.
+
+            Defaults to the impermanence `@blank` snapshots. Those are
+            created once by disko's postCreateHook at install time and are
+            what the initrd rollback service resets root to on every boot
+            -- they cannot be regenerated without reinstalling, and losing
+            one breaks the boot-time rollback. Since they are the oldest
+            snapshot on their dataset (hence "replicated") and carry no
+            zrepl prefix, every other keep rule would agree to destroy
+            them. hosts/thinkpad has these on both zroot/local/root and
+            zroot/local/home, which are exactly the datasets it serves.
+
+            Anchor patterns (^...$) so a prefix match cannot catch more
+            than intended.
+          '';
+        };
+
         preserveLegacySnapshots = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -604,10 +634,10 @@
                       notReplicatedRule
                       (gridRule cfg.retention.source)
                     ]
-                    ++ keepLegacy
+                    ++ keepProtected
                   );
 
-                  keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
+                  keepReceiver = keepReceiverOption ([ (gridRule cfg.retention.archive) ] ++ keepProtected);
                 };
               }
             );
@@ -642,10 +672,10 @@
                       notReplicatedRule
                       (gridRule cfg.retention.source)
                     ]
-                    ++ keepLegacy
+                    ++ keepProtected
                   );
 
-                  keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
+                  keepReceiver = keepReceiverOption ([ (gridRule cfg.retention.archive) ] ++ keepProtected);
                 };
               }
             );
@@ -762,10 +792,10 @@
               notReplicatedRule
               (gridRule cfg.retention.source)
             ]
-            ++ keepLegacy
+            ++ keepProtected
           );
 
-          keepReceiver = keepReceiverOption [ (gridRule cfg.retention.archive) ];
+          keepReceiver = keepReceiverOption ([ (gridRule cfg.retention.archive) ] ++ keepProtected);
         };
       };
 
