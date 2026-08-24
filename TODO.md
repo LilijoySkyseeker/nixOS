@@ -11,6 +11,47 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Agreed
+      architecture (single daemon per host, `services.zrepl.settings`
+      freeform YAML — the NixOS module is a thin ~10-line passthrough,
+      no abstraction to lean on):
+      - **homelab**: one `sink` job (`ssh+stdinserver`, `root_fs =
+        "zbackup/backup"`, zrepl auto-splits per client identity into
+        `zbackup/backup/{torrent,thinkpad}` — replaces the
+        `backup-recv` user + `zfs allow` delegation with forced-command
+        `authorized_keys` entries) plus a local `push`+`sink` job pair
+        (zrepl's `connect.type=local`/matching `listener_name`, no
+        ssh/tcp) replacing the current in-host `services.syncoid` pulls
+        for `zdata/storage/{storage,storage-bulk}` and
+        `zroot/local/state` → `zbackup/backup/homelab/*`. Replaces
+        `services.sanoid`/`services.syncoid` entirely in
+        `hosts/homelab/configuration.nix`.
+      - **torrent/thinkpad**: new shared module
+        (`modules/nixos/zrepl-push.nix`, replacing
+        `modules/nixos/backup-push.nix`'s `myBackupPush`) rendering one
+        `push` job each, `ssh+stdinserver` to homelab,
+        `replication.protection.{initial,incremental} = true` — this
+        holds-based protection is what prevents the exact failure mode
+        below (a long transfer's trailing incremental failing and
+        leaving no valid resume point).
+      - `modules/nixos/zfs-space-guard.nix` and
+        `modules/nixos/health-alerts.nix` logic is tool-agnostic
+        (works on raw `zfs list`/pool capacity) — only comment text
+        needs updating, no functional changes.
+      - Deploy order: homelab first, then torrent (whose first zrepl
+        replication run doubles as the fresh full send resolving the
+        stuck-incident entry below), then thinkpad. VM-test each per
+        `feedback_test_remote_deploys_in_vm` before any real switch.
+        Remove `backup-push.nix`/`backup-recv` user and confirm zero
+        remaining `sanoid|syncoid` refs only after all three hosts are
+        confirmed running zrepl through a burn-in period.
+      Tracked as Claude tasks #1-#9 this session (verify zrepl YAML
+      syntax against source first, not just docs prose, per
+      `feedback_oss_source_first` — the sink multi-client root_fs
+      templating and local-transport job pairing in particular need
+      confirming against the pinned v0.7.0 source before writing real
+      config). Not started — design/planning only so far.
+
 - [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
       dataset) is now stuck — needs a decision, not further automated
       action.** The initial full send (below) finished transferring
