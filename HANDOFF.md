@@ -1,12 +1,15 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, fifth
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, sixth
 revision this day. homelab is deployed, its local replication is
-**complete and verified**, and a real reboot confirmed the pool-import
-fix works. The `zrepl.service` boot race is **fixed in config and
-build-verified, but not yet verified against a real reboot** — that
-verification (a switch + reboot on homelab) is the next thing to do,
-before touching torrent or thinkpad.
+**complete and verified**, and the `zrepl.service` boot race fix is
+**deployed and reboot-verified** (three reboots, zrepl came up active
+every time, no regressions). **The next session's job is the original
+rollout again: deploy torrent, then thinkpad.** One caveat carried
+forward: the actual `storage.mount` race didn't recur across those three
+reboots, so the fix's effect on a live race is inferred from the unit
+dependency graph, not directly observed — see "PRIMARY TASK" below
+before treating that as fully closed.
 
 **Delete this file once the branch is merged and all three hosts are
 deployed.** It is session state, not documentation — durable knowledge
@@ -29,8 +32,8 @@ One-sentence prompt to start the next session with:
 > Continue the zrepl migration: enter the worktree at
 > `.claude/worktrees/zrepl-migration-plan` (branch
 > `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — the
-> `zrepl.service` boot race fix is built but needs a real homelab reboot
-> to verify, then deploy torrent and thinkpad.
+> `zrepl.service` boot race fix is deployed and reboot-verified on
+> homelab, so deploy torrent and thinkpad next.
 
 ## Read these, don't re-derive
 
@@ -97,20 +100,34 @@ One-sentence prompt to start the next session with:
   here (no root access pre-deploy); same mitigations as before apply
   (`operation = "boot"`, `autoReboot = false`).
 
-## PRIMARY TASK — fix the `zrepl.service` boot race
+## PRIMARY TASK — fix the `zrepl.service` boot race (done)
 
 **Fixed in `modules/nixos/zrepl.nix`** (the "relax `Requires=` to
 `Wants=`+`After=`" candidate below): `systemd.services.zrepl` now
 overrides `requires = lib.mkForce [ ];`, `wants`/`after` on
-`local-fs.target`. Confirmed the rendered drop-in unit shows
-`Wants=local-fs.target`, no `Requires=`, `After=zfs.target local-fs.target`
-intact. `nixos-rebuild build --flake .#homelab` succeeds. **Not yet
-verified against a real reboot** — do that before treating this as
-closed, the same way the `boot.zfs.extraPools` fix was verified last
-session. The underlying `storage.mount` race itself is still
-uninvestigated; this only removes the silent-outage consequence of it.
-See `docs/backups.md`'s new Gotchas entry and `TODO.md` for the full
-writeup.
+`local-fs.target`. Deployed to homelab via `nixos-rebuild switch`, then
+**rebooted three times in a row** (2026-08-24 16:49/16:52/16:55 PDT):
+`zrepl.service` active every time, both mounts clean, zero failed units,
+all three local jobs (`local-source`/`local-pull`/`snapshots`) cycling
+normally straight through. Live unit confirmed via
+`systemctl show zrepl.service`: `Wants=local-fs.target`,
+`After=local-fs.target`, no `local-fs.target` in `Requires=`.
+
+**Caveat, don't lose this:** `storage.mount` did not race in any of the
+three reboots, so what's verified is "no regression on a clean boot"
+plus "the dependency graph structurally can't dependency-fail zrepl's
+start job anymore" — not "observed zrepl surviving a live race", since
+no live race occurred to survive. The race is looking intermittent (one
+occurrence, then three non-occurrences) rather than reliably
+reproducible, so further confidence will most likely come from it
+happening again in the wild post-fix and zrepl visibly not going down,
+not from more deliberate reboots. If you want more direct evidence
+before fully trusting this, the VM test route from the original plan
+below is still on the table but was not attempted this session.
+
+The underlying `storage.mount` race itself is still uninvestigated; this
+fix only removes the silent-outage consequence of it. See
+`docs/backups.md`'s Gotchas entry and `TODO.md` for the full writeup.
 
 Full detail on the original finding,
 exact timestamps, and the failing unit's config are in `TODO.md`'s
@@ -202,12 +219,9 @@ non-empty before passing them to `zfs destroy`.**
 
 ## Next steps, in order
 
-1. **Verify the `zrepl.service` boot race fix against a real reboot**
-   (see "PRIMARY TASK" above — the config change is done and build-clean,
-   only reboot verification is outstanding). `nixos-rebuild switch
-   --flake .#homelab --target-host root@homelab`, then reboot homelab and
-   confirm `zrepl.service` comes up active even if `storage.mount` races
-   again. Ask before switching/rebooting — it's a live backup server.
+1. ~~Verify the `zrepl.service` boot race fix against a real reboot~~ —
+   **done this session**, see "PRIMARY TASK" above for the caveat about
+   the race not recurring during verification.
 2. **Deploy torrent**, then **thinkpad**, per the original plan. Capacity
    and the pool-import fix are both verified — nothing else blocks this.
    Build locally and push (`nixos-rebuild switch --flake .#<host>

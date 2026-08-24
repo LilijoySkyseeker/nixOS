@@ -108,15 +108,31 @@ items rather than letting them rot.
       of the whole daemon never starting. Verified the rendered drop-in
       (`systemd.services.zrepl` override unit) shows `Wants=local-fs.target`
       with no `Requires=` and `After=zfs.target local-fs.target` intact.
-      **Not yet verified against a real reboot** — do that before
-      trusting this closed, the same way the `boot.zfs.extraPools` fix
-      was verified.
+      **Reboot-verified, with a caveat.** `nixos-rebuild switch` deployed
+      to homelab, then rebooted three times in a row (16:49, 16:52, 16:55
+      PDT). All three came up clean: `zrepl.service` active every time,
+      `storage.mount`/`storage-bulk.mount` both mounted on the first
+      attempt, zero failed units, and `zrepl status` showed
+      `local-source`/`local-pull`/`snapshots` all cycling normally with
+      snapshots continuing to land right through the reboots. **The
+      `storage.mount` race itself did not reproduce in any of the three
+      attempts** — it remains a single data point from the previous
+      session. So this verifies the fix causes no regression on a clean
+      boot, and confirms by construction (inspected the live unit via
+      `systemctl show zrepl.service`: `Wants=local-fs.target`,
+      `After=local-fs.target`, `local-fs.target` no longer in
+      `Requires=`) that a dependency failure can no longer abort zrepl's
+      start job — but does not directly observe zrepl surviving a live
+      `storage.mount` failure, since none occurred to survive.
 
       **Still open, deliberately not fixed:** why `storage.mount` races
-      at all (only one data point so far: consistently reproducible on a
-      clean reboot, or intermittent? does `storage-bulk.mount` share the
-      root cause?). This fix removes the silent-outage symptom without
-      touching that underlying race.
+      at all (still only one data point total, now with three
+      non-reproductions alongside it — looks more intermittent than
+      reliably reproducible; does `storage-bulk.mount` share the root
+      cause?). This fix removes the silent-outage symptom without
+      touching that underlying race. If it recurs, check
+      `systemctl is-active zrepl.service` — it should now come up on its
+      own without manual intervention.
 
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
       complete on branch `worktree-zrepl-migration-plan`; all three hosts

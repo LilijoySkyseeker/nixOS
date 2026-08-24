@@ -246,9 +246,13 @@ These each cost real investigation; none are obvious from the config.
   `Requires=`, so the daemon still starts after the mount was attempted
   but a transient failure there no longer permanently downs it — a
   dataset that isn't mounted yet just fails that job's next cycle instead
-  of the whole daemon never starting. The underlying `storage.mount` race
-  itself is still unfixed; this only removes the "backups stay silently
-  down until a human notices" consequence of it.
+  of the whole daemon never starting. Reboot-verified on homelab (three
+  reboots, zrepl active and all local jobs cycling normally every time),
+  though the `storage.mount` race itself didn't recur in any of the
+  three to directly exercise the failure path — it looks intermittent
+  rather than reliably reproducible. The underlying race itself is still
+  unfixed; this only removes the "backups stay silently down until a
+  human notices" consequence of it.
 
 ## Testing a change to this subsystem
 
