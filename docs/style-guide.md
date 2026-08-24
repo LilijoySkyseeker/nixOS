@@ -112,6 +112,34 @@ The pattern worth copying across all of these: when a comment exists
 because an earlier assumption turned out to be false, say so — it
 stops the same wrong assumption from being made again.
 
+### Voice and mechanics
+
+- Lowercase start, no terminal period, terse fragments over full
+  sentences: `# DigitalOcean's only world facing interface`,
+  `# zram instead to prevent secrets leakage`.
+- Comment sits directly above the code it explains, no blank line
+  between them; a blank line separates it from the previous unrelated
+  block. Short annotations on a single value may trail on the same
+  line instead (`sourcePort = 19132; # minecraft: geyser (bedrock
+  edition)`, `51820 # wireguard`).
+- Name the actual actor/constraint causing the behavior rather than
+  describing generically: `# DigitalOcean's hypervisor virtual switch
+  needs cloud-init to run and "register"/arm the droplet's network
+  before it'll pass any traffic for that NIC`.
+- A single-line comment can act as a section banner introducing a
+  block of related settings, often `# tool: purpose` when the
+  tool/subsystem isn't already obvious from the surrounding attribute
+  names: `# crowdsec: watches sshd/caddy logs, bans abusive IPs via
+  the firewall bouncer`.
+- Multi-line embedded shell scripts get one comment per branch,
+  phrased as what triggers it and naming the calling tool:
+  `# nixos-rebuild's pre-activation sanity check`.
+- Inline `# TODO:` marks known-incomplete config on the same line as
+  the affected declaration: `sops.secrets.vps_caddy_env = { }; # TODO:
+  populate with DNS provider API token if using DNS-01 challenges`.
+- See `hosts/vps/configuration.nix` for a dense example of all of the
+  above in one file.
+
 ## Naming
 
 - Host names are the literal hostname (`thinkpad`, `torrent`, `homelab`,
