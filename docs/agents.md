@@ -30,17 +30,21 @@ pin while existing on another's — this isn't a hypothetical, it's an
 active split maintained on purpose. Don't assume parity between hosts
 just because they're in the same repo.
 
-## Why "why-comments," not exhaustive documentation, inline
+## Why rationale lives in commit messages, not inline comments
 
-The stated policy (`docs/style-guide.md`) is non-obvious-only inline
-comments. The reasoning: this repo's failure mode historically hasn't
-been "insufficiently documented code," it's been re-deriving the same
-already-solved problem (a boot-time sops identity issue, a gid
+The stated policy (`docs/style-guide.md`) is that inline comments cover
+mechanics/labeling only; non-obvious rationale goes in the commit
+message instead. The reasoning: this repo's failure mode historically
+hasn't been "insufficiently documented code," it's been re-deriving the
+same already-solved problem (a boot-time sops identity issue, a gid
 collision, a `nixos-rebuild-ng --sudo` behavior) because the reasoning
 behind a specific config shape wasn't recorded anywhere near the code.
-A comment that says *why* a line is shaped the way it is prevents that
-specific class of repeated investigation. A comment that just restates
-what the line does doesn't — skip those.
+A commit message that says *why* a change is shaped the way it is
+prevents that specific class of repeated investigation — `git log`/
+`git blame` on the affected lines surfaces it later. A commit message
+that just restates what the diff does doesn't — write the why, and
+split into multiple commits if different pieces need different
+rationale.
 
 ## Where to look before assuming
 

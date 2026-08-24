@@ -38,7 +38,7 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
   actually needed (see `services.syncoid`'s `zfs allow`/`zfs unallow`
   wrapper-script pattern for ZFS-touching services). If root genuinely
   can't be avoided (e.g. raw `/dev/zfs` admin ioctls with no delegation
-  path), note why in a comment.
+  path), note why in the commit message.
 - **Custom `systemd.services` sandboxing**: add `NoNewPrivileges = true`
   plus, when the unit's actual job allows it, the full stack —
   `ProtectSystem = "strict"` (with `ReadWritePaths` for whatever it
