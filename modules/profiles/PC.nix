@@ -153,6 +153,7 @@ in
           homeManagerModules.tooling
           homeManagerModules."virt-manager"
           homeManagerModules.kitty
+          homeManagerModules."claude-code"
           inputs.plover-flake.homeManagerModules.plover
         ];
         home = {
