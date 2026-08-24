@@ -18,7 +18,7 @@ shape; the vps README has the gotchas for a specific real deploy
    host on the same channel, and listing whichever `flake.modules.nixos.*`
    registration keys the host needs in its `modules = [ ... ]` list
    (see `docs/architecture.md` for how existing hosts are composed and
-   `AGENTS.md`'s "Navigating" section for how to find a module's actual
+   its "Navigating" section for how to find a module's actual
    registration key).
 3. Before the target is reachable over SSH via a sops-decrypted secret
    (e.g. Tailscale), pre-generate that host's SSH host key **outside

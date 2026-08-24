@@ -54,7 +54,8 @@ rationale.
   `import-tree` is not the same as being used by any host.
 - Before assuming a file in `files/` is dead because nothing in `.nix`
   references it, check whether it's consumed by an external tool
-  (VIA/Vial, Picard, an ICC profile loader) instead — see `AGENTS.md`.
+  (VIA/Vial, Picard, an ICC profile loader) instead — see
+  `docs/procedures/workflow.md`.
 - Before adding an options surface to a new module, check
   `docs/style-guide.md`'s `my<Name>` convention and whether a plain
   `modules/services/*.nix` file would actually be simpler for a

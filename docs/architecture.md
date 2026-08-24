@@ -150,11 +150,110 @@ Two hosts are still structurally unusual, same as before the migration:
 
 ## Navigating: "what does host X actually run?"
 
-See `AGENTS.md`'s "Navigating" section for the full walkthrough
-(`hosts.nix`'s module list -> the host's own `configuration.nix` for local
-settings -> each module's file, matched by registration key not filename ->
-profile modules' own internal `imports`). Not duplicated here to avoid the
-two drifting out of sync — that section is the canonical version.
+1. Start at `modules/flake/hosts.nix` — find the host's `modules = [ ... ]`
+   list. That's the authoritative list of shared modules it pulls in.
+2. Cross-reference `hosts/<name>/configuration.nix` for host-local settings
+   (hostname, filesystems, host-specific `myPullDeploy`/`myAutoUpdate` option
+   settings, etc.) not covered by any shared module.
+3. For each module name in step 1, find its file — mostly
+   `modules/{nixos,home-manager,profiles,services}/<name>.nix`, matched by the
+   `flake.modules.nixos.<name>` / `flake.modules.homeManager.<name>` key inside
+   it, **not necessarily the filename** (e.g. `modules/profiles/PC.nix`
+   registers as `"profile-pc"`, `modules/nixos/nfs-homelab-mounts.nix`
+   registers as `"nfs-homelab-mounts"` — grep for
+   `flake.modules.nixos."?<name>"?` if the name and filename diverge; see
+   `docs/style-guide.md`'s "Registration key vs. filename").
+4. Profile modules (`profile-default`, `profile-pc`, `profile-server`)
+   themselves pull in further modules internally — check their own `let`
+   block (`nixosModules = config.flake.modules.nixos;`) and `imports`.
+
+## Adding a new module
+
+1. Create the file wherever fits: `modules/nixos/<name>.nix`,
+   `modules/home-manager/<name>.nix`, or `modules/services/<name>.nix`.
+2. Wrap its content as `flake.modules.nixos.<name> = { ... }: { ... };` (or
+   `flake.modules.homeManager.<name>` for a home-manager module). The
+   _inner_ function's arg list works exactly like a normal NixOS module
+   (`{ config, lib, pkgs, ... }:`) — nothing changes there.
+3. It is now discoverable (`import-tree` picks up any `.nix` file under
+   `modules/`) but **not yet used by any host** — you still have to add it
+   to the relevant host's (or profile's) module list in
+   `modules/flake/hosts.nix` (or the profile file it should belong to).
+   Creating the file is necessary but not sufficient.
+4. If it needs `flake.vars`, other converted modules, or
+   `pkgs-unstable`/`pkgs-stable`, see the Gotchas below for the
+   closure-capture pattern.
+
+## Gotchas — check these before touching `modules/`
+
+- **`config` shadowing.** A file's outer function (`{ config, inputs, ... }:`)
+  receives the _flake-parts_ `config` (so `config.flake.vars`,
+  `config.flake.modules.nixos.*` work there). The _inner_ function you assign
+  to `flake.modules.nixos.<name> = { config, ... }: { ... }` receives the
+  NixOS module's own `config` instead — same name, different object. If you
+  need the outer flake-parts `config` from inside the inner module body,
+  capture it under a **different name** in a `let` before the inner function
+  shadows it:
+  ```nix
+  { config, ... }:
+  let
+    vars = config.flake.vars;              # capture BEFORE shadowing
+    nixosModules = config.flake.modules.nixos;
+  in
+  {
+    flake.modules.nixos.foo = { config, ... }: {   # this `config` is NixOS's own
+      users.groups.multimedia.gid = vars.gids.multimedia;  # use the captured name
+      imports = [ nixosModules.tooling ];
+    };
+  }
+  ```
+  Reusing the name `config` for both would silently read the wrong object —
+  this bit us once during the migration (`modules/services/jellyfin.nix`,
+  `modules/nixos/nfs-homelab-mounts.nix`), and it fails loudly at eval time
+  with an unrelated-looking error ("attribute 'flake' missing"), not a clear
+  "you shadowed config" message.
+- **`flake.modules` isn't a built-in flake-parts option.** It only exists
+  because `flake.nix` imports `inputs.flake-parts.flakeModules.modules`
+  explicitly. If that import is ever removed or a fresh flake-parts setup is
+  copied from elsewhere without it, every `flake.modules.nixos.<name> = ...`
+  definition across every file starts colliding on one unmerged freeform
+  key, producing a confusing "multiple definitions for this option, use
+  `lib.mkForce`" error that looks like a real option conflict but isn't —
+  it's this import missing.
+- **`import-tree` needs one scan root.** Don't split it into multiple
+  `import-tree` calls combined with `[ ... ]` or `++` — both produce "Module
+  imports can't be nested lists" / "expected a list but found a set" errors,
+  because `import-tree <dir>` returns an already-structured module value,
+  not a plain list. If you need to add a new top-level directory to the
+  scan, move it under `modules/` rather than adding a second `import-tree`
+  call.
+- **A module only "counts" if `modules/flake/hosts.nix` lists it.** Deleting
+  a file's _usage_ from a host means removing it from `hosts.nix`'s
+  per-host list, not (necessarily) deleting the file — and conversely, a
+  file existing under `modules/` proves nothing about which hosts run it.
+  Always check `hosts.nix`, same as the old repo required checking each
+  host's/profile's `imports` list.
+- **Relative paths inside a converted file are still relative to that
+  file's own location on disk**, exactly like before — moving a file (e.g.
+  the `profiles/` → `modules/profiles/` move done in the migration) means
+  updating any `../` path literals inside it (this repo hit this for
+  `sops.defaultSopsFile` and the stylix background image path). Nix path
+  literals don't become "relative to however the file is imported" under
+  dendritic — this is a common misconception, not an actual behavior
+  change from before.
+- **Derivation hashes for a host can change even with zero functional
+  difference.** Reordering which module declares a given
+  `environment.systemPackages` (or similar list-typed option) entry first
+  changes the final concatenated list order, which changes the built
+  derivation's store hash — even though `nix store diff-closures` on the
+  two outputs shows no actual content difference. Don't treat "the system
+  closure hash changed" alone as proof of a functional regression; diff the
+  actual built output (`nix store diff-closures`, or `diff -rq` on the
+  realized store paths) before concluding something broke.
+- Each host is still pinned to either `nixpkgs-stable` or
+  `nixpkgs-unstable` (see the per-host table above) — check
+  `modules/flake/hosts.nix` for which `inputs.nixpkgs-*.lib.nixosSystem` a
+  host uses before assuming a module option exists on it.
 
 ## Backups (homelab)
 

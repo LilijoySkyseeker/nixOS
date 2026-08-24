@@ -80,8 +80,8 @@ a new module's registration key would diverge from its filename in a
 non-obvious way, say so directly, in the file or in the owning
 folder's README — a reader who greps by filename and finds nothing
 shouldn't have to reverse-engineer the key from the file's contents.
-See `AGENTS.md`'s "Navigating: what does host X actually run?" for how
-this is used in practice.
+See `docs/architecture.md`'s "Navigating: what does host X actually run?"
+for how this is used in practice.
 
 ## Why context: commit messages, not comments
 
