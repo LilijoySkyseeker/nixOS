@@ -163,6 +163,29 @@
         keep_receiver = keepReceiver;
       };
 
+      # Every receiving job needs this, and leaving it off is a runtime
+      # failure rather than a config error.
+      #
+      # root_fs is extended with the *full* source dataset path
+      # (subroot.MapToLocal), so receiving zroot/local/home into
+      # zbackup/backup/torrent means zrepl must first create the
+      # intermediate datasets zroot and zroot/local on the receiver as
+      # "placeholders". Creating one requires knowing what to do with the
+      # encryption property, and the config default is "unspecified"
+      # (PlaceholderRecvOptions, internal/config/config.go:145), which
+      # fails the receive with "placeholder filesystem encryption handling
+      # is unspecified in receiver config" (internal/endpoint/endpoint.go).
+      # configcheck accepts the file either way -- the failure only shows
+      # up when a real receive tries to create a placeholder.
+      #
+      # Valid values are "inherit" and "off"
+      # (placeholdercreationencryptionproperty_enumer.go). zbackup is not
+      # encrypted, so "off" is right here; "inherit" is for receiving into
+      # an encrypted root.
+      mkRecv = {
+        placeholder.encryption = cfg.placeholderEncryption;
+      };
+
       # ---- job builders, one per role ------------------------------
 
       # Every dataset this host owns, however it is replicated. Used to
@@ -225,6 +248,7 @@
         # SinkJob's true), so each remote needs its own explicit root_fs.
         root_fs = r.rootFs;
         interval = r.interval;
+        recv = mkRecv;
         pruning = mkPruning r.keepSender r.keepReceiver;
       }) cfg.pull.remotes;
 
@@ -250,6 +274,7 @@
         name = "sink";
         serve = mkServe cfg.sink;
         root_fs = cfg.sink.rootFs;
+        recv = mkRecv;
       };
 
       # Same-host replication over zrepl's "local" transport -- a matching
@@ -286,6 +311,7 @@
           # itself.
           root_fs = "${cfg.local.rootFs}/${cfg.local.clientIdentity}";
           interval = cfg.local.interval;
+          recv = mkRecv;
           pruning = mkPruning cfg.local.keepSender cfg.local.keepReceiver;
         }
       ];
@@ -443,6 +469,24 @@
             Transport every role defaults to, so a repo-wide change is a
             one-line edit here rather than a per-host sweep. Individual
             roles can still override it.
+          '';
+        };
+
+        placeholderEncryption = lib.mkOption {
+          type = lib.types.enum [
+            "off"
+            "inherit"
+          ];
+          default = "off";
+          description = ''
+            What to do with the encryption property when a receiving job
+            creates an intermediate placeholder dataset.
+
+            "off" suits an unencrypted receiving pool (zbackup);
+            "inherit" is for receiving into an encrypted root. There is no
+            third option worth exposing: zrepl's own default of
+            "unspecified" fails every receive that needs a placeholder,
+            and root_fs plus a full source path always needs one.
           '';
         };
 
