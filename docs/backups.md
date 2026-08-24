@@ -206,22 +206,32 @@ These each cost real investigation; none are obvious from the config.
   failure. `myZrepl.validateConfig` (default on) runs `zrepl configcheck`
   against the generated YAML during `nixos-rebuild build`, turning that
   into a build error rather than an activation failure on the target host.
-- **Multi-filesystem send order is snapshot age, not config order.**
-  `doFilesystems` starts every filesystem in a job concurrently
+- **Multi-filesystem send order is priority-queued by snapshot date, not
+  config order, and a full send always targets "now".** `doFilesystems`
+  starts every filesystem in a job concurrently
   (`internal/replication/driver/replication_driver.go`), but each one's
   actual send/recv step has to win a slot from a shared `stepQueue` gated
   by `replication.concurrency.steps`, which defaults to `1`
   (`internal/config/config.go`) and is not overridden here — so only one
   step runs job-wide at a time. The queue is a min-heap ordered by each
-  pending step's `TargetDate()`, the creation time of the snapshot it
-  sends *to* (`replication_stepqueue.go`, `Less` picks the earlier date).
-  So whichever filesystem's next snapshot is chronologically oldest goes
-  first, globally across the job — not the dataset list order in
-  `myZrepl.local.datasets`, not name, not size. This is why homelab's
-  first local replication sent all of `storage-bulk` (oldest surviving
-  snapshot) before `storage` or `zroot/local/state` ever started, then
-  spent 15 steps replaying `storage-bulk`'s intermediate snapshots to
-  catch up to the present.
+  *waiting* step's `TargetDate()`, the creation time of the snapshot it
+  sends *to* (`replication_stepqueue.go`, `Less` picks the earlier date) —
+  but this only arbitrates contention between requests that are waiting at
+  the same moment; it does not preempt a step already running. Separately,
+  `initial_replication` defaults to `most_recent`
+  (`docs/configuration/conflict_resolution.rst`,
+  `internal/config/config.go`), so a filesystem's first-ever full send
+  always targets whatever snapshot is newest *at planning time* — never
+  the oldest. This is why homelab's first local replication needed 15
+  incremental steps to catch `storage-bulk` up after its full send: the
+  full send targeted the newest snapshot that existed when planning ran,
+  but took ~4h to transfer 2.1TiB, during which the `snapshots` job kept
+  taking new ones every 5m that then had to be replayed one at a time
+  (zrepl never jumps ahead to the latest). `storage-bulk` winning the
+  concurrency slot ahead of `storage`/`state` at the very first planning
+  pass came down to which filesystem's request reached the queue first
+  among near-simultaneous, near-tied target dates — not a deterministic
+  property of dataset name, size, or `myZrepl.local.datasets` order.
 
 ## Testing a change to this subsystem
 
