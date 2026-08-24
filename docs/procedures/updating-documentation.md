@@ -19,11 +19,12 @@ follow-up:
   a gotcha that's really just restating what the code says.
 - **Made a decision future-you will re-derive from scratch otherwise**
   (a workaround, a surprising constraint, a fix for a specific
-  incident) — add an inline why-comment at the point of decision, per
-  [`docs/style-guide.md`](../style-guide.md). This is the same
-  opportunistic, non-obvious-only policy Phase 4 of the original docs
-  effort used — not a mechanical sweep, only where it's actually
-  substantiated.
+  incident) — record it in the commit message, per
+  [`docs/style-guide.md`](../style-guide.md); split into multiple
+  commits if different pieces of the change need different rationale.
+  This is the same opportunistic, non-obvious-only policy Phase 4 of
+  the original docs effort used — not a mechanical sweep, only where
+  it's actually substantiated.
 - **Added or removed a host** — update `docs/architecture.md`'s
   per-host table and the root `README.md`'s Hosts table together; they
   should never disagree.
@@ -106,9 +107,8 @@ discipline. There's no fixed schedule; do this opportunistically when:
 The check itself: re-read the doc against the current
 `modules/flake/hosts.nix`/`hosts/*/configuration.nix`/`modules/profiles/*.nix`,
 and fix whatever's drifted. Log what was found and fixed in `TODO.md`
-if it was non-trivial, the same way Phase 4's why-comment sweep did,
-so there's a record of when the last audit happened and what it
-caught.
+if it was non-trivial, the same way Phase 4's rationale sweep did, so
+there's a record of when the last audit happened and what it caught.
 
 ## After a big refactor
 

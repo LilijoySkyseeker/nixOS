@@ -58,7 +58,7 @@ config. These follow one consistent shape:
 Reach for this pattern only when the config is genuinely parameterized
 (multiple hosts want it with different settings, or it needs an
 enable/disable toggle). If a host is the config's only consumer and
-there's nothing to parameterize, a plain `modules/services/*.nix` file
+there's nothing to parameterize, a plain `modules/*/*.nix` file
 is simpler — see `docs/architecture.md`'s module-organization section.
 
 Everything else — `modules/services/*.nix`, `modules/profiles/*.nix`,
@@ -83,36 +83,19 @@ shouldn't have to reverse-engineer the key from the file's contents.
 See `AGENTS.md`'s "Navigating: what does host X actually run?" for how
 this is used in practice.
 
-## Inline "why" comments
+## Why context: commit messages, not comments
 
-Non-obvious only — a workaround, a surprising constraint, a tradeoff,
-an incident the config is defending against. Skip comments that restate
-what the code already says. Real examples from this repo:
+Non-obvious rationale — a workaround, a surprising constraint, a
+tradeoff, an incident the config is defending against — belongs in the
+git commit message, not an inline comment. Explain what changed and,
+more importantly, why, so `git log`/`git blame` on the affected lines
+surfaces the reasoning later. Split a change into multiple commits
+when different pieces need different rationale, rather than cramming
+it all into one comment or one commit message.
 
-- `modules/profiles/default.nix`, on `services.tailscale`: explains
-  *why* `--ssh` is deliberately left disabled, with an incident
-  reference — not just "disable ssh."
-- `modules/profiles/PC.nix`, on `users.groups.flatpak.gid = 998`:
-  cross-references `modules/nixos/nfs-homelab-mounts.nix` to explain a
-  gid collision that forced a specific pinned value.
-- `modules/profiles/PC.nix`, on `sops.age.sshKeyPaths` /
-  `generateKey`: explains the boot-time identity resolution problem
-  the specific config shape works around.
-- `modules/nixos/push-deploy.nix`, on the `elevate` option: documents
-  `nixos-rebuild-ng`'s actual `--sudo` behavior, including a note that
-  a prior assumption about it was wrong.
-- `AGENTS.md`'s dendritic Gotchas section, on `config` shadowing in
-  `modules/services/jellyfin.nix` and
-  `modules/nixos/nfs-homelab-mounts.nix`: documents a real mistake made
-  during the migration (reusing `config` for both the outer
-  flake-parts scope and the inner NixOS module scope silently read the
-  wrong object) so it isn't repeated.
+Inline comments are for mechanics/labeling only — see below.
 
-The pattern worth copying across all of these: when a comment exists
-because an earlier assumption turned out to be false, say so — it
-stops the same wrong assumption from being made again.
-
-### Voice and mechanics
+## Inline comments
 
 - Lowercase start, no terminal period, terse fragments over full
   sentences: `# DigitalOcean's only world facing interface`,
