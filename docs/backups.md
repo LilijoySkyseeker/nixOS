@@ -206,6 +206,22 @@ These each cost real investigation; none are obvious from the config.
   failure. `myZrepl.validateConfig` (default on) runs `zrepl configcheck`
   against the generated YAML during `nixos-rebuild build`, turning that
   into a build error rather than an activation failure on the target host.
+- **Multi-filesystem send order is snapshot age, not config order.**
+  `doFilesystems` starts every filesystem in a job concurrently
+  (`internal/replication/driver/replication_driver.go`), but each one's
+  actual send/recv step has to win a slot from a shared `stepQueue` gated
+  by `replication.concurrency.steps`, which defaults to `1`
+  (`internal/config/config.go`) and is not overridden here — so only one
+  step runs job-wide at a time. The queue is a min-heap ordered by each
+  pending step's `TargetDate()`, the creation time of the snapshot it
+  sends *to* (`replication_stepqueue.go`, `Less` picks the earlier date).
+  So whichever filesystem's next snapshot is chronologically oldest goes
+  first, globally across the job — not the dataset list order in
+  `myZrepl.local.datasets`, not name, not size. This is why homelab's
+  first local replication sent all of `storage-bulk` (oldest surviving
+  snapshot) before `storage` or `zroot/local/state` ever started, then
+  spent 15 steps replaying `storage-bulk`'s intermediate snapshots to
+  catch up to the present.
 
 ## Testing a change to this subsystem
 
