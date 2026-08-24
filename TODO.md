@@ -79,29 +79,44 @@ items rather than letting them rot.
       `myHealthAlerts` does cover failed units, so the gap is likely in
       noticing, not in detecting.
 
-- [ ] **2026-08-24: `zrepl.service` can silently stay down after a reboot
-      due to a `local-fs.target` race — needs a durable fix.** Found while
-      rebooting homelab to verify the `boot.zfs.extraPools` fix above (the
-      pool import itself worked correctly). `storage.mount` failed its
-      first attempt at boot (`status=2/INVALIDARGUMENT`, a known ZFS
-      mount-before-ready race unrelated to the zbackup fix), which failed
-      `local-fs.target`, which `zrepl.service` hard-`Requires=` via
-      `modules/nixos/zrepl.nix`'s systemd override. The mount self-healed
-      a second later and `/storage` was fine, but systemd does not
-      retry a unit whose start failed due to a dependency failure —
-      `zrepl.service` sat `inactive (dead)` until manually started
+- [x] **2026-08-24: `zrepl.service` could silently stay down after a
+      reboot due to a `local-fs.target` race — fixed by relaxing the
+      dependency.** Found while rebooting homelab to verify the
+      `boot.zfs.extraPools` fix above (the pool import itself worked
+      correctly). `storage.mount` failed its first attempt at boot
+      (`status=2/INVALIDARGUMENT`, a known ZFS mount-before-ready race
+      unrelated to the zbackup fix), which failed `local-fs.target`,
+      which `zrepl.service` hard-`Requires=` — that comes from
+      **upstream** nixpkgs (`nixos/modules/services/backup/zrepl.nix`),
+      not this repo; `modules/nixos/zrepl.nix` had no systemd override at
+      all before this fix. The mount self-healed a second later and
+      `/storage` was fine, but systemd does not retry a unit whose start
+      failed due to a dependency failure — `zrepl.service` sat
+      `inactive (dead)` until manually started
       (`systemctl start zrepl.service`). Backups were down ~8 minutes
       this time (16:07-16:15 PDT), same failure class as the entry above
       but much smaller blast radius since it was caught immediately by
       the reboot test rather than discovered ~23h later.
 
-      **Not yet fixed.** Candidate approaches: fix the underlying mount
-      race so `local-fs.target` doesn't fail in the first place; relax
-      zrepl's `Requires=local-fs.target` to `Wants=`+`After=` so a
-      transient dependency failure doesn't permanently down it; or add
-      some retry mechanism. Needs its own investigation — don't
-      re-derive, this note plus the journal timestamps above is the
-      starting point.
+      **Fix:** `modules/nixos/zrepl.nix` now overrides
+      `systemd.services.zrepl` with `requires = lib.mkForce [ ];`,
+      `wants = [ "local-fs.target" ]; after = [ "local-fs.target" ];`.
+      Same ordering in the normal case (zrepl still starts after
+      local-fs.target's start job finishes), but a transient dependency
+      failure no longer permanently downs the daemon — an unmounted
+      dataset just makes that job's own next cycle fail and retry instead
+      of the whole daemon never starting. Verified the rendered drop-in
+      (`systemd.services.zrepl` override unit) shows `Wants=local-fs.target`
+      with no `Requires=` and `After=zfs.target local-fs.target` intact.
+      **Not yet verified against a real reboot** — do that before
+      trusting this closed, the same way the `boot.zfs.extraPools` fix
+      was verified.
+
+      **Still open, deliberately not fixed:** why `storage.mount` races
+      at all (only one data point so far: consistently reproducible on a
+      clean reboot, or intermittent? does `storage-bulk.mount` share the
+      root cause?). This fix removes the silent-outage symptom without
+      touching that underlying race.
 
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
       complete on branch `worktree-zrepl-migration-plan`; all three hosts

@@ -232,6 +232,23 @@ These each cost real investigation; none are obvious from the config.
   pass came down to which filesystem's request reached the queue first
   among near-simultaneous, near-tied target dates — not a deterministic
   property of dataset name, size, or `myZrepl.local.datasets` order.
+- **`zrepl.service` used to be able to silently stay down after a
+  reboot.** Upstream's module (`nixos/modules/services/backup/zrepl.nix`)
+  hard-`Requires=local-fs.target`. If any local mount fails its first
+  attempt at boot — homelab hit this with `storage.mount`
+  (`status=2/INVALIDARGUMENT`, a known ZFS mount-before-ready race,
+  unrelated to the receive-only-pool import gotcha above) — that failure
+  takes `local-fs.target` down with it, and systemd does not retry a unit
+  whose start job failed for a dependency reason: `zrepl.service` sits
+  `inactive (dead)` even after the mount self-heals a second later, until
+  someone runs `systemctl start zrepl`. `modules/nixos/zrepl.nix` now
+  overrides this to `Wants=`+`After=local-fs.target` instead of
+  `Requires=`, so the daemon still starts after the mount was attempted
+  but a transient failure there no longer permanently downs it — a
+  dataset that isn't mounted yet just fails that job's next cycle instead
+  of the whole daemon never starting. The underlying `storage.mount` race
+  itself is still unfixed; this only removes the "backups stay silently
+  down until a human notices" consequence of it.
 
 ## Testing a change to this subsystem
 

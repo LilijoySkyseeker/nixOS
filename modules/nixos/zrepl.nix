@@ -1009,6 +1009,40 @@
           inherit settings;
         };
 
+        # Upstream's module (nixos/modules/services/backup/zrepl.nix)
+        # hard-`Requires=local-fs.target`. Found the hard way: on a real
+        # homelab reboot, `storage.mount` (/storage, on zdata) failed its
+        # first attempt (status=2/INVALIDARGUMENT, a known ZFS
+        # mount-before-ready race unrelated to zrepl or the zbackup-import
+        # fix), which failed local-fs.target, which aborted zrepl's start
+        # job with "Dependency failed". The mount self-healed a second
+        # later, but systemd does not retry a unit whose start job failed
+        # for a dependency reason -- zrepl sat inactive (dead) until
+        # someone ran `systemctl start zrepl` by hand. That is a silent
+        # backup outage, the exact class of bug this migration exists to
+        # fix (see the boot.zfs.extraPools entry in TODO.md for the first
+        # instance).
+        #
+        # `mkForce [ ]` drops that Requires; Wants+After keeps the
+        # normal-case ordering (zrepl still starts after local-fs.target's
+        # start job finishes, mounts attempted either way) without letting
+        # a transient dependency failure permanently down the daemon. If a
+        # dataset genuinely isn't mounted yet when zrepl starts, that job's
+        # own next cycle (source/pull jobs run on their own interval)
+        # simply fails and retries -- worst case a few minutes of gap
+        # instead of an indefinite one, and no longer something a human
+        # has to notice and fix by hand. This trades away the guarantee
+        # that zrepl never starts before its filesystems are ready in
+        # exchange for it never staying down over a transient mount
+        # hiccup; the underlying storage.mount race itself is still
+        # unfixed (untriaged: reproducible only on a real reboot so far,
+        # one data point).
+        systemd.services.zrepl = {
+          requires = lib.mkForce [ ];
+          wants = [ "local-fs.target" ];
+          after = [ "local-fs.target" ];
+        };
+
         # Forced-command keys for every ssh+stdinserver peer. The command
         # is fixed here rather than chosen by the client, so a key can only
         # ever proxy to the one identity it was issued for -- it cannot ask

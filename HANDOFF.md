@@ -1,11 +1,12 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, fourth
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, fifth
 revision this day. homelab is deployed, its local replication is
 **complete and verified**, and a real reboot confirmed the pool-import
-fix works. **The next session's job is different from continuing the
-rollout: fix a newly-found boot race that leaves `zrepl.service` down
-after a reboot**, before touching torrent or thinkpad.
+fix works. The `zrepl.service` boot race is **fixed in config and
+build-verified, but not yet verified against a real reboot** — that
+verification (a switch + reboot on homelab) is the next thing to do,
+before touching torrent or thinkpad.
 
 **Delete this file once the branch is merged and all three hosts are
 deployed.** It is session state, not documentation — durable knowledge
@@ -27,10 +28,9 @@ One-sentence prompt to start the next session with:
 
 > Continue the zrepl migration: enter the worktree at
 > `.claude/worktrees/zrepl-migration-plan` (branch
-> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — fix the
-> boot race where `zrepl.service` can silently stay down after a reboot
-> because `storage.mount` sometimes fails its first attempt and takes
-> `local-fs.target` down with it, before deploying torrent or thinkpad.
+> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — the
+> `zrepl.service` boot race fix is built but needs a real homelab reboot
+> to verify, then deploy torrent and thinkpad.
 
 ## Read these, don't re-derive
 
@@ -99,7 +99,20 @@ One-sentence prompt to start the next session with:
 
 ## PRIMARY TASK — fix the `zrepl.service` boot race
 
-This is what the next session should actually work on. Full detail,
+**Fixed in `modules/nixos/zrepl.nix`** (the "relax `Requires=` to
+`Wants=`+`After=`" candidate below): `systemd.services.zrepl` now
+overrides `requires = lib.mkForce [ ];`, `wants`/`after` on
+`local-fs.target`. Confirmed the rendered drop-in unit shows
+`Wants=local-fs.target`, no `Requires=`, `After=zfs.target local-fs.target`
+intact. `nixos-rebuild build --flake .#homelab` succeeds. **Not yet
+verified against a real reboot** — do that before treating this as
+closed, the same way the `boot.zfs.extraPools` fix was verified last
+session. The underlying `storage.mount` race itself is still
+uninvestigated; this only removes the silent-outage consequence of it.
+See `docs/backups.md`'s new Gotchas entry and `TODO.md` for the full
+writeup.
+
+Full detail on the original finding,
 exact timestamps, and the failing unit's config are in `TODO.md`'s
 "Active" section (top two entries) — read that before starting, this is
 just the summary:
@@ -189,9 +202,12 @@ non-empty before passing them to `zfs destroy`.**
 
 ## Next steps, in order
 
-1. **Fix the `zrepl.service` boot race** (see "PRIMARY TASK" above).
-   VM-test if reproducible there; otherwise verify with a real homelab
-   reboot the same way the `boot.zfs.extraPools` fix was verified.
+1. **Verify the `zrepl.service` boot race fix against a real reboot**
+   (see "PRIMARY TASK" above — the config change is done and build-clean,
+   only reboot verification is outstanding). `nixos-rebuild switch
+   --flake .#homelab --target-host root@homelab`, then reboot homelab and
+   confirm `zrepl.service` comes up active even if `storage.mount` races
+   again. Ask before switching/rebooting — it's a live backup server.
 2. **Deploy torrent**, then **thinkpad**, per the original plan. Capacity
    and the pool-import fix are both verified — nothing else blocks this.
    Build locally and push (`nixos-rebuild switch --flake .#<host>
