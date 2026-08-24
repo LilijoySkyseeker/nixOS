@@ -1,7 +1,11 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24; updated the
-same day by a third session, which **deployed homelab**.
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, fourth
+revision this day. homelab is deployed, its local replication is
+**complete and verified**, and a real reboot confirmed the pool-import
+fix works. **The next session's job is different from continuing the
+rollout: fix a newly-found boot race that leaves `zrepl.service` down
+after a reboot**, before touching torrent or thinkpad.
 
 **Delete this file once the branch is merged and all three hosts are
 deployed.** It is session state, not documentation — durable knowledge
@@ -14,284 +18,191 @@ Everything is committed and pushed; nothing is left in a dirty tree.
 - Worktree: `/home/lilijoy/dotfiles/.claude/worktrees/zrepl-migration-plan`
   (enter it with the `EnterWorktree` tool, `path:` that directory — do not
   work from the main checkout).
-- Branch `worktree-zrepl-migration-plan`, pushed to `origin`. The working
-  tree was clean and `nixfmt --check` passed at handoff.
+- Branch `worktree-zrepl-migration-plan`, pushed to `origin`. Working tree
+  clean, `nixfmt --check` passes.
 - The branch is **not merged to master**. master still has sanoid/syncoid.
-- Sessions here run on `torrent`, which is where the builds were done.
+- Sessions here run on `torrent`.
 
 One-sentence prompt to start the next session with:
 
 > Continue the zrepl migration: enter the worktree at
 > `.claude/worktrees/zrepl-migration-plan` (branch
-> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — homelab is
-> deployed and its local replication was still running, so wait for that to
-> finish, then reboot homelab to verify the new `boot.zfs.extraPools`
-> import fix, and get my decision on freeing space on `zbackup` before
-> deploying torrent.
+> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — fix the
+> boot race where `zrepl.service` can silently stay down after a reboot
+> because `storage.mount` sometimes fails its first attempt and takes
+> `local-fs.target` down with it, before deploying torrent or thinkpad.
 
 ## Read these, don't re-derive
 
 - `docs/backups.md` — design, roles, retention, and the zrepl behaviours
   that are easy to get wrong. Each gotcha cites the zrepl source location.
-  Two were added this session (pool import, property inheritance).
 - `docs/procedures/backup-restore.md` — restore paths.
 - `docs/procedures/vm-testing.md` — how to run/extend the VM test.
-- `TODO.md` — status and the open incidents.
+- `TODO.md` — status and the open incidents, including the two below in
+  full detail (root cause, timestamps, resolution).
 
-## State — homelab IS DEPLOYED
+## State — homelab fully migrated and verified; torrent/thinkpad not deployed
 
-**homelab was switched at 2026-08-24 10:02 PDT** and is running zrepl.
-torrent and thinkpad are **not** deployed and still run sanoid/syncoid.
+- `zrepl.service` **active**, all three local jobs (`local-source`,
+  `local-pull`, `snapshots`) healthy. `torrent`/`thinkpad` pull jobs
+  correctly error with connection-refused — expected, those hosts aren't
+  deployed yet.
+- **Local replication (homelab's own data) is complete and verified.**
+  All three datasets landed under the new layout with matching sizes and
+  snapshots:
+  ```
+  zbackup/backup/homelab/zdata/storage/storage        485G
+  zbackup/backup/homelab/zdata/storage/storage-bulk    2.07T
+  zbackup/backup/homelab/zroot/local/state             39.7G
+  ```
+- **Reboot-verified**: `boot.zfs.extraPools = [ "zbackup" ]` works.
+  Rebooted homelab, `zfs-import-zbackup.service` imported the pool with
+  zero manual intervention. This closes out the previous session's open
+  item.
+- **Capacity fully resolved.** `zbackup`: 10.9T size, 2.59T alloc,
+  **8.32T free**, async reclaim finished (`freeing: 0`). Both
+  destroy decisions from the last session were executed with your
+  explicit sign-off: `backup/torrent/home` (3.08T, the risky half) and
+  the orphaned old-layout `backup/homelab/{state,storage,storage-bulk}`
+  (2.90T, the low-risk half, destroyed only after the new-layout copies
+  were verified complete). Plenty of room for torrent's ~3.13T first
+  pull whenever you deploy it.
+- **Legacy sanoid-era `autosnap_*` snapshots destroyed.**
+  `preserveLegacySnapshots = false` is deployed for homelab
+  (`hosts/homelab/configuration.nix`); the 711 leftover snapshots across
+  the three source datasets are gone. See the incident note below before
+  writing anything similar again.
+- **Leftover pool hygiene done**: empty placeholder containers
+  (`backup-bulk/{homelab,legion,other,thinkpad}`, `backup/{legion,other}`)
+  destroyed; `zbackup/backup/thinkpad` mountpoint fixed from
+  `/backup/thinkpad` to `none` (was drifted from `disko.nix`'s intent,
+  would have given thinkpad's received filesystems a real mountpoint on
+  first receive).
+- **Backblaze/restic offsite path confirmed unaffected** by the whole
+  migration — it operates on homelab's own source datasets
+  (`hosts/homelab/configuration.nix:96-143`), never touches `zbackup`,
+  and its `zfs list -s name | tail -1` snapshot picker is naming-scheme
+  agnostic, so it works the same with zrepl's `zrepl_*` snapshots as it
+  did with sanoid's `autosnap_*`.
+- **Auto-updater timers**: currently stopped
+  (`flake-update-test.timer`, `nixos-upgrade.timer`,
+  `push-deploy-vps.timer`). Both a `switch` and a `reboot` restart them —
+  confirmed again this session. **Re-stop after every switch or reboot**,
+  `systemctl stop <name>` does not persist:
+  ```
+  ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes root@homelab \
+    'systemctl stop flake-update-test.timer nixos-upgrade.timer push-deploy-vps.timer'
+  ```
+  torrent/thinkpad's `pull-deploy.timer` could still not be stopped from
+  here (no root access pre-deploy); same mitigations as before apply
+  (`operation = "boot"`, `autoReboot = false`).
 
-Verified live on homelab after the switch:
+## PRIMARY TASK — fix the `zrepl.service` boot race
 
-- `zrepl.service` active (running), `configcheck` passed in `ExecStartPre`.
-- sanoid/syncoid timers stopped; `syncoid`/`backup-recv` users and groups
-  removed by activation.
-- Six jobs loaded: `snapshots` (snap), `local-source`, `local-pull`,
-  `torrent` (pull), `thinkpad` (pull), `_control`.
-- First snapshots taken cleanly: three `zrepl_20260824_170228_000`
-  snapshots, one per local dataset. **Zero errors in the journal.**
-- Rollback point if needed: **generation 328**
-  (`/nix/store/y29czmvha5chc1nfarfcjyzhvi8b1hhs-...`).
+This is what the next session should actually work on. Full detail,
+exact timestamps, and the failing unit's config are in `TODO.md`'s
+"Active" section (top two entries) — read that before starting, this is
+just the summary:
 
-**Local replication has since been confirmed working in production**
-(checked 13:45 PDT, ~3h45m after the switch). This was the first real run
-of the local `source`+`pull` pair, which the VM test does not cover:
+**What happens:** on boot, `storage.mount` (`/storage`, on `zdata`)
+sometimes fails its first mount attempt
+(`status=2/INVALIDARGUMENT` — a known ZFS mount-before-ready race,
+unrelated to the `zbackup` import fix, which itself works correctly).
+That failure cascades: `storage.mount` failing takes `local-fs.target`
+down with it, and `zrepl.service`'s systemd override in
+`modules/nixos/zrepl.nix` sets `Requires=local-fs.target`, so zrepl's
+start job aborts with "Dependency failed". The mount self-heals a second
+later (`/storage` ends up fine), but systemd does not retry a unit whose
+start failed due to a dependency failure — `zrepl.service` just sits
+`inactive (dead)` until someone runs `systemctl start zrepl.service` by
+hand. Confirmed empirically this session: verified via
+`journalctl -b -u storage.mount` and `systemctl status local-fs.target`
+after a real reboot at 16:07 PDT; backups were silently down until
+16:14:49 when caught and started manually.
 
-```
-zbackup/backup/homelab/zdata/storage/storage-bulk   1.62T   (in flight)
-```
+**Why it matters:** this is the same *class* of bug as the
+`boot.zfs.extraPools` finding from the previous session (backups
+silently not running after a reboot) — just smaller blast radius this
+time (~8 minutes, caught immediately by the reboot test) instead of
+~23 hours. It will recur on every reboot until fixed, and nothing
+currently alerts on it beyond `myHealthAlerts`' failed-unit / staleness
+checks eventually noticing — the same detection gap noted in the first
+incident.
 
-It is still transferring `storage-bulk` (2.07T at source). `storage` and
-`zroot/local/state` have not started yet — the job works one dataset at a
-time. So the local pair is **proven**, but not yet **complete**.
+**Not yet investigated:**
+- Why `storage.mount` races at all — is it consistently reproducible on
+  a clean reboot, or intermittent? Only observed once so far.
+- Whether `storage-bulk.mount` (same symptom, seen in the same boot) has
+  the same root cause or a different one.
+- The right fix. Candidates, none evaluated yet:
+  - Fix the underlying mount race (probably the more correct fix, but
+    unclear what's actually racing against what at this point in boot —
+    `zfs-mount-generator`? ordering against `zfs-import-zdata.service`?)
+  - Relax zrepl's `Requires=local-fs.target` to `Wants=`+`After=` so a
+    transient dependency failure doesn't permanently down it (easy, but
+    papers over the mount race rather than fixing it, and changes
+    zrepl's guarantee that it never starts before its filesystems are
+    ready)
+  - Some retry/remediation mechanism (a path unit, a periodic health
+    check that restarts zrepl if it should be up but isn't)
+- **Test via the VM test infrastructure first** (`docs/procedures/vm-testing.md`,
+  `tests/zrepl-replication.nix`) if a reboot-race can be reproduced
+  there — much cheaper than repeatedly rebooting homelab. If it can't be
+  reproduced in the VM (timing-sensitive races often can't), a real
+  homelab reboot is the only way to verify a fix, same as the
+  `boot.zfs.extraPools` fix was verified.
 
-**Last observed state, 2026-08-24 13:48 PDT** (the final reading before
-this session ended — everything after this is unobserved):
+## Incident this session — read before writing any zfs destroy command
 
-```
-zbackup                                            7.62T alloc / 3.29T free (69% cap)
-zbackup/backup/homelab/zdata/storage/storage-bulk  1.64T   (still growing)
-zrepl.service                                      active
-flake-update-test / nixos-upgrade / push-deploy-vps timers   inactive
-```
+**An unchecked-variable bug in a destroy-range script wiped every
+snapshot on homelab's three source datasets**, not just the intended
+711 legacy `autosnap_*` ones. Full root cause and resolution in
+`TODO.md`'s top "Active" entry. Short version: the automatic prune
+ceiling had already destroyed the legacy snapshots itself (once
+`preserveLegacySnapshots=false` deployed) by the time a follow-up script
+tried to compute a `zfs destroy -r dataset@oldest%newest` range from
+them — `oldest`/`newest` came back empty, unchecked, and
+`zfs destroy -r dataset@%` was interpreted as "all snapshots" rather
+than erroring. **No data was lost** — live filesystems and `zbackup`'s
+already-replicated copies were untouched, and the surviving
+`#zrepl_CURSOR_*` bookmarks let `local-pull` recover with a small
+incremental instead of a full resend. Verified healthy afterward.
+**Lesson: always check both ends of a computed snapshot range are
+non-empty before passing them to `zfs destroy`.**
 
-The `torrent` and `thinkpad` pull jobs **will fail** until those hosts are
-deployed; they have no `sshd`/zrepl `serve` yet. That is expected, not a
-regression.
+## Also outstanding (unchanged from before, still true)
 
-## Two things this session found that were not in the plan
-
-### 1. zbackup was never imported at boot — backups were dead for ~23h
-
-Found by the handoff's own pre-deploy check. homelab rebooted
-2026-08-23 10:45 (for the cable change below); `zbackup` did not come
-back and every replication job since failed `dataset does not exist`.
-The pool was fine throughout — ONLINE, importable, no data errors.
-
-Cause: nothing in the config imported it. nixpkgs emits a
-`zfs-import-<pool>.service` only for pools something references (a
-`fileSystems` entry, or `boot.zfs.extraPools`). Every `zbackup` dataset is
-`mountpoint = "none"` by design, so nothing referenced it. `zdata` gets a
-unit only because `/storage` and `/storage-bulk` live on it. disko emits
-no import units at all. The pool had been imported by hand historically,
-which hid the gap.
-
-Fixed in commit `416b140`: `boot.zfs.extraPools = [ "zbackup" ]`.
-Verified in the built system (`zfs-import-zbackup.service` now present)
-and started by the switch. **Still unverified: a real reboot.** The user
-authorised rebooting homelab for testing — see "Next steps".
-
-### 2. The USB cable was replaced — the throughput incident is resolved
-
-All four enclosure drives now enumerate at **5000 Mbps (USB 3.0)** on bus
-2 behind the ASMedia ASM107x hub, up from 480 Mbps shared. Zero
-`uas_eh_*` / `stat urb: status -71` faults in the 23h since, vs. the
-recurring multi-drive faults previously documented. `zpool status -x`:
-all pools healthy.
-
-**Measured under real load, 2026-08-24 13:45**, during homelab's local
-replication: `zpool iostat -v zbackup` shows ~245-261 MB/s of aggregate
-device bandwidth, i.e. **~122-130 MB/s of actual data** (each mirror disk
-writes the full copy, so the pool row is the sum of the two). This agrees
-independently with the dataset growth rate: 1.62T received in ~3h45m is
-~124 MB/s.
-
-Compare the old measurement in `TODO.md`: ~20MB/s per mirror disk,
-~40MB/s aggregate. **That is roughly a 6x improvement**, and it is the
-first hard number since the cable change.
-
-This closes `TODO.md`'s 2026-08-21 throughput incident and means **the
-~40h estimate for torrent's 3.13TB send is badly out of date.** At
-~125 MB/s, ~3.13TB is on the order of **7-8 hours**, not 40. Treat that
-as the new working estimate, still unproven for a remote (SSH-transported)
-pull as opposed to this local one.
-
-The 15m replication interval and tiered `archive` grid were chosen under
-the old ceiling and are now conservative rather than forced; they have
-deliberately **not** been re-tuned.
-
-## BLOCKER — zbackup does not have room for both layouts
-
-This is the most important thing on this page and it was not anticipated
-in the original plan.
-
-`zbackup` is 10.9T. At the moment of the switch it was 5.98T used / 4.80T
-free, all of it the **old syncoid layout**:
-
-```
-zbackup/backup/homelab/{state,storage,storage-bulk}   2.90T
-zbackup/backup/torrent/home                           3.08T   (stranded)
-```
-
-**This is getting worse in real time.** homelab's local replication is
-writing the new layout alongside the old one right now — by 13:45 the pool
-was already **7.60T alloc / 3.30T free**, down from 4.80T free at 10:02,
-and `storage-bulk` was not finished. Expect roughly **2.0-2.2T free** once
-homelab's local replication completes.
-
-zrepl writes to **different paths** (`<root_fs>/<full source dataset
-path>`), so it will not reuse any of that. It needs roughly:
-
-```
-homelab  zdata/storage/storage + storage-bulk + zroot/local/state  ~2.92T
-torrent  zroot/local/{home,root}                                   ~3.13T
-thinkpad zroot/local/{home,root}                                   unknown
-                                                          total   ~6.05T+
-```
-
-**~6.05T needed vs ~4.80T free — it does not fit.** homelab's own local
-replication alone (~2.92T) fits, and is completing now. torrent's ~3.13T
-then has only ~2.0-2.2T to land in, so **torrent's first pull will fill
-the pool and fail partway** unless space is freed first. Do not start
-torrent before resolving this.
-
-The old datasets must be destroyed to make room. That is a **destructive,
-user-only decision** and was deliberately not done.
-
-**The two halves carry very different risk — do not treat them alike:**
-
-- `backup/homelab/{state,storage,storage-bulk}` (2.90T) is now an
-  **orphan**. syncoid is gone from homelab, so nothing writes to it any
-  more; it is frozen at its last syncoid run. Once the new-layout copies
-  under `backup/homelab/zdata/...` and `.../zroot/local/state` are
-  complete, it is genuinely redundant and safe to destroy. **Low risk.**
-- `backup/torrent/home` (3.08T) is **not redundant**. torrent is still on
-  sanoid/syncoid and undeployed, so no new-layout copy of it exists at
-  all. Destroying it leaves **zero backup of torrent's home** for the
-  duration of the fresh full send (~7-8h at the newly measured rate).
-  That window is the real cost of the decision, and it is the user's to
-  accept. **Genuine risk — get an explicit yes.**
-
-Suggested order once the user decides:
-
-1. Let homelab's local replication finish (it fits in current free space).
-2. Verify the new-layout copies are complete and have snapshots
-   (`zfs list -t snapshot -r zbackup/backup/homelab/zdata`).
-3. Destroy the old `backup/homelab/{state,storage,storage-bulk}` — frees
-   ~2.90T, low risk, and on its own may be enough for torrent.
-4. Only if still short, and only with an explicit yes, destroy
-   `backup/torrent/home` before starting torrent's first pull.
-
-Step 3 alone takes free space to roughly **4.9-5.1T**, which already fits
-torrent's ~3.13T. **So step 4 may not be necessary at all** — check the
-numbers before asking the user to accept the risky half.
-
-## Auto-updaters — paused, but the pause does NOT survive a switch
-
-The user asked for these to be paused so they don't collide with the
-migration. Current state:
-
-| Host | Unit | Fires | State |
-|---|---|---|---|
-| homelab | `flake-update-test.timer` | Wed 03:00 | **stopped** |
-| homelab | `nixos-upgrade.timer` | Thu 03:00 | **stopped** |
-| homelab | `push-deploy-vps.timer` | Thu 03:15 | **stopped** |
-| torrent | `pull-deploy.timer` | Thu 03:00 | **STILL ACTIVE** |
-| thinkpad | `pull-deploy.timer` | Thu 03:00 | **STILL ACTIVE** |
-
-Two traps here:
-
-- **`systemctl mask` does not work on NixOS** — units are symlinks into
-  the store, so mask fails outright. Only `stop` is available.
-- **`nixos-rebuild switch` restarts them.** Confirmed empirically: the
-  homelab switch listed `flake-update-test.timer`, `nixos-upgrade.timer`
-  and `push-deploy-vps.timer` under "the following new units were
-  started". They were stopped again afterwards. **Re-stop them after
-  every switch, and after any reboot** — `stop` does not persist.
-
-torrent/thinkpad could not be stopped from this session: it needs root
-there, torrent has no `sshd` yet (the migration is what adds it), and
-`run0` requires interactive authentication. Mitigating factor: both are
-`operation = "boot"` with `autoReboot = false`, so a firing timer sets the
-next boot entry rather than switching a running system — it cannot
-interrupt a transfer in progress. It *would* mean the host comes up on
-master (sanoid/syncoid) after a reboot.
-
-To pause them, the user can run on each host:
-`run0 systemctl stop pull-deploy.timer`
-
-The durable fix is merging this branch to master, after which the
-auto-updaters deploy the zrepl config rather than reverting it.
-
-## Also outstanding
-
-- **`zbackup/backup/thinkpad` has `mountpoint=/backup/thinkpad`**, not
-  `none` as `disko.nix` declares. Because the module sets no
-  `send.properties`, received datasets inherit their mountpoint from the
-  container, so thinkpad's received filesystems would each get a real
-  mountpoint. Fix before thinkpad's first receive:
-  `zfs set mountpoint=none zbackup/backup/thinkpad`
-  (attempted this session; blocked by the tooling's safety classifier).
-- **Benign-looking prune errors during a long transfer.** The `snapshots`
-  job logs `target could not destroy snapshots ... it's being held` for
-  snapshots the in-flight replication holds
-  (`zfs holds` shows tag `zrepl_STEP_J_local-source`). This is zrepl
-  working as designed — the step hold stops the snapshotter's ceiling
-  prune from destroying a snapshot mid-send — and it should clear once the
-  transfer finishes and the hold is released. **Worth re-checking after
-  homelab's local replication completes**; if the error persists with no
-  transfer running, it is a stuck hold and needs looking at, not ignoring.
-- **Leftover containers** slated for deletion in `TODO.md` still exist:
-  `zbackup/backup-bulk/*`, `zbackup/backup/{legion,other}`. All 96K
-  placeholders. Untouched — deletion is a user decision.
-- **Why did ~23h of failed units not raise an alert that got acted on?**
-  `myHealthAlerts` covers failed units, so the gap is likely in noticing
-  rather than detecting. Worth a look.
+- **`preserveLegacySnapshots` is now `false` for homelab only.** torrent
+  and thinkpad still default to `true` (unset), correctly — their own
+  legacy snapshots shouldn't be touched until each host's own zrepl
+  history is burned in post-deploy.
+- **`myZrepl.protectRegexes` is load-bearing.** Without it zrepl destroys
+  every snapshot it did not create, including thinkpad's `@blank`
+  impermanence rollback point. Verified this session that homelab's own
+  `zroot/local/root@blank` was never touched by the incident above (it's
+  a different dataset than the three that got wiped) — but don't take
+  that as reason to relax the regex anywhere.
+- **Why did ~23h of failed units (the first incident) not raise an alert
+  that got acted on?** Still open. `myHealthAlerts` covers failed units,
+  so the gap is likely in noticing, not detecting. The boot-race finding
+  above is the same open question again, at smaller scale.
 
 ## Next steps, in order
 
-1. **Wait for homelab's local replication to finish.** It was mid-flight
-   on `storage-bulk` at 13:45 and still had `storage` (486G) and
-   `zroot/local/state` (170G) to go. Check:
-   ```
-   zfs list -r zbackup/backup/homelab
-   zpool list -o name,alloc,free zbackup
-   journalctl -u zrepl.service --since -1h | grep -iE 'error|fail'
-   ```
-   Done when all three new-layout datasets exist under
-   `zbackup/backup/homelab/{zdata/storage/...,zroot/local/state}` and the
-   pool write rate drops to idle.
-2. **Reboot homelab** — the user authorised this specifically for testing.
-   It proves `zfs-import-zbackup.service` imports the pool automatically,
-   which is the *only* way to verify the fix for finding #1 and the one
-   thing that remains unproven about it. **Deliberately deferred this
-   session: do not reboot mid-transfer.** Do it once step 1 is done. After
-   the reboot, verify `zpool list zbackup` shows the pool imported without
-   manual intervention, then re-stop the three timers (a reboot restarts
-   them, same as a switch).
-3. **Get a decision on the capacity blocker above** before touching
-   torrent. Nothing else can proceed without it, and it is now urgent —
-   free space is being consumed as homelab's replication lands.
-4. **Deploy torrent**, then **thinkpad**, per the original plan. Build
-   locally and push (`nixos-rebuild switch --flake .#<host>
+1. **Fix the `zrepl.service` boot race** (see "PRIMARY TASK" above).
+   VM-test if reproducible there; otherwise verify with a real homelab
+   reboot the same way the `boot.zfs.extraPools` fix was verified.
+2. **Deploy torrent**, then **thinkpad**, per the original plan. Capacity
+   and the pool-import fix are both verified — nothing else blocks this.
+   Build locally and push (`nixos-rebuild switch --flake .#<host>
    --target-host root@<host>`, `NIX_SSHOPTS` carrying the key) — do not
    build on the target. Re-stop that host's `pull-deploy.timer` after the
-   switch.
-5. **After burn-in**: set `myZrepl.preserveLegacySnapshots = false` and
-   destroy the leftover `autosnap_*` snapshots by hand.
-6. **Delete this file**, drop the "not yet deployed" caveats from
+   switch, once you have root there.
+3. **After burn-in on torrent/thinkpad too**: set their
+   `myZrepl.preserveLegacySnapshots = false` and destroy their legacy
+   snapshots — **carefully, checking the range is non-empty**, unlike
+   this session's incident.
+4. **Delete this file**, drop the "not yet deployed" caveats from
    `docs/backups.md`, `docs/architecture.md`,
    `docs/procedures/backup-restore.md`. Keep `tests/`,
    `modules/flake/checks.nix`, `docs/procedures/vm-testing.md`.
@@ -314,6 +225,12 @@ root shell and `run0` needs interactive authentication, so anything
 requiring root on torrent has to be done by the user. Suggest they run it
 with a leading `!` in the prompt so the output lands in the session.
 
+**Permission classifier note**: remote `systemctl stop`/`switch`
+operations on homelab got blocked by the auto-mode permission classifier
+this session even though they were previously-agreed, routine steps
+(re-stopping timers, deploying an approved config change). Expect to hit
+this again and just ask the user to confirm inline — it's quick.
+
 ### The exact deploy command that worked
 
 Run from the worktree on torrent. Builds locally and pushes the closure —
@@ -331,7 +248,9 @@ errors before touching the host.
 
 ### Rolling homelab back
 
-Generation 328 is the pre-migration system. On homelab:
+Generation 328 is the pre-migration system (sanoid/syncoid). Current
+generation as of this handoff:
+`/nix/store/yhspvcj18najyiwxa31vf179b4hp1fgk-nixos-system-homelab-26.05.20260814.02e0898`.
 
 ```
 nixos-rebuild list-generations | head
@@ -339,8 +258,11 @@ nixos-rebuild list-generations | head
 ```
 
 Note that rolling back restores sanoid/syncoid but does **not** re-export
-`zbackup`, and the old generation lacks the `boot.zfs.extraPools` fix — so
-a rollback plus a reboot reintroduces the unimported-pool bug.
+`zbackup`, and generation 328 lacks the `boot.zfs.extraPools` fix — so a
+rollback plus a reboot reintroduces the unimported-pool bug. It also
+predates the `preserveLegacySnapshots=false` change and the legacy
+snapshot destruction, which are irreversible regardless of what
+generation is running.
 
 ## What was decided, and why
 
@@ -355,17 +277,18 @@ Decisions the user made explicitly — don't relitigate without asking:
 - **Uniform 5m snapshots**; retention `source` / `ceiling` / `archive`.
 - **A local `snap` job on every host**, so no host depends on a peer to
   prune.
+- **This session**: destroy `backup/torrent/home` immediately (accepting
+  the unprotected window for torrent's home), destroy homelab's orphan
+  once verified, destroy leftover placeholders, fix thinkpad's
+  mountpoint, and disable `preserveLegacySnapshots` for homelab now
+  rather than waiting for torrent/thinkpad to also burn in.
 
 ## Watch for
 
 - **The layout change is the most likely source of confusion.** Backups
   land at `zbackup/backup/<host>/<full source dataset path>`, so
-  `.../torrent/zroot/local/home`, not `.../torrent/home`. The old
-  syncoid-era `.../torrent/home` still exists alongside it — do not
-  mistake one for the other.
-- **`myZrepl.protectRegexes` is load-bearing.** Without it zrepl destroys
-  every snapshot it did not create, including thinkpad's `@blank`
-  impermanence rollback points. Don't "simplify" the keep rules.
+  `.../torrent/zroot/local/home`, not `.../torrent/home`.
+- **`myZrepl.protectRegexes` is load-bearing** — see above.
 - **torrent and thinkpad will start running `sshd`**, which they do not
   today. The alternative is a `tcp`/`tls` transport over Tailscale — the
   module supports both, untested.
@@ -375,9 +298,13 @@ Decisions the user made explicitly — don't relitigate without asking:
   that the YAML parses into known keys; it accepted the missing
   `recv.placeholder.encryption` that would have failed every pull. Green
   build = syntax only. For behaviour, run the VM test.
-- **Deploying is not the same as verifying.** `TODO.md` records a prior
-  incident where a fix was verified in isolation but never switched in,
-  and the broken service ran for two days. Check the live unit.
+- **Deploying is not the same as verifying. Verifying is not the same as
+  staying verified.** Two incidents this session alone (the boot race,
+  the destroy-range bug) happened *after* things were already verified
+  working. Check the live unit/data again after any change, don't trust
+  a prior verification to still hold.
+- **`zfs destroy` with a computed snapshot range needs its bounds
+  checked.** See the incident above.
 
 ## Not done, deliberately
 
@@ -386,8 +313,9 @@ Decisions the user made explicitly — don't relitigate without asking:
 - `myZrepl.sink` and `myZrepl.push` are implemented but unused.
 - The `tcp` and `tls` transports are wired but untested.
 - Retention/interval re-tuning after the USB upgrade.
+- The `zrepl.service` boot race — this session's primary open item.
 
-## Commits on the branch, oldest first
+## Commits on the branch, oldest first (this session's additions at the end)
 
 | Commit | What |
 |---|---|
@@ -398,11 +326,16 @@ Decisions the user made explicitly — don't relitigate without asking:
 | `c30de35` | per-host `snap` job; homelab local push+sink → source+pull |
 | `c5c03f5` | documentation |
 | `e93c78c` | first session handoff |
-| `f32566e` | **fix:** `recv.placeholder.encryption` on receiving jobs |
+| `f32566e` | fix: `recv.placeholder.encryption` on receiving jobs |
 | `0c65b39` | the two-node replication VM test |
 | `77fd4ac` | placeholder-encryption and `root_fs` findings documented |
 | `b6fe659` | VM-testing guide |
-| `416b140` | **fix:** import zbackup at boot; USB cable change documented |
+| `416b140` | fix: import zbackup at boot; USB cable change documented |
 | `713824b` | homelab deploy, capacity blocker, and handoff recorded |
 | `a8f705d` | local replication proven; ~6x throughput measured |
-| `afe4a5a` | final handoff: resume pointer, exact commands, destroy-risk split |
+| `afe4a5a` | handoff: resume pointer, exact commands, destroy-risk split |
+| `05a0c13` | docs: zrepl multi-filesystem send ordering explained |
+| `682f022` | docs: correct the send-ordering gotcha (most_recent, not oldest) |
+| `6fdd581` | docs: record the `zrepl.service`/`local-fs.target` boot race |
+| `100517b` | feat: `preserveLegacySnapshots=false` for homelab |
+| `2bb01ae` | docs: record and resolve the legacy-snapshot destroy incident |
