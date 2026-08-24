@@ -1,4 +1,6 @@
-# torrent - (Main Desktop)
+# torrent
+
+Primary desktop.
 
 ## Hardware
 
@@ -11,9 +13,8 @@
 - Thermal Paste: PTM 7950
 - Power Supply: 1000W ATX 80 PLUS PLATINUM, Super Flower Leadex VI
 - Case: Torrent Black Solid, Fractal Design
-- Monitors: 3x 27" 4K 60Hz, Dell S2721QS
+- Monitors: 1x 27" 4K 60Hz, Dell S2721QS
 - Keyboard (Gaming): WOOTING TWO HE
-- Keyboard (Work): faux fox keyboard v4, fingerpunch
 - Mouse: MM710 PMW3389, Cooler Master
 - Headphones: WH-1000XM4 (Wired), Sony
 - Speakers: A5+, Audioengine

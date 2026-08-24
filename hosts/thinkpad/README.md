@@ -1,4 +1,6 @@
-# thinkpad - (Main Laptop)
+# thinkpad
+
+Primary laptop.
 
 ## Hardware
 

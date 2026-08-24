@@ -41,6 +41,7 @@
         flac
         bitwarden-cli
         topgrade
+        tmux
 
         zfs-prune-snapshots # TEMP, zfs needs module
 
@@ -50,9 +51,10 @@
         # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module;
         # newer run0 modules dropped the `enable` toggle since run0 itself is always available)
         (lib.optionalAttrs (options.security ? run0) {
-          run0 =
-            { enableSudoAlias = true; }
-            // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
+          run0 = {
+            enableSudoAlias = true;
+          }
+          // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
         })
         {
           sudo = {

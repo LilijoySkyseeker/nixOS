@@ -72,7 +72,7 @@
   ];
   networking.hostId = "10ad6c0f"; # required by zfs, arbitrary+fixed for this iso
 
-  # wifi, for on-site recovery where only wireless is available
+  # wifi
   networking.networkmanager.enable = true;
   networking.wireless.enable = lib.mkForce false;
 
@@ -81,18 +81,10 @@
     "flakes"
   ];
 
-  # "minimal" -> "recovery": overrides installation-cd-minimal.nix's
-  # isoImage.edition. The rest of the filename (nixos version + build
-  # date + revision) is already dynamic via system.nixos.label, e.g.
-  # nixos-recovery-26.11.20260813.<rev>-x86_64-linux.iso.
+  # base nixos image for more recovery tools
   isoImage.edition = "recovery";
 
-  # recovery convenience: auto-login as root, no password, on the
-  # local tty this boots to. Root already has an empty password by
-  # default on nixos installer media (installation-device.nix); this
-  # only swaps *which* account autologins from "nixos" to "root" so a
-  # local user has full access immediately. SSH stays locked to
-  # pubkey-only regardless (see services.openssh below).
+  # auto root login
   services.getty.autologinUser = lib.mkForce "root";
 
   # drivers
@@ -109,13 +101,6 @@
     allowSFTP = true;
     enable = true;
     settings.KbdInteractiveAuthentication = false;
-    # PasswordAuthentication must be set as a structured option, not via
-    # extraConfig — NixOS's openssh module renders its own default
-    # (PasswordAuthentication yes) *before* extraConfig, and sshd_config
-    # uses first-directive-wins, so "passwordAuthentication = no" here
-    # was silently overridden and password auth was actually enabled
-    # this whole time (confirmed live on vps, which had the identical
-    # pattern; fixed there too — see hosts/vps/configuration.nix).
     settings.PasswordAuthentication = false;
     extraConfig = ''
       PermitRootLogin = prohibit-password

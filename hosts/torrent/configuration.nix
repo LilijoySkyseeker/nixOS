@@ -90,7 +90,7 @@
   # push home+root snapshots to homelab's zbackup pool over tailscale
   # (see TODO.md "syncoid push backups" for the design)
   sops.secrets.torrent_backup_push_key = {
-    owner = "backup-push"; # readable only by the dedicated backup-push user, not root-wide
+    owner = "backup-push";
   };
   myBackupPush = {
     enable = true;
@@ -102,14 +102,8 @@
     };
   };
 
-  # home holds large, frequently-churned Steam/game libraries — zfs
-  # snapshots pin the space of anything they touch, so heavy install/
-  # uninstall cycles can eat free space fast even with sanoid's normal
-  # retention. Auto-prune oldest snapshots under pressure; see
-  # `systemctl start zfs-emergency-prune.service` for an immediate
-  # manual escape hatch. Safe alongside myBackupPush above since
-  # --create-bookmark already preserves incremental replication history
-  # independent of which local snapshots survive.
+  # auto snapshot pruning at low disk space
+  # manual `systemctl start zfs-emergency-prune.service`
   myZfsSpaceGuard = {
     enable = true;
     pool = "zroot";

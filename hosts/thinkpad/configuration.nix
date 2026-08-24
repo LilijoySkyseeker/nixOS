@@ -108,8 +108,7 @@
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
 
-  # push home+root snapshots to homelab's zbackup pool over tailscale
-  # (see TODO.md "syncoid push backups" for the design)
+  # zfs snapshot backups to homelab
   sops.secrets.thinkpad_backup_push_key = {
     owner = "backup-push"; # readable only by the dedicated backup-push user, not root-wide
   };
@@ -123,8 +122,8 @@
     };
   };
 
-  # same rationale as torrent's myZfsSpaceGuard (see its comment) — this
-  # laptop's home also carries large game libraries.
+  # auto snapshot pruning at low disk space
+  # manual `systemctl start zfs-emergency-prune.service`
   myZfsSpaceGuard = {
     enable = true;
     pool = "zroot";

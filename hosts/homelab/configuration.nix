@@ -18,8 +18,6 @@
     restic
     backblaze-b2
     btop
-    tmux
-    zellij
   ];
 
   # disable staggered hdd spin up
@@ -27,8 +25,7 @@
     options libahci ignore_sss=1
   '';
 
-  # tailscale UDP GRO forwarding tweak — enp3s0 is this host's real NIC,
-  # not applicable to any other host in this repo.
+  # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC,
   services.networkd-dispatcher = {
     enable = true;
     rules."50-tailscale" = {
@@ -50,11 +47,7 @@
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
-  # GPU hardware acceleration — this box is a dual-GPU laptop (MSI):
-  # Intel HD 630 iGPU (card2/renderD129) + Nvidia GTX 1050 Mobile
-  # (card1/renderD128, currently on nouveau). Nvidia gets the proprietary
-  # driver so jellyfin can use NVENC/NVDEC; Intel's VAAPI/QSV stack is also
-  # enabled so its render node is usable as a fallback (see services/jellyfin.nix).
+  # GPU hardware acceleration for Jellyfin
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs-stable; [
@@ -90,10 +83,8 @@
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
 
+  # sops
   sops.secrets = {
-    # the whole rclone ini stanza ([backblazeDaily]/type/account/key) as one
-    # multiline secret, so it can be handed to rcloneConfigFile directly —
-    # no prefetcher service needed to assemble it from separate fields.
     homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
     homelab_discord_webhook = {
@@ -108,18 +99,14 @@
       initialize = true;
       createWrapper = true; # usable with restic-backblazeWeekly
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
-      # "backblazeDaily" here is the rclone remote name (the [stanza] header
-      # inside the homelab_backblaze_rclone_config secret), not this
-      # backup's name — it's a leftover from before the backblazeWeekly
-      # rename and must stay in sync with the secret unless that's also
-      # updated (sops secrets aren't edited directly; see repo docs).
-      repository = "rclone:backblazeDaily:restic21029709384"; # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper
+      # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper, "Daily" name is legacy
+      repository = "rclone:backblazeDaily:restic21029709384";
       rcloneOptions = {
         transfers = "32";
         b2-hard-delete = "false";
       };
       rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
-      #       mount all the most recent backups in a temp folder for restic to trawl
+      # mount all the most recent backups in a temp folder for restic to trawl
       backupPrepareCommand = ''
         datasets="zroot/local/state zdata/storage/storage"
 
@@ -143,12 +130,7 @@
         OnCalendar = "Fri 03:00:00";
         Persistent = true;
       };
-      # this job runs weekly, so "--keep-daily" here really means "keep
-      # the last N runs" (one snapshot lands per day-with-a-run, not per
-      # calendar day) — 2 keeps roughly the last 2 weekly cycles. This is
-      # a disaster-recovery copy only, not a versioning history (ZFS
-      # snapshots/sanoid already cover that), so a short window is
-      # intentional.
+      # daily means keep n runs, so actully 2 snapshots, 1 per week
       pruneOpts = [
         "--retry-lock 15m"
         "--keep-daily 2"
@@ -171,46 +153,13 @@
       bash
     ];
     serviceConfig = {
-      # previously Nice=19 + CPUSchedulingPolicy="idle" (SCHED_IDLE) to
-      # avoid impacting other services. Removed: SCHED_IDLE is the
-      # lowest possible Linux scheduling class, only running when the
-      # CPU is otherwise fully idle -- on this 4-core box with typical
-      # load average ~12-14 (jellyfin/game servers/syncoid all
-      # concurrent), that starved restic/rclone almost completely,
-      # observed throttling a full backup to ~2MiB/s even though
-      # neither the network link nor Backblaze itself was the
-      # bottleneck. Normal scheduling lets it compete fairly instead.
-      # this service mounts/unmounts ZFS snapshots into a shared /tmp
-      # (that's why PrivateTmp is already forced off below) and needs
-      # real mount(8) access — ProtectSystem/namespace restrictions
-      # would conflict with that, so only the always-safe flag applies.
       NoNewPrivileges = true;
       PrivateTmp = lib.mkForce false;
-      # a Backblaze auth failure can make restic/rclone retry its lock
-      # operations forever instead of erroring out — this once left the
-      # unit "running" (and thus blocking every future weekly trigger) for
-      # 7+ weeks with no successful backup. Force a hard failure instead,
-      # so the timer can retry and the failed-units health check fires.
-      # (RuntimeMaxSec has no effect on Type=oneshot — there's no separate
-      # "running" phase to bound, the ExecStart sequence *is* the start
-      # phase — so TimeoutStartSec is the one that actually applies here.)
-      # 6h was too short for the actual backlog (~2.9TiB): every weekly run
-      # got killed mid-upload before committing a snapshot, so no progress
-      # ever landed and it kept restarting from scratch (last successful
-      # snapshot was 2026-06-23). Bumped to 1w — still bounded by the
-      # weekly timer, but long enough for a run to actually finish.
       TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeWeekly";
-      # declaratively (re)assert the B2 bucket's lifecycle rule every run,
-      # since it's cloud-side state with no other source of truth: with
-      # b2-hard-delete=false, restic's own prunes (--keep-daily 30) only
-      # hide old versions rather than deleting them, so this purges hidden
-      # versions after 1 day — a short safety buffer, not a retention
-      # policy (restic's prune already governs what data is kept).
-      # Idempotent: safe to re-set on every run.
+      # backblaze bucket config
       ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
-      # only reached on success (ExecStartPost doesn't run after a failed
-      # ExecStart), so its mtime is proof a backup actually completed.
+      # time since last success timer for alerting
       ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
     };
   };
@@ -227,11 +176,6 @@
       template_working = {
         frequent_period = 1;
         frequently = 59;
-        # hourly/daily give syncoid ~2 weeks of slack to recover a stuck
-        # target before its resume base gets pruned out from under it
-        # (see localTargetAllow's "destroy" comment below for context) —
-        # zdata has 8TB+ free and current snapshot overhead is negligible,
-        # so this is cheap.
         hourly = 168;
         daily = 14;
         weekly = 0;
@@ -263,11 +207,6 @@
     enable = true;
     interval = "hourly";
     commonArgs = [ "--no-sync-snap" ]; # "--create-bookmark" for mobile machines
-    # Module default omits "destroy": without it, syncoid can't run "zfs
-    # receive -A" to abort a partial receive whose source snapshot has since
-    # been pruned, so it fails every run forever instead of self-healing.
-    # Scoped to target datasets only (the ones syncoid already fully owns
-    # via delegation) — source datasets don't get this permission.
     localTargetAllow = [
       "change-key"
       "compression"
