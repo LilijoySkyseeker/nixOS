@@ -28,8 +28,7 @@ secrets/ + .sops.yaml               # sops-nix encrypted secrets
 `modules/flake/hosts.nix` is the file to check for "what does host X
 actually run" — it lists, per host, which `flake.modules.*` entries get
 pulled in. A module existing under `modules/` doesn't mean any host uses
-it; that's still decided by `hosts.nix`. Every folder above has its own
-README with a full inventory. For how it all fits together — see
+it; that's still decided by `hosts.nix`. For how it all fits together — see
 [`docs/architecture.md`](./docs/architecture.md).
 [`docs/style-guide.md`](./docs/style-guide.md) covers conventions
 (formatting, when a custom NixOS options module is worth writing vs. a
