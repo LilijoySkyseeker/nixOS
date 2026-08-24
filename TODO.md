@@ -51,7 +51,22 @@ items rather than letting them rot.
 
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
       complete on branch `worktree-zrepl-migration-plan`; all three hosts
-      build and pass `zrepl configcheck`. **Nothing is deployed.**
+      build and pass `zrepl configcheck`. **homelab is deployed as of
+      2026-08-24 10:02 PDT; torrent and thinkpad are not.**
+
+      **BLOCKED on a user decision before torrent can proceed: `zbackup`
+      has no room for both layouts.** The pool is 10.9T with 5.98T used /
+      4.80T free, and all of that 5.98T is the *old* syncoid layout
+      (`backup/homelab/{state,storage,storage-bulk}` 2.90T +
+      `backup/torrent/home` 3.08T). zrepl writes to different paths and
+      reuses none of it, needing ~2.92T for homelab plus ~3.13T for
+      torrent — ~6.05T against 4.80T free. homelab's own local
+      replication fits; torrent's first pull would fill the pool and fail
+      partway. The old datasets have to be destroyed to make room, which
+      also means explicitly accepting the loss of the stranded 3.08T
+      `backup/torrent/home` (the incident below) — currently the only
+      backup of torrent's home that exists. Deliberately not done.
+      Suggested order in `HANDOFF.md`.
 
       Design, retention, and the non-obvious zrepl behaviours are
       documented in `docs/backups.md` — read that rather than
