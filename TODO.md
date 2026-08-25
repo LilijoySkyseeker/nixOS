@@ -466,6 +466,22 @@ them rot.
       2026-08-20, so the race hasn't had a chance to reproduce (or be
       confirmed fixed) since it was first noticed.
 
+      **Re-checked live 2026-08-25 (same session as the CrowdSec bouncer
+      fix above, no reboot involved):** both `caddy.service` and
+      `anubis-jellyfin.service` still show uptime since the 2026-08-20
+      boot (today's crowdsec-only deploys didn't touch/restart either),
+      so still no fresh data on the race itself. Swept caddy's entire
+      journal history for the `dial unix .../anubis.sock: permission
+      denied` signature: all 36 occurrences are confined to the single
+      Aug 18 03:30–03:31 window already described above, zero since —
+      consistent with "self-resolved, boot-order race" rather than a
+      persistent config problem. Socket perms
+      (`srwxrwx--- anubis:anubis`) and caddy's `anubis` group membership
+      both currently correct. Live functional check: `curl
+      https://jellyfin.skyseekerlabs.net/` → `HTTP 302` (working
+      normally). Still needs an actual reboot to confirm one way or the
+      other whether the race recurs.
+
 ## Done
 
 Completed items live in [`docs/DONE.md`](docs/DONE.md), not here — move an
