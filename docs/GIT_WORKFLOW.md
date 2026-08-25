@@ -40,6 +40,10 @@ No `Co-Authored-By: Claude ...` or `Claude-Session:` trailer in commit
 messages — the git author/committer identity already records who/what made
 the commit, so both are redundant noise in history.
 
+Same for PR descriptions: no "🤖 Generated with Claude Code" footer or
+`claude.ai/code/session_...` link. Let the body end at its last real
+content line (e.g. the test plan).
+
 ## Hooks
 
 - **pre-commit** — blocks commits containing an unencrypted `secrets.yaml`
