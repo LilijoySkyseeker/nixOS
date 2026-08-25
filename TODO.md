@@ -692,15 +692,36 @@ items rather than letting them rot.
             inactive rather than failed, then reconnect and confirm the
             next timer fire (or a manual `systemctl start`) catches up
             immediately (`Persistent = true`).
-      - [ ] Sanity-check `zfs-space-guard.timer` on both hosts: manually
-            drop a test dataset's free space (or just review the script
-            logic against `zpool list -Hpo capacity`) and confirm the
-            15%-free trigger and `keepMin = 2` floor behave as expected
-            before trusting it under real pressure.
-      - [ ] Confirm `systemctl start zfs-emergency-prune.service` works
-            as a manual break-glass action on both hosts (dry-run reading
-            the script's `zfs destroy` targets first, since it's
-            destructive by design).
+      - [x] **2026-08-25: zfs-space-guard reviewed and tested, both
+            automated and manual.** Found and fixed a real bug while
+            reviewing: `cap=$(zpool list -Hpo capacity $pool)` on a
+            failed/garbage read (bad pool name, exported pool, transient
+            hiccup) made the numeric threshold test error out, and bash
+            treats a failed `[ ]` as the `if` being false — so the old
+            script fell through to the *unconditional prune* branch
+            instead of skipping. Reproduced directly: `bash -c 'cap="";
+            if [ "$cap" -lt 85 ]; then echo skip; else echo PRUNE; fi'`
+            prints PRUNE. Now validates `$cap` is non-empty/numeric first
+            and exits 1 instead of falling through. Added
+            `tests/zfs-space-guard.nix` (`checks.zfs-space-guard`,
+            `nix build .#checks.x86_64-linux.zfs-space-guard`), a permanent
+            runNixOSTest covering healthy/pressure/keepMin-floor/
+            zrepl-style-hold-tolerance/emergency-prune/this-bug's-regression
+            — all green. Manually verified live on torrent (thinkpad
+            skipped — identical setup, torrent's testing translates):
+            timer active, journal showed no evidence the bug had ever
+            fired for real (real capacity has been sitting at 79%, close
+            to the 85% trigger); confirmed the real no-op path, then
+            temporarily raised `freeThresholdPercent` to 25 to force a real
+            trigger at that capacity, `build`+`switch`+ran it for real —
+            pruned `zroot/local/{home,root}` from 30 snapshots down to
+            exactly `keepMin`=2 each, then reverted the threshold and
+            switched back (clean, byte-identical store path to before).
+            Also ran `zfs-emergency-prune.service` for real, down to the
+            single newest snapshot per dataset. Confirmed the safety net
+            held throughout: homelab's zrepl pull for torrent stayed
+            incremental with no forced full-send, replicating the very
+            snapshots taken during/after the test.
       - [ ] Once real backups exist, wire
             `myHealthAlerts.backupStaleness` values (already set) into a
             live check — confirm a Discord alert actually fires if a
