@@ -722,6 +722,39 @@ items rather than letting them rot.
             held throughout: homelab's zrepl pull for torrent stayed
             incremental with no forced full-send, replicating the very
             snapshots taken during/after the test.
+
+      - [x] **2026-08-25 (same day, follow-up): re-examined the actual use
+            case and removed the auto-prune half entirely.** The real need
+            is "I downloaded a game, disk is nearly full, I delete
+            something to install a different one and need that space back
+            *right then*" — not a background timer. Capacity-threshold
+            auto-pruning down to a keep-newest floor doesn't solve that:
+            ZFS doesn't free a deleted file's blocks until every snapshot
+            referencing them is gone, and whatever snapshot is newest at
+            delete time was almost always taken *before* the delete (zrepl
+            snapshots on its own 5m clock, unrelated to when you delete
+            something) — proved this empirically in the VM test before
+            removing anything: writing a file, snapshotting it, deleting
+            it, then running the old "keep newest 1" emergency-prune left
+            real pool space unreclaimed, because the one surviving
+            snapshot still held the file.
+            Removed `zfs-space-guard.timer`/`.service` and the
+            `pool`/`freeThresholdPercent`/`keepMin`/`checkInterval` options
+            entirely — dead weight that never solved the actual problem.
+            Kept and repointed `zfs-emergency-prune.service`: now destroys
+            every local snapshot except one named exactly `@blank` (the
+            impermanence rollback point disko creates once at install),
+            instead of "keep the newest one" — since every host is
+            expected to end up on impermanence, `@blank` is the one
+            snapshot that must never go, and destroying everything else
+            guarantees full reclaim regardless of snapshot timing. On a
+            host without `@blank` yet (torrent — see the impermanence
+            migration item above), this destroys everything, which is the
+            documented fallback, not a bug. `tests/zfs-space-guard.nix`
+            rewritten to match (blank-preservation + real space-reclaim +
+            no-blank-fallback + hold-tolerance); host configs on torrent
+            and thinkpad updated to drop the removed options; both hosts
+            build clean.
       - [ ] Once real backups exist, wire
             `myHealthAlerts.backupStaleness` values (already set) into a
             live check — confirm a Discord alert actually fires if a

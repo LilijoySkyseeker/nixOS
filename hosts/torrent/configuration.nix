@@ -105,15 +105,12 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # auto snapshot pruning at low disk space
-  # manual `systemctl start zfs-emergency-prune.service`
+  # emergency space reclaim: `systemctl start zfs-emergency-prune.service`
   myZfsSpaceGuard = {
     enable = true;
-    pool = "zroot";
     datasets = [
       "zroot/local/home"
       "zroot/local/root"
     ];
-    freeThresholdPercent = 15;
   };
 }
