@@ -5,11 +5,33 @@ referenced across sessions. Not a replacement for host-specific docs
 (e.g. `hosts/*/README.md`) — this is for higher-level, cross-host
 or longer-horizon items.
 
-Convention: add a dated entry when a new plan/goal is agreed on; check
-items off or move them to "Done" as they land; prune stale/abandoned
-items rather than letting them rot.
+Convention: add a dated entry when a new plan/goal is agreed on; once it
+lands, move the entry to [`docs/DONE.md`](docs/DONE.md) (append a dated
+"landed" note rather than editing the original text away) instead of
+checking it off in place; prune stale/abandoned items rather than letting
+them rot.
 
 ## Active
+
+- [ ] **2026-08-25: vps's CrowdSec firewall bouncer has been failing since
+      at least 2026-08-20 — pre-existing, found live while deploying the
+      auto-updater rearchitect, unrelated to it.** Both
+      `crowdsec-firewall-bouncer.service` (`Failed to set up credentials:
+      No such file or directory`, step CREDENTIALS) and
+      `crowdsec-firewall-bouncer-register.service` (`Bouncer registered
+      but API key is not present`) fail on every boot/restart —
+      confirmed identical failure text in the journal from 2026-08-20,
+      five days before it was noticed. Looks like the bouncer's API key
+      credential was never actually provisioned (or was lost/rotated
+      out from under it), so `crowdsec-firewall-bouncer-config`'s
+      `LoadCredential=`/systemd-creds step has nothing to load. Needs:
+      figure out where this bouncer's API key is supposed to come from
+      (`crowdsec-firewall-bouncer-register.service`'s own job, a sops
+      secret, or a one-time `cscli bouncers add` step) and re-provision
+      it. Not currently blocking anything else (the firewall itself
+      still runs via `hosts/vps/configuration.nix`'s own iptables rules,
+      independent of CrowdSec) but the bouncer's dynamic IP-ban
+      enforcement has effectively been off this whole time.
 
 - [ ] **2026-08-25: build and test a full restore suite (scripts +
       procedures) against real data — out of scope of the zrepl
@@ -986,25 +1008,6 @@ items rather than letting them rot.
       evaluated only. Build (not switch) both before relying on them,
       then switch when ready.
 
-- [ ] **2026-08-18: homelab's weekly restic-to-Backblaze backup has no
-      safeguard against `myAutoUpdate`'s Thursday auto-switch killing
-      a mid-run backup.** During a full-bucket reset/re-test of the
-      backup (see this session), we found homelab runs
-      `nixos-rebuild switch` every Thursday 03:00 via `myAutoUpdate`
-      (`hosts/homelab/configuration.nix`), and `switch-to-configuration`
-      restarts any systemd unit whose definition changed — including
-      `restic-backups-backblazeWeekly.service` (Type=oneshot,
-      `TimeoutStartSec=1w`) if the restic module, its overrides, or a
-      shared dep like `pkgs-stable` changes. A run in progress (backups
-      have taken multiple days for the ~2.9TiB dataset) would be killed
-      with no resumption. Worked around this time by manually pausing
-      the `nixos-upgrade` timer for the duration of the manual run.
-      Needs a permanent fix: either make the backup service resilient
-      to being interrupted/restarted (state/resume support, or a
-      `ConditionXXX`/lock that defers an auto-switch while a backup is
-      active), or have `myAutoUpdate` skip switching while
-      `restic-backups-backblazeWeekly.service` is active.
-
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended
       period (over a month), surfaced while reasoning through the full
@@ -1141,38 +1144,7 @@ items rather than letting them rot.
       but worth confirming it isn't recurring (e.g. flaky upstream
       resolver, or the service starting before network-online.target).
 
-- [ ] **2026-08-19: `flake-update-test.service` failing on homelab —
-      root has no git identity configured.** Found during the same log
-      trawl. The update-branch step fails with `fatal: unable to
-      auto-detect email address (got 'root@homelab.(none)')` right
-      after the flake inputs are bumped, because `git config
-      --global user.email`/`user.name` were never set for root on
-      homelab. Needs: set a git identity for root declaratively (e.g.
-      via `home-manager.users.root.programs.git` in
-      `profiles/server.nix`, alongside the existing root home-manager
-      block) so `myAutoUpdate`'s commit step succeeds.
-
-      **Confirmed live 2026-08-21** while deploying zfs-backup-push:
-      the crash (2026-08-19 03:01) left homelab's `/etc/nixos` checkout
-      on an orphaned `auto-update` branch with an uncommitted
-      `flake.lock` bump — `nixos-rebuild switch` was blocked on this
-      stale state until manually cleaned up (`git checkout master &&
-      git reset --hard origin/master && git branch -D auto-update &&
-      git clean -fd`, done live with the user's explicit go-ahead).
-      **Note for the eventual fix**: `modules/nixos/auto-update.nix`'s
-      `flake-update-test.service` script does `git fetch origin; git
-      checkout master; git reset --hard origin/master` *before*
-      creating the `auto-update` branch each run, which should already
-      self-heal past a prior crash's leftover branch/lockfile diff on
-      its own next scheduled run (`git checkout master` + `reset
-      --hard` discards it) — but confirm that actually holds once the
-      git-identity fix lands, rather than assuming; the crash observed
-      here happened before that reset-and-recreate sequence ever got
-      a chance to run again (the timer's next fire would have hit the
-      exact same git-identity failure and stayed stuck), so it's
-      unverified whether the self-heal path was ever actually
-      exercised successfully.
-
-
 ## Done
 
+Completed items live in [`docs/DONE.md`](docs/DONE.md), not here — move an
+item there (don't just check it off in place) once it's landed.

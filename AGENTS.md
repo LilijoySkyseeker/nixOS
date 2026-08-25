@@ -33,6 +33,7 @@ encrypted with sops-nix.
 | `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (`TODO.md`). |
 | `docs/GIT_WORKFLOW.md` | Commit conventions, git hooks, day-to-day branching. |
 | `TODO.md` | Live plans/goals and known in-flight issues — check before assuming a described feature is fully deployed. |
+| `docs/DONE.md` | Completed `TODO.md` items, moved here once landed rather than checked off in place — historical record of what was fixed and when. |
 
 ## Commands
 

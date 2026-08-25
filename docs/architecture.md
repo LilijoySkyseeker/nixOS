@@ -290,6 +290,52 @@ Two things worth knowing before touching anything nearby:
   the impermanence rollback snapshots alive. See `docs/backups.md`'s
   Gotchas before changing any retention rule.
 
+## Auto-update & deploy
+
+Three `modules/nixos/` options-surface modules, one shared safe-switch
+guard, no manual "did anyone build this" step for any of the four real
+hosts:
+
+| Host | Module | What it does |
+|---|---|---|
+| `homelab` | `myAutoUpdate` | `flake-update-test` (branch, bump `flake.lock`, build-test, merge to master if it builds) + `auto-switch` (fetch+switch on a schedule) as two separate jobs |
+| `thinkpad`, `torrent` | `myPullDeploy` | fetch+build+switch/boot on a schedule, from each host's own local checkout |
+| `vps` | `myPushDeploy` | homelab builds vps's config and pushes+activates it over SSH — vps never builds locally (too resource-constrained) |
+
+All three share one safe-switch core (`modules/flake/deploy-guards.nix`,
+a plain shell fragment, not a derivation, so it's usable regardless of
+which pkgs variant a host is pinned to) before any of them will
+build/switch:
+
+- **dirty/branch check + fetch+ff-only-merge** — always builds from
+  verified-fresh `origin/master`, never trusts whatever's already
+  checked out. This is what a 2026-08-21 incident was missing: a
+  scheduled switch built from a stale/dirty local checkout and silently
+  reverted a manual deploy (see `docs/DONE.md`).
+- **`minSwitchInterval`** (default 7 days) — skips if
+  `/nix/var/nix/profiles/system`'s own mtime (not dereferenced — the
+  symlink itself is recreated fresh on every switch/boot, so its mtime
+  *is* the last-activation time, no new state needed) is more recent
+  than the threshold. A manual or push-deployed switch counts too, so
+  it defers the next scheduled one.
+- **`protectedUnits`** — skips (retries next cycle) rather than
+  build/switch while any listed unit is active, so a scheduled switch
+  can't kill a long-running job mid-run (homelab:
+  `restic-backups-backblazeWeekly.service`, whose runs can take days).
+
+homelab additionally exposes `auto-switch-now` — same build/switch
+logic, manual-trigger only (`systemctl start --wait
+auto-switch-now.service`), deliberately skipping the interval/protected-
+unit guards since those exist to protect an *unattended* run, not to
+silently no-op a human asking for a deploy right now.
+
+A service running as root against a *user*-owned `flakeDir` (both PC
+hosts: root has no home-manager profile there at all, unlike server
+hosts) needs two things a root-owned `/etc/nixos` checkout gets for
+free, both handled inside the shared guard/module: `git config --global
+--add safe.directory`, and (via `myPullDeploy.sshKeyPath`) an SSH
+identity to fetch with, since root has none of its own.
+
 ## Secrets
 
 Encrypted with sops-nix. `.sops.yaml` maps named recipient keys (one per
