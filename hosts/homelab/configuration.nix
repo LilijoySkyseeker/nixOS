@@ -213,6 +213,11 @@
     publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJESBjkAOLvKdaRlpAg/CiBh/WvW0lzb4QScEw40o3Kc";
   };
 
+  programs.ssh.knownHosts.thinkpad = {
+    hostNames = [ "thinkpad" ];
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF2TU4+7NDf2QOY8x/48KYt/1WX1jtCRhUOwKgYW7pNY";
+  };
+
   myZrepl = {
     enable = true;
 
