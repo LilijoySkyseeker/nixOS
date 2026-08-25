@@ -78,7 +78,16 @@
           };
           script = ''
             set -uo pipefail
-            cap=$(zpool list -Hpo capacity ${lib.escapeShellArg cfg.pool})
+            cap=$(zpool list -Hpo capacity ${lib.escapeShellArg cfg.pool}) || {
+              echo "zfs-space-guard: zpool list failed for ${cfg.pool}, skipping this run" >&2
+              exit 1
+            }
+            case "$cap" in
+              ""|*[!0-9]*)
+                echo "zfs-space-guard: unexpected capacity value '$cap' for ${cfg.pool}, skipping this run" >&2
+                exit 1
+                ;;
+            esac
             if [ "$cap" -lt $(( 100 - ${toString cfg.freeThresholdPercent} )) ]; then
               exit 0
             fi
