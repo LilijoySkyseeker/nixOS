@@ -127,7 +127,13 @@
       paths = [ "/tmp/restic" ];
       timerConfig = {
         OnCalendar = "Fri 03:00:00";
-        Persistent = true;
+        # Persistent=false (default) is deliberate: after a long outage this
+        # would otherwise fire its missed run immediately at boot, piling
+        # ~2.9TiB of I/O on top of zrepl's own post-boot catch-up
+        # replication (see TODO.md). Skipping straight to next Friday
+        # instead isn't silent — myHealthAlerts pages if
+        # last-success goes over 336h/14 days stale (see below).
+        Persistent = false;
       };
       # daily means keep n runs, so actully 2 snapshots, 1 per week
       pruneOpts = [
