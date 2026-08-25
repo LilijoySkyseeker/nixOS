@@ -139,7 +139,55 @@ items rather than letting them rot.
       build and pass `zrepl configcheck`. **homelab deployed 2026-08-24
       10:02 PDT (local replication complete, boot race fixed and
       reboot-verified); torrent deployed 2026-08-24 ~17:16 PDT (initial
-      full send to homelab in progress); thinkpad not yet deployed.**
+      full send to homelab in progress, ~301 GiB/3.3 TiB as of 18:45 PDT,
+      ETA roughly 05:00-07:00 PDT 2026-08-25); thinkpad not yet deployed.**
+
+      **2026-08-24 ~18:20 PDT: fixed a recurring `local-pull` prune
+      `ExecErr` on homelab** (`destroys failed ... it's being held`,
+      firing on `zdata/storage/storage`, `storage-bulk`, and
+      `zroot/local/state` on every ~15min cycle). Root cause, found by
+      reading zrepl's own pruning source
+      (`internal/pruning/retentiongrid/retentiongrid.go`,
+      `internal/pruning/keep_grid.go`, `internal/pruning/pruning.go` in
+      the pinned nixpkgs `zrepl.src`, nixpkgs rev `e4bae1bd`): a grid
+      bucket without `keep=all` sorts its occupants youngest-first and
+      removes the leading `removeCount` of them
+      (`RemoveYoungerSnapsExceedingKeepCount`), i.e. it targets the
+      *newest* snapshot in an over-full bucket for destruction, not the
+      oldest. `Grid.FitEntries` also redefines "now" every prune run as
+      the youngest matching snapshot's own timestamp. `retention.archive`
+      (`"168x1h | 30x1d | 12x30d"`, no leading full-granularity bucket)
+      combined with `local-pull`'s 15m interval against snapshots landing
+      every 5m meant the just-received snapshot landed in an over-full
+      bucket almost every cycle — and that snapshot is exactly the one
+      zrepl's own endpoint had just placed its
+      `zrepl_last_received_J_<job>` hold on, to guarantee a valid
+      incremental base. The destroy failed loudly every cycle. Harmless
+      (checked: receiver-side snapshot counts stayed bounded, older
+      entries in the bucket pruned fine) but permanent log noise, and a
+      sign the rule set was fighting zrepl's own bookkeeping — not a
+      config mistake specific to homelab, since every receiving job
+      shares this default.
+
+      **Fix:** `retention.archive` gets a leading `1x15m(keep=all)`
+      bucket (commit `6f6e4f3`), sized to the pull interval — `keep=all`
+      short-circuits the grid's destroy-list logic for that bucket
+      entirely (`if b.keepCount == RetentionGridKeepCountAll { return nil
+      }`), so the newest snapshot can never collide with its own hold.
+      Deployed to homelab (switch) and torrent (`run0`-wrapped local
+      switch); verified via a clean `local-pull` cycle post-deploy
+      (`Pruning Receiver: Status: Done`, actually destroying old
+      snapshots, no `ExecErr`). Documented in `docs/backups.md` Gotchas.
+
+      **Side effect, not a bug:** restarting `zrepl.service` on homelab
+      (as any switch does) killed torrent's in-flight `home` full send
+      mid-transfer at ~257 GiB. `SavePartialRecvState:true` meant a
+      `receive_resume_token` survived on the receiver, so the next pull
+      cycle resumed from ~257 GiB rather than restarting the 3.3 TiB send
+      — confirmed via `zfs get receive_resume_token` before the resume
+      and the dataset's `USED` growing steadily after. Worth remembering
+      before any future homelab config change while a host's initial
+      sync is still running: expect a pause-and-resume, not data loss.
 
       The capacity blocker below (`zbackup` had no room for both layouts)
       was resolved earlier this session by destroying the old syncoid-era

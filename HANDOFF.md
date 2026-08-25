@@ -1,15 +1,16 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24 (rewritten
-clean at end of day — prior revisions had accumulated a lot of resolved
-detail; see `TODO.md` and `docs/backups.md` for the full history, this
-file only carries what the next session actually needs).
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, updated same
+day ~18:50 PDT after the retention-grid fix (see below). See `TODO.md`
+and `docs/backups.md` for full history, this file only carries what the
+next session actually needs.
 
 **Status: homelab and torrent deployed and healthy; thinkpad is the only
 host left.** homelab's local replication is complete and verified, its
-boot race is fixed and reboot-verified. torrent was deployed today and
-is mid-flight on its very first replication to `zbackup` — **checking on
-that is the next session's first job**, not deploying thinkpad blind.
+boot race is fixed and reboot-verified. torrent's first-ever replication
+to `zbackup` is in progress (resumed cleanly after one interruption, see
+below) — **this next session's job is to deploy thinkpad, run locally on
+thinkpad itself**, not from torrent.
 
 **Delete this file once the branch is merged and all three hosts are
 deployed.** It is session state, not documentation — durable knowledge
@@ -17,47 +18,87 @@ lives in `docs/backups.md`, `hosts/homelab/README.md`, and `TODO.md`.
 
 ## One-sentence prompt to start the next session with
 
-> Continue the zrepl migration: enter the worktree at
-> `.claude/worktrees/zrepl-migration-plan` (branch
-> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — first
-> check in on torrent's backup status, both its local snapshots and its
-> replication progress onto `zbackup`, then deploy thinkpad if that
-> looks healthy.
+> Continue the zrepl migration, running **locally on thinkpad** (not
+> torrent, not remotely): fetch the dotfiles repo, get onto branch
+> `worktree-zrepl-migration-plan` (pull/fetch first — it moved since this
+> was written), and read `HANDOFF.md` first. homelab and torrent are
+> deployed and healthy; deploy thinkpad next, following "Deploying
+> thinkpad" below.
 
 ## How to resume
 
 Everything is committed and pushed; nothing is left in a dirty tree.
 
-- Worktree: `/home/lilijoy/dotfiles/.claude/worktrees/zrepl-migration-plan`
-  (enter it with the `EnterWorktree` tool, `path:` that directory — do
-  not work from the main checkout).
+- This session must run **on thinkpad itself** — `nixos-rebuild switch`
+  with no `--target-host` this time, since that's what the user asked
+  for this round (torrent's deploy was pushed remotely from a session
+  running on torrent; thinkpad's is being done locally instead).
+- Get the repo onto thinkpad if it isn't already there, and enter a
+  worktree/checkout of branch `worktree-zrepl-migration-plan` (fetch
+  first — `git log --oneline -1` should show `6f6e4f3` or later).
 - Branch `worktree-zrepl-migration-plan`, pushed to `origin`. Working
   tree clean, `nixfmt --check` passes.
 - The branch is **not merged to master**. master still has sanoid/syncoid.
-- Sessions here run on `torrent` — that's "this local machine".
+- `run0` is aliased to `sudo` on every host (`docs/hardening.md`), so
+  root actions on thinkpad work the same way they did on torrent: batch
+  what needs root into as few `run0` calls as possible, it prompts
+  interactively per invocation.
 
 ## Read these, don't re-derive
 
 - `docs/backups.md` — design, roles, retention, and every non-obvious
   zrepl behaviour hit so far, each citing its zrepl/nixpkgs source
-  location. Two new Gotchas from today: `zrepl.service`'s boot race fix,
-  and `root_fs` needing to pre-exist (bit torrent's deploy).
+  location. New Gotchas from today: `zrepl.service`'s boot race fix,
+  `root_fs` needing to pre-exist (bit torrent's deploy), and the grid
+  bucket / last-received-hold collision below.
 - `docs/procedures/backup-restore.md` — restore paths (unexercised so far).
 - `docs/procedures/vm-testing.md` — how to run/extend the VM test.
 - `TODO.md`'s Active section — status and full incident writeups
   (root cause, timestamps, resolution) for everything summarized below.
 
-## Checking on torrent — do this first
+## retention.archive fix, deployed and verified (commit `6f6e4f3`)
 
-torrent's first-ever replication to homelab started 2026-08-24 17:28 PDT:
-`zroot/local/home` (3.3 TiB) + `zroot/local/root` (23 GiB), full sends
-since nothing existed on `zbackup` for it before today. `root` finished
-in ~8 minutes; `home` was still running at session end, throughput
-suggesting somewhere around a day to finish (this repo has hit slow
-cross-network zrepl throughput before — see `TODO.md`'s torrent USB
-throughput entry, though that was same-host/local, not this leg).
+homelab's `local-pull` job was logging a recurring `ExecErr` on every
+prune cycle (`destroys failed ... it's being held`) on three datasets.
+Root cause, found by reading zrepl's actual pruning source: a grid bucket
+without `keep=all` marks its *newest* occupant for destruction, not its
+oldest, and collides with the hold zrepl's own endpoint places on the
+just-received snapshot. Full writeup: `docs/backups.md` Gotchas ("A grid
+bucket without `keep=all`..."). Fixed by giving `retention.archive` a
+leading `1x15m(keep=all)` bucket — this is a shared default, so it
+applies to every receiving job, `local-pull` and every `pull.remotes.*`
+(torrent, thinkpad) alike.
 
-Check both sides:
+**Deployed to homelab and torrent, verified clean** — a `local-pull`
+cycle completed after the fix with `Pruning Receiver: Status: Done`
+(actually destroying old snapshots) instead of `ExecErr`. Nothing further
+to do here; thinkpad picks this up automatically once deployed, since it
+was written into the config before thinkpad's first deploy rather than
+patched in after.
+
+**Side effect worth knowing before you next touch homelab's config:**
+switching homelab restarts `zrepl.service`, which killed torrent's
+in-flight `home` full send mid-transfer (this happened once already,
+deploying this very fix). It resumed cleanly — `SavePartialRecvState`
+kept a `receive_resume_token` on the receiver, so it picked back up from
+where it left off rather than restarting the 3.3 TiB send — but expect
+another such interruption+resume if homelab's config changes again while
+torrent is still mid-sync (e.g. pinning thinkpad's host key, see below).
+Not destructive, just a several-minute pause.
+
+## torrent status as of 2026-08-24 18:45 PDT
+
+`zroot/local/root` finished its first sync (~8 min). `zroot/local/home`
+(3.3 TiB total) is at ~301 GiB, throughput ~4-5 GiB/min sustained across
+two samples (one pre-interruption, one post-resume) → rough ETA
+**~10-12.5 hours from 18:45 PDT, i.e. somewhere around 05:00-07:00 PDT
+2026-08-25**. Treat that as a band, not a commitment — this link's
+throughput has swung 2-3x before (see `TODO.md`'s torrent USB throughput
+entry). No `PlanErr`/`ExecErr` as of this writing. This does not block
+deploying thinkpad — thinkpad's own first sync is independent and can run
+concurrently.
+
+Check both sides if you want a fresh read:
 
 ```
 # local: torrent's own snap job + sshd/zrepl health
@@ -72,10 +113,10 @@ ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes root@homelab \
 Look for: `Status: fan-out-filesystems` progressing (not stuck), no
 `PlanErr`/`ExecErr`, and eventually `Status: Latest` once both
 filesystems finish their first sync-up. `zpool list zbackup` should show
-`FREE` shrinking roughly in line with progress (started at 8.29T with
-2.61T alloc). If it stalled or errored, `journalctl -u zrepl -b` on
-whichever side looks wrong is the next step — don't re-deploy anything
-until you understand why.
+`FREE` shrinking roughly in line with progress (2.89T alloc as of this
+writing). If it stalled or errored, `journalctl -u zrepl -b` on whichever
+side looks wrong is the next step — don't re-deploy anything until you
+understand why.
 
 ## What's deployed and verified
 
@@ -97,10 +138,10 @@ until you understand why.
   can't fail this way anymore" — not "observed surviving a live race".
   Full writeup: `docs/backups.md` Gotchas, `TODO.md`.
 - **torrent**: `zrepl.service` + `sshd` active, `snap` job taking
-  snapshots, `pull-deploy.timer` stopped (doesn't persist across a
-  switch/reboot — re-stop if you deploy again). First replication to
-  homelab in progress, see above. Two deploy-time issues, both fixed —
-  see `docs/backups.md` Gotchas:
+  snapshots, `pull-deploy.timer` stopped again after the retention-fix
+  switch (doesn't persist — re-stop if you deploy again). First
+  replication to homelab in progress, see above. Two deploy-time issues,
+  both fixed — see `docs/backups.md` Gotchas:
   - `zbackup/backup/torrent` (zrepl's `root_fs` container) had been
     destroyed by mistake in an earlier session's capacity cleanup.
     zrepl never creates `root_fs` itself, only placeholders under it.
@@ -126,33 +167,45 @@ On torrent, root actions need `run0` (interactive, one prompt per
 invocation — minimize how many you issue, batch what you can):
 `run0 systemctl stop pull-deploy.timer`.
 
-## Deploying thinkpad
+## Deploying thinkpad — run this part locally, on thinkpad
 
-Once torrent's replication looks healthy (see above), deploy thinkpad
-the same way torrent was deployed today:
+This is the one difference from how torrent was deployed: torrent's
+switch was pushed remotely from a session running on torrent itself
+(`--target-host root@torrent`). This time the user asked for it to run
+**locally on thinkpad** — build and switch directly there, no
+`--target-host`. The `programs.ssh.knownHosts.thinkpad` step below still
+means editing and pushing from wherever you're comfortable (it's just a
+repo edit + a remote `nixos-rebuild switch` against homelab), but the
+thinkpad switch itself needs thinkpad's own root, via `run0`.
 
 ```
-export NIX_SSHOPTS="-i /home/lilijoy/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes"
-nixos-rebuild build --flake .#thinkpad   # cheap, catches eval errors first
-nixos-rebuild switch --flake .#thinkpad --target-host root@thinkpad
+nixos-rebuild build --flake .#thinkpad    # cheap, catches eval errors first
+run0 nixos-rebuild switch --flake .#thinkpad
 ```
 
 Expect the same two issues torrent hit, and fix them the same way:
 
 1. **Pin thinkpad's SSH host key** on homelab before its first pull
    attempt, or expect `Host key verification failed`. Get the real key
-   directly from thinkpad (`/etc/ssh/ssh_host_ed25519_key.pub`), then add
-   a `programs.ssh.knownHosts.thinkpad` entry in
-   `hosts/homelab/configuration.nix` next to torrent's.
+   directly from thinkpad (`/etc/ssh/ssh_host_ed25519_key.pub` — you're
+   running on thinkpad now, so this is a local read), then add a
+   `programs.ssh.knownHosts.thinkpad` entry in
+   `hosts/homelab/configuration.nix` next to torrent's, commit, push, and
+   deploy homelab (`nixos-rebuild switch --flake .#homelab --target-host
+   root@homelab`, with `NIX_SSHOPTS` set as before). **This restarts
+   homelab's `zrepl.service` and will interrupt torrent's still-running
+   `home` sync** — expected, harmless, see the retention-fix section
+   above; it resumes on its own.
 2. **Check `zbackup/backup/thinkpad` still exists** before the first
    pull (`zfs list zbackup/backup/thinkpad` on homelab) — it was
-   confirmed present as of this session (its mountpoint was fixed to
-   `none` last session), but re-verify since torrent's was found missing
-   unexpectedly. If it's gone, recreate per the Gotchas entry in
+   confirmed present as of the 2026-08-24 session (its mountpoint was
+   fixed to `none` that session), but re-verify since torrent's was found
+   missing unexpectedly. If it's gone, recreate per the Gotchas entry in
    `docs/backups.md`.
-3. Re-stop thinkpad's own auto-update timer after the switch, once you
-   have root there (same `run0` pattern as torrent — thinkpad's timer
-   name may differ, check `docs/architecture.md`'s host table).
+3. Re-stop thinkpad's own auto-update timer after the switch:
+   `run0 systemctl stop pull-deploy.timer` — thinkpad uses the same
+   `pull-deploy` module as torrent (`docs/architecture.md`'s host table),
+   so it's the same timer name, not a different one.
 4. `myZrepl.protectRegexes`'s default `^blank$` matters most here —
    thinkpad has impermanence `@blank` snapshots on both
    `zroot/local/root` and `zroot/local/home`. Don't touch
@@ -274,3 +327,4 @@ below).
 | `0db5b1e` | docs: record homelab reboot-verification of the boot-race fix |
 | `9ae82a6` | feat: pin torrent's SSH host key; torrent deployed |
 | `376e591` | docs: record pull-deploy.timer stopped on torrent |
+| `6f6e4f3` | fix: retention.archive leading keep=all bucket to stop hold/prune collision |
