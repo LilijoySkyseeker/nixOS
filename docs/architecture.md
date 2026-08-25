@@ -323,6 +323,19 @@ build/switch:
   can't kill a long-running job mid-run (homelab:
   `restic-backups-backblazeWeekly.service`, whose runs can take days).
 
+homelab's `flake-update-test`/`auto-switch` timers (and its
+`restic-backups-backblazeWeekly` timer, outside this shared guard core)
+deliberately run with `Persistent = false`, unlike `myPullDeploy`'s.
+After a long outage, a `Persistent = true` timer fires its missed run
+immediately at boot — for these three specifically that would pile
+I/O/CPU load onto zrepl's own post-boot catch-up replication, which
+also runs on homelab (see the Backups section above). None of the three
+need immediate catch-up (a week's delay is a non-issue given
+`minSwitchInterval` already treats weekly cadence as normal for the
+first two, and restic has its own staleness alert as a backstop), so
+skipping straight to the next scheduled run is preferred over
+contending with zrepl at boot.
+
 homelab additionally exposes `auto-switch-now` — same build/switch
 logic, manual-trigger only (`systemctl start --wait
 auto-switch-now.service`), deliberately skipping the interval/protected-

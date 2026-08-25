@@ -321,19 +321,29 @@ them rot.
       firing its one missed catch-up run right at boot, all at once).
       **Partially reworked since 2026-08-18 — re-assessed 2026-08-25,
       not fully closed:**
-      - **Boot-time contention pile-up**: sanoid and syncoid (the
-        original minutely/hourly `Persistent = true` timers this bullet
-        was written about) no longer exist — replaced repo-wide by
-        zrepl, a long-running daemon whose jobs run on their own
-        internal interval from whenever the daemon starts, not systemd
-        timer catch-up semantics. That removes this specific pile-up
-        mechanism for ZFS snapshotting/replication, but the restic
-        weekly timer and both `myAutoUpdate` timers (fetch + switch,
-        confirmed still `Persistent = true` in `modules/nixos/
-        auto-update.nix`) still exist and could still contend with
-        zrepl's own post-boot catch-up replication for I/O after a long
-        outage. No `RandomizedDelaySec`/explicit staggering has been
-        added anywhere in the repo (confirmed via grep, 2026-08-25).
+      - **Boot-time contention pile-up — resolved 2026-08-25.** sanoid
+        and syncoid (the original minutely/hourly `Persistent = true`
+        timers this bullet was written about) no longer exist — replaced
+        repo-wide by zrepl, a long-running daemon whose jobs run on
+        their own internal interval from whenever the daemon starts, not
+        systemd timer catch-up semantics. That already removed this
+        specific pile-up mechanism for ZFS snapshotting/replication. The
+        remaining three (`restic-backups-backblazeWeekly`'s timer plus
+        both `myAutoUpdate` timers, fetch + switch) now have
+        `Persistent = false` (`modules/nixos/auto-update.nix`,
+        `hosts/homelab/configuration.nix`) instead of the
+        `RandomizedDelaySec`/jitter approach first considered — a missed
+        run after a long outage is skipped rather than fired
+        immediately at boot, which removes the contention with zrepl's
+        post-boot catch-up entirely rather than just spreading it over a
+        smaller window. Chosen over jitter because none of the three
+        need immediate catch-up (flake-update-test/auto-switch: a
+        week's delay is a non-issue given `minSwitchInterval` already
+        treats weekly cadence as normal; restic: already has a
+        336h/14-day staleness alert via `myHealthAlerts` as a backstop,
+        so a skipped cycle isn't silent). Build-tested (`nixos-rebuild
+        build --flake .#homelab`); not yet deployed or observed through
+        a real long-outage reboot.
       - **Compounds directly with the item above**: **partially
         addressed.** `hosts/homelab/configuration.nix` now sets
         `myAutoUpdate.protectedUnits = [
@@ -361,15 +371,11 @@ them rot.
         `docs/DONE.md`), which is a different mechanism with different
         (already-encountered-and-fixed) failure modes, not a direct
         continuation of this specific risk.
-      - **Unverified**: whether the B2 application key
-        (`homelab_backblaze_rclone_config` secret) has an expiration
-        date set on Backblaze's side. Couldn't check without exposing
-        the secret's contents; confirm on the B2 web console if this
-        needs certainty. Unchanged.
-      Still needs: stagger/serialize the remaining boot-time timers
-      (restic weekly + `myAutoUpdate` fetch/switch) so a long-outage
-      reboot doesn't pile them up against zrepl's own catch-up
-      replication, and confirm the B2 key expiration.
+      - **B2 key expiration — confirmed 2026-08-25 (user checked the B2
+        web console): no expiration set** on the application key backing
+        `homelab_backblaze_rclone_config`. Closed.
+      Still needs: deploy the `Persistent = false` change
+      (`worktree-stagger-boot-timers`, commit `c3131b9`) to homelab.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
