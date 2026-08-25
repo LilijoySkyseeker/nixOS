@@ -11,5 +11,10 @@
         pkgs = config.flake.pkgsUnstable;
         zreplModule = config.flake.modules.nixos."zrepl";
       };
+
+      checks.zfs-space-guard = import ../../tests/zfs-space-guard.nix {
+        pkgs = config.flake.pkgsUnstable;
+        zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
+      };
     };
 }
