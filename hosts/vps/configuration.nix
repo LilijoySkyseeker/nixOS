@@ -392,11 +392,19 @@ in
     ];
   };
   services.crowdsec-firewall-bouncer.enable = true;
-  # drop "crowdsec" from StateDirectory, collides with our impermanence bind-mount
+  # drop both dirs from StateDirectory — systemd's own StateDirectory= mechanism
+  # creates /var/lib/X as a symlink to /var/lib/private/X, which collides with
+  # our impermanence bind-mounts for both /var/lib/crowdsec and (now that it's
+  # persisted too, to fix the register service losing its API key credential
+  # every reboot) /var/lib/crowdsec-firewall-bouncer-register — a real bind
+  # mount can't be placed at a path that's actually a symlink.
   systemd.services.crowdsec-firewall-bouncer-register.serviceConfig = {
-    StateDirectory = lib.mkForce "crowdsec-firewall-bouncer-register";
-    # DynamicUser makes /var/lib/crowdsec read-only, but cscli needs to write
-    ReadWritePaths = [ "/var/lib/crowdsec" ];
+    StateDirectory = lib.mkForce [ ];
+    # DynamicUser makes both dirs read-only otherwise, but cscli needs to write
+    ReadWritePaths = [
+      "/var/lib/crowdsec"
+      "/var/lib/crowdsec-firewall-bouncer-register"
+    ];
   };
   # symlink cscli's expected default config path into place
   systemd.tmpfiles.rules = [
