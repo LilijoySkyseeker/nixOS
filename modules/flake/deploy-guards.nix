@@ -16,6 +16,12 @@
   # "config shadowing" gotcha).
   flake.deployGuardsScript = ''
     require_clean_master() {
+      # a service running as root against a user-owned flakeDir (e.g.
+      # myPullDeploy on a PC host, ~lilijoy/dotfiles) otherwise hits git's
+      # "dubious ownership" refusal on every run -- idempotent, harmless
+      # to repeat, and scoped to $PWD (the caller has already cd'd into
+      # flakeDir before sourcing this).
+      git config --global --add safe.directory "$(pwd)"
       if [ -n "$(git status --porcelain)" ]; then
         echo "Working tree dirty, skipping this scheduled run."
         exit 0
