@@ -253,6 +253,38 @@ These each cost real investigation; none are obvious from the config.
   rather than reliably reproducible. The underlying race itself is still
   unfixed; this only removes the "backups stay silently down until a
   human notices" consequence of it.
+- **`root_fs` must already exist — zrepl never creates it.** Placeholder
+  auto-creation only covers the datasets *under* `root_fs`
+  (`subroot.MapToLocal`, see the placeholder-encryption gotcha above);
+  `Receiver.ListFilesystems` hard-fails with `root_fs does not exist` if
+  the container itself is missing (`internal/endpoint/endpoint.go:658` in
+  zrepl 0.7.0), and nothing creates it for you. `disko.nix` declares one
+  container per source host under `zbackup/backup/<host>` for exactly
+  this reason — but disko only acts at pool *format* time, so if one gets
+  destroyed later (as `backup/torrent` was, by mistake, in the
+  capacity-cleanup incident in `TODO.md`), deploying that host's pull job
+  fails until someone `zfs create`s it back by hand, matching disko's
+  declared properties. `canmount` doesn't inherit in ZFS — it's
+  dataset-local and defaults to `on` regardless of a parent's `off` — so
+  matching the siblings (`backup/homelab`, `backup/thinkpad`) only needs
+  `mountpoint=none` and `com.sun:auto-snapshot=false` set explicitly;
+  everything else (`compression`/`atime`/`xattr`/`acltype`) inherits from
+  the pool root already. Check with
+  `zfs get -s local,inherited,default mountpoint,canmount,com.sun:auto-snapshot <dataset>`
+  before assuming a recreated container matches its siblings.
+- **The `ssh+stdinserver` transport has no TTY to TOFU-prompt on an
+  unrecognized host key.** zrepl's SSH client (go-netssh, shelling out to
+  system `ssh`) fails outright with "Host key verification failed" on a
+  source host's very first connection, rather than prompting — hit this
+  deploying torrent, where the pull job's first real attempt (after its
+  `sshd` came up) failed this way instead of the expected
+  connection-refused. Fixed by pinning the host key declaratively via
+  `programs.ssh.knownHosts.<host>` on the puller
+  (`hosts/homelab/configuration.nix`) rather than
+  `StrictHostKeyChecking=accept-new` — these are public keys, not
+  secrets, so declaring them is no less secure than TOFU and stays
+  reproducible from source. Every newly-deployed source host needs this
+  once its real host key is known.
 
 ## Testing a change to this subsystem
 

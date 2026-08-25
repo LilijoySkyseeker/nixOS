@@ -136,22 +136,43 @@ items rather than letting them rot.
 
 - [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
       complete on branch `worktree-zrepl-migration-plan`; all three hosts
-      build and pass `zrepl configcheck`. **homelab is deployed as of
-      2026-08-24 10:02 PDT; torrent and thinkpad are not.**
+      build and pass `zrepl configcheck`. **homelab deployed 2026-08-24
+      10:02 PDT (local replication complete, boot race fixed and
+      reboot-verified); torrent deployed 2026-08-24 ~17:16 PDT (initial
+      full send to homelab in progress); thinkpad not yet deployed.**
 
-      **BLOCKED on a user decision before torrent can proceed: `zbackup`
-      has no room for both layouts.** The pool is 10.9T with 5.98T used /
-      4.80T free, and all of that 5.98T is the *old* syncoid layout
-      (`backup/homelab/{state,storage,storage-bulk}` 2.90T +
-      `backup/torrent/home` 3.08T). zrepl writes to different paths and
-      reuses none of it, needing ~2.92T for homelab plus ~3.13T for
-      torrent — ~6.05T against 4.80T free. homelab's own local
-      replication fits; torrent's first pull would fill the pool and fail
-      partway. The old datasets have to be destroyed to make room, which
-      also means explicitly accepting the loss of the stranded 3.08T
-      `backup/torrent/home` (the incident below) — currently the only
-      backup of torrent's home that exists. Deliberately not done.
-      Suggested order in `HANDOFF.md`.
+      The capacity blocker below (`zbackup` had no room for both layouts)
+      was resolved earlier this session by destroying the old syncoid-era
+      datasets once the new layout's local copies were verified complete
+      — see "Capacity fully resolved" in the prior handoff. One
+      side-effect of that cleanup only surfaced deploying torrent today:
+      the destroy took `backup/torrent` itself, not just
+      `backup/torrent/home` underneath it (unlike `backup/thinkpad`,
+      which survived as an empty container) — so torrent's first pull
+      failed with zrepl's `root_fs does not exist` (`root_fs` is required
+      to pre-exist; zrepl only auto-creates the placeholders *under* it,
+      never `root_fs` itself —
+      confirmed against `internal/endpoint/endpoint.go:658` in zrepl
+      0.7.0). Fixed by recreating it to match `disko.nix`'s declared
+      properties exactly (`mountpoint=none`,
+      `com.sun:auto-snapshot=false`; `canmount` doesn't inherit in ZFS —
+      it's dataset-local and defaults to `on`, so leaving it unset
+      reproduces the siblings' actual `on` regardless of the pool root's
+      `off` — confirmed by comparing property sources against
+      `backup/homelab`/`backup/thinkpad` before recreating). User ran the
+      `zfs create` directly since the auto-mode permission classifier
+      blocked it when attempted via SSH, same friction the handoff
+      predicted for homelab root actions.
+
+      Also fixed as part of today's torrent deploy: `zrepl`'s
+      `ssh+stdinserver` client has no TTY to TOFU-prompt on an
+      unrecognized host key, so the very first pull attempt after
+      torrent's `sshd` came up failed with "Host key verification
+      failed" rather than connection-refused. Pinned torrent's actual
+      host key declaratively via `programs.ssh.knownHosts.torrent` in
+      `hosts/homelab/configuration.nix` rather than weakening to
+      `StrictHostKeyChecking=accept-new` — thinkpad will need the same
+      treatment once its host key is known.
 
       Design, retention, and the non-obvious zrepl behaviours are
       documented in `docs/backups.md` — read that rather than

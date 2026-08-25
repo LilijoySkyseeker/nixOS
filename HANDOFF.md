@@ -1,15 +1,17 @@
 # Handoff — zrepl migration
 
-Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, sixth
+Branch `worktree-zrepl-migration-plan`. Written 2026-08-24, seventh
 revision this day. homelab is deployed, its local replication is
 **complete and verified**, and the `zrepl.service` boot race fix is
 **deployed and reboot-verified** (three reboots, zrepl came up active
-every time, no regressions). **The next session's job is the original
-rollout again: deploy torrent, then thinkpad.** One caveat carried
-forward: the actual `storage.mount` race didn't recur across those three
-reboots, so the fix's effect on a live race is inferred from the unit
-dependency graph, not directly observed — see "PRIMARY TASK" below
-before treating that as fully closed.
+every time, no regressions — one caveat: the actual `storage.mount` race
+didn't recur across those three reboots, so the fix's effect on a live
+race is inferred from the unit dependency graph, not directly observed).
+**torrent is now deployed too** (~17:16 PDT): `zrepl.service` and `sshd`
+both active, its `snap` job is taking snapshots, and homelab's pull job
+is mid-flight on the initial full send (3.4 TiB total across
+`zroot/local/home`+`zroot/local/root`) — check progress before assuming
+it's done. **thinkpad is the only host left to deploy.**
 
 **Delete this file once the branch is merged and all three hosts are
 deployed.** It is session state, not documentation — durable knowledge
@@ -31,9 +33,9 @@ One-sentence prompt to start the next session with:
 
 > Continue the zrepl migration: enter the worktree at
 > `.claude/worktrees/zrepl-migration-plan` (branch
-> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — the
-> `zrepl.service` boot race fix is deployed and reboot-verified on
-> homelab, so deploy torrent and thinkpad next.
+> `worktree-zrepl-migration-plan`) and read `HANDOFF.md` first — homelab
+> and torrent are both deployed (check torrent's initial full send has
+> finished), so deploy thinkpad next.
 
 ## Read these, don't re-derive
 
@@ -44,7 +46,7 @@ One-sentence prompt to start the next session with:
 - `TODO.md` — status and the open incidents, including the two below in
   full detail (root cause, timestamps, resolution).
 
-## State — homelab fully migrated and verified; torrent/thinkpad not deployed
+## State — homelab fully migrated and verified; torrent deployed (replicating); thinkpad not deployed
 
 - `zrepl.service` **active**, all three local jobs (`local-source`,
   `local-pull`, `snapshots`) healthy. `torrent`/`thinkpad` pull jobs
@@ -222,12 +224,34 @@ non-empty before passing them to `zfs destroy`.**
 1. ~~Verify the `zrepl.service` boot race fix against a real reboot~~ —
    **done this session**, see "PRIMARY TASK" above for the caveat about
    the race not recurring during verification.
-2. **Deploy torrent**, then **thinkpad**, per the original plan. Capacity
-   and the pool-import fix are both verified — nothing else blocks this.
-   Build locally and push (`nixos-rebuild switch --flake .#<host>
-   --target-host root@<host>`, `NIX_SSHOPTS` carrying the key) — do not
-   build on the target. Re-stop that host's `pull-deploy.timer` after the
-   switch, once you have root there.
+2. ~~Deploy torrent~~ — **done this session** (~17:16 PDT). `zrepl` and
+   `sshd` active, `snap` job running, initial full send to homelab
+   in progress (3.4 TiB total). Two things that came up deploying it,
+   both fixed and worth knowing before thinkpad hits the same class of
+   issue — full detail in `docs/backups.md`'s Gotchas and `TODO.md`:
+   - `zbackup/backup/torrent` (zrepl's `root_fs` container) had been
+     destroyed along with the old syncoid data in a prior session's
+     cleanup, unlike `backup/thinkpad` which survived as an empty
+     container. zrepl never creates `root_fs` itself, only placeholders
+     under it, so the pull failed with `root_fs does not exist` until
+     it was recreated to match `disko.nix`.
+   - Homelab had never talked to torrent's `sshd` before, so the first
+     pull attempt failed `Host key verification failed` (no TTY to
+     TOFU-prompt). Fixed by pinning the real host key via
+     `programs.ssh.knownHosts.torrent` in `hosts/homelab/configuration.nix`.
+     **thinkpad will need the same entry** once its host key is known —
+     get it from `/etc/ssh/ssh_host_ed25519_key.pub` on thinkpad itself,
+     the same way torrent's was read directly off the local machine.
+   - **Not done**: torrent's own `pull-deploy.timer` (its local
+     auto-update timer) is still active, next fire 2026-08-27 03:00 PDT.
+     `run0 systemctl stop pull-deploy.timer` timed out once and wasn't
+     retried (minimizing elevated calls per user instruction that
+     session, and it wasn't urgent). Stop it before 08-27, or accept it
+     may redeploy master (pre-zrepl) over this branch's config.
+   Deploy thinkpad the same way: build locally and push
+   (`nixos-rebuild switch --flake .#thinkpad --target-host root@thinkpad`,
+   `NIX_SSHOPTS` carrying the key) — do not build on the target. Re-stop
+   its `pull-deploy.timer` after the switch too.
 3. **After burn-in on torrent/thinkpad too**: set their
    `myZrepl.preserveLegacySnapshots = false` and destroy their legacy
    snapshots — **carefully, checking the range is non-empty**, unlike

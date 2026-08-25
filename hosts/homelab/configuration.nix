@@ -196,6 +196,23 @@
   # USB link (USB 2.0 and heavily contended until the 2026-08-23 cable
   # change moved it to USB 3.0; see hosts/homelab/README.md).
   sops.secrets.homelab_zrepl_key = { };
+
+  # zrepl's ssh+stdinserver client (go-netssh, shelling out to system ssh)
+  # has no interactive TTY to prompt on an unrecognized host key, so the
+  # very first connection to a freshly-deployed source host fails outright
+  # with "Host key verification failed" rather than TOFU-prompting -- hit
+  # this deploying torrent (2026-08-24), the pull job's first real attempt
+  # after its sshd came up. Pinning the host key declaratively (rather
+  # than `StrictHostKeyChecking=accept-new`, or `ssh-keyscan`ing by hand)
+  # keeps this reproducible from source and doesn't weaken the actual
+  # protection host-key checking provides -- these are public keys, not
+  # secrets. thinkpad will need the same entry once it's deployed and its
+  # host key is known.
+  programs.ssh.knownHosts.torrent = {
+    hostNames = [ "torrent" ];
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJESBjkAOLvKdaRlpAg/CiBh/WvW0lzb4QScEw40o3Kc";
+  };
+
   myZrepl = {
     enable = true;
 
