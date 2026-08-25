@@ -13,6 +13,46 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-25: two branches with substantial unmerged progress have
+      been idle for 5-6 days and aren't reflected anywhere in this file —
+      reviewed, not yet touched, needs a decision on whether to revive
+      them.** Both diverged from `master` at the same point (merge-base
+      `2026-08-18`, `master` now ~179 commits ahead of that point for
+      either), so either would need a real rebase, not a fast-forward.
+      - **`worktree-distributed-build-todo`** (7 commits, last touched
+        2026-08-19): looks feature-complete for the "layer distributed
+        builders across the tailnet" item below — `modules/nixos/
+        build-worker.nix`/`build-fleet.nix`/`build-submitter.nix` wire
+        `nix.distributedBuilds`/`buildMachines` across homelab/thinkpad/
+        torrent, per-worker SSH keys added to `secrets/secrets.yaml`,
+        config centralized in a later commit. Footprint is small and
+        targeted (host configs + 3 new modules + secrets), so a rebase
+        is plausible without much conflict, but it predates the zrepl
+        migration, the auto-updater rearchitect, and everything else
+        that's landed since — needs a real rebase-and-rebuild check, not
+        just a fast-forward, before trusting it.
+      - **`worktree-fde-secureboot-plan`** (19 commits, last touched
+        2026-08-20): a large drafted plan *and* partial implementation
+        for FDE + Secure Boot + TPM2 auto-unlock on homelab/thinkpad/
+        torrent, phased (Phase 2 explicitly folds in the "migrate
+        torrent/thinkpad to impermanence" item below), with per-host
+        `RECOVERY.md` runbooks (TPM2-unseal failure, Secure Boot key
+        loss, full hardware failure) and a `scripts/reinstall-host.sh`
+        orchestrator (temp backup via syncoid → disko-install over the
+        recovery ISO → restore → Secure Boot Setup Mode → TPM2 PCR7
+        enrollment). Unlike the branch above, this one touches nearly
+        every doc and host config in the repo (`TODO.md` alone diffs at
+        +1495/-unknown against current `master`) and predates the
+        dendritic-pattern restructuring — reviving this is a real
+        project (effectively re-deriving the plan against current
+        `master`'s architecture), not a quick rebase. Also proposes a
+        LUKS-recovery-passphrase escrow scheme flagged as needing the
+        user's own sign-off, not an agent decision.
+      Neither is locked by another session. Not started on either —
+      logged here so the next session (or the user) can decide whether
+      to revive, rebase, or abandon them, rather than losing this
+      progress silently.
+
 - [ ] **2026-08-25: vps's CrowdSec firewall bouncer has been failing since
       at least 2026-08-20 — pre-existing, found live while deploying the
       auto-updater rearchitect, unrelated to it.** Both
@@ -32,6 +72,9 @@ them rot.
       still runs via `hosts/vps/configuration.nix`'s own iptables rules,
       independent of CrowdSec) but the bouncer's dynamic IP-ban
       enforcement has effectively been off this whole time.
+      **Confirmed still failing, unchanged, live-checked 2026-08-25**:
+      both services still fail identically (`step CREDENTIALS`/`API key
+      is not present`) on vps's current boot.
 
 - [ ] **2026-08-25: build and test a full restore suite (scripts +
       procedures) against real data — out of scope of the zrepl
@@ -46,742 +89,24 @@ them rot.
       for each host's `zbackup/backup/<host>/...` data, ideally scripted
       and repeatable rather than one-off manual runs, plus writing up
       the verified procedure in `docs/procedures/backup-restore.md` in
-      place of the current unexercised steps. This likely supersedes the
-      2026-08-20 "`docs/procedures/backup-restore.md` needs real
-      content" entry below once the zrepl migration lands.
-
-- [x] **2026-08-24: agent error destroyed all source-side snapshots on
-      homelab during legacy-snapshot cleanup — recovered via the
-      surviving replication cursor bookmark, no full resend needed.**
-      While destroying the sanoid-era `autosnap_*` snapshots on
-      `zdata/storage/storage`, `zdata/storage/storage-bulk`, and
-      `zroot/local/state` (approved separately from the entry below), a
-      script computed the oldest/newest `autosnap_` snapshot to build a
-      `zfs destroy -r dataset@first%last` range, but didn't check that
-      `first`/`last` came back empty — the automatic prune ceiling had
-      already destroyed them itself moments earlier, once
-      `preserveLegacySnapshots=false` deployed. The resulting
-      `dataset@%` (empty on both sides) destroyed **every** snapshot on
-      all three datasets, not just the legacy ones.
-
-      **No data was actually lost.** The live filesystems were untouched
-      (only snapshots were targeted), `zbackup`'s already-replicated
-      copies were untouched (destination-side, not in scope), and
-      crucially the `#zrepl_CURSOR_*` replication cursor bookmarks
-      survived (bookmarks don't depend on their originating snapshot
-      still existing). Once the next periodic snap-job cycle produced a
-      fresh snapshot, `local-pull` used the surviving bookmarks to send
-      small incrementals (tens of MiB) rather than a ~2.6TiB full resend.
-      Verified via `zrepl status --mode dump` showing `DONE` with no
-      errors on all three filesystems.
-
-      **Lesson:** never build a `zfs destroy` snapshot range from
-      shell-variable interpolation without checking both ends are
-      non-empty first — `dataset@%` is apparently accepted as "all
-      snapshots" rather than erroring.
-
-- [x] **2026-08-24: `zbackup` was never imported at boot — backups had
-      been silently dead for ~23h. Fixed declaratively.** Found while
-      running the zrepl migration's pre-deploy check. homelab rebooted
-      Sun 2026-08-23 10:45 (for the USB cable change below); `zbackup`
-      did not come back, and every replication job since failed with
-      `dataset does not exist`. The pool itself was fine the whole time
-      — ONLINE, importable, no data errors.
-
-      **Cause:** nothing in the NixOS config ever imported it. nixpkgs
-      only emits a `zfs-import-<pool>.service` for a pool something
-      references — a `fileSystems` entry, or `boot.zfs.extraPools`.
-      `zdata` gets one implicitly because `/storage` and `/storage-bulk`
-      are mountpoints on it. Every `zbackup` dataset is
-      `mountpoint = "none"` by design (it is a receive-only target that
-      should mount nothing), so nothing referenced the pool and no unit
-      was ever generated. Confirmed against the built system, not
-      guessed: `ls result/etc/systemd/system/ | grep zfs-import` listed
-      only `zdata`. disko is not a fallback here — it emits no import
-      units at all (no `extraPools` anywhere in the pinned tree), and
-      only creates datasets at *format* time.
-
-      It survived earlier reboots only because someone had imported it
-      by hand. That is why this went unnoticed for so long.
-
-      **Fix:** `boot.zfs.extraPools = [ "zbackup" ];` in
-      `hosts/homelab/configuration.nix`, on the zrepl migration branch.
-      Verified: the rebuilt system now contains
-      `zfs-import-zbackup.service`, and the pool imports on a real
-      reboot.
-
-      **Worth noting as a class of bug:** a receive-only ZFS pool with
-      no mountpoints is invisible to every implicit import mechanism.
-      Any future backup-target pool needs `boot.zfs.extraPools`
-      explicitly. Also worth asking separately why ~23h of failed
-      replication units did not produce an alert that got acted on —
-      `myHealthAlerts` does cover failed units, so the gap is likely in
-      noticing, not in detecting.
-
-- [x] **2026-08-24: `zrepl.service` could silently stay down after a
-      reboot due to a `local-fs.target` race — fixed by relaxing the
-      dependency.** Found while rebooting homelab to verify the
-      `boot.zfs.extraPools` fix above (the pool import itself worked
-      correctly). `storage.mount` failed its first attempt at boot
-      (`status=2/INVALIDARGUMENT`, a known ZFS mount-before-ready race
-      unrelated to the zbackup fix), which failed `local-fs.target`,
-      which `zrepl.service` hard-`Requires=` — that comes from
-      **upstream** nixpkgs (`nixos/modules/services/backup/zrepl.nix`),
-      not this repo; `modules/nixos/zrepl.nix` had no systemd override at
-      all before this fix. The mount self-healed a second later and
-      `/storage` was fine, but systemd does not retry a unit whose start
-      failed due to a dependency failure — `zrepl.service` sat
-      `inactive (dead)` until manually started
-      (`systemctl start zrepl.service`). Backups were down ~8 minutes
-      this time (16:07-16:15 PDT), same failure class as the entry above
-      but much smaller blast radius since it was caught immediately by
-      the reboot test rather than discovered ~23h later.
-
-      **Fix:** `modules/nixos/zrepl.nix` now overrides
-      `systemd.services.zrepl` with `requires = lib.mkForce [ ];`,
-      `wants = [ "local-fs.target" ]; after = [ "local-fs.target" ];`.
-      Same ordering in the normal case (zrepl still starts after
-      local-fs.target's start job finishes), but a transient dependency
-      failure no longer permanently downs the daemon — an unmounted
-      dataset just makes that job's own next cycle fail and retry instead
-      of the whole daemon never starting. Verified the rendered drop-in
-      (`systemd.services.zrepl` override unit) shows `Wants=local-fs.target`
-      with no `Requires=` and `After=zfs.target local-fs.target` intact.
-      **Reboot-verified, with a caveat.** `nixos-rebuild switch` deployed
-      to homelab, then rebooted three times in a row (16:49, 16:52, 16:55
-      PDT). All three came up clean: `zrepl.service` active every time,
-      `storage.mount`/`storage-bulk.mount` both mounted on the first
-      attempt, zero failed units, and `zrepl status` showed
-      `local-source`/`local-pull`/`snapshots` all cycling normally with
-      snapshots continuing to land right through the reboots. **The
-      `storage.mount` race itself did not reproduce in any of the three
-      attempts** — it remains a single data point from the previous
-      session. So this verifies the fix causes no regression on a clean
-      boot, and confirms by construction (inspected the live unit via
-      `systemctl show zrepl.service`: `Wants=local-fs.target`,
-      `After=local-fs.target`, `local-fs.target` no longer in
-      `Requires=`) that a dependency failure can no longer abort zrepl's
-      start job — but does not directly observe zrepl surviving a live
-      `storage.mount` failure, since none occurred to survive.
-
-      **Still open, deliberately not fixed:** why `storage.mount` races
-      at all (still only one data point total, now with three
-      non-reproductions alongside it — looks more intermittent than
-      reliably reproducible; does `storage-bulk.mount` share the root
-      cause?). This fix removes the silent-outage symptom without
-      touching that underlying race. If it recurs, check
-      `systemctl is-active zrepl.service` — it should now come up on its
-      own without manual intervention.
-
-- [ ] **2026-08-23: replace sanoid+syncoid with zrepl repo-wide.** Code
-      complete on branch `worktree-zrepl-migration-plan`; all three hosts
-      build and pass `zrepl configcheck`. **homelab deployed 2026-08-24
-      10:02 PDT (local replication complete, boot race fixed and
-      reboot-verified); torrent deployed 2026-08-24 ~17:16 PDT (initial
-      full send to homelab in progress, ~301 GiB/3.3 TiB as of 18:45 PDT,
-      ETA roughly 05:00-07:00 PDT 2026-08-25); thinkpad not yet deployed.**
-
-      **2026-08-24 ~18:20 PDT: fixed a recurring `local-pull` prune
-      `ExecErr` on homelab** (`destroys failed ... it's being held`,
-      firing on `zdata/storage/storage`, `storage-bulk`, and
-      `zroot/local/state` on every ~15min cycle). Root cause, found by
-      reading zrepl's own pruning source
-      (`internal/pruning/retentiongrid/retentiongrid.go`,
-      `internal/pruning/keep_grid.go`, `internal/pruning/pruning.go` in
-      the pinned nixpkgs `zrepl.src`, nixpkgs rev `e4bae1bd`): a grid
-      bucket without `keep=all` sorts its occupants youngest-first and
-      removes the leading `removeCount` of them
-      (`RemoveYoungerSnapsExceedingKeepCount`), i.e. it targets the
-      *newest* snapshot in an over-full bucket for destruction, not the
-      oldest. `Grid.FitEntries` also redefines "now" every prune run as
-      the youngest matching snapshot's own timestamp. `retention.archive`
-      (`"168x1h | 30x1d | 12x30d"`, no leading full-granularity bucket)
-      combined with `local-pull`'s 15m interval against snapshots landing
-      every 5m meant the just-received snapshot landed in an over-full
-      bucket almost every cycle — and that snapshot is exactly the one
-      zrepl's own endpoint had just placed its
-      `zrepl_last_received_J_<job>` hold on, to guarantee a valid
-      incremental base. The destroy failed loudly every cycle. Harmless
-      (checked: receiver-side snapshot counts stayed bounded, older
-      entries in the bucket pruned fine) but permanent log noise, and a
-      sign the rule set was fighting zrepl's own bookkeeping — not a
-      config mistake specific to homelab, since every receiving job
-      shares this default.
-
-      **Fix:** `retention.archive` gets a leading `1x15m(keep=all)`
-      bucket (commit `6f6e4f3`), sized to the pull interval — `keep=all`
-      short-circuits the grid's destroy-list logic for that bucket
-      entirely (`if b.keepCount == RetentionGridKeepCountAll { return nil
-      }`), so the newest snapshot can never collide with its own hold.
-      Deployed to homelab (switch) and torrent (`run0`-wrapped local
-      switch); verified via a clean `local-pull` cycle post-deploy
-      (`Pruning Receiver: Status: Done`, actually destroying old
-      snapshots, no `ExecErr`). Documented in `docs/backups.md` Gotchas.
-
-      **Side effect, not a bug:** restarting `zrepl.service` on homelab
-      (as any switch does) killed torrent's in-flight `home` full send
-      mid-transfer at ~257 GiB. `SavePartialRecvState:true` meant a
-      `receive_resume_token` survived on the receiver, so the next pull
-      cycle resumed from ~257 GiB rather than restarting the 3.3 TiB send
-      — confirmed via `zfs get receive_resume_token` before the resume
-      and the dataset's `USED` growing steadily after. Worth remembering
-      before any future homelab config change while a host's initial
-      sync is still running: expect a pause-and-resume, not data loss.
-
-      The capacity blocker below (`zbackup` had no room for both layouts)
-      was resolved earlier this session by destroying the old syncoid-era
-      datasets once the new layout's local copies were verified complete
-      — see "Capacity fully resolved" in the prior handoff. One
-      side-effect of that cleanup only surfaced deploying torrent today:
-      the destroy took `backup/torrent` itself, not just
-      `backup/torrent/home` underneath it (unlike `backup/thinkpad`,
-      which survived as an empty container) — so torrent's first pull
-      failed with zrepl's `root_fs does not exist` (`root_fs` is required
-      to pre-exist; zrepl only auto-creates the placeholders *under* it,
-      never `root_fs` itself —
-      confirmed against `internal/endpoint/endpoint.go:658` in zrepl
-      0.7.0). Fixed by recreating it to match `disko.nix`'s declared
-      properties exactly (`mountpoint=none`,
-      `com.sun:auto-snapshot=false`; `canmount` doesn't inherit in ZFS —
-      it's dataset-local and defaults to `on`, so leaving it unset
-      reproduces the siblings' actual `on` regardless of the pool root's
-      `off` — confirmed by comparing property sources against
-      `backup/homelab`/`backup/thinkpad` before recreating). User ran the
-      `zfs create` directly since the auto-mode permission classifier
-      blocked it when attempted via SSH, same friction the handoff
-      predicted for homelab root actions.
-
-      Also fixed as part of today's torrent deploy: `zrepl`'s
-      `ssh+stdinserver` client has no TTY to TOFU-prompt on an
-      unrecognized host key, so the very first pull attempt after
-      torrent's `sshd` came up failed with "Host key verification
-      failed" rather than connection-refused. Pinned torrent's actual
-      host key declaratively via `programs.ssh.knownHosts.torrent` in
-      `hosts/homelab/configuration.nix` rather than weakening to
-      `StrictHostKeyChecking=accept-new` — thinkpad will need the same
-      treatment once its host key is known.
-
-      Design, retention, and the non-obvious zrepl behaviours are
-      documented in `docs/backups.md` — read that rather than
-      re-deriving. Restore steps in
-      `docs/procedures/backup-restore.md`. Session handoff with the
-      remaining steps in `HANDOFF.md`.
-
-      Status in brief: one shared module (`modules/nixos/zrepl.nix`,
-      `myZrepl`) replaced sanoid, syncoid and `backup-push.nix`. Topology
-      is pull (homelab dials out; sources passive). Every host runs a
-      local `snap` job so snapshotting and a prune ceiling never depend
-      on a peer. `zbackup`'s layout changed to
-      `zbackup/backup/<host>/<full source dataset path>`.
-
-      VM-tested (2026-08-24): all three hosts boot with `zrepl.service`
-      started, and a new two-node NixOS VM test
-      (`nix build .#checks.x86_64-linux.zrepl-replication`) exercises a
-      real pull over the forced-command SSH transport. That test found
-      and fixed a bug `zrepl configcheck` cannot catch: receiving jobs
-      were missing `recv.placeholder.encryption`, which would have failed
-      every remote pull on first receive with no syncoid left to fall
-      back on.
-
-      Remaining: deploy homelab → torrent → thinkpad. Before switching
-      homelab, confirm `zbackup/backup/{homelab,thinkpad,torrent}` exist
-      — zrepl does not create `root_fs`, and disko only creates datasets
-      when formatting a disk. torrent's first pull doubles as the fresh full send that
-      resolves the stuck-backup incident below. thinkpad's existing copy
-      sits at old paths and needs a fresh send or a manual `zfs rename`.
-      Once burnt in, turn off `myZrepl.preserveLegacySnapshots` and clear
-      the leftover `autosnap_*` snapshots by hand — nothing ages them out
-      while it is on.
-
-      **2026-08-25: all three hosts deployed; thinkpad's first sync
-      completed clean.** thinkpad built+switched locally (`run0
-      nixos-rebuild switch`, no `--target-host`, per the user's request
-      for this host), its SSH host key pinned on homelab
-      (`programs.ssh.knownHosts.thinkpad`, commit `5eb7858`). torrent's
-      first-ever full send finished sometime before 2026-08-25 06:50 PDT
-      (was ~1.8 TiB/3.1 TiB at 00:05, done and down to tiny incrementals
-      by 06:50).
-
-      Traced a recurring `dial_timeout of 10s exceeded` on thinkpad's pull
-      job (self-healing every 15m retry, but frequent — correlated against
-      every failure timestamp checked) to Tailscale's magicsock
-      continuously flapping between candidate endpoints for the
-      homelab↔thinkpad path, confirmed via `tailscaled` logs, even though
-      both hosts share a LAN with a stable 1ms direct path available.
-      Verified against zrepl v0.7.0's actual source
-      (`internal/config/config.go`, fetched from the exact tagged commit
-      the nix build uses) rather than the docs site, which undersold the
-      mid-transfer failure mode: `dial_timeout` is a real per-connect-type
-      field (`SSHStdinserverConnect`/`TCPConnect`/`TLSConnect`), default
-      10s. Bumped to 60s universally in the shared `mkConnect` helper
-      (commit `6bd1638`) rather than patching thinkpad alone, since this
-      class of network flakiness is inherent to whatever LAN a host sits
-      on. Deployed to homelab (the only dialer).
-
-      `myZrepl.preserveLegacySnapshots` turned off for thinkpad and
-      torrent (commit `a9bfed7`), matching homelab. thinkpad verified to
-      already have zero legacy `autosnap_*` snapshots on
-      `zroot/local/{root,home}` — deployed and confirmed live, a pure
-      hygiene no-op there. **torrent's change is staged but NOT deployed**
-      — the session doing this work ran on thinkpad, which has no
-      shell/deploy access to torrent at all (not even via homelab, whose
-      own `root@torrent` key is rejected at the publickey stage). Needs
-      `nixos-rebuild switch --target-host root@torrent` (or run locally on
-      torrent) from a session with real access. This is the one loose end
-      left after `HANDOFF.md` was deleted and the branch merged to
-      `master` — check `zfs list -t snapshot` on torrent for lingering
-      `autosnap_*` entries once that switch lands.
-
-- [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
-      dataset) is now stuck — needs a decision, not further automated
-      action.** The initial full send (below) finished transferring
-      all ~3.13TB successfully, but the *same* syncoid invocation then
-      tried to also send a trailing incremental to catch up to the
-      latest snapshot, and that failed: the base snapshot it needed
-      (`zroot/local/home@autosnap_2026-08-20_22:00:02_hourly`) had
-      already been pruned by torrent's own local sanoid retention
-      (`hourly=24` ≈ 24h) during the ~38-40h transfer — a run this
-      long outlasts that retention window. Because the run didn't
-      fully succeed, syncoid never reached its "create bookmark" step
-      either (that only happens after a clean finish), so there's now
-      **no bookmark and no matching snapshot** between source and the
-      already-populated 3.08T target. Confirmed live: re-running the
-      service now fails immediately with `Target zbackup/backup/
-      torrent/home exists but has no snapshots matching with
-      zroot/local/home! ... Cowardly refusing to destroy your existing
-      target.` — syncoid won't auto-resolve this by design.
-      **Needs a decision**: either force a full resend (syncoid would
-      destroy the existing homelab-side target and re-transfer all
-      ~3.13TB from scratch, another ~38-40h at the observed rate), or
-      leave the Aug 20 snapshot as the backup state for now and decide
-      later. Not resolved automatically — deliberately left for the
-      user. The `root` dataset's push (second syncoid call in the same
-      script, sequential after `home`) never even ran this attempt
-      since the script failed on `home` first — its state is unknown/
-      unattempted, not separately confirmed broken.
-      **Underlying fix needed regardless of the decision above**:
-      torrent's local sanoid retention (`hourly=24`, inline
-      `services.sanoid.settings.template_working` in
-      `hosts/torrent/configuration.nix` — still the pre-dendritic
-      inline shape as of this writing, not yet the
-      `modules/nixos/zfs-snapshots.nix` module) is too short for how
-      long a large `myBackupPush` initial/catch-up send can take. The
-      same trap will recur on any future large resend (e.g. after a
-      forced full resend here, or on thinkpad's own first push) unless
-      either the source retention window is widened well past the
-      realistic worst-case transfer time, or `myBackupPush`/syncoid
-      usage changes to guarantee a bookmark lands even when the
-      trailing incremental step fails (e.g. splitting the full-send
-      and incremental-catchup into separate syncoid invocations so a
-      bookmark is created after the (more reliable) full send succeeds,
-      independent of whether the smaller incremental afterward does).
-      Also separately confirmed live (2026-08-23) during this
-      troubleshooting: an earlier `run0 nixos-rebuild switch` deploy
-      step for a prior fix (the `--sshoption` fix, see the fluctuation
-      item below) was verified only via a manual bypass test and never
-      actually switched into the running system — the live service
-      kept running the old broken script for ~2 days until this was
-      caught. Worth remembering as a process gotcha: manually verifying
-      a fix in isolation is not the same as confirming it's actually
-      deployed and taking effect through the real service path.
-
-- [x] **2026-08-21: torrent's initial full backup send to homelab is
-      throughput-limited to ~20-40MB/s — root-caused while it was
-      in progress. RESOLVED 2026-08-23 in hardware.**
-
-      **Resolution: the enclosure's USB cable was replaced.** All four
-      drives now enumerate at **5000 Mbps (USB 3.0 SuperSpeed)** on bus
-      2 behind the ASMedia ASM107x hub, up from 480 Mbps — confirmed
-      2026-08-24 via `/sys/bus/usb/devices/*/speed` showing `5000` for
-      all four `TerraMaster TDAS` entries. Cause #2's fault class is
-      gone with it: **zero** `uas_eh_*` / `stat urb: status -71` events
-      across the 23h since, versus the recurring multi-drive faults
-      documented below, and `zpool status -x` reports all pools
-      healthy. That single change addresses causes #1, #2 and #4 —
-      exactly as the "if/when revisited" note below predicted. Cause #3
-      (sanoid's minutely recursive walk) is moot: the zrepl migration
-      removes sanoid entirely.
-
-      **Measured 2026-08-24 13:45 under real load** (homelab's first
-      zrepl local replication, ~1.62T transferred): `zpool iostat -v
-      zbackup` shows ~245-261MB/s aggregate device bandwidth, i.e.
-      **~122-130MB/s of actual data** — each mirror disk writes the full
-      copy, so the pool row sums the two. Confirmed independently by
-      dataset growth: 1.62T in ~3h45m ≈ 124MB/s. Against the old
-      ~20MB/s-per-disk / ~40MB/s aggregate, that is **roughly 6x**.
-
-      Consequence: **the old ~40h estimate for torrent's ~3.13TB is badly
-      out of date.** At ~125MB/s it is on the order of 7-8h. Still
-      unproven for a *remote* SSH-transported pull as opposed to this
-      local one — torrent's first pull remains the honest datapoint for
-      that.
-
-      Not re-tuned: the 15m replication interval and tiered `archive`
-      grid were chosen under the old ceiling and are now conservative
-      rather than forced. Left as-is deliberately.
-
-      Original diagnosis, kept for the record: Investigated live during
-      torrent's first-ever `myBackupPush` run (3.13TB initial `zfs
-      send`). Ruled out: network (confirmed direct LAN peer connection
-      via `tailscale status --json`'s `CurAddr: 192.168.1.154:41641` —
-      not relayed through DERP), CPU (modest usage on both ends), and
-      raw disk bandwidth (`zpool iostat -v zbackup` showed each mirror
-      disk only doing ~20MB/s, well under HDD capability). Actual
-      causes, roughly by impact:
-      1. **`zbackup`'s 2 disks (and `zdata`'s other 2) are all USB
-         2.0 High-Speed (480 Mbps, confirmed via `lsblk -o TRAN` =
-         `usb` and `/sys/bus/usb/devices/*/speed` = `480`), sharing
-         one hub on a single upstream link** (`1-6.1`-`1-6.4`). That's
-         a hard ~40-60MB/s ceiling across *all four* drives combined —
-         not per-drive — which lines up almost exactly with the
-         measured aggregate write rate. This is very likely the same
-         physical enclosure/hub/cabling behind the pre-existing
-         `hosts/homelab/README.md` "zdata pool: recurring I/O
-         suspensions" known issue — same drives, same USB link, same
-         symptom class (command timeouts/resets), not necessarily two
-         separate problems.
-      2. **Real USB-level faults recurring on the same link**:
-         `dmesg` shows `uas_eh_abort_handler`/`uas_eh_device_reset_handler`
-         and `stat urb: status -71` across multiple drives (`sdb`,
-         `sdc`, `sdd`, `sde`) at multiple points in time (including
-         within the hour, and again from 5+ days ago) — not a one-off.
-         Worth a physical inspection of the enclosure/hub/cable at
-         some point, separate from any software fix.
-      3. **`services.sanoid.interval = "minutely"` recursively walking
-         all of `zbackup`** (`"zbackup" = { use_template = "backup";
-         recursive = "yes"; }`, `hosts/homelab/configuration.nix`)
-         adds real seek contention on top of an already
-         bandwidth-starved USB link — confirmed via `zpool iostat -w
-         zbackup`'s latency histogram showing a real tail of read/write
-         ops taking 2-8 *seconds*, not just milliseconds, consistent
-         with interleaved random (sanoid's metadata enumeration) and
-         sequential (the receive stream) I/O thrashing the same two
-         physical disks. Even with `autosnap = "no"` on the backup
-         template, sanoid still enumerates every existing snapshot
-         every 60s to evaluate `autoprune` — real work against a tree
-         that includes 168+ historical snapshots on `storage-bulk`
-         alone.
-      4. **Root cause of the hour-to-hour rate fluctuation, confirmed
-         2026-08-21 ~21:00 via a temporary non-invasive correlation
-         trace** (2-min samples of `zpool iostat`, cross-referenced
-         with `systemctl status` on the local syncoid units — removed
-         after the transfer, not left running): homelab's own three
-         local `syncoid` jobs (`syncoid-zdata-storage-storage[-bulk]`,
-         `syncoid-zroot-local-state`, all hourly) were confirmed
-         **`active (running)` continuously for ~2 hours** (since
-         19:01:26, still running at the 21:00 check) — competing with
-         torrent's transfer for the same USB-bandwidth-capped pool the
-         entire time. These are normally-fast incremental syncs that
-         finish in seconds, but with the USB link already saturated by
-         torrent's initial full send, they get starved too, run long
-         enough to blow past their next hourly trigger, and end up
-         running back-to-back instead of going idle between runs — a
-         compounding effect where torrent's big transfer slows the
-         local jobs, and the local jobs competing for bandwidth slows
-         torrent right back. The aggregate pool write rate itself
-         (~33-48MB/s, near the #1 USB ceiling) stayed fairly
-         consistent throughout — what fluctuates is how that fixed
-         bandwidth splits between torrent's stream and these 3
-         concurrent local jobs.
-      Not fixed — diagnosis only, explicitly requested not to change
-      anything mid-transfer. If/when revisited: consider a real
-      USB 3.0 (SuperSpeed) link or SATA/HBA passthrough for this
-      enclosure (addresses #1, #2, and #4 all at once — the local-job
-      contention only compounds because #1's ceiling is so low), and/or
-      loosening `zbackup`'s sanoid cadence off the global `minutely`
-      interval since it's a receive-only target that never autosnaps
-      anyway (addresses #3) — but both are real infra/config changes
-      that need their own separate decision, not bundled into this.
+      place of the current unexercised steps. Supersedes the 2026-08-20
+      "`docs/procedures/backup-restore.md` needs real content" entry,
+      moved to `docs/DONE.md` 2026-08-25 once confirmed the doc already
+      has real (if unexercised) content — this item is what's left.
 
 - [ ] **2026-08-18: migrate torrent and thinkpad to impermanence.**
-      Agreed as a prerequisite for eventually shrinking their zfs-backup
-      scope (see the zfs-backups item below) — both hosts currently
+      Agreed as a prerequisite for eventually shrinking the zfs-backup
+      scope of these two hosts (the original zfs-backup item this
+      referenced, `myBackupPush`, was superseded by the zrepl migration
+      — see `docs/DONE.md`) — both hosts currently
       keep `zroot/local/root` as durable state, impermanence would wipe
       root on boot and move real state to an explicit persist dataset.
       Needs its own disko layout changes + persist-path audit per host,
       and should be VM-tested before real hardware per
-      `feedback_test_remote_deploys_in_vm`. Not started.
-
-- [ ] **2026-08-19: syncoid push backups, torrent + thinkpad → homelab
-      (zfs snapshot based, over Tailscale).** Shared `myBackupPush`
-      module (`modules/nixos/backup-push.nix`), used identically by both
-      hosts, pushing `zroot/local/home` + `zroot/local/root` to a
-      dedicated `backup-recv` user on homelab via `zfs allow`-scoped
-      delegation. Uses syncoid `--create-bookmark` so long offline
-      periods (esp. the thinkpad laptop, but torrent can also go dark on
-      vacation) don't force a full resync once sanoid's short
-      source-side retention (hourly=24/daily=1) prunes past the last
-      pushed snapshot. Trigger: hourly systemd timer, `Persistent =
-      true`, gated by a Tailscale-reachability `ExecCondition` so an
-      offline host no-ops instead of alerting. `backupStaleness`
-      thresholds set generously (336h/2wk) for both, for the same
-      reason. Source-side runs as a dedicated `backup-push` user
-      (zfs-allow-scoped, not root), and a paired
-      `modules/nixos/zfs-space-guard.nix` (`myZfsSpaceGuard`) on both
-      hosts auto-prunes oldest local snapshots under free-space pressure
-      (torrent/thinkpad's game libraries under `zroot/local/home` churn
-      heavily) plus a `zfs-emergency-prune.service` manual escape hatch.
-      **Follow-up once impermanence (above) lands**: `zroot/local/root`
-      will likely stop being the meaningful thing to back up — update
-      `myBackupPush.datasets` on both hosts to point at whatever the new
-      persist dataset ends up being called instead.
-
-      **Final zbackup layout (simplified 2026-08-19)**: one flat
-      `zbackup/backup/<host>/<subdir>` convention for everything — no
-      more backup-vs-backup-bulk split. That split existed to keep
-      large/churny data out of any future offsite job, but restic's
-      offsite `backblazeWeekly` job reads an explicit hardcoded dataset
-      list (`zroot/local/state zdata/storage/storage
-      zdata/storage/storage-bulk`) and never touches `zbackup` at all —
-      confirmed by reading the actual `backupPrepareCommand` — so the
-      split wasn't doing anything functional. Current tree:
-      ```
-      zbackup/backup/homelab/{storage,storage-bulk,state}   (local syncoid pulls)
-      zbackup/backup/thinkpad/{home,root}                    (remote syncoid push)
-      zbackup/backup/torrent/{home,root}                     (remote syncoid push)
-      ```
-      `backup/legion`, `backup-bulk/legion`, `backup/other`,
-      `backup-bulk/other` (all confirmed unreferenced placeholders) were
-      dropped entirely. Sanoid's `"zbackup" = { use_template = "backup";
-      recursive = "yes"; }` already covers the whole tree recursively —
-      no per-dataset sanoid config needed for any of this.
-      Code committed on branch `worktree-zfs-backup-push`; **not yet
-      deployed to any real host.**
-
-      **Merged onto master 2026-08-21** (commit `dff4450`, branch not
-      yet pushed to origin): rebased this whole feature onto the
-      dendritic flake-parts restructuring that landed on master in the
-      meantime (`flake.nix` rewrite, `profiles/`/`services/` moved into
-      `modules/`, host `imports` replaced by named-module wiring in
-      `modules/flake/hosts.nix`). `backup-push.nix` and
-      `zfs-space-guard.nix` converted to the
-      `flake.modules.nixos."<name>"` wrapper format and wired into
-      torrent's/thinkpad's module lists there. `hosts/homelab/disko.nix`
-      and `hosts/homelab/configuration.nix` merged with **zero
-      conflicts** — confirmed non-overlapping with the dendritic changes
-      and with `zfs-pool-recovery-restore`'s LUKS work via an earlier
-      dry-run merge test. Verified post-merge: `nixos-rebuild build`
-      (not switch) succeeds for all three hosts, and `nix flake check`
-      passes for the whole flake (all 5 nixosConfigurations). **Still
-      not deployed/switched anywhere, and this branch is still
-      unpushed** — only a local merge commit so far.
-
-      **New hard blocker from the merge**: `secrets/secrets.yaml` had a
-      real conflict — both this branch (torrent/thinkpad backup-push
-      keys) and master (a samba password from another branch) added new
-      secrets in the same spot. The per-key encrypted values merged
-      safely as a plain union (each is an independent ciphertext), but
-      the file's `sops:` metadata (`lastmodified`/`mac` — a MAC over the
-      *entire file's* contents) could not be hand-merged; master's copy
-      was kept as a placeholder and **is now stale**. Before trusting
-      this file for anything (including the build steps below, which
-      already worked because Nix doesn't verify the mac at eval time —
-      but real secret *decryption* on a target host will fail once the
-      mismatch is caught), the user must run
-      `sops updatekeys secrets/secrets.yaml` themselves (not done here —
-      never edit sops files directly) to produce a fresh valid mac.
-
-      **Live pool note**: none of the above touches the live homelab
-      pool — disko.nix is install-time only, and I'm not running zfs
-      commands against a live host without you present. Two things need
-      manual handling on your own schedule once you're ready:
-      1. `zdata/storage/storage-bulk`'s syncoid target *renamed* from
-         `zbackup/backup-bulk/homelab/storage-bulk` (old, this session's
-         earlier layout, still the live/deployed path as of this
-         writing) to `zbackup/backup/homelab/storage-bulk` (final, only
-         in this branch's not-yet-deployed Nix config). **MUST happen
-         atomically with deploying this branch to homelab (same
-         maintenance window, rename immediately before or immediately
-         after `nixos-rebuild switch` — not as a standalone action on
-         its own schedule.)** Caught by a peer session
-         (backblaze-homelab-reset) reviewing this: if the live `zfs
-         rename` runs while homelab is still running the *currently
-         deployed* config (which still points syncoid at the old path),
-         the next hourly syncoid run looks for a dataset at the old path
-         that no longer exists — best case it errors, worst case it
-         auto-creates a fresh empty dataset there and starts a full
-         ~2.26TiB reseed from scratch, the same failure mode that
-         triggered that session's whole backblaze-homelab-reset task in
-         the first place. If the old path already has live replicated
-         data on homelab (check with `zfs list -r
-         zbackup/backup-bulk/homelab`), rename it in place rather than
-         losing the history:
-         `zfs rename zbackup/backup-bulk/homelab/storage-bulk zbackup/backup/homelab/storage-bulk`
-         — then the next syncoid run should pick up incrementally at the
-         new target name with no re-send needed, *provided the deployed
-         config already matches by the time that run fires*.
-      2. Any of `zbackup/backup/legion`, `zbackup/backup-bulk/legion`,
-         `zbackup/backup/other`, `zbackup/backup-bulk/other`,
-         `zbackup/backup/thinkpad` (the old non-flattened container), or
-         `zbackup/backup-bulk/thinkpad`/`zbackup/backup-bulk/torrent`
-         (this session's earlier bulk-split layout, now also superseded)
-         that exist live and are confirmed unused/empty can be destroyed:
-         ```
-         zfs list -r zbackup/backup zbackup/backup-bulk   # see what's really there first
-         zfs destroy -r zbackup/backup/legion               # only if confirmed placeholder-only
-         zfs destroy -r zbackup/backup-bulk/legion
-         zfs destroy -r zbackup/backup/other
-         zfs destroy -r zbackup/backup-bulk/other
-         zfs destroy -r zbackup/backup/thinkpad             # only if empty (superseded, pre-flatten)
-         zfs destroy -r zbackup/backup-bulk/thinkpad         # only if empty (superseded, pre-flatten)
-         zfs destroy -r zbackup/backup-bulk/torrent          # only if empty (superseded, pre-flatten)
-         ```
-      I'll handle the live side whenever you're ready to walk through it
-      together — not done automatically.
-
-      Checklist to finish rollout:
-      - [ ] **BLOCKING, do this first**: run `sops updatekeys
-            secrets/secrets.yaml` to refresh the stale mac left by the
-            master-merge conflict resolution above. Nothing that reads
-            real secrets on a target host should be trusted until this
-            is done — a `nixos-rebuild build` succeeding is not proof
-            this is fine, since Nix doesn't verify the sops mac at eval
-            time, only `sops`/`sops-install-secrets` do, at activation.
-      - [x] Push this branch to origin and merge into `master`.
-            (2026-08-21) Pushed `worktree-zfs-backup-push`, then fast-
-            forward merged straight into `master` (`7706eca..a03ce7c`,
-            no merge commit needed — this branch already contained all
-            of master's history from the earlier rebase). The
-            repo's pre-push hook build-tested every affected host
-            (isoimage, torrent, vps, thinkpad, homelab) on both pushes;
-            all succeeded. Still no `nixos-rebuild switch` run anywhere
-            — code is live on `master` but not deployed to any real
-            host yet. `zfs-pool-recovery-restore` can now rebase their
-            branch on top whenever they're ready (small mechanical
-            import-list conflicts expected, per the earlier dry-run).
-      - [ ] Re-verify `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
-            and `nix flake check` one more time immediately before the
-            actual deploy, in case anything else landed on master in
-            the meantime.
-      - [x] Generate `torrent_backup_push_key` and
-            `thinkpad_backup_push_key` ed25519 keypairs. (2026-08-19)
-      - [x] Add both private keys to `secrets/secrets.yaml` via `sops
-            secrets/secrets.yaml` (never edit sops files directly).
-            (2026-08-19, done by the user)
-      - [x] Paste both public keys into
-            `hosts/homelab/configuration.nix`'s
-            `backup-recv.openssh.authorizedKeys.keys`, prefixed with
-            `restrict `. (2026-08-19)
-      - [x] Re-run `nixos-rebuild build --flake .#{homelab,torrent,thinkpad}`
-            to confirm all three build clean once secrets exist. All
-            three build clean end-to-end as of 2026-08-19 — no more
-            code-side blockers.
-      - [ ] Handle the live pool note above: the storage-bulk rename
-            MUST land atomically with homelab's `nixos-rebuild switch`
-            for this branch (see the detailed caution above) — the
-            other dataset cleanup (legion/other/superseded placeholders)
-            isn't time-sensitive and can happen whenever.
-      - [x] Deploy homelab. **Done 2026-08-21.** Live deploy surfaced
-            and fixed two real bugs the build-only testing couldn't
-            have caught (both committed): `backup-recv-zfs-allow.service`
-            failed because `zfs allow` needs its target dataset to
-            already exist — `zbackup/backup/torrent` had never been
-            created (no push has run yet), a chicken-and-egg problem on
-            first deploy, fixed with a `zfs create -p` pre-step; and
-            `health-check.service`'s `backupStaleness` loop crashed
-            entirely under `set -e -o pipefail` the first time it hit a
-            genuinely nonexistent dataset (vs. one that just has no
-            snapshots yet), fixed with `|| true` to let the existing
-            empty-string handling take over. Also found and fixed
-            (separately, pre-existing, unrelated to this feature):
-            homelab's `/etc/nixos` checkout was stuck on an orphaned
-            `auto-update` branch from a crashed `flake-update-test`
-            run — cleaned up live with explicit go-ahead (see the
-            myAutoUpdate git-identity TODO item above) — and
-            `secrets/secrets.yaml` needed a real `sops --ignore-mac
-            --rotate --in-place` (plain `sops updatekeys` alone doesn't
-            touch the mac) to fix the stale mac left by the earlier
-            merge conflict resolution; verified by running
-            `sops-install-secrets` directly against the built manifest
-            before trusting it live. Post-switch: `systemctl --failed`
-            clean, `current-system` matches the verified build,
-            `backup-recv` user + `zfs allow` delegation on
-            `zbackup/backup/{torrent,thinkpad}` confirmed correct,
-            `storage-bulk` rename confirmed intact (2.26T + full
-            snapshot history), unrelated services from the same merge
-            (jellyfin, etc.) unaffected.
-      - [ ] Deploy torrent and thinkpad; watch
-            `systemctl status backup-push-torrent.service` /
-            `journalctl -u backup-push-torrent` for the first real push
-            (first run is a full send — expect it to take longer and
-            transfer more than subsequent hourly incrementals).
-      - [ ] On homelab, confirm snapshots are actually landing:
-            `zfs list -t snapshot -r zbackup/backup/torrent` and
-            `.../thinkpad`.
-      - [ ] Confirm the Tailscale-reachability `ExecCondition` behaves
-            as intended: stop tailscaled (or disconnect) on thinkpad,
-            confirm `backup-push-thinkpad.service` reports as skipped/
-            inactive rather than failed, then reconnect and confirm the
-            next timer fire (or a manual `systemctl start`) catches up
-            immediately (`Persistent = true`).
-      - [x] **2026-08-25: zfs-space-guard reviewed and tested, both
-            automated and manual.** Found and fixed a real bug while
-            reviewing: `cap=$(zpool list -Hpo capacity $pool)` on a
-            failed/garbage read (bad pool name, exported pool, transient
-            hiccup) made the numeric threshold test error out, and bash
-            treats a failed `[ ]` as the `if` being false — so the old
-            script fell through to the *unconditional prune* branch
-            instead of skipping. Reproduced directly: `bash -c 'cap="";
-            if [ "$cap" -lt 85 ]; then echo skip; else echo PRUNE; fi'`
-            prints PRUNE. Now validates `$cap` is non-empty/numeric first
-            and exits 1 instead of falling through. Added
-            `tests/zfs-space-guard.nix` (`checks.zfs-space-guard`,
-            `nix build .#checks.x86_64-linux.zfs-space-guard`), a permanent
-            runNixOSTest covering healthy/pressure/keepMin-floor/
-            zrepl-style-hold-tolerance/emergency-prune/this-bug's-regression
-            — all green. Manually verified live on torrent (thinkpad
-            skipped — identical setup, torrent's testing translates):
-            timer active, journal showed no evidence the bug had ever
-            fired for real (real capacity has been sitting at 79%, close
-            to the 85% trigger); confirmed the real no-op path, then
-            temporarily raised `freeThresholdPercent` to 25 to force a real
-            trigger at that capacity, `build`+`switch`+ran it for real —
-            pruned `zroot/local/{home,root}` from 30 snapshots down to
-            exactly `keepMin`=2 each, then reverted the threshold and
-            switched back (clean, byte-identical store path to before).
-            Also ran `zfs-emergency-prune.service` for real, down to the
-            single newest snapshot per dataset. Confirmed the safety net
-            held throughout: homelab's zrepl pull for torrent stayed
-            incremental with no forced full-send, replicating the very
-            snapshots taken during/after the test.
-
-      - [x] **2026-08-25 (same day, follow-up): re-examined the actual use
-            case and removed the auto-prune half entirely.** The real need
-            is "I downloaded a game, disk is nearly full, I delete
-            something to install a different one and need that space back
-            *right then*" — not a background timer. Capacity-threshold
-            auto-pruning down to a keep-newest floor doesn't solve that:
-            ZFS doesn't free a deleted file's blocks until every snapshot
-            referencing them is gone, and whatever snapshot is newest at
-            delete time was almost always taken *before* the delete (zrepl
-            snapshots on its own 5m clock, unrelated to when you delete
-            something) — proved this empirically in the VM test before
-            removing anything: writing a file, snapshotting it, deleting
-            it, then running the old "keep newest 1" emergency-prune left
-            real pool space unreclaimed, because the one surviving
-            snapshot still held the file.
-            Removed `zfs-space-guard.timer`/`.service` and the
-            `pool`/`freeThresholdPercent`/`keepMin`/`checkInterval` options
-            entirely — dead weight that never solved the actual problem.
-            Kept and repointed `zfs-emergency-prune.service`: now destroys
-            every local snapshot except one named exactly `@blank` (the
-            impermanence rollback point disko creates once at install),
-            instead of "keep the newest one" — since every host is
-            expected to end up on impermanence, `@blank` is the one
-            snapshot that must never go, and destroying everything else
-            guarantees full reclaim regardless of snapshot timing. On a
-            host without `@blank` yet (torrent — see the impermanence
-            migration item above), this destroys everything, which is the
-            documented fallback, not a bug. `tests/zfs-space-guard.nix`
-            rewritten to match (blank-preservation + real space-reclaim +
-            no-blank-fallback + hold-tolerance); host configs on torrent
-            and thinkpad updated to drop the removed options; both hosts
-            build clean.
-      - [ ] Once real backups exist, wire
-            `myHealthAlerts.backupStaleness` values (already set) into a
-            live check — confirm a Discord alert actually fires if a
-            target dataset goes stale past 336h, e.g. by temporarily
-            lowering the threshold for a smoke test.
+      `feedback_test_remote_deploys_in_vm`. Not started directly, but see
+      the `worktree-fde-secureboot-plan` branch noted at the top of this
+      file — its Phase 2 explicitly folds this migration in as part of a
+      larger FDE/Secure Boot/TPM2 plan.
 
 - [ ] **2026-08-18: verify Android SMB share end-to-end** (homelab,
       `modules/services/samba.nix`, commits c5c0f0e..24c4913, moved to
@@ -914,26 +239,31 @@ them rot.
       resolves, since none of `MODRINTH_PROJECTS` pins a mod version).
       None of this has been tested against the running container yet.
 
-- [ ] **2026-08-20: deploy the wg0 IPv4-endpoint fix to homelab, then
-      verify it survives a real IPv6 address rotation.**
+      **Confirmed deployed 2026-08-25** via live inspection: the
+      container (now named `minecraft-vanilla-plus`, up 21h, `healthy`)
+      has `ENABLE_AUTOPAUSE=TRUE`, `MAX_TICK_TIME=-1`, `VERSION=LATEST`,
+      and `CAP_NET_RAW` all present — the config-level rollout is done.
+      Still unverified: the actual Bedrock-client/nether-roof behavior,
+      and whether autopause/resume + the watchdog behave as intended —
+      none of that is checkable without a live game client.
+
+- [ ] **2026-08-20: wg0 IPv4-endpoint fix — deployed and working; still
+      needs to survive a real IPv6 address rotation unwatched.**
       `hosts/homelab/configuration.nix`'s wg0 peer now points at vps's
       stable IPv4 (`137.184.45.18:51820`) instead of vps's IPv6
       literal, fixing a bug where the tunnel died silently whenever
       homelab's RFC4941 privacy IPv6 address rotated (confirmed live:
-      0% ping both directions despite `persistentKeepalive`). Merged to
-      master, **not yet deployed** — the real homelab host is still
-      running the old (broken) config until this switch happens.
-      Deploy plan: `nixos-rebuild switch --flake .#homelab` (or via
-      whatever push-deploy path is standard now), then confirm `wg show
-      wg0` shows a fresh handshake and jellyfin/minecraft/factorio are
-      reachable through it. Testing (do after deploy, not before): the
-      fix itself is straightforward (IPv4 doesn't rotate), but hasn't
-      been watched through an actual homelab IPv6 address rotation yet
-      — confirm `wg show wg0` keeps a fresh handshake and
-      jellyfin/minecraft/factorio stay reachable across the next one or
-      two rotations (homelab's privacy addresses appear to rotate on
-      the order of hours-to-a-day, based on the two different addresses
-      already observed during this investigation).
+      0% ping both directions despite `persistentKeepalive`).
+
+      **Confirmed deployed and healthy 2026-08-25**: `wg show wg0` on
+      homelab shows the peer endpoint as `137.184.45.18:51820` with a
+      handshake ~2 minutes old. Still unconfirmed: this fix hasn't been
+      watched live through an actual IPv6 rotation event yet (nothing to
+      indicate one has happened since deploy) — confirm `wg show wg0`
+      keeps a fresh handshake and jellyfin/minecraft/factorio stay
+      reachable across the next one or two rotations (homelab's privacy
+      addresses appear to rotate on the order of hours-to-a-day, based
+      on prior observation).
 
 - [ ] **2026-08-20: deploy `new.factorio`** — merged to master
       (`c7796c9`), not yet deployed. A second Factorio server
@@ -964,94 +294,89 @@ them rot.
         `:34198` got no ICMP unreachable back.
       - Despite both of the above, the user reports the client cannot
         actually connect/join.
-      Not yet checked: whether the vps's DNAT/firewall/ratelimit rules
-      for 34198 (`hosts/vps/configuration.nix`, added alongside 34197's)
-      are actually correct and were deployed — the "needs
-      `nixos-rebuild switch` on homelab and vps" step above may not
-      actually be done yet despite the container running (the container
-      could be up on homelab while the vps-side forwarding was never
-      switched); the SRV-record lookup (`_factorio._udp.new.factorio`,
-      first real use of SRV in this repo) is also still unverified and a
-      plausible culprit if the client resolves via SRV rather than the
-      plain A record; and a UDP `nc` probe getting no ICMP-unreachable is
-      not proof the DNAT rule itself is forwarding traffic all the way
-      through to homelab (only that *something* on the path isn't
-      actively rejecting it). Needs real triage: confirm vps's
-      `iptables`/DNAT rules for 34198 are live (`iptables -t nat -L
-      PREROUTING`), confirm wg0 tunnel from vps to homelab is up and
-      carrying this traffic, and test an actual client join rather than
-      just a raw port probe.
+      Not yet checked (as of 2026-08-21): whether the vps's DNAT/
+      firewall/ratelimit rules for 34198 were actually deployed — the
+      container could be up on homelab while the vps-side forwarding was
+      never switched; the SRV-record lookup was also unverified; and a
+      UDP `nc` probe getting no ICMP-unreachable isn't proof the DNAT
+      rule itself forwards traffic all the way through.
 
-- [ ] **2026-08-20: `docs/procedures/backup-restore.md` needs real
-      content once the `zbackup` restructuring lands.** Currently a
-      placeholder. `docs/architecture.md` now documents the two
-      backup mechanisms that exist today (restic->Backblaze via
-      rclone; sanoid/syncoid->`zbackup`), but restore steps were
-      deliberately deferred — coordinated with the `zfs backups plus
-      spaceguard` session, which is mid-restructure: renaming the
-      `zbackup` dataset layout to a flat `zbackup/backup/<host>/<subdir>`
-      convention and adding syncoid push-backups from `torrent`/
-      `thinkpad` over Tailscale via a new scoped backup-recv/
-      backup-push user pair. A separate `zfs-pool-recovery-restore`
-      branch is also refactoring the inline `services.sanoid` block on
-      homelab into a new `modules/nixos/zfs-snapshots.nix` module
-      (same behavior, different file). Needs: once both land, write
-      `docs/procedures/backup-restore.md` for real (restic restore via
-      `restic-backblazeWeekly` wrapper; syncoid/zfs-receive restore
-      from `zbackup`), and update `docs/architecture.md`'s Backups
-      section to describe the final dataset layout instead of the
-      current in-flux one.
-
-- [ ] **2026-08-20: build+switch thinkpad and torrent after the
-      dendritic migration** (see entry above) — only `vps`/`homelab`
-      were fully built during the migration; `thinkpad`/`torrent` were
-      evaluated only. Build (not switch) both before relying on them,
-      then switch when ready.
+      **2026-08-25 live triage: every infra layer now checks out.** On
+      vps, `iptables -t nat -L nixos-nat-pre -n -v` shows the DNAT rule
+      live and correct (`udp dpt:34198 to:10.100.0.2:34198`), alongside
+      the working 25565/19132/34197 rules. DNS resolves correctly both
+      ways: `dig SRV _factorio._udp.new.factorio.skyseekerlabs.net` →
+      `0 0 34198 new.factorio.skyseekerlabs.net.`, and the A record
+      resolves to vps's IPv4. The `factorio-new` container itself is
+      still up (21h) alongside `factorio-main`/`minecraft-vanilla-plus`.
+      vps's `current-system` was rebuilt today (2026-08-25 13:21, likely
+      via the auto-updater rearchitect's deploy), so the 34198 rule's
+      packet counters were freshly zeroed and can't confirm whether real
+      client traffic has hit it since — that's the one thing this
+      triage pass couldn't settle. Given everything on the infra side is
+      now confirmed correctly configured and deployed, the original
+      "vps-side forwarding was never switched" hypothesis no longer
+      holds as an explanation; what's still missing is a genuine
+      client-join retest to confirm the original Aug 21 report is
+      actually resolved.
 
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended
       period (over a month), surfaced while reasoning through the full
-      backup reset/re-test.** Grouped as one item since they share a
-      root cause (everything below is `Persistent = true` and fires
-      its one missed catch-up run right at boot, all at once):
-      - **Boot-time contention pile-up**: sanoid (minutely), syncoid
-        (hourly), the restic weekly timer, and both `myAutoUpdate`
-        timers (fetch + switch) are all `Persistent = true` — after a
-        long outage they all queue their catch-up run around the same
-        time on boot, recreating (likely worse, since concentrated
-        instead of spread out) the resource-contention throttling
-        diagnosed live during this session (4 cores, load average
-        12-14, multiple ZFS-heavy jobs + restic upload all competing).
-      - **Compounds directly with the item above**: if the catch-up
-        `nixos-rebuild switch` lands while the catch-up restic backup
-        is still mid-run, the service gets killed and restarts from
-        scratch — more likely right after a long outage than during
-        normal weekly operation, since both are now racing on the same
-        boot instead of being naturally staggered.
+      backup reset/re-test.** Grouped as one item since they originally
+      shared a root cause (everything below was `Persistent = true`,
+      firing its one missed catch-up run right at boot, all at once).
+      **Partially reworked since 2026-08-18 — re-assessed 2026-08-25,
+      not fully closed:**
+      - **Boot-time contention pile-up**: sanoid and syncoid (the
+        original minutely/hourly `Persistent = true` timers this bullet
+        was written about) no longer exist — replaced repo-wide by
+        zrepl, a long-running daemon whose jobs run on their own
+        internal interval from whenever the daemon starts, not systemd
+        timer catch-up semantics. That removes this specific pile-up
+        mechanism for ZFS snapshotting/replication, but the restic
+        weekly timer and both `myAutoUpdate` timers (fetch + switch,
+        confirmed still `Persistent = true` in `modules/nixos/
+        auto-update.nix`) still exist and could still contend with
+        zrepl's own post-boot catch-up replication for I/O after a long
+        outage. No `RandomizedDelaySec`/explicit staggering has been
+        added anywhere in the repo (confirmed via grep, 2026-08-25).
+      - **Compounds directly with the item above**: **partially
+        addressed.** `hosts/homelab/configuration.nix` now sets
+        `myAutoUpdate.protectedUnits = [
+        "restic-backups-backblazeWeekly.service" ]`, and
+        `modules/flake/deploy-guards.nix`'s
+        `check_protected_units_inactive` makes a scheduled auto-switch
+        skip (and retry next cycle) rather than switch while that unit
+        is active — see the git-identity entry in `docs/DONE.md`. This
+        closes the specific "switch kills a mid-run backup" collision,
+        but doesn't address the raw boot-time resource contention
+        itself (previous bullet).
       - **Self-inflicted history loss from the `--keep-daily 2`
-        retention** we set this session (disaster-recovery-only, not
-        versioning, per explicit choice): once the first post-outage
-        backup succeeds, its prune step drops straight to the 2 most
-        recent backup-days, permanently discarding all pre-outage B2
-        history at that point. Intentional given the retention
-        philosophy, but worth having a documented awareness of before
-        it surprises someone during an actual recovery.
-      - **Syncoid resume-base pruning, same failure mode as before,
-        longer fuse**: the widened retention from `fbf547f` (hourly
-        168/7d, daily 14) gives a stuck syncoid target ~1-2 weeks of
-        slack now instead of ~1 day, but a target stuck that long
-        post-boot (plausible given the contention point above) would
-        still hit the exact "resume base pruned, forced full reseed"
-        failure that caused this whole reset project.
+        retention** (disaster-recovery-only, not versioning, per
+        explicit choice): once the first post-outage backup succeeds,
+        its prune step drops straight to the 2 most recent backup-days,
+        permanently discarding all pre-outage B2 history at that point.
+        Intentional given the retention philosophy, but worth having a
+        documented awareness of before it surprises someone during an
+        actual recovery. Unchanged, still applies.
+      - **Syncoid resume-base pruning — moot, mechanism replaced.** The
+        specific failure mode (a stuck syncoid target's incremental base
+        getting pruned before it catches up) no longer applies now that
+        syncoid is gone; zrepl has its own hold/bookmark-based
+        incremental-base guarantees (see the zrepl entry in
+        `docs/DONE.md`), which is a different mechanism with different
+        (already-encountered-and-fixed) failure modes, not a direct
+        continuation of this specific risk.
       - **Unverified**: whether the B2 application key
         (`homelab_backblaze_rclone_config` secret) has an expiration
         date set on Backblaze's side. Couldn't check without exposing
         the secret's contents; confirm on the B2 web console if this
-        needs certainty.
-      Needs: stagger/serialize the catch-up timers (e.g. `RandomizedDelaySec`
-      spread, or explicit ordering) so they don't all fire at once on
-      boot, and decide whether the auto-update-vs-backup conflict fix
-      above should also gate against this boot-time race specifically.
+        needs certainty. Unchanged.
+      Still needs: stagger/serialize the remaining boot-time timers
+      (restic weekly + `myAutoUpdate` fetch/switch) so a long-outage
+      reboot doesn't pile them up against zrepl's own catch-up
+      replication, and confirm the B2 key expiration.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
@@ -1079,6 +404,12 @@ them rot.
       rely on `keyFile` alone there). Not yet reproduced against a clean
       reboot (holding off per the no-unconfirmed-local-restarts rule).
 
+      **Confirmed still present in code, 2026-08-25** (path moved to
+      `modules/profiles/PC.nix` post-dendritic, same content): both
+      `sops.age.sshKeyPaths` and `sops.age.keyFile` are still configured
+      in the same vulnerable order, unchanged. Still open, still
+      unreproduced against a clean reboot.
+
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
       ports** (Minecraft 25565/19132, Factorio 34197/34198 — the
       latter added 2026-08-20 for `new.factorio`, same treatment
@@ -1099,6 +430,9 @@ them rot.
       IPv6-capable SNAT equivalent so return traffic survives
       WireGuard's cryptokey routing (mirrors the existing IPv4
       POSTROUTING SNAT rule), then re-add the AAAA records.
+      **Confirmed still unaddressed, 2026-08-25**: `net.ipv6.conf.all.
+      forwarding` is still `0` live on vps, no ip6tables DNAT rules for
+      these ports exist beyond the stock empty `nixos-nat-pre` chain.
 
 - [ ] **2026-08-18: layer distributed builders across the tailnet**.
       vps's rebuilds are already offloaded off-box — homelab builds and
@@ -1112,7 +446,9 @@ them rot.
       to whichever machine initiates a given host's rebuild — fans out
       across the tailnet instead of always landing on one machine.
       Purely a build-time-distribution optimization, not required for
-      any host's correctness.
+      any host's correctness. See the stale-branch entry at the top of
+      this file — `worktree-distributed-build-todo` looks like a
+      feature-complete implementation of this, unreviewed/unmerged.
 
 - [ ] **2026-08-18: caddy hits a permission-denied race against the
       anubis unix socket right after vps reboots.** Found trawling
@@ -1131,18 +467,11 @@ them rot.
       the anubis service/socket so caddy doesn't start accepting
       traffic until anubis's socket exists with the right group perms
       already applied.
-
-- [ ] **2026-08-19: `octodns-sync.service` failing on homelab —
-      transient DNS resolution error.** Found during a read-only log
-      trawl through homelab (checked against exposed services in
-      `hosts/homelab/configuration.nix`; no signs of compromise, SSH
-      and service access all traced to known keys/tailnet/LAN). Job
-      failed with `requests.exceptions.ConnectionError` /
-      `NameResolutionError` trying to reach `api.cloudflare.com`
-      (`Failed to resolve 'api.cloudflare.com' ... Temporary failure
-      in name resolution`). Timer retries hourly so this may self-heal,
-      but worth confirming it isn't recurring (e.g. flaky upstream
-      resolver, or the service starting before network-online.target).
+      **Confirmed still unfixed in code, 2026-08-25** (no explicit
+      caddy→anubis systemd ordering in `hosts/vps/configuration.nix`),
+      but unverified live either way: vps hasn't rebooted since
+      2026-08-20, so the race hasn't had a chance to reproduce (or be
+      confirmed fixed) since it was first noticed.
 
 ## Done
 
