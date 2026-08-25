@@ -242,12 +242,11 @@ non-empty before passing them to `zfs destroy`.**
      **thinkpad will need the same entry** once its host key is known —
      get it from `/etc/ssh/ssh_host_ed25519_key.pub` on thinkpad itself,
      the same way torrent's was read directly off the local machine.
-   - **Not done**: torrent's own `pull-deploy.timer` (its local
-     auto-update timer) is still active, next fire 2026-08-27 03:00 PDT.
-     `run0 systemctl stop pull-deploy.timer` timed out once and wasn't
-     retried (minimizing elevated calls per user instruction that
-     session, and it wasn't urgent). Stop it before 08-27, or accept it
-     may redeploy master (pre-zrepl) over this branch's config.
+   - torrent's own `pull-deploy.timer` (its local auto-update timer) is
+     now stopped (`run0 systemctl stop pull-deploy.timer`, confirmed
+     with user; a first attempt earlier in the session had timed out).
+     Like homelab's auto-update timers, this doesn't persist — a switch
+     or reboot restarts it, so re-stop it after either.
    Deploy thinkpad the same way: build locally and push
    (`nixos-rebuild switch --flake .#thinkpad --target-host root@thinkpad`,
    `NIX_SSHOPTS` carrying the key) — do not build on the target. Re-stop
