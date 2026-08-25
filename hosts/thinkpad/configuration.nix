@@ -102,6 +102,7 @@
   # compromised source the ability to destroy its own backup history.
   myZrepl = {
     enable = true;
+    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [

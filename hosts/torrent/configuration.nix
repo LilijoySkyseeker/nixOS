@@ -77,6 +77,7 @@
   # since under pull the puller owns retention.
   myZrepl = {
     enable = true;
+    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [
