@@ -35,6 +35,12 @@
     }
 
     fetch_and_merge_master() {
+      # root's own known_hosts may never have trusted the origin remote's
+      # host before (e.g. a PC host's root user, vs. lilijoy's own
+      # already-populated known_hosts) -- accept-new rather than fail
+      # closed on first contact, same pattern myPushDeploy already uses
+      # for its own SSH usage.
+      export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
       git fetch origin
       git merge --ff-only origin/master
     }
