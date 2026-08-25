@@ -27,18 +27,28 @@ each check actually catches, and when to reach for it.
    packages, failing derivations) but says nothing about runtime
    behavior — a unit can build fine and still be broken when it
    actually runs.
-4. **`nix build .#checks.x86_64-linux.<name>`** — a NixOS VM test:
-   boots real VMs and asserts on their runtime behavior. The only
-   layer below "actually switching" that catches a unit which builds
-   and starts but does the wrong thing. Lives in `tests/`, wired up in
-   `modules/flake/checks.nix`. Slow (minutes, boots one VM per node),
-   so reserve it for subsystems where a build proves too little —
-   currently `zrepl-replication`, which builds a two-node source/
-   puller pair with real zpools because `nixos-rebuild build` can only
-   prove the generated zrepl YAML *parses*, never that a pull lands
-   data. Add one when a change's failure mode is runtime-only and the
-   blast radius justifies the wait. How to write and debug one, and the
-   traps involved: `docs/procedures/vm-testing.md`.
+4. **VM-test the change — the default before anything touches a live
+   host, not an occasional extra.** Two forms, see
+   `docs/procedures/vm-testing.md` for the full mechanics and traps:
+   - `nix build .#nixosConfigurations.<host>.config.system.build.vm` —
+     boots the real host config in a throwaway VM. Generic, works for
+     any host, and is the default sanity check ("does this still boot,
+     do its units start") before switching `vps`/`homelab` or after
+     any change with real activation risk.
+   - `nix build .#checks.x86_64-linux.<name>` — a targeted
+     `runNixOSTest` asserting on actual runtime behavior (multi-host
+     interaction, a service doing its job), where it exists for the
+     module being touched. Lives in `tests/`, wired up in
+     `modules/flake/checks.nix`; currently `zrepl-replication` and
+     `zfs-space-guard`. Write one per `vm-testing.md`'s guidance when a
+     change's failure mode is runtime-only and none already covers it.
+
+   Slow (minutes, boots one or more VMs), so skip only when something
+   concrete prevents it — no meaningful boot behavior to check (a
+   docs-only or comment-only edit), or a documented VM limitation makes
+   the result meaningless (e.g. anything sops-backed, since the host
+   key isn't in the VM — see `vm-testing.md`'s table). "It'll probably
+   be fine" is not a reason to skip; a specific, statable blocker is.
 5. **`nvd diff /run/current-system <new-closure-path>`** — a readable
    diff between what's currently running and a built-but-not-switched
    closure. Use this before ever switching a live host, to see exactly

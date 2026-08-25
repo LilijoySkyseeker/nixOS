@@ -75,11 +75,22 @@ again*. Ask what it guards:
   passes and they have no reason to look closer.
 - **Delete** when it verified a specific one-off migration that is now
   finished, or when the thing it covered is gone. A passing test nobody
-  will ever need again is just a slow check and a file to maintain.
+  will ever need again is just a slow check and a file to maintain — once
+  the thing it was proving has actually landed and been confirmed
+  working, remove `tests/<name>.nix` and its `modules/flake/checks.nix`
+  registration rather than leaving it to rot as dead weight in every
+  future `nix flake check`.
 
 One-off verification doesn't need a file at all — boot a
 `system.build.vm`, read the result, clean up the qcow2. That leaves no
 artifact by design.
+
+If a since-deleted one-off test had genuinely reusable scaffolding inside
+it — node/pool setup, a snakeoil-key pattern, anything the *next* test
+would otherwise have to reinvent — pull just that part out into a shared
+location (there's no `tests/lib.nix` yet; start one when the second test
+actually needs to share something) instead of keeping the whole one-off
+test around to mine later.
 
 ## Adding a check
 

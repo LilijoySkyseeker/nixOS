@@ -277,6 +277,10 @@
     hostAttr = "homelab";
     updateDates = "Wed 03:00";
     switchDates = "Thu 03:00";
+    # the weekly restic->Backblaze run can take multiple days (~2.9TiB) —
+    # switch-to-configuration restarts any unit whose definition changed, so
+    # a same-cycle switch would kill it mid-run. Defer instead (see TODO.md).
+    protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
   };
 
   # vps builds nothing itself anymore (myPullDeploy removed there — a
@@ -299,7 +303,7 @@
     # homelab's own myAutoUpdate switch, so this reuses the same
     # already-vetted master checkout instead of racing/duplicating it.
   };
-  systemd.services.nixos-upgrade.onSuccess = [ "push-deploy-vps.service" ];
+  systemd.services.auto-switch.onSuccess = [ "push-deploy-vps.service" ];
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {

@@ -37,6 +37,30 @@ consolidated in one place rather than scattered per-topic.
 - Editing or decrypting `secrets/*` yourself — see
   `docs/procedures/secrets.md`.
 
+## If you already made a destructive local mistake
+
+Every host running `myZrepl` (`homelab`, `torrent`, `thinkpad` — see
+`docs/backups.md`) snapshots its own datasets locally every **5 minutes**,
+independent of whether replication to `zbackup` ever runs. That includes
+`zroot/local/home`, so an accidental `rm -rf`/overwrite in a home directory
+(e.g. this repo's own checkout, or a worktree under `.claude/worktrees/`) is
+almost always recoverable from the same host, in under a minute, without
+touching `zbackup` or another machine at all — the on-box `ceiling` preset
+keeps roughly 32 days of these.
+
+Recover with the same recipe as "Recovering a few files" in
+`docs/procedures/backup-restore.md`: find the most recent snapshot from
+*before* the mistake under `<mountpoint>/.zfs/snapshot/<zrepl_timestamp>/...`
+(`zfs list -t snapshot <dataset>` to see what's available), then `cp -a` the
+missing path back out and verify with `diff -rq` against the snapshot before
+trusting it. This is read-only against the snapshot — it carries none of the
+risk a `zfs rollback` would.
+
+Still tell the user what happened and what you did to fix it — recoverability
+doesn't change the "confirm before destructive actions" rule going forward,
+it's a safety net for when that rule was missed, not a reason to be looser
+about destructive commands.
+
 ## Remote installs and deploys
 
 - **Test in a local VM before real hardware/cloud** when feasible

@@ -84,6 +84,14 @@ let
         ;;
     esac
 
+    # myPushDeploy's minSwitchInterval pre-check -- exact match, no
+    # wildcard, since this one has no interpolated store path to bound
+    case "$cmd" in
+      "stat -c %Y /nix/var/nix/profiles/system")
+        exec ${pkgs.coreutils}/bin/stat -c %Y /nix/var/nix/profiles/system
+        ;;
+    esac
+
     reject
   '';
 in
