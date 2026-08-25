@@ -364,6 +364,14 @@ Success is tracked by an `ExecStartPost` touching a marker file, watched by
 `myHealthAlerts.staleMarkerFiles`, because a hung run never reaches
 systemd's `failed` state.
 
+The timer runs with `Persistent = false` (deliberate — see the
+Auto-update & deploy section of `docs/architecture.md`): a missed run
+after a long outage is skipped rather than fired immediately at boot,
+where it would otherwise pile ~2.9TiB of I/O onto zrepl's own post-boot
+catch-up replication. `myHealthAlerts.staleMarkerFiles`' 336h/14-day
+threshold is the backstop that catches a skipped run turning into an
+actual problem.
+
 ## Restore
 
 See `docs/procedures/backup-restore.md` for the restore paths out of both
