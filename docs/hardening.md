@@ -15,6 +15,24 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
   Any new persist-capable host that gets `security.auditd`/
   `security.audit` needs `/var/log` in its impermanence persistence
   list, or the audit trail is wiped every boot.
+- **Persisting a `DynamicUser=true` service's `StateDirectory=`.**
+  systemd creates `/var/lib/<name>` as a symlink into
+  `/var/lib/private/<name>` for `StateDirectory=`-managed paths under
+  `DynamicUser=true` — a real impermanence bind mount can't land on a
+  path that's actually a symlink (`mount: not canonical, contains a
+  symlink`). If a `DynamicUser` service's state needs to survive
+  reboots, drop the directory from that service's `StateDirectory=`
+  (`lib.mkForce` an override without it) and grant write access via
+  `ReadWritePaths` instead, so impermanence owns the path outright —
+  see `hosts/vps/configuration.nix`'s
+  `crowdsec-firewall-bouncer-register` override for both directories it
+  needs this for. Missing this can produce a subtler failure than an
+  outright mount error: if a service's on-disk state (e.g. CrowdSec's
+  own bouncer-registration DB) persists via one mechanism while a
+  *different* directory the same subsystem depends on (e.g. the
+  bouncer's API key file) isn't persisted at all, the two can silently
+  diverge across a reboot into a split-brain state that only surfaces
+  as an application-level error, not a systemd/mount failure.
 - **No real `sudo`.** All hosts alias `sudo` to `run0`
   (`security.run0.enableSudoAlias` in `modules/profiles/default.nix`);
   `server.nix`'s `security.sudo.enable = false` confirms the real

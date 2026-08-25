@@ -16,7 +16,8 @@ them rot.
 - [ ] **2026-08-25: add fail2ban to vps, defaulting to an immediate ban
       for any connection attempt against a non-present/non-listening
       service.** Requested by the user alongside the CrowdSec bouncer
-      fix below — a complementary, simpler layer: rather than
+      credential fix (landed 2026-08-25, see `docs/DONE.md`) — a
+      complementary, simpler layer: rather than
       CrowdSec's scenario-based detection, fail2ban here should treat
       any probe of a port/service vps doesn't actually offer as
       inherently hostile (e.g. scanners hitting closed ports or
@@ -67,29 +68,6 @@ them rot.
       logged here so the next session (or the user) can decide whether
       to revive, rebase, or abandon them, rather than losing this
       progress silently.
-
-- [ ] **2026-08-25: vps's CrowdSec firewall bouncer has been failing since
-      at least 2026-08-20 — pre-existing, found live while deploying the
-      auto-updater rearchitect, unrelated to it.** Both
-      `crowdsec-firewall-bouncer.service` (`Failed to set up credentials:
-      No such file or directory`, step CREDENTIALS) and
-      `crowdsec-firewall-bouncer-register.service` (`Bouncer registered
-      but API key is not present`) fail on every boot/restart —
-      confirmed identical failure text in the journal from 2026-08-20,
-      five days before it was noticed. Looks like the bouncer's API key
-      credential was never actually provisioned (or was lost/rotated
-      out from under it), so `crowdsec-firewall-bouncer-config`'s
-      `LoadCredential=`/systemd-creds step has nothing to load. Needs:
-      figure out where this bouncer's API key is supposed to come from
-      (`crowdsec-firewall-bouncer-register.service`'s own job, a sops
-      secret, or a one-time `cscli bouncers add` step) and re-provision
-      it. Not currently blocking anything else (the firewall itself
-      still runs via `hosts/vps/configuration.nix`'s own iptables rules,
-      independent of CrowdSec) but the bouncer's dynamic IP-ban
-      enforcement has effectively been off this whole time.
-      **Confirmed still failing, unchanged, live-checked 2026-08-25**:
-      both services still fail identically (`step CREDENTIALS`/`API key
-      is not present`) on vps's current boot.
 
 - [ ] **2026-08-25: build and test a full restore suite (scripts +
       procedures) against real data — out of scope of the zrepl
