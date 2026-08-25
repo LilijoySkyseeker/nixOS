@@ -19,7 +19,12 @@
 #     every snapshot destroyed -- the documented fallback, not a surprise
 #   * a zrepl-style hold on a snapshot is tolerated (`|| true`), not fatal
 #     to the run -- other snapshots still get destroyed
+#   * a zrepl-style cursor *bookmark* does NOT pin the space of a destroyed
+#     snapshot's data -- confirming the module's own claim that zrepl's
+#     replication cursor surviving locally destructive pruning doesn't
+#     also mean it silently keeps the space you were trying to reclaim
 #
+
 # Kept as a regression test: the failure mode (destroying the wrong thing,
 # or not actually reclaiming space) is exactly the kind of thing you'd only
 # discover under real pressure. Delete it if the module is ever replaced.
@@ -111,6 +116,42 @@ pkgs.testers.runNixOSTest {
         assert snap_names("guardpool/b") == [], (
             "guardpool/b has no @blank to protect, so the fallback is to "
             "destroy every snapshot -- this is the documented behavior, not a bug"
+        )
+
+    with subtest("a zrepl-style cursor bookmark does not pin space after its snapshot is gone"):
+        # zrepl's replication cursor is a *bookmark*, not a snapshot -- this
+        # checks that claim actually holds: does leaving the bookmark behind
+        # (as emergency-prune does; it only ever destroys snapshots) still
+        # let a deleted file's space come back, or does the bookmark itself
+        # pin those blocks the same way a snapshot would?
+        guard.succeed("zfs create -o compression=off guardpool/d")
+        guard.succeed("dd if=/dev/zero of=/guardpool/d/bigfile bs=1M count=60 status=none")
+        guard.succeed("zfs snapshot guardpool/d@cursor")
+        guard.succeed("zfs bookmark guardpool/d@cursor guardpool/d#cursor")
+        avail_before = int(guard.succeed("zfs list -Hp -o avail guardpool/d").strip())
+        # Simulate what emergency-prune actually does: destroy the snapshot,
+        # leave the bookmark alone (it isn't a snapshot, so the module's
+        # `zfs list -t snapshot` never even sees it).
+        guard.succeed("zfs destroy guardpool/d@cursor")
+        guard.succeed("rm /guardpool/d/bigfile")
+        # ZFS defers actually freeing blocks to its own background txg
+        # processing -- `avail` right after destroy+rm can still reflect
+        # the old, not-yet-reclaimed usage for a moment. Force a sync and
+        # poll briefly so the assertion reflects steady state, not a race.
+        guard.succeed("zpool sync guardpool")
+        avail_after = None
+        for _ in range(20):
+            avail_after = int(guard.succeed("zfs list -Hp -o avail guardpool/d").strip())
+            if avail_after - avail_before > 50 * 1024 * 1024:
+                break
+            guard.succeed("sleep 1")
+        assert avail_after - avail_before > 50 * 1024 * 1024, (
+            "a bookmark alone must not keep the deleted file's blocks alive "
+            f"-- otherwise the whole point of this module breaks: before={avail_before}, after={avail_after}"
+        )
+        bookmarks = guard.succeed("zfs list -Hp -t bookmark -o name guardpool/d").strip()
+        assert bookmarks == "guardpool/d#cursor", (
+            f"the bookmark itself should survive destroying its originating snapshot: {bookmarks}"
         )
   '';
 }
