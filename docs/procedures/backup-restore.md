@@ -4,10 +4,11 @@ Getting data back out of `zbackup` (zrepl) or Backblaze (restic). For how
 the backups are produced, see [`docs/backups.md`](../backups.md).
 
 > **Written from the mechanics, not yet exercised.** The zrepl layout it
-> describes is not deployed at time of writing (see `TODO.md`). The `zfs`
-> commands are standard, but nobody has done a real restore against this
-> layout yet — verify each step's output rather than pasting the whole
-> sequence, and correct this doc once a restore has actually been done.
+> describes is deployed and replicating on all three hosts, but the `zfs`
+> commands below are standard, unverified-in-practice recipes — nobody has
+> done a real restore against this layout yet (tracked in `TODO.md`).
+> Verify each step's output rather than pasting the whole sequence, and
+> correct this doc once a restore has actually been done.
 
 ## First: work out where the data is
 

@@ -290,9 +290,6 @@ Two things worth knowing before touching anything nearby:
   the impermanence rollback snapshots alive. See `docs/backups.md`'s
   Gotchas before changing any retention rule.
 
-**Not yet deployed** — check `TODO.md` for current status before assuming
-any of this is live.
-
 ## Secrets
 
 Encrypted with sops-nix. `.sops.yaml` maps named recipient keys (one per

@@ -368,6 +368,6 @@ systemd's `failed` state.
 
 See `docs/procedures/backup-restore.md` for the restore paths out of both
 `zbackup` and Backblaze. It is written from the mechanics and has not yet
-been exercised against a deployed copy of the layout above — verify each
-step's output as you go, and correct that doc once a real restore has been
-done.
+been exercised as a real restore — verify each step's output as you go,
+and correct that doc once a real restore has been done (tracked in
+`TODO.md`).

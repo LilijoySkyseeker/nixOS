@@ -11,6 +11,23 @@ items rather than letting them rot.
 
 ## Active
 
+- [ ] **2026-08-25: build and test a full restore suite (scripts +
+      procedures) against real data — out of scope of the zrepl
+      migration itself.** The zrepl migration (branch
+      `worktree-zrepl-migration-plan`) documents restore *paths* in
+      `docs/procedures/backup-restore.md`, but per its handoff notes
+      these remain unexercised against real data: the VM test
+      (`docs/procedures/vm-testing.md`) only covers clone-based file
+      recovery, and rollback / full-dataset restore have never been
+      run for real. Needs: actual restore drills (clone-based file
+      recovery, full-dataset rollback, disaster-recovery-from-scratch)
+      for each host's `zbackup/backup/<host>/...` data, ideally scripted
+      and repeatable rather than one-off manual runs, plus writing up
+      the verified procedure in `docs/procedures/backup-restore.md` in
+      place of the current unexercised steps. This likely supersedes the
+      2026-08-20 "`docs/procedures/backup-restore.md` needs real
+      content" entry below once the zrepl migration lands.
+
 - [x] **2026-08-24: agent error destroyed all source-side snapshots on
       homelab during legacy-snapshot cleanup — recovered via the
       surviving replication cursor bookmark, no full resend needed.**
@@ -253,6 +270,45 @@ items rather than letting them rot.
       Once burnt in, turn off `myZrepl.preserveLegacySnapshots` and clear
       the leftover `autosnap_*` snapshots by hand — nothing ages them out
       while it is on.
+
+      **2026-08-25: all three hosts deployed; thinkpad's first sync
+      completed clean.** thinkpad built+switched locally (`run0
+      nixos-rebuild switch`, no `--target-host`, per the user's request
+      for this host), its SSH host key pinned on homelab
+      (`programs.ssh.knownHosts.thinkpad`, commit `5eb7858`). torrent's
+      first-ever full send finished sometime before 2026-08-25 06:50 PDT
+      (was ~1.8 TiB/3.1 TiB at 00:05, done and down to tiny incrementals
+      by 06:50).
+
+      Traced a recurring `dial_timeout of 10s exceeded` on thinkpad's pull
+      job (self-healing every 15m retry, but frequent — correlated against
+      every failure timestamp checked) to Tailscale's magicsock
+      continuously flapping between candidate endpoints for the
+      homelab↔thinkpad path, confirmed via `tailscaled` logs, even though
+      both hosts share a LAN with a stable 1ms direct path available.
+      Verified against zrepl v0.7.0's actual source
+      (`internal/config/config.go`, fetched from the exact tagged commit
+      the nix build uses) rather than the docs site, which undersold the
+      mid-transfer failure mode: `dial_timeout` is a real per-connect-type
+      field (`SSHStdinserverConnect`/`TCPConnect`/`TLSConnect`), default
+      10s. Bumped to 60s universally in the shared `mkConnect` helper
+      (commit `6bd1638`) rather than patching thinkpad alone, since this
+      class of network flakiness is inherent to whatever LAN a host sits
+      on. Deployed to homelab (the only dialer).
+
+      `myZrepl.preserveLegacySnapshots` turned off for thinkpad and
+      torrent (commit `a9bfed7`), matching homelab. thinkpad verified to
+      already have zero legacy `autosnap_*` snapshots on
+      `zroot/local/{root,home}` — deployed and confirmed live, a pure
+      hygiene no-op there. **torrent's change is staged but NOT deployed**
+      — the session doing this work ran on thinkpad, which has no
+      shell/deploy access to torrent at all (not even via homelab, whose
+      own `root@torrent` key is rejected at the publickey stage). Needs
+      `nixos-rebuild switch --target-host root@torrent` (or run locally on
+      torrent) from a session with real access. This is the one loose end
+      left after `HANDOFF.md` was deleted and the branch merged to
+      `master` — check `zfs list -t snapshot` on torrent for lingering
+      `autosnap_*` entries once that switch lands.
 
 - [ ] **2026-08-23: torrent's `backup-push-torrent.service` (`home`
       dataset) is now stuck — needs a decision, not further automated
