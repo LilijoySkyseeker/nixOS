@@ -13,7 +13,6 @@
 
   # System installed pkgs
   environment.systemPackages = with pkgs-stable; [
-    sanoid # also installs syncoid and findoid
     zfs
     restic
     backblaze-b2
@@ -164,128 +163,97 @@
     };
   };
 
-  # zfs snapshots
-  services.sanoid = {
-    enable = true;
-    extraArgs = [ "--verbose" ];
-    interval = "minutely";
-    settings = {
-      "zroot/local/state".use_template = "working";
-      "zdata/storage/storage".use_template = "working";
-      "zdata/storage/storage-bulk".use_template = "working";
-      template_working = {
-        frequent_period = 1;
-        frequently = 59;
-        hourly = 168;
-        daily = 14;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "yes";
-        autoprune = "yes";
-      };
-      "zbackup" = {
-        use_template = "backup";
-        recursive = "yes";
-      };
-      template_backup = {
-        frequently = 0;
-        hourly = 168;
-        daily = 366;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "no";
-        autoprune = "yes";
-      };
-    };
-  };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
-  };
-  services.syncoid = {
-    enable = true;
-    interval = "hourly";
-    commonArgs = [ "--no-sync-snap" ]; # "--create-bookmark" for mobile machines
-    localTargetAllow = [
-      "change-key"
-      "compression"
-      "create"
-      "mount"
-      "mountpoint"
-      "receive"
-      "rollback"
-      "destroy"
-    ];
-    commands = {
-      "zdata/storage/storage" = {
-        source = "zdata/storage/storage";
-        target = "zbackup/backup/homelab/storage";
-        extraArgs = [ "--identifier=zdata_storage_storage" ];
-      };
-      "zdata/storage/storage-bulk" = {
-        source = "zdata/storage/storage-bulk";
-        # NOTE: this target is renaming from the old
-        # zbackup/backup-bulk/homelab/storage-bulk path — live data still
-        # sits at the old path on homelab as of this commit. Not renamed
-        # live yet; see TODO.md for the pending manual zfs rename.
-        target = "zbackup/backup/homelab/storage-bulk";
-        extraArgs = [ "--identifier=zdata_storage_storage-bulk" ];
-      };
-      "zroot/local/state" = {
-        source = "zroot/local/state";
-        target = "zbackup/backup/homelab/state";
-        extraArgs = [ "--identifier=zroot_local_state" ];
-      };
-    };
+  # Import zbackup at boot.
+  #
+  # nixpkgs only generates a zfs-import-<pool>.service for pools something
+  # actually references -- a `fileSystems` entry, or this option. zdata gets
+  # one implicitly because /storage and /storage-bulk are mountpoints on it.
+  # Every zbackup dataset is `mountpoint = "none"` (see disko.nix) precisely
+  # because nothing should mount from the backup pool, so nothing referenced
+  # it and nothing imported it: after the 2026-08-23 reboot zbackup simply
+  # stayed exported and every replication job failed for ~23h with
+  # "dataset does not exist". disko does not help here -- it only creates
+  # pools at format time and emits no import units at all.
+  boot.zfs.extraPools = [ "zbackup" ];
+
+  # zfs snapshots + replication (zrepl; replaced sanoid+syncoid)
+  #
+  # homelab is the active side of every replication relationship here. It
+  # pulls from torrent and thinkpad rather than having them push, so a
+  # compromised source host has no RPC handle on this machine at all --
+  # zrepl's receiving endpoint exposes DestroySnapshots to whoever is
+  # authenticated, which under push would let a compromised source delete
+  # its own backup history. Pulling keeps retention authority here.
+  #
+  # It also replicates its own datasets into zbackup over zrepl's local
+  # transport, replacing the three hourly syncoid jobs that used to do it.
+  #
+  # Snapshotting itself belongs to the module's snap job (on by default,
+  # covering every dataset named below), not to any replication job, so it
+  # keeps running regardless of what any peer is doing. Local replication
+  # therefore runs on its own interval rather than firing every time a
+  # snapshot is taken -- which matters here because zbackup sits behind a
+  # USB link (USB 2.0 and heavily contended until the 2026-08-23 cable
+  # change moved it to USB 3.0; see hosts/homelab/README.md).
+  sops.secrets.homelab_zrepl_key = { };
+
+  # zrepl's ssh+stdinserver client (go-netssh, shelling out to system ssh)
+  # has no interactive TTY to prompt on an unrecognized host key, so the
+  # very first connection to a freshly-deployed source host fails outright
+  # with "Host key verification failed" rather than TOFU-prompting -- hit
+  # this deploying torrent (2026-08-24), the pull job's first real attempt
+  # after its sshd came up. Pinning the host key declaratively (rather
+  # than `StrictHostKeyChecking=accept-new`, or `ssh-keyscan`ing by hand)
+  # keeps this reproducible from source and doesn't weaken the actual
+  # protection host-key checking provides -- these are public keys, not
+  # secrets. thinkpad will need the same entry once it's deployed and its
+  # host key is known.
+  programs.ssh.knownHosts.torrent = {
+    hostNames = [ "torrent" ];
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJESBjkAOLvKdaRlpAg/CiBh/WvW0lzb4QScEw40o3Kc";
   };
 
-  # receive side for torrent's + thinkpad's syncoid push backups (see
-  # TODO.md "syncoid push backups" and modules/nixos/backup-push.nix).
-  # Dedicated non-root user per feedback_dedicated_service_users; scoped
-  # via `zfs allow` to only the two subtrees it needs, not the whole
-  # zbackup pool, so a compromised source host key can't touch anything
-  # else on this pool.
-  users.users.backup-recv = {
-    isSystemUser = true;
-    group = "backup-recv";
-    shell = pkgs-stable.bash; # needed for syncoid's remote zfs commands over ssh
-    openssh.authorizedKeys.keys = [
-      # "restrict" disables port/agent/X11 forwarding and pty allocation —
-      # this key should only ever run zfs-receive-adjacent commands, same
-      # least-privilege spirit as vps-deploy's forced-command key
-      # (hosts/vps/configuration.nix). No forced `command=` here since
-      # syncoid needs to run different zfs commands with dynamic args, so
-      # `zfs allow`'s scoping (below) is the real boundary, not this.
-      "restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJl8i5+psY+G1rzCHa4oc5DWHdE84N2r31UYqSoSxQA5 torrent-backup-push"
-      "restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIWl2P8DAPk9dpt7YgXgv7oycg69LV9Ypuid+JC/U0I3 thinkpad-backup-push"
-    ];
+  programs.ssh.knownHosts.thinkpad = {
+    hostNames = [ "thinkpad" ];
+    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF2TU4+7NDf2QOY8x/48KYt/1WX1jtCRhUOwKgYW7pNY";
   };
-  users.groups.backup-recv = { };
 
-  systemd.services.backup-recv-zfs-allow = {
-    description = "Delegate zfs receive permissions on backup/{torrent,thinkpad} to backup-recv";
-    after = [ "zfs-import-zbackup.service" ];
-    wantedBy = [ "multi-user.target" ];
-    # not gated in front of sshd: if this ever fails (e.g. zbackup import
-    # trouble), ssh access to homelab should still come up — a syncoid
-    # push just fails and gets caught by backupStaleness instead.
-    path = [ pkgs-stable.zfs ];
-    serviceConfig.Type = "oneshot";
-    serviceConfig.RemainAfterExit = true;
-    # zfs allow is idempotent — safe to re-run every activation/boot.
-    # `zfs allow` requires the target dataset to already exist, but
-    # disko.nix declaring it doesn't create it on a live pool (disko is
-    # install-time only) — and a source host's first syncoid push is
-    # what would normally create it via `zfs receive`, a chicken-and-egg
-    # problem the very first time. `zfs create -p` first (skipped if it
-    # already exists) breaks that cycle idempotently.
-    script = ''
-      for dataset in zbackup/backup/torrent zbackup/backup/thinkpad; do
-        zfs list -H "$dataset" >/dev/null 2>&1 || zfs create -p "$dataset"
-        zfs allow backup-recv create,mount,mountpoint,receive,rollback,destroy "$dataset"
-      done
-    '';
+  myZrepl = {
+    enable = true;
+
+    pull.remotes = {
+      # Received filesystems land at <rootFs>/<full source dataset path>,
+      # e.g. zbackup/backup/torrent/zroot/local/home -- zrepl extends
+      # root_fs with the whole source path rather than a chosen leaf name,
+      # so this tree is deeper than the syncoid layout it replaces.
+      torrent = {
+        host = "torrent";
+        identityFile = config.sops.secrets.homelab_zrepl_key.path;
+        rootFs = "zbackup/backup/torrent";
+      };
+      thinkpad = {
+        host = "thinkpad";
+        identityFile = config.sops.secrets.homelab_zrepl_key.path;
+        rootFs = "zbackup/backup/thinkpad";
+      };
+    };
+
+    local = {
+      enable = true;
+      datasets = [
+        "zdata/storage/storage"
+        "zdata/storage/storage-bulk"
+        "zroot/local/state"
+      ];
+      rootFs = "zbackup/backup";
+      clientIdentity = "homelab";
+    };
+
+    # homelab's own zrepl history is proven (local replication completed
+    # and verified 2026-08-24) -- the sanoid-era autosnap_ snapshots are
+    # no longer needed as a safety net and were destroyed by hand once
+    # this landed.
+    preserveLegacySnapshots = false;
   };
 
   # cpu power management
@@ -338,27 +306,29 @@
     enable = true;
     webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
     interval = "*:0/15";
-    # syncoid runs hourly; alert if a target hasn't advanced in 2x that plus
-    # slack, so a stuck target is caught long before the source's ~24h
-    # snapshot retention prunes the base it needs to resume from.
+    # Paths carry the full source dataset path because zrepl extends
+    # root_fs with it (see myZrepl above) — these are NOT the old syncoid
+    # target names.
+    #
+    # zrepl replicates every 15m; alert if a target hasn't advanced in
+    # well over that, so a stuck target is caught early. It is no longer a
+    # race against the source pruning its incremental base: zrepl's
+    # replication cursor holds that base regardless of how long a target
+    # lags, which is the failure that stranded the old syncoid push.
     backupStaleness = {
-      "zbackup/backup/homelab/storage" = 6;
-      "zbackup/backup/homelab/storage-bulk" = 6;
-      "zbackup/backup/homelab/state" = 6;
+      "zbackup/backup/homelab/zdata/storage/storage" = 6;
+      "zbackup/backup/homelab/zdata/storage/storage-bulk" = 6;
+      "zbackup/backup/homelab/zroot/local/state" = 6;
       # torrent is a desktop, not a server — usually up, but can go dark
-      # for a while too (e.g. powered off during vacation). Same
-      # reasoning as thinkpad below: bookmarks make this a non-issue for
-      # resync, so the threshold only exists to catch a genuinely broken
-      # key/config, not normal off time. 336h = 2 weeks.
-      "zbackup/backup/torrent/home" = 336;
-      "zbackup/backup/torrent/root" = 336;
+      # for a while (e.g. powered off during vacation). The threshold only
+      # exists to catch a genuinely broken key/config, not normal off
+      # time. 336h = 2 weeks.
+      "zbackup/backup/torrent/zroot/local/home" = 336;
+      "zbackup/backup/torrent/zroot/local/root" = 336;
       # thinkpad is a laptop that legitimately goes offline for long
-      # stretches (asleep/traveling) — syncoid's --create-bookmark means
-      # that's not a resync risk, so this threshold is only meant to catch
-      # a genuinely broken key/config, not normal laptop-off time. 336h =
-      # 2 weeks.
-      "zbackup/backup/thinkpad/home" = 336;
-      "zbackup/backup/thinkpad/root" = 336;
+      # stretches (asleep/traveling), same reasoning as torrent above.
+      "zbackup/backup/thinkpad/zroot/local/home" = 336;
+      "zbackup/backup/thinkpad/zroot/local/root" = 336;
     };
     # offsite restic backup runs weekly (Fri 03:00) and can now take up to
     # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give
@@ -489,7 +459,9 @@
       # is consumed on first boot then fails every boot after since the state gets wiped
       "/var/lib/health-alerts" # alert dedup stamps
       "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
-      "/var/lib/sanoid" # snapshot state cache
+      # zrepl needs no persisted state directory: its replication cursors,
+      # holds and bookmarks all live in ZFS itself, so there is no
+      # equivalent of sanoid's /var/lib/sanoid cache to keep here.
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
     ];
     files = [

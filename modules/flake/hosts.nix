@@ -21,7 +21,7 @@ in
         nixosModules.kde
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
-        nixosModules."backup-push"
+        nixosModules."zrepl"
         nixosModules."zfs-space-guard"
       ];
     };
@@ -40,7 +40,7 @@ in
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         nixosModules."iso-autobuild"
-        nixosModules."backup-push"
+        nixosModules."zrepl"
         nixosModules."zfs-space-guard"
       ];
     };
@@ -60,6 +60,7 @@ in
         nixosModules."auto-update"
         nixosModules."health-alerts"
         nixosModules."push-deploy"
+        nixosModules."zrepl"
         nixosModules.jellyfin
         nixosModules.minecraft
         nixosModules.factorio

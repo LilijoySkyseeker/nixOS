@@ -7,6 +7,11 @@
       "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6pG0Y9QdCBRJZKpCD62U3uXl5Lz/bE0ifWLbhZ4q9o lilijoy@torrent" # torrent
     ];
+    # Public half of homelab's zrepl pull key (private half is the
+    # homelab_zrepl_key sops secret). Both source hosts pin this same key
+    # to a forced `zrepl stdinserver` command in root's authorized_keys, so
+    # it lives here rather than being repeated per host.
+    zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHGCZd2jS1ZzBQckagi87/+h0musJxPpCkZvYFkmUzgi homelab-zrepl-pull";
     username = "lilijoy";
     # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
     # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)

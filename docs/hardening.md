@@ -35,10 +35,14 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
   (system user, no login shell) rather than `root`, unless root is
   strictly required for that service to function — grant only the
   specific group memberships/capabilities/`zfs allow` delegations
-  actually needed (see `services.syncoid`'s `zfs allow`/`zfs unallow`
-  wrapper-script pattern for ZFS-touching services). If root genuinely
-  can't be avoided (e.g. raw `/dev/zfs` admin ioctls with no delegation
-  path), note why in the commit message.
+  actually needed. If root genuinely can't be avoided, note why in the
+  commit message — `zrepl` is the standing example: its daemon runs as
+  root for ZFS admin ioctls, and its `ssh+stdinserver` transport requires
+  the *SSH* user to be root too, because the stdinserver socket sits in a
+  0700 runtime directory with no chmod applied. The boundary there is a
+  forced command in `authorized_keys` pinning the key to exactly
+  `zrepl stdinserver <identity>`, with the identity fixed server-side
+  rather than asserted by the client (see `docs/backups.md`).
 - **Custom `systemd.services` sandboxing**: add `NoNewPrivileges = true`
   plus, when the unit's actual job allows it, the full stack —
   `ProtectSystem = "strict"` (with `ReadWritePaths` for whatever it

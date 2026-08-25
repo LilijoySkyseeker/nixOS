@@ -51,7 +51,7 @@
     rclone
     restic
     backblaze-b2
-    sanoid # also installs syncoid, for zfs snapshot send/receive recovery
+    zrepl # zfs snapshot send/receive recovery, matching what the hosts run
 
     # networking diagnostics
     inetutils

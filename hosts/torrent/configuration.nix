@@ -3,6 +3,7 @@
   pkgs-stable,
   lib,
   config,
+  vars,
   ...
 }:
 {
@@ -44,31 +45,6 @@
   boot.kernelModules = [ "r8125" ];
   nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
 
-  # zfs snapshots
-  services.sanoid = {
-    enable = true;
-    extraArgs = [ "--verbose" ];
-    interval = "minutely";
-    settings = {
-      "zroot/local/root".use_template = "working";
-      "zroot/local/home".use_template = "working";
-      template_working = {
-        frequent_period = 1;
-        frequently = 59;
-        hourly = 24;
-        daily = 1;
-        weekly = 0;
-        monthly = 0;
-        yearly = 0;
-        autosnap = "yes";
-        autoprune = "yes";
-      };
-    };
-  };
-  systemd.services.sanoid.serviceConfig = {
-    User = lib.mkForce "root";
-  };
-
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
 
@@ -87,20 +63,47 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
-  # push home+root snapshots to homelab's zbackup pool over tailscale
-  # (see TODO.md "syncoid push backups" for the design)
-  sops.secrets.torrent_backup_push_key = {
-    owner = "backup-push";
-  };
-  myBackupPush = {
+  # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
+  # sanoid + the syncoid-based myBackupPush).
+  #
+  # This host is the passive side of replication: it answers homelab's
+  # pulls but never initiates a connection and holds no credential for
+  # homelab. Backup retention is decided by homelab's pull job
+  # (keep_sender), so a compromise here cannot delete backup history.
+  #
+  # Snapshotting and a local prune ceiling are handled on-box by the
+  # module's snap job, independent of homelab being reachable -- without
+  # that, an extended homelab outage would mean no pruning here at all,
+  # since under pull the puller owns retention.
+  myZrepl = {
     enable = true;
-    targetHost = "backup-recv@homelab";
-    identityFile = config.sops.secrets.torrent_backup_push_key.path;
-    datasets = {
-      "zroot/local/home" = "zbackup/backup/torrent/home";
-      "zroot/local/root" = "zbackup/backup/torrent/root";
+    preserveLegacySnapshots = false;
+    serve = {
+      enable = true;
+      datasets = [
+        "zroot/local/home"
+        "zroot/local/root"
+      ];
+      clients.homelab.publicKey = vars.zreplPullerKey;
     };
   };
+
+  # sshd exists on this host solely to carry zrepl's stdinserver
+  # transport. It is reachable only over the tailnet (no openFirewall), and
+  # root login is forced-commands-only, so the single forced command in
+  # root's authorized_keys -- rendered by the zrepl module -- is the only
+  # thing an SSH connection here can ever do. There are no other root keys
+  # on this host to weaken that.
+  services.openssh = {
+    enable = true;
+    openFirewall = false;
+    settings = {
+      PermitRootLogin = "forced-commands-only";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+    };
+  };
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
   # auto snapshot pruning at low disk space
   # manual `systemctl start zfs-emergency-prune.service`
