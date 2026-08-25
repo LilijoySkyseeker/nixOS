@@ -113,7 +113,7 @@ in
 
             export NIX_SSHOPTS="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"
 
-            last_switch=$(ssh $NIX_SSHOPTS ${cfg.targetHost} stat -c %Y -L /nix/var/nix/profiles/system)
+            last_switch=$(ssh $NIX_SSHOPTS ${cfg.targetHost} stat -c %Y /nix/var/nix/profiles/system)
             check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
 
             nixos-rebuild ${cfg.operation} \

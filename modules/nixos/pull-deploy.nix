@@ -94,7 +94,7 @@ in
             require_clean_master
             fetch_and_merge_master
 
-            last_switch=$(stat -c %Y -L /nix/var/nix/profiles/system)
+            last_switch=$(stat -c %Y /nix/var/nix/profiles/system)
             check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
             check_protected_units_inactive "${lib.concatStringsSep " " cfg.protectedUnits}"
 
