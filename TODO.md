@@ -17,17 +17,52 @@ them rot.
       for any connection attempt against a non-present/non-listening
       service.** Requested by the user alongside the CrowdSec bouncer
       credential fix (landed 2026-08-25, see `docs/DONE.md`) — a
-      complementary, simpler layer: rather than
-      CrowdSec's scenario-based detection, fail2ban here should treat
-      any probe of a port/service vps doesn't actually offer as
-      inherently hostile (e.g. scanners hitting closed ports or
-      non-existent vhosts) and ban on first sight rather than after a
-      threshold. Needs: figure out what "non-present services" means
-      concretely on vps (firewall-reject/deny log lines via the
-      existing iptables logging, Caddy's access log for unmatched
-      vhosts, etc.), a fail2ban jail per source, and `findtime`/
-      `maxretry`/`bantime` tuned for immediate-ban-on-first-hit rather
-      than fail2ban's normal repeated-failure default. Not started.
+      complementary, simpler layer: rather than CrowdSec's
+      scenario-based detection, fail2ban here should treat any probe of
+      a port/service vps doesn't actually offer as inherently hostile
+      and ban on first sight rather than after a threshold.
+
+      **2026-08-25: scoped down after live review of vps** (see
+      `worktree-vps-probe-visibility`/branch
+      `worktree-vps-probe-visibility`, prerequisite logging fixes
+      already landed there — closed-port TCP-scan logging
+      (`networking.firewall.logRefusedConnections`, was off, is TCP-SYN
+      only — closed *UDP* ports remain unlogged, no cheap fix found),
+      a Caddy `:80` catch-all vhost for unmatched-Host probes, and
+      reusing CrowdSec's own `crowdsec-blacklists-0` ipset to protect
+      the DNAT'd game ports from *already-banned* IPs — see
+      `docs/DONE.md` once that lands):
+      - **fail2ban should own**: (1) the closed-TCP-port-scan jail on
+        `logRefusedConnections`'s kernel log (`journalctl -k`,
+        `refused connection: ` prefix, TCP SYN only) — CrowdSec has
+        zero visibility here, its acquisitions only read
+        `sshd.service`/`caddy.service` journal units, never kernel
+        logs; (2) a jail on the game-port hashlimit DROP rules once
+        those are logged (not done yet — the raw-table hashlimit rules
+        in `hosts/vps/configuration.nix` don't log at all currently,
+        and logging every dropped packet at flood volume — up to
+        ~2000pps for the factorio rules — would flood the journal on a
+        1GB box; needs a coarse/sampled LOG rule design, not a
+        naive one, before fail2ban has anything to jail on). Both are
+        "nothing legitimate lives here" cases — zero-threshold
+        (`maxretry=1`) ban carries no real false-positive risk.
+      - **fail2ban should NOT duplicate the `:80` catch-all.** CrowdSec's
+        Caddy acquisition filters on `_SYSTEMD_UNIT=caddy.service` (the
+        whole unit's journal, not a per-vhost path), so the catch-all's
+        access-log lines already flow through the existing
+        `crowdsecurity/caddy` scenarios for free, no new wiring needed.
+        That's signature-based, not zero-threshold, but a stray
+        unmatched-Host hit isn't inherently hostile the way a
+        closed-port probe or game-port drop is — a zero-threshold jail
+        there would risk banning innocent traffic CrowdSec correctly
+        leaves alone.
+      - **Ban-mechanism choice still open**: fail2ban's own iptables
+        rules (independent of CrowdSec, standard default action) vs.
+        having fail2ban's ban action run `cscli decisions add` so
+        there's one unified ban list instead of two independent
+        mechanisms on the box. Not decided yet.
+      Not started (the prerequisite logging/ipset-reuse work above is
+      build-tested but not yet deployed as of this note).
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
