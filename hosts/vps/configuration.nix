@@ -165,6 +165,17 @@ in
         mode = "0750";
       }
       "/etc/crowdsec" # hub state (installed collections/parsers)
+      {
+        # crowdsec-firewall-bouncer-register's api-key.cred lives here. Without
+        # persisting it, every reboot wipes this dir while /var/lib/crowdsec's
+        # bouncer-registration DB above survives, so the register service finds
+        # the bouncer already registered but has no key file for it and fails
+        # ("Bouncer registered but API key is not present").
+        directory = "/var/lib/crowdsec-firewall-bouncer-register";
+        user = "crowdsec";
+        group = "crowdsec";
+        mode = "0750";
+      }
     ];
     files = [
       "/etc/machine-id"
