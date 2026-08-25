@@ -371,13 +371,11 @@ them rot.
         `docs/DONE.md`), which is a different mechanism with different
         (already-encountered-and-fixed) failure modes, not a direct
         continuation of this specific risk.
-      - **Unverified**: whether the B2 application key
-        (`homelab_backblaze_rclone_config` secret) has an expiration
-        date set on Backblaze's side. Couldn't check without exposing
-        the secret's contents; confirm on the B2 web console if this
-        needs certainty. Unchanged.
-      Still needs: deploy the `Persistent = false` change to homelab and
-      confirm the B2 key expiration.
+      - **B2 key expiration — confirmed 2026-08-25 (user checked the B2
+        web console): no expiration set** on the application key backing
+        `homelab_backblaze_rclone_config`. Closed.
+      Still needs: deploy the `Persistent = false` change
+      (`worktree-stagger-boot-timers`, commit `c3131b9`) to homelab.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
