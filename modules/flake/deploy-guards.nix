@@ -40,7 +40,15 @@
       # already-populated known_hosts) -- accept-new rather than fail
       # closed on first contact, same pattern myPushDeploy already uses
       # for its own SSH usage.
-      export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new"
+      local ssh_opts="-o StrictHostKeyChecking=accept-new"
+      # a caller running as root against a user-owned flakeDir (e.g. a PC
+      # host, where root has no home-manager profile and thus no SSH
+      # identity of its own at all) can point this at that user's key --
+      # root can read it fine regardless of its file permissions.
+      if [ -n "''${DEPLOY_GUARDS_IDENTITY_FILE:-}" ]; then
+        ssh_opts="-i $DEPLOY_GUARDS_IDENTITY_FILE $ssh_opts"
+      fi
+      export GIT_SSH_COMMAND="ssh $ssh_opts"
       git fetch origin
       git merge --ff-only origin/master
     }

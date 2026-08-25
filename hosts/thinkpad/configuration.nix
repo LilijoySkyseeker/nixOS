@@ -21,6 +21,10 @@
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
+    # root has no home-manager profile (and thus no SSH identity of its
+    # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
+    # already trusts and authenticates to the origin remote day-to-day.
+    sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
   # System installed pkgs

@@ -19,6 +19,10 @@
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
+    # root has no home-manager profile (and thus no SSH identity of its
+    # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
+    # already trusts and authenticates to the origin remote day-to-day.
+    sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
   # rebuild the recovery iso into ~/Downloads every time pull-deploy

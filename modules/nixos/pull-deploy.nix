@@ -74,6 +74,19 @@ in
             restarting them mid-run.
           '';
         };
+
+        sshKeyPath = lib.mkOption {
+          type = lib.types.nullOr lib.types.path;
+          default = null;
+          description = ''
+            SSH identity file to use for this job's git fetch, when this
+            service (which runs as root) has no SSH identity of its own --
+            e.g. a PC host where root has no home-manager profile at all,
+            unlike the flakeDir-owning user. Root can read the file
+            regardless of its permissions. Leave null to use whatever
+            identity root's own SSH client would otherwise resolve.
+          '';
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -89,6 +102,9 @@ in
           script = ''
             set -euo pipefail
             cd ${cfg.flakeDir}
+            ${lib.optionalString (
+              cfg.sshKeyPath != null
+            ) "export DEPLOY_GUARDS_IDENTITY_FILE=${lib.escapeShellArg cfg.sshKeyPath}"}
 
             ${deployGuardsScript}
 
