@@ -13,6 +13,21 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-25: add fail2ban to vps, defaulting to an immediate ban
+      for any connection attempt against a non-present/non-listening
+      service.** Requested by the user alongside the CrowdSec bouncer
+      fix below — a complementary, simpler layer: rather than
+      CrowdSec's scenario-based detection, fail2ban here should treat
+      any probe of a port/service vps doesn't actually offer as
+      inherently hostile (e.g. scanners hitting closed ports or
+      non-existent vhosts) and ban on first sight rather than after a
+      threshold. Needs: figure out what "non-present services" means
+      concretely on vps (firewall-reject/deny log lines via the
+      existing iptables logging, Caddy's access log for unmatched
+      vhosts, etc.), a fail2ban jail per source, and `findtime`/
+      `maxretry`/`bantime` tuned for immediate-ban-on-first-hit rather
+      than fail2ban's normal repeated-failure default. Not started.
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
