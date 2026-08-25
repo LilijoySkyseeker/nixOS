@@ -149,6 +149,27 @@ These each cost real investigation; none are obvious from the config.
   them. Combined with the pruner treating everything older than the
   replication cursor as replicated, an unguarded config destroys every
   foreign snapshot on the first prune.
+- **A grid bucket without `keep=all` targets its *newest* occupant for
+  destruction, not its oldest.** `RemoveYoungerSnapsExceedingKeepCount`
+  sorts a bucket's entries youngest-first and removes the leading
+  `removeCount` of them (`internal/pruning/retentiongrid/retentiongrid.go`),
+  keeping whichever is oldest in the bucket. Combined with `now` being
+  redefined every prune run as the *youngest matching snapshot's own
+  timestamp* (`Grid.FitEntries`), a receiving job whose pull interval is
+  shorter than its leading grid bucket's width will, on almost every
+  cycle, mark the snapshot it just received for destruction — the exact
+  snapshot the endpoint just placed its `zrepl_last_received_J_<job>` hold
+  on to guarantee a valid incremental base. The destroy fails
+  (`it's being held`) every cycle; harmless (older bucket occupants still
+  prune fine, snapshot count stays bounded) but permanent log noise, and a
+  sign the rule set is fighting zrepl's own bookkeeping. Fix: give the
+  leading bucket `keep=all`, sized at least as wide as the job's pull
+  interval — it short-circuits before ever building a destroy list for
+  that bucket (`if b.keepCount == RetentionGridKeepCountAll { return nil
+  }`). This is what `retention.archive`'s leading `1x15m(keep=all)` is
+  for; caught on homelab's `local-pull` job first, but applies to every
+  receiving job (`local-pull` and every `pull.remotes.*`) since they all
+  default to `retention.archive`.
 - **`myZrepl.protectRegexes` is what actually protects.** A `regex` keep
   rule keeps what it matches and only lists non-matches for destruction, so
   one matching rule is enough to hold a snapshot forever. Defaults to

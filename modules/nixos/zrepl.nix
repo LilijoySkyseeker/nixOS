@@ -620,23 +620,30 @@
 
           archive = lib.mkOption {
             type = lib.types.str;
-            default = "168x1h | 30x1d | 12x30d";
+            default = "1x15m(keep=all) | 168x1h | 30x1d | 12x30d";
             description = ''
               Retention for copies living on the backup target: hourly for
               a week, daily for a month, monthly for a year.
 
-              ~210 snapshots, ~13 month reach. Tiering rather than a flat
+              ~212 snapshots, ~13 month reach. Tiering rather than a flat
               wall of dailies buys longer reach for well under half the
               snapshot count, which matters here because every prune walks
               the whole list on a pool already short on I/O headroom.
 
-              No full-granularity bucket, so the source's 5m snapshots
-              collapse to one per hour shortly after arriving. They are
-              still sent (replication walks the snapshot chain), which
-              costs a little transient space for blocks that changed
-              between them and are then freed -- add a leading
-              1x1h(keep=all) if fine-grained recent history is wanted on
-              the target too.
+              The source's 5m snapshots collapse to one per hour shortly
+              after arriving, past the leading bucket. That leading
+              1x15m(keep=all) bucket is load-bearing, not cosmetic: without
+              it, the grid's "keep the oldest snapshot per bucket, remove
+              younger ones in the same bucket" rule (retentiongrid.go's
+              RemoveYoungerSnapsExceedingKeepCount) marks the just-received
+              newest snapshot for destruction on almost every pull cycle --
+              directly colliding with the hold zrepl's endpoint places on
+              that same snapshot (zrepl_last_received_J_<job>) to guarantee
+              a valid incremental base. The destroy fails loudly every
+              cycle even though nothing is actually wrong. Widen this past
+              the pull interval (default 15m) if pull interval ever grows,
+              or drop to keep=all for a full hour for more fine-grained
+              recent history on the target as a side effect.
             '';
           };
         };
