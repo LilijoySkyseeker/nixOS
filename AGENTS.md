@@ -48,6 +48,18 @@ git hooks and `pull.rebase true`.
 - Lint: `statix check .` and `deadnix .`. Format: `nixfmt <file>`.
 - Full breakdown of when to use which: `docs/procedures/testing-changes.md`.
 
+## You have real SSH access
+
+`homelab` and `vps` both accept interactive `root@<host>` SSH from this
+machine's own keys (`vps` is Tailscale-only) — a failed bare `ssh <host>`
+with no username is not evidence you lack access; retry as `root`. This
+machine *is* `torrent` (check `hostname` if unsure) — don't SSH to it,
+just run commands locally. `torrent` and `thinkpad` both set
+`PermitRootLogin = "forced-commands-only"`, so neither accepts interactive
+root SSH from anywhere, by design; `thinkpad` may also simply be offline
+(it's a laptop). Full key model and per-host detail:
+`docs/procedures/remote-access.md`.
+
 ## The two rules that matter most
 
 - **Never run `nixos-rebuild switch` or push a build to a live remote host

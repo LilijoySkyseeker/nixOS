@@ -5,6 +5,14 @@ consolidated in one place rather than scattered per-topic.
 
 ## Checks before you start
 
+- **You have real interactive SSH access to `homelab` and `vps`** as
+  `root@<host>` — a failed bare `ssh <host>` (no username) isn't proof of
+  no access, retry as `root`. `torrent` and `thinkpad` set
+  `PermitRootLogin = "forced-commands-only"` and accept no interactive
+  root SSH at all, from anywhere — if your session is running on `torrent`
+  itself (check `hostname`), just run commands locally instead of trying
+  to SSH to it. `thinkpad` may also be offline (laptop). Details:
+  `docs/procedures/remote-access.md`.
 - **Pull first.** `git fetch origin master && git pull origin master` (or
   fast-forward local `master`) before creating a new branch or worktree, so
   it's cut from up-to-date `master`. See `docs/GIT_WORKFLOW.md`.

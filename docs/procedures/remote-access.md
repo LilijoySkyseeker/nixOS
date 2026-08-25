@@ -17,19 +17,33 @@ machine means appending its public key to that one list in
 `vars` `specialArg` — see `modules/flake/hosts.nix`), there's no
 per-host key list to maintain separately.
 
-Every host's `services.openssh` sets `PermitRootLogin =
-prohibit-password` and `settings.PasswordAuthentication = false` —
-key-only, no exceptions. Root login itself is intentional here (not a
-hardening gap): these are single-admin personal machines, not shared
-multi-user servers, so there's no separate non-root account to sudo
-from.
+Every host disables `PasswordAuthentication` — key-only, no exceptions.
+`PermitRootLogin` differs by host, though: `homelab`, `vps`, and
+`isoimage` set `prohibit-password` (interactive root login with the
+shared admin keys above); `torrent` and `thinkpad` set
+`"forced-commands-only"` instead, so **no interactive root login exists
+on either of those two, from anywhere** — see "Reaching each host"
+below for what that means in practice. Root login itself is intentional
+where it's allowed (not a hardening gap): these are single-admin personal
+machines, not shared multi-user servers, so there's no separate non-root
+account to sudo from.
 
 ## Reaching each host
 
-- **`thinkpad` / `torrent`** — desktops, reached directly on the LAN
-  or over Tailscale when off-network. No special setup.
-- **`homelab`** — same as above: LAN or Tailscale, `ssh root@homelab`
-  (or its Tailscale name) works once Tailscale is up.
+- **`thinkpad` / `torrent`** — desktops. **No interactive root SSH to
+  either, from anywhere, by design**: both set `services.openssh.settings
+  .PermitRootLogin = "forced-commands-only"` (see each host's
+  `configuration.nix`), so the admin key list isn't even installed as a
+  general-login `authorizedKeys` there — only forced-command principals
+  (e.g. `myZrepl`'s pull key) can connect. Reaching one of these means
+  being logged into it directly (physically, or as this machine's own
+  session — `torrent` in particular is this repo's usual daily-driver
+  machine; run `hostname` if a session isn't sure whether it already *is*
+  torrent before trying to SSH to it). `thinkpad` is also a laptop that's
+  frequently just offline/asleep — check `tailscale status` before
+  assuming a connection failure means something else.
+- **`homelab`** — LAN or Tailscale, `ssh root@homelab` (or its Tailscale
+  name) works once Tailscale is up — confirmed reachable this way.
 - **`vps`** — **Tailscale only.** Port 22 is never opened on the
   public interface (`services.openssh.openFirewall = false`,
   restricted to `networking.firewall.trustedInterfaces` covering
