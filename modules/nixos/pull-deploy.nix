@@ -81,6 +81,7 @@ in
           description = "Pull latest master and switch if it builds";
           path = with pkgs; [
             git
+            openssh
             nixos-rebuild
             nix
             coreutils
