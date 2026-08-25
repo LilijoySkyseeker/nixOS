@@ -89,7 +89,11 @@
       # Git
       programs.git = {
         enable = true;
-        includes = [ { path = "/home/lilijoy/.config/git/identity"; } ];
+        # relative to whichever user's home-manager profile imports this
+        # module — lilijoy on PC hosts, root on server hosts. Each host's
+        # own profile (profiles/PC.nix, profiles/server.nix) is responsible
+        # for actually rendering a sops template at this path.
+        includes = [ { path = "${config.home.homeDirectory}/.config/git/identity"; } ];
       };
 
       # fzf
@@ -183,9 +187,6 @@
           '';
           gds.body = ''
             git add --all && git diff --staged | bat --paging always --pager less
-          '';
-          deploy-homelab.body = ''
-            ssh root@homelab systemctl start --wait nixos-upgrade.service
           '';
           __fish_command_not_found_handler.body = ''
             comma $argv[1]

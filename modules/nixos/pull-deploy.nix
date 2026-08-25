@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  deployGuardsScript = config.flake.deployGuardsScript;
+in
 {
   flake.modules.nixos."pull-deploy" =
     {
@@ -50,6 +53,27 @@
           default = false;
           description = "Only run the deploy job while on AC power (e.g. for laptops).";
         };
+
+        minSwitchInterval = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 7 * 24 * 60 * 60;
+          description = ''
+            Minimum seconds since /nix/var/nix/profiles/system's last
+            activation before this scheduled job will build/switch. Manual
+            switches count too (they update the same profile symlink), so a
+            manual deploy this week defers next week's scheduled one.
+          '';
+        };
+
+        protectedUnits = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = ''
+            Systemd units that, if active, cause this scheduled job to skip
+            (and retry next cycle) rather than build/switch and risk
+            restarting them mid-run.
+          '';
+        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -65,19 +89,14 @@
             set -euo pipefail
             cd ${cfg.flakeDir}
 
-            if [ -n "$(git status --porcelain)" ]; then
-              echo "Working tree dirty, skipping auto-deploy."
-              exit 0
-            fi
+            ${deployGuardsScript}
 
-            branch=$(git rev-parse --abbrev-ref HEAD)
-            if [ "$branch" != "master" ]; then
-              echo "Not on master (on $branch), skipping auto-deploy."
-              exit 0
-            fi
+            require_clean_master
+            fetch_and_merge_master
 
-            git fetch origin
-            git merge --ff-only origin/master
+            last_switch=$(stat -c %Y -L /nix/var/nix/profiles/system)
+            check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
+            check_protected_units_inactive "${lib.concatStringsSep " " cfg.protectedUnits}"
 
             if nixos-rebuild build --flake .#${cfg.hostAttr}; then
               nixos-rebuild ${cfg.operation} --flake .#${cfg.hostAttr}
@@ -95,7 +114,7 @@
             # this unit runs `nixos-rebuild switch`/`boot` itself — real
             # system activation — so it can't be filesystem/kernel-sandboxed
             # the way a plain build-only job can (see myAutoUpdate's
-            # flake-update-test vs nixos-upgrade for the same distinction).
+            # flake-update-test vs auto-switch for the same distinction).
             NoNewPrivileges = true;
             ExecStartPost = lib.optionals cfg.autoReboot [
               (pkgs.writeShellScript "reboot-if-kernel-changed" ''

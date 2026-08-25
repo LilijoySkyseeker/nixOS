@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  deployGuardsScript = config.flake.deployGuardsScript;
+in
 {
   flake.modules.nixos."push-deploy" =
     {
@@ -60,6 +63,19 @@
           description = "systemd OnCalendar spec for the push/switch job — a periodic fallback independent of any onSuccess wiring the caller may also set up.";
         };
 
+        minSwitchInterval = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 7 * 24 * 60 * 60;
+          description = ''
+            Minimum seconds since the target's /nix/var/nix/profiles/system
+            was last activated (checked remotely over SSH) before this
+            scheduled job will build/push. Mainly matters for the periodic
+            `dates` fallback — an onSuccess-triggered run right after this
+            same host's own switch is already gated by that switch's own
+            interval check.
+          '';
+        };
+
         operation = lib.mkOption {
           type = lib.types.enum [
             "switch"
@@ -80,6 +96,7 @@
         systemd.services."push-deploy-${cfg.hostAttr}" = {
           description = "Build locally and push+activate ${cfg.hostAttr} on ${cfg.targetHost}";
           path = with pkgs; [
+            git
             nixos-rebuild
             nix
             openssh
@@ -89,7 +106,15 @@
             set -euo pipefail
             cd ${cfg.flakeDir}
 
+            ${deployGuardsScript}
+
+            require_clean_master
+            fetch_and_merge_master
+
             export NIX_SSHOPTS="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"
+
+            last_switch=$(ssh $NIX_SSHOPTS ${cfg.targetHost} stat -c %Y -L /nix/var/nix/profiles/system)
+            check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
 
             nixos-rebuild ${cfg.operation} \
               --flake .#${cfg.hostAttr} \
@@ -118,7 +143,7 @@
             User = "root";
             # this unit runs `nixos-rebuild switch`/`boot` against a remote
             # target, not this machine — no local system activation happens
-            # here, so unlike pull-deploy/nixos-upgrade this genuinely could
+            # here, so unlike pull-deploy/auto-switch this genuinely could
             # be sandboxed further, but ReadOnlyPaths on ${cfg.flakeDir}
             # plus NoNewPrivileges is enough for now given it doesn't touch
             # this machine's own kernel/units at all.
