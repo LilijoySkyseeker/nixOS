@@ -37,6 +37,19 @@
       # v0.7.0 internal/config/config.go's ConnectEnum/ServeEnum
       # unmarshallers). Callers name a transport once, using the
       # connect-side spelling, and these renderers absorb the split.
+      # zrepl's own default dial_timeout for every network connect type
+      # (ssh+stdinserver, tcp, tls) is 10s (v0.7.0
+      # internal/config/config.go's Connect structs). That's tight enough
+      # that a few seconds of path renegotiation -- e.g. Tailscale's
+      # magicsock flapping between candidate endpoints, seen causing
+      # exactly this on thinkpad's LAN -- trips a hard failure the job
+      # only recovers from on its next scheduled interval. Bumped
+      # universally here (not per-host) so every current and future
+      # remote gets the same slack against transient network flakiness,
+      # since that's inherent to whatever LAN/link a host is on and not
+      # something this repo controls.
+      remoteDialTimeout = "60s";
+
       mkConnect =
         t:
         {
@@ -44,11 +57,13 @@
             type = "ssh+stdinserver";
             inherit (t) host user port;
             identity_file = toString t.identityFile;
+            dial_timeout = remoteDialTimeout;
           }
           // lib.optionalAttrs (t.sshOptions != [ ]) { options = t.sshOptions; };
           "tcp" = {
             type = "tcp";
             inherit (t) address;
+            dial_timeout = remoteDialTimeout;
           };
           "tls" = {
             type = "tls";
@@ -57,6 +72,7 @@
             cert = toString t.cert;
             key = toString t.key;
             server_cn = t.serverCn;
+            dial_timeout = remoteDialTimeout;
           };
           "local" = {
             type = "local";
