@@ -46,6 +46,33 @@ them rot.
       so this doesn't depend on a race resolving in the box's favor on
       every future boot.
 
+      **2026-08-26: root cause confirmed live via SSH, fix coded, not yet
+      deployed.** `journalctl -b` on homelab shows `zfs-mount.service`
+      (`zfs mount -a`) and the fstab-generated `storage.mount`/
+      `storage-bulk.mount` units both starting their mount attempt in the
+      same second right after `zdata` imports — both datasets have
+      `canmount=on` and a real ZFS `mountpoint` property, so both
+      mounting paths consider themselves responsible for the same path;
+      the loser gets `zfs_mount_at() failed: mountpoint or dataset is
+      busy` / `INVALIDARGUMENT`. Fix: `options.mountpoint = "legacy"` on
+      `storage/storage` and `storage/storage-bulk` in
+      `hosts/homelab/disko.nix` (disko's own documented `zfs-over-legacy`
+      pattern — confirmed against the pinned disko source, `ff8702b`,
+      including its own NixOS VM test for this exact shape) — ZFS's own
+      `zfs mount -a` explicitly skips legacy-mountpoint datasets, so only
+      the fstab/systemd path ever calls `mount()`. `nixos-rebuild build`
+      for homelab succeeds with this change, and the built closure's
+      `/etc/fstab` correctly drops the `zfsutil` mount option for both
+      entries (required to pair with `mountpoint=legacy`, matches
+      disko's own derivation logic). Not yet applied: this needs a
+      one-time live `zfs set mountpoint=legacy zdata/storage/storage`
+      (+ `storage-bulk`) on homelab before/alongside the
+      `nixos-rebuild switch`, since disko.nix's dataset properties are
+      only applied to already-existing datasets by the `disko` CLI
+      tool/`nixos-anywhere`, never by a normal rebuild — the Nix-level
+      change alone only affects `/etc/fstab`'s generated options, not
+      the live ZFS property. Branch: `worktree-todo-review-2026-08-26`.
+
 - [ ] **2026-08-26: do a full security audit / hardening pass on
       homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
       turned out to already carry a real, globally-routable public IPv6

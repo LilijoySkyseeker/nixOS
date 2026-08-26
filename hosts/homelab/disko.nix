@@ -110,11 +110,17 @@
             "storage/storage" = {
               type = "zfs_fs";
               mountpoint = "/storage"; # "<path>" just mountpoint
+              # legacy: prevents zfs-mount.service's `zfs mount -a` from also
+              # trying to mount this dataset at boot, racing against the
+              # fstab-generated storage.mount unit (disko's documented
+              # zfs-over-legacy pattern, see example/zfs.nix upstream).
+              options.mountpoint = "legacy";
               options."com.sun:auto-snapshot" = "false";
             };
             "storage/storage-bulk" = {
               type = "zfs_fs";
               mountpoint = "/storage-bulk";
+              options.mountpoint = "legacy"; # see storage/storage above
               options."com.sun:auto-snapshot" = "false";
             };
           };
