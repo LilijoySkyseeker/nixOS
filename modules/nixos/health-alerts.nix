@@ -245,10 +245,23 @@
             User = "health-check";
             Group = "health-check";
             StateDirectory = "health-alerts";
-            # smartctl's SG_IO ioctls require CAP_SYS_RAWIO even with rw access
-            # to the block device via the "disk" group; grant only that, not root.
-            AmbientCapabilities = [ "CAP_SYS_RAWIO" ];
-            CapabilityBoundingSet = [ "CAP_SYS_RAWIO" ];
+            # smartctl needs both the "disk" group and CAP_SYS_RAWIO for its
+            # SG_IO ioctls. Both are granted here, on the unit, rather than on
+            # users.users.health-check -- a group on the *user* applies to
+            # everything that user ever runs, whereas SupplementaryGroups is
+            # scoped to this one invocation. That matters more than it looks:
+            # /dev/sd* is root:disk 0660, i.e. read *and write* on every raw
+            # block device, which is root-equivalent (and on homelab is a
+            # direct read of the age key that decrypts the whole secrets
+            # file). The previous comment here claimed "read access"; the
+            # grant was never read-only.
+            #
+            # Both are also gated on checkSmart, since nothing else in this
+            # unit touches a block device -- vps runs with checkSmart = false
+            # and was carrying the capability and the group for no reason.
+            SupplementaryGroups = lib.optionals cfg.checkSmart [ "disk" ];
+            AmbientCapabilities = lib.optionals cfg.checkSmart [ "CAP_SYS_RAWIO" ];
+            CapabilityBoundingSet = lib.optionals cfg.checkSmart [ "CAP_SYS_RAWIO" ];
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;
@@ -269,13 +282,14 @@
           };
         };
 
-        # dedicated non-root user: "disk" group gives read access to the raw
-        # block devices smartctl needs; zpool status/systemctl status queries
-        # are unprivileged on their own.
+        # dedicated non-root user. It deliberately holds no supplementary
+        # groups: the "disk" membership smartctl needs is granted on the unit
+        # instead (serviceConfig.SupplementaryGroups above), so it applies to
+        # that one invocation rather than to anything running as this user.
+        # zpool status/systemctl status queries are unprivileged on their own.
         users.users.health-check = {
           isSystemUser = true;
           group = "health-check";
-          extraGroups = [ "disk" ];
         };
         users.groups.health-check = { };
       };

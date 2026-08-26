@@ -57,6 +57,31 @@
     # switch (/nix/var/nix/profiles/system's mtime, local or remote).
     check_min_switch_interval() {
       local min_seconds="$1" last_switch_epoch="$2" now elapsed
+      # $2 is NOT necessarily local: myPushDeploy feeds it from
+      # `ssh <targetHost> stat -c %Y /nix/var/nix/profiles/system`, so its
+      # value is whatever the *remote* host chose to print. Bash evaluates
+      # arithmetic operands recursively, and an array-subscript payload of
+      # the form `x[$(...)]` runs a command substitution inside $(( )) --
+      # so passing this straight into arithmetic gave a compromised target
+      # host code execution as root on the deployer, reversing the one
+      # direction of that relationship the threat model treated as a
+      # boundary. Reject anything that is not a plain decimal integer
+      # before it reaches arithmetic context.
+      #
+      # This fails CLOSED (exit 1), unlike the skip-guards below which
+      # deliberately exit 0: a non-numeric timestamp means the target is
+      # either broken or lying, and neither is a reason to carry on.
+      # NB: the empty-string pattern below is written with double quotes
+      # rather than the more idiomatic pair of single quotes. This whole
+      # fragment lives inside a Nix indented string, and a bare pair of
+      # single quotes terminates that string -- including inside what looks
+      # to a reader like a shell comment.
+      case "$last_switch_epoch" in
+        "" | *[!0-9]*)
+          echo "Refusing non-numeric last-switch timestamp from target: [$last_switch_epoch]" >&2
+          exit 1
+          ;;
+      esac
       now=$(date +%s)
       elapsed=$(( now - last_switch_epoch ))
       if [ "$elapsed" -lt "$min_seconds" ]; then
