@@ -570,6 +570,24 @@ them rot.
       confirmed IPv6-only. Revisit if that ever comes up; otherwise this
       can sit indefinitely.
 
+      **2026-08-26: long-term direction, separate from the above
+      near-term "not worth it" call.** The parked verdict is about
+      *this specific, narrow* ask (game-port forwarding only, bolted on
+      ad hoc). The actual long-term goal for this repo is full dual-stack
+      IPv4+IPv6 support everywhere, with the architecture and docs
+      treating IPv6 as a first-class default going forward rather than
+      an afterthought retrofitted host-by-host — i.e. new services and
+      new hosts should be designed dual-stack from the start (including
+      the "does this interface's IPv6 address also happen to be public"
+      question this session kept running into), instead of repeating
+      the same host-wide-firewall-rule-plus-surprise-public-IPv6
+      discovery each time. That's a real architecture/documentation
+      project of its own — worth scoping once the homelab
+      security-audit item above has run its course and the general
+      pattern (interface-scoped firewall rules as the default, not the
+      exception; dual-stack assumed rather than special-cased) is
+      better understood across the whole fleet, not just vps/homelab.
+
 - [ ] **2026-08-26: homelab's host firewall has no real protection
       against its own already-public IPv6 address — currently only
       saved by the ISP router's own (undocumented, unconfigured-by-this-
