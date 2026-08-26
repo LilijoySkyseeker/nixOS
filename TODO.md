@@ -325,9 +325,16 @@ them rot.
         week's delay is a non-issue given `minSwitchInterval` already
         treats weekly cadence as normal; restic: already has a
         336h/14-day staleness alert via `myHealthAlerts` as a backstop,
-        so a skipped cycle isn't silent). Build-tested (`nixos-rebuild
-        build --flake .#homelab`); not yet deployed or observed through
-        a real long-outage reboot.
+        so a skipped cycle isn't silent). **Deployed to homelab
+        2026-08-26** (`nixos-rebuild switch --flake .#homelab
+        --target-host root@homelab`, off master post-merge — the
+        `worktree-stagger-boot-timers` branch was already fully merged,
+        this just landed it on the live box) — confirmed live via
+        `systemctl cat` on all three units
+        (`restic-backups-backblazeWeekly.timer`, `auto-switch.timer`,
+        `flake-update-test.timer`) showing `Persistent=false`, no
+        failed units post-switch. Still not observed through a real
+        long-outage reboot (nothing to trigger that intentionally).
       - **Compounds directly with the item above**: **partially
         addressed.** `hosts/homelab/configuration.nix` now sets
         `myAutoUpdate.protectedUnits = [
@@ -358,8 +365,9 @@ them rot.
       - **B2 key expiration — confirmed 2026-08-25 (user checked the B2
         web console): no expiration set** on the application key backing
         `homelab_backblaze_rclone_config`. Closed.
-      Still needs: deploy the `Persistent = false` change
-      (`worktree-stagger-boot-timers`, commit `c3131b9`) to homelab.
+      Still open: the `--keep-daily 2` history-loss caveat above
+      (intentional, just needs to stay documented) and observing the
+      `Persistent = false` deploy through an actual long-outage reboot.
 
 - [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
       fire when `age.sshKeyPaths` fails during early boot** (torrent).
