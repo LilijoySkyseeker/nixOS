@@ -64,6 +64,86 @@ them rot.
       Not started (the prerequisite logging/ipset-reuse work above is
       build-tested but not yet deployed as of this note).
 
+      **2026-08-25/26: closed-TCP-port-scan jail implemented** (branch
+      `worktree-fail2ban-vps`, `hosts/vps/configuration.nix`,
+      build-tested via `nixos-rebuild build`, not yet deployed):
+      - **Ban mechanism decided: `cscli decisions add`/`decisions delete`**
+        (user's call) — a custom `environment.etc."fail2ban/action.d/
+        cscli.conf"` action, so bans land in CrowdSec's own decision
+        list/ipset (`crowdsec-blacklists-0`) instead of a second
+        independent mechanism. `<ip>`/`<bantime>`/`<name>` are standard
+        fail2ban action tags, no `[Init]` boilerplate needed; verified
+        `cscli decisions add --duration` accepts Go-duration strings
+        (`<bantime>s` is valid — Go's `ParseDuration` accepts a bare `s`
+        unit) via `cscli decisions add --help`/`delete --help` against
+        the pinned nixpkgs crowdsec build.
+      - **`jails.sshd.enabled = false;`** — the NixOS fail2ban module
+        auto-adds a default `sshd` jail (plain iptables action) the
+        moment `services.openssh.enable = true`, independent of anything
+        else configured. Left alone, that's a second, uncoordinated ban
+        mechanism for exactly what `crowdsecurity/sshd` already covers.
+        Caught by reading `nixos/modules/services/security/fail2ban.nix`
+        directly, not assumed.
+      - **Filter**: `journalmatch = "_TRANSPORT=kernel"`,
+        `failregex = ^refused connection: .*\sSRC=<HOST>\s` — matches
+        the exact `--log-prefix` string in `firewall-iptables.nix`
+        (vps uses the iptables backend; `networking.nftables.enable`
+        defaults false and isn't set here). Verified against a synthetic
+        log line with `fail2ban-regex`: 1/1 matched.
+      - **Progressive/escalating bans, capped not permanent** (user's
+        call, after confirming with CrowdSec no-longer-guessing): base
+        `4h`, roughly quadrupling per repeat offense, capped at `90d`
+        (`4h, 16h, 64h, 256h, 1024h, then 2160h`) — deliberately capped,
+        not literal-forever, since a shared/dynamic IP (residential ISP
+        reassignment, CGNAT, VPN exit) can later belong to someone
+        unrelated to the original scanner. Two independent mechanisms,
+        tuned to produce the *same* curve:
+        - **fail2ban**: `bantime-increment.multipliers =
+          "1 4 16 64 256 1024"` against a `4h` jail `bantime`, capped by
+          `bantime-increment.maxtime = "90d"`. Confirmed in fail2ban's
+          own `server/jail.py` that `multipliers` indexes a fixed table
+          against the jail's *static* configured bantime
+          (`ban.Time * banFactor * multipliers[ban.Count]`), not
+          compounding on the previous ban — needed to get the curve to
+          line up with CrowdSec's below rather than guessing.
+        - **CrowdSec**: `services.crowdsec.localConfig.profiles`
+          overridden (the option has no merge semantics — both of the
+          module's default profiles, `default_ip_remediation` and
+          `default_range_remediation`, had to be reproduced verbatim,
+          confirmed via the module's own `default =` in
+          `crowdsec.nix`) adding
+          `duration_expr = "Sprintf('%dh', int(min(4 **
+          (GetDecisionsCount(Alert.GetValue()) + 1), 2160)))"`.
+          **Only applies to CrowdSec's own scenario-generated alerts**
+          — traced in CrowdSec's `pkg/apiserver/controllers/v1/
+          alerts.go`: alerts arriving with a decision already attached
+          (which is what `cscli decisions add` sends, confirmed in
+          `cmd/crowdsec-cli/clidecision/decisions.go`) run through
+          profile matching for notification purposes only, and the
+          handler explicitly discards the profile-computed decision,
+          keeping the manually-specified duration untouched. So this
+          governs CrowdSec's own sshd/caddy scenario bans; it does
+          *not* retroactively escalate fail2ban's cscli-triggered bans
+          — that's what the fail2ban-side `bantime-increment` above is
+          for. Verified `min`/`int`/`**` are real expr-lang builtins
+          (`expr-lang/expr`'s `builtin.go`/`parser/operator/
+          operator.go`) and `GetDecisionsCount(value)` counts all
+          historical decisions for that IP regardless of expiry
+          (`pkg/exprhelpers/helpers.go`) — cumulative repeat-offender
+          memory, not just currently-active bans. Config-tested clean
+          with the real `crowdsec -t` binary against a sandboxed config
+          (`duration_expr` compiles at profile-load time, would have
+          failed loudly here if malformed).
+      - **`/var/lib/fail2ban` added to vps's impermanence persistence
+        list** — without it, fail2ban's ban-history sqlite db (which
+        `bantime-increment` reads to know each IP's prior ban count)
+        resets to zero every reboot, since vps's root is tmpfs. Runs as
+        root (no `DynamicUser`), so a bare string entry, no user/group/
+        mode needed.
+      - **Still not done**: the game-port hashlimit jail (blocked on the
+        same sampled-logging-design gap noted above — unchanged by this
+        session).
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive

@@ -176,6 +176,10 @@ in
         group = "crowdsec";
         mode = "0750";
       }
+      # fail2ban's ban-history db (fail2ban.sqlite3) — without this, progressive
+      # ban tracking (bantime-increment) resets to first-offense duration every
+      # reboot. Runs as root (no DynamicUser), so no user/group/mode needed.
+      "/var/lib/fail2ban"
     ];
     files = [
       "/etc/machine-id"
@@ -420,6 +424,44 @@ in
         labels.type = "syslog";
       }
     ];
+    # progressive bans for CrowdSec's own scenario-detected decisions (sshd/caddy):
+    # each repeat offense (by decision-history count for that IP/range, all-time,
+    # not just currently-active bans) roughly quadruples the ban duration off the
+    # module's stock 4h default — 4h, 16h, ~2.7d, ~10.7d, ~42.7d, then capped —
+    # rather than literal-forever, since a shared/dynamic IP (residential ISP
+    # reassignment, CGNAT, VPN exit) can hand off to an unrelated user later.
+    # This is CrowdSec's own module default profile pair, reproduced verbatim
+    # (services.crowdsec.localConfig.profiles has no merge semantics — setting it
+    # replaces the default, so both scopes must be repeated here) plus duration_expr.
+    # NOTE: only applies to CrowdSec's own alert->profile pipeline; `cscli decisions
+    # add` (fail2ban's cscli.conf action, below) bypasses profile evaluation
+    # entirely — verified against crowdsec's own apiserver source, see TODO.md.
+    localConfig.profiles = [
+      {
+        name = "default_ip_remediation";
+        filters = [ "Alert.Remediation == true && Alert.GetScope() == 'Ip'" ];
+        decisions = [
+          {
+            type = "ban";
+            duration = "4h"; # fallback if duration_expr fails to evaluate/parse
+          }
+        ];
+        duration_expr = "Sprintf('%dh', int(min(4 ** (GetDecisionsCount(Alert.GetValue()) + 1), 2160)))"; # cap 2160h = 90d
+        on_success = "break";
+      }
+      {
+        name = "default_range_remediation";
+        filters = [ "Alert.Remediation == true && Alert.GetScope() == 'Range'" ];
+        decisions = [
+          {
+            type = "ban";
+            duration = "4h";
+          }
+        ];
+        duration_expr = "Sprintf('%dh', int(min(4 ** (GetDecisionsCount(Alert.GetValue()) + 1), 2160)))";
+        on_success = "break";
+      }
+    ];
   };
   services.crowdsec-firewall-bouncer.enable = true;
   # drop both "crowdsec" and "crowdsec-firewall-bouncer-register" from StateDirectory —
@@ -443,6 +485,63 @@ in
       (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec.settings.general
     }"
   ];
+
+  # fail2ban: complements CrowdSec's scenario-based detection with a zero-threshold
+  # layer for probes against ports/services vps doesn't actually offer — "nothing
+  # legitimate lives here", so ban on first sight instead of after a failure count.
+  # Bans go through CrowdSec's own decision list (cscli), not fail2ban's default
+  # iptables action, so this stays a second detector feeding one unified ban list/
+  # ipset — the same one the DNAT'd game ports already consult (see vps-ratelimit
+  # above) — rather than a second independent ban mechanism on the box.
+  services.fail2ban = {
+    enable = true;
+    # progressive bans: fail2ban's own repeat-offender tracking (per source IP,
+    # keyed off ban history in its sqlite db — persisted above, see /var/lib/fail2ban).
+    # multipliers is a fixed lookup table applied against each jail's *static*
+    # configured bantime (bantime * factor * multipliers[priorBanCount], not
+    # compounding on the previous ban's duration — verified in fail2ban's own
+    # jail.py) — deliberately powers-of-4 to reproduce, ban-for-ban, the exact
+    # same curve as CrowdSec's duration_expr below (both start from a 4h base):
+    # 4h, 16h, 64h, 256h, 1024h, then capped — same cap too, for the same
+    # shared/dynamic-IP reason (residential ISP reassignment, CGNAT, VPN exit).
+    bantime-increment = {
+      enable = true;
+      multipliers = "1 4 16 64 256 1024";
+      maxtime = "90d";
+    };
+    # SSH brute-force is already CrowdSec's job (crowdsecurity/sshd scenario against
+    # sshd.service's journal) — leave the module's auto-added default jail off so
+    # the same threat isn't judged by two uncoordinated detectors.
+    jails.sshd.enabled = false;
+
+    jails.vps-closed-port-scan = {
+      # networking.firewall.logRefusedConnections logs refused TCP SYNs to the
+      # kernel log with this prefix — CrowdSec never sees these, its acquisitions
+      # only read the sshd/caddy journal units, never kernel logs.
+      filter.Definition = {
+        failregex = ''^refused connection: .*\sSRC=<HOST>\s'';
+        ignoreregex = "";
+      };
+      settings = {
+        journalmatch = "_TRANSPORT=kernel";
+        # any hit here is a probe of a port vps doesn't listen on — no legitimate
+        # traffic can trigger this filter, so ban on the very first match
+        findtime = "1d";
+        maxretry = 1;
+        # base for bantime-increment's multiplier table above — matches
+        # CrowdSec's duration_expr base so both curves line up exactly
+        bantime = "4h";
+        action = "cscli";
+      };
+    };
+  };
+  # custom action: bans via `cscli decisions add` instead of fail2ban's own
+  # iptables rules, so this jail's bans land in CrowdSec's decision list/ipset
+  environment.etc."fail2ban/action.d/cscli.conf".text = ''
+    [Definition]
+    actionban = ${config.services.crowdsec.package}/bin/cscli decisions add --ip <ip> --duration <bantime>s --reason "fail2ban-<name>" --type ban
+    actionunban = ${config.services.crowdsec.package}/bin/cscli decisions delete --ip <ip>
+  '';
 
   # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
   sops.secrets.vps_discord_webhook = {
