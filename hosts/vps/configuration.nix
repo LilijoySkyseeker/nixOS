@@ -109,9 +109,29 @@ in
 
   # DigitalOcean's hypervisor virtual switch needs cloud-init to run and "register"/arm the droplet's network before it'll pass any traffic for that NIC
   networking.networkmanager.enable = lib.mkForce false;
-  networking.useDHCP = lib.mkDefault true;
+  # DigitalOcean's public NIC is NOT DHCP -- it requires the static address
+  # cloud-init reads from the ConfigDrive datasource. cloud-init's NixOS
+  # module always renders that as systemd-networkd units (system_info.network.renderers
+  # defaults to [ "networkd" ], hardcoded upstream), so networkd has to be the
+  # one actually managing interfaces or nothing ever consumes that config.
+  # Confirmed via a rescue-ISO journal read: with useNetworkd unset (scripted
+  # dhcpcd networking), dhcpcd did its own blind DHCP on the public NIC, got
+  # no lease (DO doesn't run DHCP on that network), and fell back to a
+  # self-assigned 169.254.x.x link-local address -- box never actually bound
+  # its real IP despite cloud-init having read the correct static config.
+  # Per nixpkgs's own networking module docs: running
+  # systemd.network.enable = true (which services.cloud-init.network.enable
+  # below turns on) together with useDHCP = true and useNetworkd = false
+  # "can cause both networkd and dhcpcd to manage the same interfaces...
+  # loss of networking" -- exactly this bug. useDHCP is disabled here since
+  # cloud-init's rendered units already carry the static addresses/routes;
+  # letting NixOS also generate a DHCP-enabled unit for the same interface
+  # would just recreate the same race.
+  networking.useNetworkd = true;
+  networking.useDHCP = false;
   services.cloud-init = {
     enable = true;
+    network.enable = true;
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
