@@ -202,6 +202,91 @@ them rot.
         in a single-VM scratch setup — another reason to confirm this on
         the real box rather than chase it further here.
 
+      **2026-08-26: deployed live to vps, hit a real incident, root-caused,
+      two more fixes folded into this same branch/PR as a result.** Deploy
+      itself (closure built locally on `torrent`, copied via `nix copy`,
+      activated with `switch-to-configuration switch` over root SSH — no
+      `nixos-rebuild --target-host`, same net effect) went cleanly:
+      `fail2ban.service`'s own startup log confirmed the exact intended
+      settings live (`banTime: 14400`, `multipliers = 1 4 16 64 256 1024`,
+      `maxtime: 90d`), zero failed units, `cscli decisions add`/`list`
+      verified working end-to-end as root against the live local API
+      (the thing VM-testing couldn't finish confirming).
+      - **Incident: lost SSH access to vps entirely, ~15-20 minutes into
+        testing.** Root cause, found by mounting vps's real `/persist`
+        from a DigitalOcean rescue ISO and reading CrowdSec's own decision
+        database directly (`/var/lib/crowdsec/state/crowdsec.db`, sqlite):
+        **CrowdSec's own pre-existing `crowdsecurity/sshd` collection
+        banned the admin's own tailscale IP** (`crowdsecurity/ssh-slow-bf`
+        scenario) because troubleshooting fired off roughly a dozen
+        separate `ssh root@vps '...'` calls in quick succession — a
+        pattern indistinguishable, to that scenario, from a slow
+        bruteforce attempt. Nothing to do with fail2ban or this PR's
+        config; CrowdSec's sshd scenario predates all of it. Explains
+        every symptom: SSH died while public :80 kept responding (ban is
+        IP-scoped), `tailscale ping` still worked (that check rode an
+        IPv6 DERP relay, a different path than the banned IPv4 address),
+        and the ban would have survived the next reboot regardless (it
+        lives in the persisted decision DB, re-applied by the bouncer on
+        every boot) — cleared by deleting the row directly from the
+        mounted db before rebooting back to the real system.
+      - **Separate, pre-existing bug surfaced by the reboots that
+        followed**: two consecutive real reboots both failed to bring up
+        tailscale or CrowdSec, confirmed via the persisted journal
+        (`journalctl --directory=<mounted-persist>/var/log/journal -b -1`
+        etc. from the rescue ISO) — identical failure, down to the
+        second, both times: DigitalOcean's hypervisor takes longer to
+        actually pass traffic for `ens3` than `network-online.target`
+        reports ready (matches the existing `externalInterface` comment
+        in `hosts/vps/configuration.nix` about cloud-init network
+        arming), so `crowdsec.service`'s `ExecStartPre` (`cscli hub
+        update`) and `tailscaled-autoconnect.service` both lose a DNS/
+        network race around the ~90s mark and neither ever retries.
+        `crowdsec.service` sets `RestartSec=60` upstream in nixpkgs'
+        own `crowdsec.nix` but never sets `Restart=` — an incomplete
+        no-op, not something we introduced, just never previously
+        surfaced since this droplet hadn't been cold-rebooted in 5+
+        days. Fixed in this same branch: `Restart=on-failure` on both
+        `crowdsec.service` and `crowdsec-firewall-bouncer.service` (the
+        latter had no restart policy at all — its failure was a pure
+        cascade from crowdsec not being ready), and
+        `TimeoutStartSec=300s` on `tailscaled-autoconnect.service`
+        (systemd's bare default is 90s). VM-tested only so far (a real
+        network-arming delay can't be reproduced in a local VM); the
+        real fix confirmation is whichever future vps reboot needs it.
+      - **Self-ban prevention added**: a `crowdsec-allowlist-tailnet`
+        oneshot unit (`After=`/`Requires=crowdsec.service`,
+        `wantedBy = [ "multi-user.target" ]`) runs `cscli allowlists
+        create`/`add` to exempt `100.64.0.0/10` (the full tailscale
+        CGNAT range) from every CrowdSec decision, not just
+        `ssh-slow-bf` — extends the same trust boundary
+        `networking.firewall.trustedInterfaces = [ "tailscale0" ]`
+        already draws at the packet-filter level to CrowdSec's decision
+        engine too, rather than loosening the scenario's own detection
+        threshold (which would weaken it against real attackers from the
+        actual internet). VM-verified both fresh (`allowlist ... created
+        successfully`, `added 1 values`, `cscli allowlists inspect`
+        showing `100.64.0.0/10` with `never` expiration) and idempotent
+        on a forced restart (`already exists`/`already in allowlist`,
+        unit still exits success) — matters since this runs on every
+        boot, not just once. `cscli allowlists create` errors on an
+        existing name (confirmed in crowdsec's own
+        `cliallowlists/allowlists.go`) unlike `add`, which just warns and
+        skips known values — hence `|| true` only on the `create` step.
+      - Considered and rejected: allowlisting only specific known-good
+        IPs (torrent, homelab) instead of the whole tailnet range —
+        tighter blast radius but needs upkeep as tailnet membership
+        changes; the whole-range choice leans on tailscale's own device
+        authorization (ACLs/key approval) as the real access gate, plus
+        `sshd`'s existing publickey-only auth meaning there's no password
+        to brute-force from inside the mesh regardless.
+      - Status as of this note: vps was rebooted (then resized down to
+        original specs after a temporary bump) after the incident;
+        connectivity (`tailscale ping`, public `:80`) had not yet come
+        back at last check. The boot-race and allowlist fixes above are
+        build- and VM-tested but **this exact combination has not yet
+        been confirmed on a real vps boot**.
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
