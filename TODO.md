@@ -402,10 +402,11 @@ them rot.
       unreproduced against a clean reboot.
 
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
-      ports** (Minecraft 25565/19132, Factorio 34197/34198 — the
-      latter added 2026-08-20 for `new.factorio`, same treatment
-      needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding` is
-      explicitly off on the vps and there are no `ip6tables` DNAT
+      ports — reviewed 2026-08-26, parked as a long-term/low-priority
+      project, not actively planned.** (Minecraft 25565/19132, Factorio
+      34197/34198 — the latter added 2026-08-20 for `new.factorio`, same
+      treatment needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding`
+      is explicitly off on the vps and there are no `ip6tables` DNAT
       rules for these ports, so `minecraft`/`factorio`'s DNS records
       were made A-only (`modules/services/octodns.nix`) after a live
       bug where the AAAA records
@@ -414,16 +415,101 @@ them rot.
       IPv6 when a hostname resolves to both. The apex still has an
       AAAA record since Caddy on the vps itself is native IPv6, no
       forwarding needed — this item is specifically about the DNAT'd
-      raw TCP/UDP game ports. Needs: enable IPv6 forwarding for wg0
-      egress only (not blanket `net.ipv6.conf.all.forwarding`), add
-      matching `ip6tables`/`nat` DNAT + FORWARD-accept rules alongside
-      the existing IPv4 ones in `hosts/vps/configuration.nix`, an
-      IPv6-capable SNAT equivalent so return traffic survives
-      WireGuard's cryptokey routing (mirrors the existing IPv4
-      POSTROUTING SNAT rule), then re-add the AAAA records.
+      raw TCP/UDP game ports.
       **Confirmed still unaddressed, 2026-08-25**: `net.ipv6.conf.all.
       forwarding` is still `0` live on vps, no ip6tables DNAT rules for
       these ports exist beyond the stock empty `nixos-nat-pre` chain.
+
+      **2026-08-26 cost/benefit review, parked:** benefit is narrow —
+      dual-stack clients (the large majority in 2026) already connect
+      fine over the existing A records today; this would only help
+      clients with *no* IPv4 path at all (genuinely IPv6-only networks),
+      an unconfirmed and likely small slice of this server's actual
+      whitelisted/friends-and-family player base. Cost is real and
+      non-trivial, so not worth it speculatively:
+      - True per-interface IPv6 forwarding doesn't exist on current
+        mainline kernels (confirmed against an active 2025 LKML patch
+        thread, `force_forwarding`, proposing to add it) — the only
+        lever available is the blanket `net.ipv6.conf.all.forwarding`
+        sysctl, a broader posture change than "wg0 egress only" as
+        originally scoped above (narrowable via firewall FORWARD-chain
+        rules, but not avoidable at the sysctl level).
+      - Bigger issue found during this review: homelab's LAN interface
+        already carries a real, globally-routable IPv6 address today
+        (ISP RA-delegated, confirmed live). Making the game containers
+        IPv6-reachable needs Docker dual-stack
+        (`virtualisation.docker.daemon.settings.ipv6`), and
+        `modules/services/minecraft.nix`/`factorio.nix` currently open
+        their ports host-wide, not interface-scoped — so without *also*
+        re-scoping those to `wg0` only, this would make the game
+        containers directly reachable from the raw internet over IPv6,
+        bypassing every one of vps's defenses (CrowdSec, fail2ban,
+        per-IP rate limiting) entirely. This exact exposure pattern
+        (host-wide firewall rule + homelab's already-public IPv6)
+        already exists today for sshd/jellyfin, independent of this
+        item — see the new item immediately below.
+      - Full scope ends up touching wg0 addressing on both hosts, vps's
+        NAT/DNAT plus a full parallel set of ip6tables rate-limit rules,
+        homelab's Docker daemon (bounces both game containers on
+        deploy), CrowdSec's tailnet allowlist, and DNS — roughly
+        doubling the surface of an already carefully-tuned setup, in a
+        corner (dual-stack Docker + WireGuard + custom ip6tables chains)
+        fiddly enough that it's hard to fully validate without a real
+        client on a real IPv6 path — this repo's other "confirmed
+        deployed, not confirmed with a real client" items suggest that
+        gap tends to linger.
+      Conclusion: not worth pursuing unless a specific player is
+      confirmed IPv6-only. Revisit if that ever comes up; otherwise this
+      can sit indefinitely.
+
+- [ ] **2026-08-26: homelab's host firewall has no real protection
+      against its own already-public IPv6 address — currently only
+      saved by the ISP router's own (undocumented, unconfigured-by-this-
+      repo) inbound IPv6 firewall.** Surfaced while reviewing whether to
+      add IPv6 to the vps's game-port forwarding (see the item above).
+      Confirmed live: homelab's LAN NIC (`enp3s0`) already has a real,
+      globally-routable IPv6 GUA (ISP RA-delegated, e.g.
+      `2600:1010:a022:496c::/64`) — unlike its IPv4 address, which stays
+      private/CGNAT'd behind the home router and is only reachable
+      externally via vps's DNAT'd WireGuard tunnel. Several of
+      homelab's services open their ports host-wide rather than
+      interface-scoped (unlike `modules/services/nfs.nix` and
+      `samba.nix`, which correctly scope to
+      `networking.firewall.interfaces.tailscale0.*`):
+      - `services.openssh` (`hosts/homelab/configuration.nix`) has no
+        `openFirewall = false` — vps's config explicitly sets this
+        ("force port 22 closed"), homelab never got the same treatment
+        — so NixOS's default `openFirewall = true` leaves port 22 open
+        on every interface.
+      - `services.jellyfin.openFirewall = true` plus an explicit
+        `networking.firewall.allowedTCPPorts`/`allowedUDPPorts = [ 8096 ]`
+        (`modules/services/jellyfin.nix`) — meant to be reached only via
+        vps's Caddy+Anubis proxy, but exposed raw and unchallenged on
+        every interface at the host level.
+      - `modules/services/minecraft.nix`/`factorio.nix` also open their
+        ports host-wide (relevant if the parked IPv6 game-ports item
+        above is ever revived).
+      Live-tested from vps (a genuine external vantage point, not a
+      self-connect) 2026-08-26: connections to homelab's real IPv6 GUA
+      on both port 22 and port 8096 timed out — not reachable in
+      practice right now — while a control connection from the same vps
+      to a known-good external IPv6 endpoint succeeded immediately,
+      ruling out a vps-side IPv6 egress problem. So something upstream
+      (almost certainly the ISP-provided router's own default-deny
+      inbound IPv6 firewall) is the only thing actually blocking this
+      today — not anything this repo declares or controls, and nothing
+      that would survive a router replacement/firmware change/ISP
+      config change unnoticed. Needs: decide on a fix (e.g. move sshd
+      and jellyfin to explicit `networking.firewall.interfaces.*`
+      scoping, matching the nfs.nix/samba.nix pattern) — note jellyfin
+      is more nuanced than a straight tailscale0-only copy, since
+      `openFirewall` likely also covers LAN auto-discovery (DLNA/
+      Chromecast-style clients), and IPv6 breaks the usual "LAN
+      interface ⇒ private-only" assumption since the LAN NIC now
+      carries a public address too — a same-interface allow can't
+      distinguish a real LAN neighbor from an internet host arriving on
+      that same NIC. Not yet fixed; flagged for a decision, not treated
+      as an active fire since nothing is currently reachable.
 
 - [ ] **2026-08-18: layer distributed builders across the tailnet**.
       vps's rebuilds are already offloaded off-box — homelab builds and
