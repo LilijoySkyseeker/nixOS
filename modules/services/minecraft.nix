@@ -69,13 +69,18 @@ in
           ALLOW_FLIGHT = "TRUE";
           SPAWN_PROTECTION = "FALSE";
           SEED = "3522075773609978693";
-          # pause the JVM (SIGSTOP) when no clients are connected, resuming on
-          # the next connection attempt (knockd watches for it on the
-          # container's eth0). Requires max-tick-time disabled below — the
-          # server watchdog would otherwise self-kill on resume, since a
-          # single tick spans however long the process was paused.
-          ENABLE_AUTOPAUSE = "TRUE";
-          MAX_TICK_TIME = "-1";
+          # autopause (SIGSTOP-when-idle, via knockd) deliberately not used:
+          # pausing only ever saves CPU, not RAM (a stopped JVM keeps its
+          # full heap resident), and this port is public — DNAT'd through
+          # vps for friends without Tailscale — so it gets knocked by
+          # internet background scanners (confirmed: Oracle Cloud source
+          # IPs) every couple minutes regardless of real players. Measured
+          # live 2026-08-26: under knockd's default 120s re-pause window,
+          # that noise alone kept the JVM resumed ~65-75% of "idle" time,
+          # eating most of the CPU savings autopause exists for. Not worth
+          # the added complexity/attack surface (knockd needs NET_RAW,
+          # which in turn needs no-new-privileges dropped — see git history
+          # on this file if reconsidering autopause later).
           MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
           MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
           MODRINTH_PROJECTS = ''
@@ -136,25 +141,7 @@ in
           "--cap-drop=ALL"
           "--cap-add=SETUID"
           "--cap-add=SETGID"
-          # knockd (autopause) sniffs the connection attempt that wakes the
-          # paused JVM back up; needs raw-socket access to do that.
-          "--cap-add=NET_RAW"
-          # deliberately no --security-opt=no-new-privileges here (unlike
-          # factorio.nix): itzg's image grants knockd NET_RAW via a build-time
-          # `setcap cap_net_raw=ep` file capability (PR itzg/docker-minecraft-
-          # server#2625), since gosu's setuid drop to the unprivileged
-          # "minecraft" user clears the process's own effective NET_RAW
-          # before knockd ever runs. no-new-privileges disables exactly that
-          # file-capability-on-exec mechanism (that's its purpose), so with
-          # it set knockd fails with "could not open eth0: ... Operation not
-          # permitted" and autopause never actually pauses — confirmed live
-          # 2026-08-26, root-caused via itzg/docker-minecraft-server#2421/
-          # #2625/#2813. Accepted trade-off: --cap-drop=ALL above already
-          # limits the bounding set to just SETUID/SETGID/NET_RAW, so
-          # dropping no-new-privileges only lets those three (already-
-          # granted) capabilities be exercised via setuid/file-cap binaries
-          # inside the container — it doesn't let the container acquire
-          # anything beyond what --cap-add already grants it.
+          "--security-opt=no-new-privileges:true"
         ];
       };
     };
