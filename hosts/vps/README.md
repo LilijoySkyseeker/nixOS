@@ -49,6 +49,21 @@ until/unless a lower-memory install path is found.
 tier at ~956MB) before touching anything and refuses to proceed if
 it's short, rather than run headlong into the same OOM again.
 
+**`nixos-anywhere` must target the droplet's normally-booted OS, not
+DigitalOcean's recovery/rescue ISO.** Tested and confirmed not to work:
+the rescue ISO is a separate ephemeral live environment that doesn't
+touch the real disk the way a kexec install needs to, and `nixos-anywhere`
+run against it does not produce a working install. The rescue ISO is
+still genuinely useful for *forensics* — SSH into it, then `mount
+/dev/vda2 /mnt/boot; mount /dev/vda3 /mnt/nix; mount /dev/vda4
+/mnt/persist` (matches `disko.nix`'s layout — verify with `lsblk -f`
+first in case it ever shifts) to read `journalctl
+--directory=/mnt/persist/var/log/journal` off a bricked box's real
+disk — just not as the `nixos-anywhere` target itself. Boot
+or reset the droplet back to a normal running OS (its stock pre-install
+image, or a DO dashboard "Reset Droplet") before running the install
+below.
+
 Before running the install — the fresh box needs a *working* key the
 moment it boots, not after: generate a new tailscale auth key in the
 admin console (the old device is stale after a droplet recreate), then
