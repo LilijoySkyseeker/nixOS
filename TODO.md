@@ -38,11 +38,22 @@ them rot.
       `doctl`/API token in this repo to automate it) — a reserved
       IPv4+IPv6 pair carried over unchanged, so the octodns.nix/
       homelab-wireguard IP references needed no update after all. New
-      tailscale key set. Left before calling this done: run the actual
-      reinstall, confirm crowdsec/bouncer/tailscaled-autoconnect/caddy/
-      fail2ban are healthy, and exercise a real reboot to confirm the
-      boot-race fixes actually hold against DigitalOcean's real
-      network-arming delay.
+      tailscale key set. First two real `nixos-anywhere` attempts hit
+      script bugs (a stray `--` separator token passed straight through
+      to `nixos-anywhere`, since fixed) and then `kexec` getting
+      OOM-killed on the stock 1GB droplet — twice, once with no swap
+      and again with a 1G swapfile added, the second time almost
+      instantly (`anon-rss:0kB`), consistent with `kexec_load` needing
+      genuinely free kernel-pinned physical RAM that swap can't supply.
+      Dropped the swap workaround from the script; the real fix (user's
+      call) is a temporary RAM-tier resize before installing, resized
+      back down after — documented in `hosts/vps/README.md` and
+      `docs/procedures/new-host.md` as a real, recurring step for this
+      host, not a one-off. Left before calling this done: user resizes
+      the droplet up, retry the install, confirm crowdsec/bouncer/
+      tailscaled-autoconnect/caddy/fail2ban are healthy, resize back
+      down, and exercise a real reboot to confirm the boot-race fixes
+      actually hold against DigitalOcean's real network-arming delay.
 
 - [ ] **2026-08-25: add fail2ban to vps, defaulting to an immediate ban
       for any connection attempt against a non-present/non-listening
