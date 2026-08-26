@@ -48,5 +48,19 @@ shape; the vps README has the gotchas for a specific real deploy
   silently point at the wrong disk.
 - Legacy BIOS vs UEFI boot loader choice needs to match the real
   target, not be assumed from another host.
+- **`kexec` can get OOM-killed on a tiny/RAM-constrained target with no
+  swap**, even when `free` shows what looks like plenty — confirmed
+  live against a fresh 1GB DigitalOcean droplet (no swap by default on
+  the stock image) where 613MB nominally free still wasn't enough
+  headroom. `scripts/bootstrap-host.sh` adds a throwaway swapfile
+  before installing to a real target for exactly this reason.
+- **Recreating a droplet that reuses its old IP leaves a stale SSH
+  host key in your `known_hosts`**, since the new box's key is
+  different even though the address isn't — `ssh` refuses to connect
+  with a scary "REMOTE HOST IDENTIFICATION HAS CHANGED" warning until
+  you `ssh-keygen -R <ip>` to clear the old entry. Expected in this
+  situation, not a sign of anything actually wrong, but don't blindly
+  disable host-key checking to work around it — confirm you actually
+  just recreated the box first.
 
 Full detail and exact commands for a real deploy: `hosts/vps/README.md`.

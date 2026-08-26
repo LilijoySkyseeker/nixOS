@@ -25,7 +25,14 @@ in this repo, so that step is manual): `DO-Regular`, 1 vCPU, 1GB RAM,
 25GB disk, same region, any SSH key added at creation just needs to
 get `nixos-anywhere` in the door. A reserved IP pair survives a
 recreate if you reassign it — check the new droplet's actual public
-IPv4/IPv6 before assuming either changed.
+IPv4/IPv6 before assuming either changed. If it's the same IP, clear
+the old droplet's now-stale entry first (`ssh-keygen -R <ip>`) — the
+new box has a different SSH host key, and `ssh` will otherwise refuse
+to connect with a "REMOTE HOST IDENTIFICATION HAS CHANGED" warning.
+
+The 482MB zram swap noted above only exists once NixOS is actually
+running — the stock pre-install image has none at all, which matters
+for the next step.
 
 Before running the install — the fresh box needs a *working* key the
 moment it boots, not after: generate a new tailscale auth key in the
@@ -51,7 +58,10 @@ vanish on the very first real boot — it has to land at
 `--kexec-extra-flags -c` is DigitalOcean-specific — its kexec target
 otherwise fails to pick up an IP. The script handles the rest: fresh
 SSH host key generated outside the repo, `.sops.yaml` rotation, `sops
-updatekeys`, then the `nixos-anywhere` invocation itself.
+updatekeys`, a throwaway swapfile on the target if it has none
+(`kexec` got OOM-killed on this exact droplet without one — 613MB
+"free" per `free -h` still wasn't enough headroom), then the
+`nixos-anywhere` invocation itself.
 
 After install:
 

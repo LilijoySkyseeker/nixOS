@@ -20,6 +20,14 @@ set -euo pipefail
 # touching any real target — no SSH, no .sops.yaml/secrets.yaml
 # changes, no confirmation prompt.
 #
+# For a real target, also makes sure it has swap before kexec'ing —
+# kexec loads a full kernel+initrd into memory on top of whatever the
+# target's current OS is already using, and can get OOM-killed on a
+# tiny/RAM-constrained target with none (confirmed live: a fresh 1GB
+# DigitalOcean droplet with no swap and 613MB nominally free still
+# wasn't enough headroom). Adds a throwaway 1G swapfile if none
+# exists; harmless since disko wipes the whole disk moments later.
+#
 # Example (DigitalOcean, impermanence, needs --kexec-extra-flags -c):
 #   scripts/bootstrap-host.sh vps 164.90.1.2 --persist-root /persist -- --kexec-extra-flags -c
 #   scripts/bootstrap-host.sh vps --vm-test --persist-root /persist
@@ -41,6 +49,7 @@ if [[ "${1:-}" == "--persist-root" ]]; then
 	persist_root=$2
 	shift 2
 fi
+[[ "${1:-}" == "--" ]] && shift
 extra_args=("$@")
 
 # Resolved from the script's own location, not the caller's cwd -- this
@@ -55,7 +64,15 @@ host_dir="$repo_root/hosts/$host"
 }
 
 work_dir=$(mktemp -d)
-trap 'rm -rf "$work_dir"' EXIT
+cleanup() {
+	status=$?
+	if [[ $status -ne 0 ]]; then
+		echo "==> failed (exit $status) -- preserving $work_dir (has the generated host key) for recovery" >&2
+	else
+		rm -rf "$work_dir"
+	fi
+}
+trap cleanup EXIT
 
 key_dir="$work_dir${persist_root}/etc/ssh"
 echo "==> generating a fresh SSH host key for $host (kept outside the repo checkout)"
@@ -98,7 +115,7 @@ else
 fi
 
 echo "==> re-encrypting secrets/secrets.yaml for the new recipient"
-sops updatekeys -y "$repo_root/secrets/secrets.yaml"
+sops --config "$sops_file" updatekeys -y "$repo_root/secrets/secrets.yaml"
 
 echo
 echo "This will WIPE and reinstall root@$target as '$host'. This cannot be undone."
@@ -107,6 +124,18 @@ read -r -p "Continue? [y/N] " reply
 	echo "aborted -- .sops.yaml/secrets.yaml changes above are already committed to disk, revert if unwanted" >&2
 	exit 1
 }
+
+echo "==> ensuring the target has swap (kexec can be OOM-killed on tiny/RAM-constrained"
+echo "    targets without it -- confirmed live against a 1GB droplet with no swap: 613MB"
+echo "    free wasn't enough headroom, even though that looks like plenty)"
+ssh_opts=(-o ConnectTimeout=8 -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+if ssh "${ssh_opts[@]}" "root@$target" 'swapon --show | grep -q .' 2>/dev/null; then
+	echo "==> target already has swap, skipping"
+else
+	ssh "${ssh_opts[@]}" "root@$target" \
+		'fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'
+	echo "==> added a temporary 1G swapfile on the target -- harmless, disko wipes the disk moments later"
+fi
 
 echo "==> building $host locally and installing to root@$target"
 nixos-anywhere \
