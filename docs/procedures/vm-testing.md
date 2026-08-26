@@ -109,6 +109,21 @@ host — the point is to exercise the module, not to rebuild a host.
 
 ## Things that will bite you
 
+- **`nixos-anywhere --vm-test` can't validate a real disko layout or
+  `--extra-files`.** Its throwaway test-VM disk size is hardcoded
+  internally (confirmed via `nix show-derivation` on the failing
+  `vm-test-run-disko-<host>-disko` build — no CLI flag or env var
+  overrides it) and is too small for a disko config with large
+  fixed-size partitions (e.g. vps's 18G `nix` partition): `sgdisk`
+  fails with `Could not create partition N` before the disk is even
+  formatted. It also rejects `--extra-files` outright regardless of
+  disk size. In practice this means `--vm-test` only proves something
+  for hosts whose disko sizes are small/proportional enough to fit its
+  built-in disk, and never proves extra-files placement (e.g. an
+  impermanence host's pre-seeded SSH host key) either way — that only
+  gets a real check during the actual install. Confirmed safe either
+  way: with no `--target-host`/ssh-host argument passed, everything it
+  does run stays inside its own isolated qemu sandbox.
 - **`git add` new files first.** The flake's source is the git tree, so
   an untracked `tests/foo.nix` is invisible to `nix build` and you get a
   confusing "does not provide attribute" error. Staging is enough; no

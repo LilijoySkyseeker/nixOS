@@ -109,9 +109,29 @@ in
 
   # DigitalOcean's hypervisor virtual switch needs cloud-init to run and "register"/arm the droplet's network before it'll pass any traffic for that NIC
   networking.networkmanager.enable = lib.mkForce false;
-  networking.useDHCP = lib.mkDefault true;
+  # DigitalOcean's public NIC is NOT DHCP -- it requires the static address
+  # cloud-init reads from the ConfigDrive datasource. cloud-init's NixOS
+  # module always renders that as systemd-networkd units (system_info.network.renderers
+  # defaults to [ "networkd" ], hardcoded upstream), so networkd has to be the
+  # one actually managing interfaces or nothing ever consumes that config.
+  # Confirmed via a rescue-ISO journal read: with useNetworkd unset (scripted
+  # dhcpcd networking), dhcpcd did its own blind DHCP on the public NIC, got
+  # no lease (DO doesn't run DHCP on that network), and fell back to a
+  # self-assigned 169.254.x.x link-local address -- box never actually bound
+  # its real IP despite cloud-init having read the correct static config.
+  # Per nixpkgs's own networking module docs: running
+  # systemd.network.enable = true (which services.cloud-init.network.enable
+  # below turns on) together with useDHCP = true and useNetworkd = false
+  # "can cause both networkd and dhcpcd to manage the same interfaces...
+  # loss of networking" -- exactly this bug. useDHCP is disabled here since
+  # cloud-init's rendered units already carry the static addresses/routes;
+  # letting NixOS also generate a DHCP-enabled unit for the same interface
+  # would just recreate the same race.
+  networking.useNetworkd = true;
+  networking.useDHCP = false;
   services.cloud-init = {
     enable = true;
+    network.enable = true;
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
@@ -121,6 +141,61 @@ in
       preserve_hostname = true;
     };
   };
+  # cloud-init's own package ships a 05_logging.cfg default (console at
+  # WARNING, full DEBUG to /var/log/cloud-init.log) but NixOS's cloud-init
+  # module doesn't install it, and all four cloud-init systemd units are
+  # StandardOutput=journal+console -- so with no logging config at all,
+  # cloud-init falls back to a much noisier default and every DEBUG line
+  # (hundreds per boot) gets echoed straight to the console, which is what
+  # DigitalOcean's web console showed during a live reinstall. Installing
+  # the upstream package's own default here (verbatim, from
+  # <cloud-init pkg>/lib/python3.14/site-packages/etc/cloud/cloud.cfg.d/05_logging.cfg)
+  # keeps full detail in the log file without spamming the console.
+  environment.etc."cloud/cloud.cfg.d/05_logging.cfg".text = ''
+    _log:
+     - &log_base |
+       [loggers]
+       keys=root,cloudinit
+
+       [handlers]
+       keys=consoleHandler,cloudLogHandler
+
+       [formatters]
+       keys=simpleFormatter,arg0Formatter
+
+       [logger_root]
+       level=DEBUG
+       handlers=consoleHandler,cloudLogHandler
+
+       [logger_cloudinit]
+       level=DEBUG
+       qualname=cloudinit
+       handlers=
+       propagate=1
+
+       [handler_consoleHandler]
+       class=StreamHandler
+       level=WARNING
+       formatter=arg0Formatter
+       args=(sys.stderr,)
+
+       [formatter_arg0Formatter]
+       format=%(asctime)s - %(filename)s[%(levelname)s]: %(message)s
+
+       [formatter_simpleFormatter]
+       format=[CLOUDINIT] %(filename)s[%(levelname)s]: %(message)s
+     - &log_file |
+       [handler_cloudLogHandler]
+       class=FileHandler
+       level=DEBUG
+       formatter=arg0Formatter
+       args=('/var/log/cloud-init.log', 'a', 'UTF-8')
+
+    log_cfgs:
+     - [ *log_base, *log_file ]
+
+    output: {all: '| tee -a /var/log/cloud-init-output.log'}
+  '';
 
   # DigitalOcean only supports GRUB, not systemdboot
   boot.loader.systemd-boot.enable = lib.mkForce false;
@@ -141,6 +216,26 @@ in
       "size=2G"
       "mode=0755"
       "noexec"
+      "nosuid"
+      "nodev"
+    ];
+    neededForBoot = true;
+  };
+  # cloud-init writes DigitalOcean's vendor-data boothook script under
+  # /var/lib/cloud and execs it directly -- root's tmpfs noexec above
+  # broke this with a bare PermissionError on the real droplet (confirmed
+  # via a rescue-ISO journal read: cloud-init's datasource activation
+  # succeeded fine, only the boothook exec failed), which in turn seems
+  # to be what actually arms DigitalOcean's network for this NIC (see the
+  # services.cloud-init comment below) -- so the box never came up at
+  # all on its first real boot. Give this one path its own exec-capable
+  # tmpfs rather than loosening root itself.
+  fileSystems."/var/lib/cloud" = {
+    device = "none";
+    fsType = "tmpfs";
+    options = [
+      "size=64M"
+      "mode=0755"
       "nosuid"
       "nodev"
     ];

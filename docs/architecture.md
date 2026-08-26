@@ -254,6 +254,26 @@ Two hosts are still structurally unusual, same as before the migration:
   `nixpkgs-unstable` (see the per-host table above) — check
   `modules/flake/hosts.nix` for which `inputs.nixpkgs-*.lib.nixosSystem` a
   host uses before assuming a module option exists on it.
+- **A shared module can quietly drag in packages/services that have
+  nothing to do with why it was wired into a given host.** Dendritic
+  modules are convenient specifically because importing one name can
+  pull in a whole bundle — but that convenience cuts both ways: nothing
+  stops a "general tooling" module from also enabling something
+  desktop- or role-specific, and a server host importing it gets that
+  too, silently. Caught live: `modules/profiles/server.nix` wires
+  `homeManagerModules.tooling` into every server host's root profile
+  for CLI tools (fzf, zoxide, git, fish, ...), but `tooling.nix` also
+  unconditionally enables `services.kdeconnect`, `programs.obs-studio`,
+  `programs.obsidian`, and `programs.firefox` — a phone-sync daemon, a
+  screen recorder, a notes app, and a whole browser, all landing in
+  vps's actual built closure with nothing in `server.nix` hinting at
+  it. Found via `nix why-depends <closure-path> <suspicious-package>`
+  against a real build, not by reading the importing file — reading
+  `server.nix` alone gives no reason to suspect any of this is in
+  there. When wiring a shared module into a new role, actually check
+  what it contains (or `nix why-depends` the result) rather than
+  trusting the name. See `TODO.md`'s active entry for the fix (splitting
+  `tooling.nix` into CLI-only vs. desktop-GUI pieces) — not yet done.
 
 ## Backups
 
