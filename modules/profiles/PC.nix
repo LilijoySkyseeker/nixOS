@@ -196,7 +196,8 @@ in
       # activation. generateKey creates that identity on first activation if
       # it doesn't already exist, so it's reproducible from a fresh install:
       # its public key just needs to be added to .sops.yaml afterwards (see
-      # secrets/README or repo history for the one-time step).
+      # docs/procedures/secrets.md's "Adding a recipient" runbook for the
+      # one-time step).
       #
       # Deliberately NOT setting sops.age.sshKeyPaths to lilijoy's
       # ~/.ssh key here: that NixOS option only feeds sops-install-secrets'
