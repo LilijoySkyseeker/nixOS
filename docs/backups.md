@@ -270,10 +270,19 @@ These each cost real investigation; none are obvious from the config.
   of the whole daemon never starting. Reboot-verified on homelab (three
   reboots, zrepl active and all local jobs cycling normally every time),
   though the `storage.mount` race itself didn't recur in any of the
-  three to directly exercise the failure path — it looks intermittent
-  rather than reliably reproducible. The underlying race itself is still
-  unfixed; this only removes the "backups stay silently down until a
-  human notices" consequence of it.
+  three to directly exercise the failure path at the time — it looked
+  intermittent rather than reliably reproducible. **2026-08-26: the
+  underlying race itself is now fixed too**, not just this consequence
+  of it — see `docs/DONE.md`'s "`/storage`/`/storage-bulk` failed their
+  first mount attempt on boot" entry: `storage/storage` and
+  `storage/storage-bulk` now use `options.mountpoint = "legacy"` in
+  `hosts/homelab/disko.nix` (disko's own `zfs-over-legacy` pattern), so
+  `zfs-mount.service`'s `zfs mount -a` skips both entirely and only the
+  fstab/systemd path ever mounts them — reboot-verified with no
+  `INVALIDARGUMENT` and no failed units. This `Wants=`/`After=` override
+  is still worth keeping regardless (defense in depth against any other
+  local mount having a bad boot), but it's no longer masking a live,
+  unfixed race for these two datasets specifically.
 - **`root_fs` must already exist — zrepl never creates it.** Placeholder
   auto-creation only covers the datasets *under* `root_fs`
   (`subroot.MapToLocal`, see the placeholder-encryption gotcha above);
