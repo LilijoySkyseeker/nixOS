@@ -141,6 +141,61 @@ in
       preserve_hostname = true;
     };
   };
+  # cloud-init's own package ships a 05_logging.cfg default (console at
+  # WARNING, full DEBUG to /var/log/cloud-init.log) but NixOS's cloud-init
+  # module doesn't install it, and all four cloud-init systemd units are
+  # StandardOutput=journal+console -- so with no logging config at all,
+  # cloud-init falls back to a much noisier default and every DEBUG line
+  # (hundreds per boot) gets echoed straight to the console, which is what
+  # DigitalOcean's web console showed during a live reinstall. Installing
+  # the upstream package's own default here (verbatim, from
+  # <cloud-init pkg>/lib/python3.14/site-packages/etc/cloud/cloud.cfg.d/05_logging.cfg)
+  # keeps full detail in the log file without spamming the console.
+  environment.etc."cloud/cloud.cfg.d/05_logging.cfg".text = ''
+    _log:
+     - &log_base |
+       [loggers]
+       keys=root,cloudinit
+
+       [handlers]
+       keys=consoleHandler,cloudLogHandler
+
+       [formatters]
+       keys=simpleFormatter,arg0Formatter
+
+       [logger_root]
+       level=DEBUG
+       handlers=consoleHandler,cloudLogHandler
+
+       [logger_cloudinit]
+       level=DEBUG
+       qualname=cloudinit
+       handlers=
+       propagate=1
+
+       [handler_consoleHandler]
+       class=StreamHandler
+       level=WARNING
+       formatter=arg0Formatter
+       args=(sys.stderr,)
+
+       [formatter_arg0Formatter]
+       format=%(asctime)s - %(filename)s[%(levelname)s]: %(message)s
+
+       [formatter_simpleFormatter]
+       format=[CLOUDINIT] %(filename)s[%(levelname)s]: %(message)s
+     - &log_file |
+       [handler_cloudLogHandler]
+       class=FileHandler
+       level=DEBUG
+       formatter=arg0Formatter
+       args=('/var/log/cloud-init.log', 'a', 'UTF-8')
+
+    log_cfgs:
+     - [ *log_base, *log_file ]
+
+    output: {all: '| tee -a /var/log/cloud-init-output.log'}
+  '';
 
   # DigitalOcean only supports GRUB, not systemdboot
   boot.loader.systemd-boot.enable = lib.mkForce false;
