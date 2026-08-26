@@ -8,8 +8,9 @@ keys:
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad
   - &torrent-age age1gsmfmtvd97d9x52d2hpgx5qppna5admpf6ch5l0hcn58cv7dp5ws9fhu2t
   # pre-generated vps host key, enrolled before install so sops works
-  # on first boot — see hosts/vps/README.md step 1
-  - &vps age1p6nhsn2z56tkkvh9y3cv60p0m2ap624ydg6qlunmsmylm490getq3fl6f8
+  # on first boot — see hosts/vps/README.md step 1. Rotated 2026-08-25
+  # for the post-brick reinstall (old key's droplet was destroyed).
+  - &vps age1uc86th6cf36pfsqzap9c9lmxu8hq6gn7v9qqjg26ay3pls0jxa0sj2lqc4
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
