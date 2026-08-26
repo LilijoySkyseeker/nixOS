@@ -13,6 +13,26 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-26: do a full security audit / hardening pass on
+      homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
+      turned out to already carry a real, globally-routable public IPv6
+      address (ISP RA-delegated), which quietly changes the risk model
+      for every host-wide (non-interface-scoped) firewall rule on that
+      box — a class of gap that was invisible under IPv4-only CGNAT.
+      sshd's host-wide exposure is already fixed (see the fix commit
+      referenced by this session), and jellyfin's is logged as its own
+      item below, still open. This item is for a broader pass beyond
+      just those two: audit homelab as a whole (not just IPv6-triggered
+      findings) — every `networking.firewall.allowedTCPPorts`/
+      `allowedUDPPorts`/`openFirewall` use, docker container hardening
+      (capabilities, read-only rootfs, network exposure — minecraft.nix/
+      factorio.nix already do this carefully, worth checking the rest
+      got the same treatment), systemd hardening completeness across
+      all of homelab's services (some services have detailed hardening
+      comments, e.g. jellyfin/samba/nfs — confirm nothing was missed
+      elsewhere), and whether anything else assumes "this box has no
+      real public address" the way sshd/jellyfin did. Not started.
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
