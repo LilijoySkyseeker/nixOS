@@ -144,6 +144,64 @@ them rot.
         same sampled-logging-design gap noted above — unchanged by this
         session).
 
+      **2026-08-25/26: VM-tested** (`nixos-rebuild build-vm --flake .#vps`,
+      per `docs/procedures/vm-testing.md` — booted twice, non-interactively,
+      via a scripted stdin feed since driving a live console isn't
+      practical in this tool environment; a `virtualisation.vmVariant`
+      autologin override was used locally to get a shell at all, since the
+      real host is SSH-pubkey-only with no console password — never
+      committed, reverted after):
+      - fail2ban's own log output **confirms the intended config actually
+        takes effect at runtime**, not just that it renders correctly:
+        `maxRetry: 1`, `findtime: 86400`, `banTime: 14400` (4h),
+        `Set banTime.increment = True`,
+        `Set banTime.multipliers = 1 4 16 64 256 1024`,
+        `Set banTime.maxtime = 90d`, and
+        `[vps-closed-port-scan] Jail is in operation now (process new
+        journal entries)`. No `[FAILED]` units across two separate boots;
+        `crowdsec`, `crowdsec-firewall-bouncer`, and
+        `crowdsec-firewall-bouncer-register` all reached active/running
+        (crowdsec's first-boot hub bootstrap — `cscli collections install`
+        — genuinely downloads from `hub-data.crowdsec.net` over the VM's
+        NAT and takes real wall-clock time, ~30–90s+ under this sandbox's
+        TCG emulation with no KVM available).
+      - **Found a real footgun for anyone testing this by hand**: bare
+        `cscli` on `PATH` is not the raw crowdsec binary — the NixOS
+        module wraps it (`pkgs.writeShellScriptBin "cscli"` in
+        `environment.systemPackages`, confirmed in nixpkgs'
+        `crowdsec.nix`) with a check that aborts
+        (`Aborting, cscli must be run as user \`crowdsec\`!`) unless
+        invoked as the `crowdsec` user, or re-execs via `sudo -u crowdsec`
+        if `security.sudo.enable`. Hit this firsthand typing bare `cscli
+        decisions list` as root at the VM console. **Does not affect
+        fail2ban's action** — `environment.etc."fail2ban/action.d/
+        cscli.conf"` calls the raw unwrapped binary by absolute store
+        path (`${config.services.crowdsec.package}/bin/cscli`), bypassing
+        this wrapper and `PATH` lookup entirely — but worth remembering
+        when checking this by hand on vps: use the absolute path (or
+        `sudo -u crowdsec cscli ...` if sudo's enabled), not bare `cscli`
+        as root.
+      - **Not independently confirmed in the VM**: that the raw-binary
+        `cscli decisions add`/`delete` call actually succeeds end-to-end
+        against the live local API when run as root (vs. the wrapper's
+        `crowdsec` user) — was mid-way through testing this exact
+        command when VM testing was stopped in favor of testing live on
+        vps instead. Worth checking directly as a first step after
+        deploying (or by hand first, at the user's discretion):
+        `/nix/store/.../crowdsec-*/bin/cscli decisions add --ip
+        203.0.113.99 --duration 14400s --type ban` as root, then
+        `cscli decisions list` (as the `crowdsec` user, or same raw path)
+        to confirm it landed.
+      - **Self-test methodology gap, not a config bug**: connecting from
+        the VM to its own IP (not `127.0.0.1`) does not trigger the
+        closed-port-scan log line — Linux locally-routes same-host
+        traffic over `lo`, bypassing the external-interface REJECT/LOG
+        chain entirely. Verifying the actual `refused connection:` log
+        line needs a genuinely external-looking connection (a real
+        outside host hitting the real vps, or a second VM), not doable
+        in a single-VM scratch setup — another reason to confirm this on
+        the real box rather than chase it further here.
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
