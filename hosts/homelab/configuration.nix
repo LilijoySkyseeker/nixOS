@@ -77,7 +77,15 @@
 
   # directory permissions
   systemd.tmpfiles.rules = [
-    "d /srv 0770 - root root -"
+    # Fields are: type path mode user group age [argument]. This previously
+    # read "d /srv 0770 - root root -", which puts "-" in the user field and
+    # shifts everything right, landing "root" in the *age* field --
+    # systemd-tmpfiles rejects the whole line with "Invalid age 'root'" and
+    # carries on, so /srv was silently left at its default 0755 for the
+    # entire life of this config. That matters because /srv holds factorio's
+    # server directories (which contain the account token and game password)
+    # and jellyfin's config, so they were world-readable throughout.
+    "d /srv 0770 root root -"
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];

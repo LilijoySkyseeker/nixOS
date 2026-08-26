@@ -136,6 +136,12 @@ in
             nixos-rebuild
             nix
             coreutils
+            # openssh: git fetch/push here talk to the origin remote over SSH,
+            # and without a transport on PATH the very first `git fetch` fails.
+            # myPullDeploy and myPushDeploy both already include it; this unit
+            # was the odd one out, which is one of the two reasons it has never
+            # completed a run (zero automated flake.lock commits in 1371).
+            openssh
           ];
           script = ''
             set -euo pipefail
@@ -183,7 +189,17 @@ in
             # silently breaking the push step.
             NoNewPrivileges = true;
             ProtectSystem = "strict";
-            ReadWritePaths = [ flakeDir ];
+            # /root as well as the flake dir: ProtectSystem = "strict" makes
+            # the whole filesystem read-only apart from what is listed here,
+            # and this unit needs to write /root/.cache/nix (nix's eval and
+            # fetcher caches) plus git's own state under /root. That omission
+            # is the second reason this unit has never completed a run --
+            # ProtectHome was already left off for the same underlying need,
+            # but strict ProtectSystem re-imposed the restriction anyway.
+            ReadWritePaths = [
+              flakeDir
+              "/root"
+            ];
             ProtectKernelModules = true;
             ProtectKernelTunables = true;
             ProtectKernelLogs = true;
