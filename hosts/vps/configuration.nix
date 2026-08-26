@@ -146,6 +146,26 @@ in
     ];
     neededForBoot = true;
   };
+  # cloud-init writes DigitalOcean's vendor-data boothook script under
+  # /var/lib/cloud and execs it directly -- root's tmpfs noexec above
+  # broke this with a bare PermissionError on the real droplet (confirmed
+  # via a rescue-ISO journal read: cloud-init's datasource activation
+  # succeeded fine, only the boothook exec failed), which in turn seems
+  # to be what actually arms DigitalOcean's network for this NIC (see the
+  # services.cloud-init comment below) -- so the box never came up at
+  # all on its first real boot. Give this one path its own exec-capable
+  # tmpfs rather than loosening root itself.
+  fileSystems."/var/lib/cloud" = {
+    device = "none";
+    fsType = "tmpfs";
+    options = [
+      "size=64M"
+      "mode=0755"
+      "nosuid"
+      "nodev"
+    ];
+    neededForBoot = true;
+  };
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/persist".neededForBoot = true;
 
