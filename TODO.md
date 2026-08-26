@@ -433,45 +433,6 @@ them rot.
       this file — `worktree-distributed-build-todo` looks like a
       feature-complete implementation of this, unreviewed/unmerged.
 
-- [ ] **2026-08-18: caddy hits a permission-denied race against the
-      anubis unix socket right after vps reboots.** Found trawling
-      vps's logs: from 03:18–03:47 (right after a 23:47 reboot), every
-      request to `jellyfin.skyseekerlabs.net` 502'd with `dial unix
-      /run/anubis/anubis-jellyfin/anubis.sock: connect: permission
-      denied` (36 requests total), then self-resolved and hasn't
-      recurred since (0 in the following ~13h). `caddy`'s `id` shows
-      it *is* in the `anubis` group (`hosts/vps/configuration.nix`
-      already has `users.users.caddy.extraGroups = [ "anubis" ]`,
-      added for exactly this failure mode per the comment there) — so
-      this looks like a boot-order race, not a missing-permission bug:
-      caddy's group membership or the socket itself isn't ready by the
-      time caddy starts serving. Needs: add an explicit
-      `systemd.services.caddy.after`/`wants` (or similar ordering) on
-      the anubis service/socket so caddy doesn't start accepting
-      traffic until anubis's socket exists with the right group perms
-      already applied.
-      **Confirmed still unfixed in code, 2026-08-25** (no explicit
-      caddy→anubis systemd ordering in `hosts/vps/configuration.nix`),
-      but unverified live either way: vps hasn't rebooted since
-      2026-08-20, so the race hasn't had a chance to reproduce (or be
-      confirmed fixed) since it was first noticed.
-
-      **Re-checked live 2026-08-25 (same session as the CrowdSec bouncer
-      fix above, no reboot involved):** both `caddy.service` and
-      `anubis-jellyfin.service` still show uptime since the 2026-08-20
-      boot (today's crowdsec-only deploys didn't touch/restart either),
-      so still no fresh data on the race itself. Swept caddy's entire
-      journal history for the `dial unix .../anubis.sock: permission
-      denied` signature: all 36 occurrences are confined to the single
-      Aug 18 03:30–03:31 window already described above, zero since —
-      consistent with "self-resolved, boot-order race" rather than a
-      persistent config problem. Socket perms
-      (`srwxrwx--- anubis:anubis`) and caddy's `anubis` group membership
-      both currently correct. Live functional check: `curl
-      https://jellyfin.skyseekerlabs.net/` → `HTTP 302` (working
-      normally). Still needs an actual reboot to confirm one way or the
-      other whether the race recurs.
-
 ## Done
 
 Completed items live in [`docs/DONE.md`](docs/DONE.md), not here — move an
