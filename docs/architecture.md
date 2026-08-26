@@ -272,8 +272,9 @@ Two hosts are still structurally unusual, same as before the migration:
   `server.nix` alone gives no reason to suspect any of this is in
   there. When wiring a shared module into a new role, actually check
   what it contains (or `nix why-depends` the result) rather than
-  trusting the name. See `TODO.md`'s active entry for the fix (splitting
-  `tooling.nix` into CLI-only vs. desktop-GUI pieces) — not yet done.
+  trusting the name. Fixed 2026-08-26 by splitting the desktop-only
+  pieces into `modules/home-manager/tooling-desktop.nix`, imported only
+  by `modules/profiles/PC.nix` — see `docs/DONE.md`.
 
 ## Backups
 

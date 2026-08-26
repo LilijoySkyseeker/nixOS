@@ -151,6 +151,7 @@ in
       home-manager.users.lilijoy = {
         imports = [
           homeManagerModules.tooling
+          homeManagerModules."tooling-desktop"
           homeManagerModules."virt-manager"
           homeManagerModules."claude-code"
           inputs.plover-flake.homeManagerModules.plover
