@@ -464,6 +464,63 @@ in
     ];
   };
   services.crowdsec-firewall-bouncer.enable = true;
+  # boot-race fix: this droplet's network intermittently takes longer to actually
+  # pass traffic than network-online.target reports ready — DigitalOcean's
+  # hypervisor vNIC arming lags behind the guest's own DHCP lease acquisition (see
+  # the externalInterface comment above), so anything doing a network call at
+  # startup can lose this race. Confirmed live across two separate reboots: both
+  # crowdsec.service (its ExecStartPre's `cscli hub update`) and
+  # crowdsec-firewall-bouncer.service failed with a DNS resolution error at
+  # ~90s into userspace boot — identically, down to the second, both times — and
+  # neither ever retried for the rest of that boot session. crowdsec.service
+  # already sets RestartSec=60 upstream but never sets Restart=, an incomplete
+  # no-op left in nixpkgs' own crowdsec.nix; crowdsec-firewall-bouncer.service has
+  # no restart policy at all.
+  systemd.services.crowdsec.serviceConfig.Restart = "on-failure";
+  systemd.services.crowdsec-firewall-bouncer.serviceConfig = {
+    Restart = "on-failure";
+    RestartSec = "15s";
+  };
+  # tailscaled-autoconnect polls internally until tailscale reports Running, but
+  # systemd's default 90s unit-start timeout was killing it before that could
+  # happen on a slow boot — also confirmed live, twice, at the same ~90s mark.
+  systemd.services.tailscaled-autoconnect.serviceConfig.TimeoutStartSec = "300s";
+  # self-ban prevention: exempt the tailnet (100.64.0.0/10) from every CrowdSec
+  # decision. SSH here is tailscale-only (no public port 22), so anything that
+  # reconnects quickly enough — scripted health checks, this repo's own deploy
+  # tooling, a burst of manual troubleshooting — can trip crowdsecurity/sshd's
+  # ssh-slow-bf scenario against itself and get banned by the same mechanism
+  # meant for internet attackers. Confirmed live 2026-08-26: rapid diagnostic
+  # SSH during this PR's own testing did exactly that to the admin's own IP.
+  # Not a new trust boundary — networking.firewall.trustedInterfaces above
+  # already treats tailscale0 as trusted at the packet-filter level; this
+  # extends the same boundary to CrowdSec's decision engine. The actual access
+  # gate stays tailscale's own device authorization (ACLs/key approval) — only
+  # devices explicitly added to the tailnet can ever present a 100.64.0.0/10
+  # source — and sshd is publickey-only regardless, so there's no password to
+  # brute-force from inside the mesh even if this exemption were ever abused.
+  # `cscli allowlists create` errors (not just warns) if the name already
+  # exists, unlike `add` (which just warns and skips already-present values —
+  # confirmed in crowdsec's own cliallowlists/allowlists.go), hence `|| true`
+  # only on the create step.
+  systemd.services.crowdsec-allowlist-tailnet = {
+    description = "Exempt the tailnet from CrowdSec decisions";
+    after = [ "crowdsec.service" ];
+    requires = [ "crowdsec.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      Restart = "on-failure";
+      RestartSec = "15s";
+      ExecStart = pkgs.writeShellScript "crowdsec-allowlist-tailnet" ''
+        set -eu
+        cscli=${config.services.crowdsec.package}/bin/cscli
+        "$cscli" allowlists create trusted-tailnet -d "tailscale mesh, exempt from ban decisions" || true
+        "$cscli" allowlists add trusted-tailnet 100.64.0.0/10 -d "tailnet CGNAT range"
+      '';
+    };
+  };
   # drop both "crowdsec" and "crowdsec-firewall-bouncer-register" from StateDirectory —
   # both are real impermanence bind-mounts, and DynamicUser's StateDirectory= migration
   # (moving the "pre-existing public" dir into /var/lib/private/<name> behind a symlink)
