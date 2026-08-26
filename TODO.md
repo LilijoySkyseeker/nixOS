@@ -13,6 +13,39 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-26: `/storage`/`/storage-bulk` failed their first mount
+      attempt on boot, self-healed within the same boot — worth
+      understanding, not urgent.** Surfaced by the full homelab reboot
+      done to verify the tailscale0-only firewall re-scoping (see the
+      security-audit items below). Boot sequence from `journalctl -b`:
+      `zdata`'s import itself raced once (`cannot import 'zdata': no
+      such pool available`, retried ~2s later and succeeded — ZFS's own
+      import unit has built-in retry, worked as designed), then
+      immediately after the successful import, both `storage.mount` and
+      `storage-bulk.mount` (the `/etc/fstab`-generated units, from this
+      repo's `fileSystems."/storage"`/`"/storage-bulk"` entries) failed
+      their own mount attempt (`status=2/INVALIDARGUMENT`) within the
+      same second `zfs-mount.service` started — looks like the classic
+      ZFS-on-systemd race of having a dataset in both `/etc/fstab` *and*
+      relying on ZFS's own `zfs-mount.service`/mountpoint property, where
+      the fstab-generated unit's `mount.zfs` call loses the race against
+      ZFS's own mount. Both mounts show `active (mounted)` now (systemd
+      picked up the real mount once `zfs-mount.service` established it
+      via `/proc/self/mountinfo`, regardless of which process's `mount()`
+      call actually succeeded), `zpool status -x` reports "all pools are
+      healthy", `df -h` shows correct sizes/usage for both, and
+      `systemctl --failed` is empty — no data loss or lasting problem,
+      just a scary-looking boot log. Not caused by this session's
+      changes (firewall-only, no mount/import ordering touched) — this
+      is a pre-existing race that just hadn't been observed since this
+      box is rarely rebooted. Needs: either add explicit
+      `after`/`requires` ordering on the fstab-generated mount units
+      against the zfs import/mount units, or drop the `/etc/fstab`
+      entries entirely in favor of relying purely on each dataset's own
+      ZFS `mountpoint` property (the more idiomatic NixOS+ZFS pattern),
+      so this doesn't depend on a race resolving in the box's favor on
+      every future boot.
+
 - [ ] **2026-08-26: do a full security audit / hardening pass on
       homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
       turned out to already carry a real, globally-routable public IPv6
@@ -49,6 +82,11 @@ them rot.
         key approval) rather than exposed ports, but worth an explicit
         decision on whether that trust boundary is sufficient long-term
         or whether basic protections belong at the homelab layer too.
+      - `bootctl` warns on every boot that `/boot`'s mount point and its
+        `loader/random-seed` file are world-accessible ("which is a
+        security hole"), surfaced in the 2026-08-26 reboot's journal —
+        minor, but a real finding worth folding into this pass rather
+        than a one-off fix.
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
@@ -257,9 +295,30 @@ them rot.
       container (now named `minecraft-vanilla-plus`, up 21h, `healthy`)
       has `ENABLE_AUTOPAUSE=TRUE`, `MAX_TICK_TIME=-1`, `VERSION=LATEST`,
       and `CAP_NET_RAW` all present — the config-level rollout is done.
-      Still unverified: the actual Bedrock-client/nether-roof behavior,
-      and whether autopause/resume + the watchdog behave as intended —
-      none of that is checkable without a live game client.
+      Still unverified: the actual Bedrock-client/nether-roof behavior.
+
+      **2026-08-26: autopause confirmed broken**, surfaced for free by a
+      full homelab reboot (done to verify the tailscale0-only firewall
+      re-scoping survives a real boot, see the security-audit items
+      above). Container logs on fresh start:
+      `could not open eth0: ... Operation not permitted`,
+      `[Autopause loop] Failed to start knockd daemon`. Docker itself
+      does grant the capability (`docker inspect
+      minecraft-vanilla-plus --format '{{.HostConfig.CapAdd}}'` →
+      `[CAP_NET_RAW CAP_SETGID CAP_SETUID]`), but it doesn't survive the
+      entrypoint's privilege drop from root to the unprivileged
+      `minecraft` user — plain `setuid` clears effective capabilities
+      unless something explicitly keeps them (ambient caps / `prctl
+      PR_SET_KEEPCAPS` / file capabilities), none of which this image's
+      entrypoint appears to do for knockd. So autopause has likely never
+      actually worked since it was deployed 2026-08-20 — the container's
+      been running continuously since then, so this is the first fresh
+      start to reveal it. Needs a real fix, not just more testing: either
+      get `CAP_NET_RAW` into knockd's effective set post-setuid (image-side
+      fix, not something this repo controls) or use the workaround the
+      log itself suggests — `AUTOPAUSE_KNOCK_INTERFACE` env var — if that
+      routes around the packet-capture path entirely rather than hitting
+      the same capability wall.
 
 - [ ] **2026-08-20: wg0 IPv4-endpoint fix — deployed and working; still
       needs to survive a real IPv6 address rotation unwatched.**

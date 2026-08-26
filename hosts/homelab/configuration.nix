@@ -393,18 +393,6 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # TEMPORARY (added 2026-08-26): LAN IPv4-only SSH safety net while
-  # testing this round of firewall re-scoping (sshd + jellyfin +
-  # minecraft + factorio moving from host-wide to tailscale0/wg0-only).
-  # Deliberately plain `iptables`, not `ip46tables`/the interfaces.*
-  # option — this must stay IPv4-only, since enp3s0's IPv6 address is
-  # the real public one this whole change exists to stop exposing.
-  # Remove once tailscale0-only SSH is confirmed working end-to-end and
-  # this host can't be locked out.
-  networking.firewall.extraCommands = ''
-    iptables -A nixos-fw -p tcp --dport 22 -i enp3s0 -j nixos-fw-accept
-  '';
-
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];
   services.zfs = {
