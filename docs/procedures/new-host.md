@@ -48,12 +48,21 @@ shape; the vps README has the gotchas for a specific real deploy
   silently point at the wrong disk.
 - Legacy BIOS vs UEFI boot loader choice needs to match the real
   target, not be assumed from another host.
-- **`kexec` can get OOM-killed on a tiny/RAM-constrained target with no
-  swap**, even when `free` shows what looks like plenty — confirmed
-  live against a fresh 1GB DigitalOcean droplet (no swap by default on
-  the stock image) where 613MB nominally free still wasn't enough
-  headroom. `scripts/bootstrap-host.sh` adds a throwaway swapfile
-  before installing to a real target for exactly this reason.
+- **`kexec` can get OOM-killed on a tiny/RAM-constrained target, and
+  swap doesn't reliably fix it.** Confirmed live, twice, against a
+  fresh 1GB DigitalOcean droplet: first with no swap at all (613MB
+  nominally free per `free -h` still wasn't enough headroom), then
+  again *with* a 1G swapfile added (`scripts/bootstrap-host.sh` does
+  this automatically before installing to a real target — cheap
+  insurance, keep it) — the second failure killed `kexec` almost
+  instantly with `anon-rss:0kB`, consistent with `kexec_load` needing
+  genuinely free, kernel-pinned physical RAM for the new kernel+initrd
+  that can't be satisfied by reclaiming swappable pages from other
+  processes. The fix that actually works: temporarily resize the
+  target to a bigger RAM tier before installing, resize back down
+  once it succeeds. Document the temporary spec bump in the host's own
+  README (see `hosts/vps/README.md`) so it isn't a surprise cost next
+  time.
 - **Recreating a droplet that reuses its old IP leaves a stale SSH
   host key in your `known_hosts`**, since the new box's key is
   different even though the address isn't — `ssh` refuses to connect

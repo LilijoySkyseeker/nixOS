@@ -20,13 +20,13 @@ set -euo pipefail
 # touching any real target — no SSH, no .sops.yaml/secrets.yaml
 # changes, no confirmation prompt.
 #
-# For a real target, also makes sure it has swap before kexec'ing —
-# kexec loads a full kernel+initrd into memory on top of whatever the
-# target's current OS is already using, and can get OOM-killed on a
-# tiny/RAM-constrained target with none (confirmed live: a fresh 1GB
-# DigitalOcean droplet with no swap and 613MB nominally free still
-# wasn't enough headroom). Adds a throwaway 1G swapfile if none
-# exists; harmless since disko wipes the whole disk moments later.
+# kexec needs genuinely free, kernel-pinned physical RAM for the new
+# kernel+initrd -- confirmed live (twice) that a tiny/RAM-constrained
+# target can OOM-kill it even with swap added, since swap only helps
+# reclaim swappable pages and kexec's own allocation isn't one. This
+# script does not work around that; resize the target up for more real
+# RAM before installing if it's tight, then back down after. See
+# docs/procedures/new-host.md and hosts/vps/README.md.
 #
 # Example (DigitalOcean, impermanence, needs --kexec-extra-flags -c):
 #   scripts/bootstrap-host.sh vps 164.90.1.2 --persist-root /persist -- --kexec-extra-flags -c
@@ -124,18 +124,6 @@ read -r -p "Continue? [y/N] " reply
 	echo "aborted -- .sops.yaml/secrets.yaml changes above are already committed to disk, revert if unwanted" >&2
 	exit 1
 }
-
-echo "==> ensuring the target has swap (kexec can be OOM-killed on tiny/RAM-constrained"
-echo "    targets without it -- confirmed live against a 1GB droplet with no swap: 613MB"
-echo "    free wasn't enough headroom, even though that looks like plenty)"
-ssh_opts=(-o ConnectTimeout=8 -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
-if ssh "${ssh_opts[@]}" "root@$target" 'swapon --show | grep -q .' 2>/dev/null; then
-	echo "==> target already has swap, skipping"
-else
-	ssh "${ssh_opts[@]}" "root@$target" \
-		'fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'
-	echo "==> added a temporary 1G swapfile on the target -- harmless, disko wipes the disk moments later"
-fi
 
 echo "==> building $host locally and installing to root@$target"
 nixos-anywhere \

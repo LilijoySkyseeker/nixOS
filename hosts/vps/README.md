@@ -34,6 +34,17 @@ The 482MB zram swap noted above only exists once NixOS is actually
 running — the stock pre-install image has none at all, which matters
 for the next step.
 
+**Temporarily resize the droplet up before installing.** Confirmed
+live, twice: `kexec` gets OOM-killed on the stock 1GB droplet even
+with a swapfile added (it needs genuinely free, kernel-pinned physical
+RAM for the new kernel+initrd — not something swap can supply). Bump
+it to a bigger RAM tier in the DO dashboard (this needs a power-off/
+resize/power-on cycle on the still-stock image — no NixOS state to
+lose yet), run the install, then resize back down to `DO-Regular`/1GB
+once it succeeds. This is a real, recurring cost tradeoff for this
+host, not a one-off — expect to repeat it on every future reinstall
+until/unless a lower-memory install path is found.
+
 Before running the install — the fresh box needs a *working* key the
 moment it boots, not after: generate a new tailscale auth key in the
 admin console (the old device is stale after a droplet recreate), then
@@ -58,10 +69,8 @@ vanish on the very first real boot — it has to land at
 `--kexec-extra-flags -c` is DigitalOcean-specific — its kexec target
 otherwise fails to pick up an IP. The script handles the rest: fresh
 SSH host key generated outside the repo, `.sops.yaml` rotation, `sops
-updatekeys`, a throwaway swapfile on the target if it has none
-(`kexec` got OOM-killed on this exact droplet without one — 613MB
-"free" per `free -h` still wasn't enough headroom), then the
-`nixos-anywhere` invocation itself.
+updatekeys`, then the `nixos-anywhere` invocation itself — it does
+*not* work around the memory issue above; that's the resize's job.
 
 After install:
 
