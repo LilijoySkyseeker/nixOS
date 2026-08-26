@@ -68,7 +68,11 @@ scripts/bootstrap-host.sh vps <new-ip> --persist-root /persist -- --kexec-extra-
 tmpfs (impermanence), so a host key written to plain `/etc/ssh` would
 vanish on the very first real boot — it has to land at
 `/persist/etc/ssh/...`, which is where vps's
-`environment.persistence."/persist"` config reads it from.
+`environment.persistence."/persist"` config reads it from. Add `-y` to
+skip the "this will WIPE..." confirmation for a scripted/backgrounded
+run — piping `y` into stdin instead isn't reliable if the invocation
+gets backgrounded (confirmed live: `read` can see EOF regardless of
+what was piped in).
 
 `--kexec-extra-flags -c` is DigitalOcean-specific — its kexec target
 otherwise fails to pick up an IP. The script handles the rest: fresh

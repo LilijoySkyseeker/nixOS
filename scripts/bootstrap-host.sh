@@ -7,7 +7,7 @@ set -euo pipefail
 # key, enrolls its age key in .sops.yaml, and re-encrypts secrets
 # before the box ever boots, so sops-nix can decrypt on first boot.
 #
-# Usage: scripts/bootstrap-host.sh <host> <target-ip|--vm-test> [--persist-root <path>] [-- <extra nixos-anywhere args>]
+# Usage: scripts/bootstrap-host.sh <host> <target-ip|--vm-test> [--persist-root <path>] [-y|--yes] [-- <extra nixos-anywhere args>]
 #
 # --persist-root is required for impermanence hosts (e.g. vps's
 # /persist): with root on tmpfs, a host key written to plain /etc/ssh
@@ -19,6 +19,13 @@ set -euo pipefail
 # extra-files/--persist-root placement in a throwaway local VM before
 # touching any real target — no SSH, no .sops.yaml/secrets.yaml
 # changes, no confirmation prompt.
+#
+# -y/--yes skips the "this will WIPE ..." confirmation prompt, for
+# scripted/backgrounded invocations. Piping a "y" into stdin instead is
+# NOT a reliable substitute: backgrounding this script with a trailing
+# `&` can leave `read` seeing EOF regardless of what was piped in
+# (confirmed live), which aborts the whole script under `set -e`
+# without ever showing the prompt.
 #
 # kexec needs genuinely free, kernel-pinned physical RAM for the new
 # kernel+initrd -- confirmed live (twice) that a tiny/RAM-constrained
@@ -35,7 +42,7 @@ set -euo pipefail
 #   scripts/bootstrap-host.sh vps --vm-test --persist-root /persist
 
 usage() {
-	echo "Usage: $0 <host> <target-ip|--vm-test> [--persist-root <path>] [-- <extra nixos-anywhere args>]" >&2
+	echo "Usage: $0 <host> <target-ip|--vm-test> [--persist-root <path>] [-y|--yes] [-- <extra nixos-anywhere args>]" >&2
 	exit 1
 }
 
@@ -47,11 +54,26 @@ vm_test=false
 [[ "$target" == "--vm-test" ]] && vm_test=true
 
 persist_root=""
-if [[ "${1:-}" == "--persist-root" ]]; then
-	persist_root=$2
-	shift 2
-fi
-[[ "${1:-}" == "--" ]] && shift
+yes=false
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--persist-root)
+		persist_root=$2
+		shift 2
+		;;
+	-y | --yes)
+		yes=true
+		shift
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		break
+		;;
+	esac
+done
 extra_args=("$@")
 
 # Resolved from the script's own location, not the caller's cwd -- this
@@ -151,11 +173,15 @@ sops --config "$sops_file" updatekeys -y "$repo_root/secrets/secrets.yaml"
 
 echo
 echo "This will WIPE and reinstall root@$target as '$host'. This cannot be undone."
-read -r -p "Continue? [y/N] " reply
-[[ "$reply" =~ ^[Yy]$ ]] || {
-	echo "aborted -- .sops.yaml/secrets.yaml changes above are already committed to disk, revert if unwanted" >&2
-	exit 1
-}
+if $yes; then
+	echo "==> -y/--yes given, skipping the confirmation prompt"
+else
+	read -r -p "Continue? [y/N] " reply
+	[[ "$reply" =~ ^[Yy]$ ]] || {
+		echo "aborted -- .sops.yaml/secrets.yaml changes above are already committed to disk, revert if unwanted" >&2
+		exit 1
+	}
+fi
 
 echo "==> building $host locally and installing to root@$target"
 nixos-anywhere \
