@@ -64,7 +64,9 @@ shape; the vps README has the gotchas for a specific real deploy
   total RAM against a 1900MB floor before touching anything (comfortably
   clears DigitalOcean's 2GB tier at ~1962MB, rejects its 1GB tier at
   ~956MB) and refuses to proceed if it's short, rather than run
-  headlong into the same OOM again.
+  headlong into the same OOM again. It also prints a reminder to resize
+  back down on success — easy to forget once the install itself is
+  working, and the upsize is meant to be temporary.
 - **Recreating a droplet that reuses its old IP leaves a stale SSH
   host key in your `known_hosts`**, since the new box's key is
   different even though the address isn't — `ssh` refuses to connect

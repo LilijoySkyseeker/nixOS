@@ -82,6 +82,12 @@ updatekeys`, then the `nixos-anywhere` invocation itself — it does
 
 After install:
 
+- **Resize the droplet back down to `DO-Regular`/1GB** — easy to
+  forget once the install itself is working, but the RAM bump above is
+  meant to be temporary; leaving it upsized just pays for capacity
+  vps doesn't otherwise need. The script prints a reminder on success,
+  but do this once you're actually done poking at the new box, not the
+  moment it boots (a resize is another power-off/on cycle).
 - If the public IP did change, update `modules/services/octodns.nix`'s
   `vpsPublicIp`(`6`) and `hosts/homelab/configuration.nix`'s wireguard
   peer `endpoint`.

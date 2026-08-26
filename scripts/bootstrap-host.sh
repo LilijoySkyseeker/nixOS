@@ -192,3 +192,4 @@ nixos-anywhere \
 	"${extra_args[@]}"
 
 echo "==> install finished. verify live services before trusting this host -- see docs/procedures/new-host.md."
+echo "==> if you resized $target up temporarily for this install, resize it back down now."
