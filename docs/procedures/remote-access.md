@@ -84,9 +84,11 @@ A brand-new host can't be reached over Tailscale until sops decrypts
 its Tailscale auth key, and sops can't decrypt anything until the
 host's age key (usually derived from its SSH host key) is already
 registered in `.sops.yaml` — which normally doesn't exist until
-*after* install. See `docs/procedures/new-host.md` and
-`hosts/vps/README.md` step 1 for how this is broken: pre-generate the
-host's SSH key locally, register its age key in `.sops.yaml` and run
-`sops updatekeys secrets/secrets.yaml` *before* the install, then pass
-the pre-generated key in via `nixos-anywhere --extra-files` so it's in
-place before sshd/sops ever run on the new box.
+*after* install. `scripts/bootstrap-host.sh` automates the break:
+pre-generate the host's SSH key locally, register its age key in
+`.sops.yaml` and run `sops updatekeys secrets/secrets.yaml` *before*
+the install, then pass the pre-generated key in via `nixos-anywhere
+--extra-files` so it's in place before sshd/sops ever run on the new
+box. See `docs/procedures/new-host.md` and `hosts/vps/README.md` for
+the worked example — impermanence hosts need `--persist-root` too, or
+the key vanishes on the first real boot.

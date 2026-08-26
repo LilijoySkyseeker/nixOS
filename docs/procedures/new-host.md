@@ -21,25 +21,21 @@ shape; the vps README has the gotchas for a specific real deploy
    its "Navigating" section for how to find a module's actual
    registration key).
 3. Before the target is reachable over SSH via a sops-decrypted secret
-   (e.g. Tailscale), pre-generate that host's SSH host key **outside
-   the repo checkout, even gitignored** — never stage key material
-   inside a tracked worktree. Convert it with `ssh-to-age`, add the
-   resulting age key to `.sops.yaml`'s `keys:` block as a new named
-   anchor, then run `sops updatekeys secrets/secrets.yaml` so the new
+   (e.g. Tailscale), that host's SSH host key needs pre-generating
+   **outside the repo checkout, even gitignored** — never stage key
+   material inside a tracked worktree — converting with `ssh-to-age`,
+   enrolling as a new named anchor in `.sops.yaml`'s `keys:` block, and
+   re-encrypting via `sops updatekeys secrets/secrets.yaml`, so the new
    host can actually decrypt secrets on first boot. If this step is
    skipped, sops can't decrypt anything on the fresh install —
    including whatever secret is needed to reach the box at all.
-4. Install with `nixos-anywhere --flake .#<name> --target-host
-   root@<ip> --generate-hardware-config nixos-generate-config <path>
-   --extra-files <dir>`, where `<path>` points at
-   `hosts/<name>/hardware-configuration.nix` in the checkout/worktree
-   currently being worked on (not necessarily the main checkout), and
-   `<dir>` is where the pre-generated host key from step 3 lives so
-   `nixos-anywhere` can enroll it before first boot.
-5. Build locally rather than on the remote target
-   (`--build-on-remote` unset) — small/cheap VPS instances can be
-   memory- or disk-constrained enough to hang or OOM mid-install if
-   asked to build their own closure.
+4. `scripts/bootstrap-host.sh <name> <ip>` automates step 3 and the
+   `nixos-anywhere` invocation itself (builds locally rather than on
+   the remote target — small/cheap instances can be memory- or
+   disk-constrained enough to hang or OOM mid-install if asked to
+   build their own closure). Pass DigitalOcean's `--kexec-extra-flags
+   -c` (see gotchas below) and any other `nixos-anywhere` flags after
+   a `--`. See `hosts/vps/README.md` for a worked example.
 
 ## Gotchas seen in practice
 

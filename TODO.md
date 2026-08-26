@@ -13,6 +13,33 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-25: full vps reinstall via nixos-anywhere, automated and
+      documented** (branch `worktree-vps-reinstall`). Follow-up to the
+      vps-bricked entry below — declared unrecoverable rather than
+      chasing the boot race further. Plan: destroy and recreate the
+      DigitalOcean droplet (user, dashboard — no `doctl`/DO API token
+      in this repo), then reinstall via a new `scripts/bootstrap-
+      host.sh <host> <ip>` that automates the sops/tailscale chicken-
+      and-egg (pre-generate host SSH key outside the repo, enroll its
+      age key in `.sops.yaml`, `sops updatekeys`) followed by the
+      `nixos-anywhere` invocation itself — see `hosts/vps/README.md`'s
+      new "Reinstall" section for the worked example, including the
+      `--persist-root /persist` flag impermanence hosts need (a key
+      written to plain `/etc/ssh` vanishes on the first real boot on a
+      tmpfs-root host). vps's `&vps` `.sops.yaml` anchor already
+      rotated to a freshly generated key (old one destroyed with the
+      droplet); build + VM-boot both confirmed clean against current
+      master. Blocked on: (1) user recreating the droplet and sharing
+      the new IP, (2) a new tailscale auth key (value rotation is
+      user-only, see `docs/procedures/secrets.md`) since the old vps
+      tailscale device is stale after a recreate. Once live: update
+      `modules/services/octodns.nix`'s `vpsPublicIp` and `hosts/
+      homelab/configuration.nix`'s wireguard peer `endpoint` off the
+      old IP, confirm crowdsec/bouncer/tailscaled-autoconnect/caddy/
+      fail2ban are healthy, and exercise a real reboot to confirm the
+      boot-race fixes actually hold against DigitalOcean's real
+      network-arming delay before calling this done.
+
 - [ ] **2026-08-25: add fail2ban to vps, defaulting to an immediate ban
       for any connection attempt against a non-present/non-listening
       service.** Requested by the user alongside the CrowdSec bouncer
