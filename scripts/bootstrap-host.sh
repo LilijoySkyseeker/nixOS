@@ -7,7 +7,7 @@ set -euo pipefail
 # key, enrolls its age key in .sops.yaml, and re-encrypts secrets
 # before the box ever boots, so sops-nix can decrypt on first boot.
 #
-# Usage: scripts/bootstrap-host.sh <host> <target-ip> [--persist-root <path>] [-- <extra nixos-anywhere args>]
+# Usage: scripts/bootstrap-host.sh <host> <target-ip|--vm-test> [--persist-root <path>] [-- <extra nixos-anywhere args>]
 #
 # --persist-root is required for impermanence hosts (e.g. vps's
 # /persist): with root on tmpfs, a host key written to plain /etc/ssh
@@ -15,18 +15,26 @@ set -euo pipefail
 # host's `environment.persistence."<path>"` module reads it from —
 # check the host's configuration.nix if unsure.
 #
+# Pass --vm-test instead of a target IP to exercise the real disko +
+# extra-files/--persist-root placement in a throwaway local VM before
+# touching any real target — no SSH, no .sops.yaml/secrets.yaml
+# changes, no confirmation prompt.
+#
 # Example (DigitalOcean, impermanence, needs --kexec-extra-flags -c):
 #   scripts/bootstrap-host.sh vps 164.90.1.2 --persist-root /persist -- --kexec-extra-flags -c
+#   scripts/bootstrap-host.sh vps --vm-test --persist-root /persist
 
 usage() {
-	echo "Usage: $0 <host> <target-ip> [--persist-root <path>] [-- <extra nixos-anywhere args>]" >&2
+	echo "Usage: $0 <host> <target-ip|--vm-test> [--persist-root <path>] [-- <extra nixos-anywhere args>]" >&2
 	exit 1
 }
 
 [[ $# -ge 2 ]] || usage
 host=$1
-target_ip=$2
+target=$2
 shift 2
+vm_test=false
+[[ "$target" == "--vm-test" ]] && vm_test=true
 
 persist_root=""
 if [[ "${1:-}" == "--persist-root" ]]; then
@@ -35,7 +43,11 @@ if [[ "${1:-}" == "--persist-root" ]]; then
 fi
 extra_args=("$@")
 
-repo_root=$(git rev-parse --show-toplevel)
+# Resolved from the script's own location, not the caller's cwd -- this
+# is meant to be invoked from a scratch directory (see docs/procedures/
+# vm-testing.md) so nixos-anywhere's qcow2/log artifacts don't land in
+# the repo checkout.
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 host_dir="$repo_root/hosts/$host"
 [[ -d "$host_dir" ]] || {
 	echo "no such host: $host_dir" >&2
@@ -56,6 +68,21 @@ chmod 644 "$key_dir/ssh_host_ed25519_key.pub"
 age_key=$(ssh-to-age -i "$key_dir/ssh_host_ed25519_key.pub")
 echo "==> new age key: $age_key"
 
+if $vm_test; then
+	echo "==> --vm-test: skipping .sops.yaml/secrets.yaml changes and the confirmation prompt"
+	echo "==> NOTE: nixos-anywhere's --vm-test rejects --extra-files outright, so this only"
+	echo "    exercises disko + basic install/boot -- it cannot validate the persist-root"
+	echo "    key placement above. That still only gets a real check during the actual install."
+	echo "==> building $host and booting it as a throwaway local VM (own virtual disk; no"
+	echo "    --target-host/ssh-host is passed, so nothing outside that VM is touched)"
+	nixos-anywhere \
+		--flake "$repo_root#$host" \
+		--vm-test \
+		"${extra_args[@]}"
+	echo "==> vm-test finished. this did not touch .sops.yaml, secrets.yaml, or any real target."
+	exit 0
+fi
+
 sops_file="$repo_root/.sops.yaml"
 anchor="&$host "
 if grep -qF "$anchor" "$sops_file"; then
@@ -74,17 +101,17 @@ echo "==> re-encrypting secrets/secrets.yaml for the new recipient"
 sops updatekeys -y "$repo_root/secrets/secrets.yaml"
 
 echo
-echo "This will WIPE and reinstall root@$target_ip as '$host'. This cannot be undone."
+echo "This will WIPE and reinstall root@$target as '$host'. This cannot be undone."
 read -r -p "Continue? [y/N] " reply
 [[ "$reply" =~ ^[Yy]$ ]] || {
 	echo "aborted -- .sops.yaml/secrets.yaml changes above are already committed to disk, revert if unwanted" >&2
 	exit 1
 }
 
-echo "==> building $host locally and installing to root@$target_ip"
+echo "==> building $host locally and installing to root@$target"
 nixos-anywhere \
 	--flake "$repo_root#$host" \
-	--target-host "root@$target_ip" \
+	--target-host "root@$target" \
 	--generate-hardware-config nixos-generate-config "$host_dir/hardware-configuration.nix" \
 	--extra-files "$work_dir" \
 	"${extra_args[@]}"
