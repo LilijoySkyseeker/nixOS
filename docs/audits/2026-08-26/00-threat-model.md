@@ -11,6 +11,12 @@ failure modes they should actively probe for. Secondarily it is meant
 to outlive the audit — every future "should I expose this service?"
 decision is really a question about §3 and §4.
 
+**One fact that colours everything below: this repository is public
+on GitHub.** The configuration, its full history, and the encrypted
+secrets file are all world-readable. §4.7 works through what that does
+and does not change; the short version is that no finding may be
+discounted on the grounds that an attacker would not know about it.
+
 **Status of the claims here.** Everything in §2–§4 was read out of the
 config in this repo on 2026-08-26 and is cited by `file:line`. Where
 something is inferred rather than read, it says so. Where the config
@@ -340,6 +346,77 @@ Two structural gaps are already visible and are P2's to size:
   forwarded game ports" item in `TODO.md` ever lands, it must bring
   the v6 rate-limiting with it or it silently ships a bypass.
 
+### 4.7 The configuration itself is public
+
+**This repository is public on GitHub.** Everything described in §2, §3
+and §4 — the port map, the service inventory, the deploy mechanism, the
+exact ForceCommand allowlist, the usernames, the tailnet structure, the
+domain, every version pin — is readable by anyone, in full, at leisure,
+including by an attacker who has not yet touched a single host.
+
+Three consequences, each of which changes how findings should be rated
+rather than merely adding a caveat:
+
+- **There is no obscurity anywhere in this model, and none may be
+  claimed.** An attacker studying vps's deploy dispatcher for a parsing
+  flaw reads exactly the same source we do, with no rate limit and no
+  detection. Any control whose value rests on an adversary not knowing
+  it exists is worth zero here. In practice this means: never discount
+  a weak control on the grounds that finding it would be hard, and
+  treat "an attacker would have to know X" as satisfied by default in
+  every reachability assessment.
+- **The encrypted secrets are public ciphertext, permanently.**
+  `secrets/secrets.yaml` is downloadable by anyone, and so is every one
+  of its 72 historical revisions. sops/age encryption is therefore the
+  *only* thing protecting it — there is no network boundary, no access
+  control, and no rate limit in front of an offline attack. Two things
+  follow. Key hygiene carries the entire weight, so the recipient set
+  in `.sops.yaml` and the age keys behind it matter more here than they
+  would in a private repo. And **rotation is not retroactive**: an
+  attacker who archives the ciphertext today and obtains any host age
+  key at any point in the future decrypts every secret that file ever
+  held, including ones rotated long before. A host key compromise is
+  therefore a *historical* breach of every secret that host could read,
+  not merely a present one — which raises the stakes on the impermanence
+  and host-key-handling questions elsewhere in this audit.
+- **Pull requests are an inbound path to `origin/master`**, which §4.1
+  establishes is fleet root. Anyone can open a PR against a public
+  repo. Whether that is a real path depends on things not visible in
+  the config: whether branch protection is enabled, whether any
+  workflow runs automatically on an untrusted PR, and whether any such
+  workflow holds a credential. None of that lives in this repo, so it
+  cannot be settled by reading it — see open question §8.8.
+
+**Already checked, and clean.** Because public history is permanent and
+un-revocable, the obvious first question is whether anything was ever
+committed in plaintext. It was not:
+
+- All 72 historical revisions of `secrets/secrets.yaml` carry
+  `ENC[AES256_GCM...]` markers — every revision, back to 2024, was
+  sops-encrypted at commit time. There is no pre-sops plaintext era in
+  this file's history.
+- No credential-shaped filename (`*.pem`, `*.key`, `id_rsa`,
+  `id_ed25519`, `.env`, `htpasswd`, `*.kdbx`, and similar) was ever
+  added anywhere in history — the only matches on a name scan of all
+  202 files ever added are `secrets/secrets.yaml` itself and two docs
+  *about* secrets.
+- A content scan of all 5,109 blobs in history for OpenSSH/PGP private
+  keys, `tskey-` tailscale auth keys, GitHub `gh[pousr]_` tokens, AWS
+  `AKIA` keys, Slack `xox*` tokens, Discord webhook URLs, Cloudflare
+  tokens, WireGuard private keys and generic long password/token
+  assignments produced exactly one match: `modules/services/octodns.nix`
+  line 142, which is the string `env/CLOUDFLARE_TOKEN` — octodns's own
+  environment-variable indirection placeholder, not a value.
+
+So the public-history exposure is a property to manage going forward,
+not an incident to clean up. That is a meaningfully better starting
+position than most public infrastructure repos, and it is worth
+preserving deliberately: the cost of a single plaintext commit here is
+permanent, since deleting it from the branch does not remove it from
+clones, forks, or GitHub's own dangling-object views.
+
+---
+
 ---
 
 ## 5. Adversaries
@@ -354,7 +431,7 @@ this specific fleet, not a general statement.
 | A3 | Malicious game-server client | authenticated-ish, speaks the protocol, reaches homelab through vps's DNAT | plausible; public game servers attract this |
 | A4 | LAN-local | a guest device, an IoT thing, a compromised phone on the home network | plausible, and mostly unmodelled today |
 | A5 | Rogue tailnet device | a stolen laptop, an over-broad auth key, an attacker-enrolled node | low, and the single highest-leverage compromise (§4.4) |
-| A6 | Supply chain | a malicious nixpkgs/flake input, or push access to `origin/master` | low probability, total impact (§4.1) |
+| A6 | Supply chain | a malicious nixpkgs/flake input, or push access to `origin/master`; on a **public** repo this also includes anyone opening a PR (§4.7) | low probability, total impact (§4.1) |
 | A7 | Local unprivileged user | anything running as `lilijoy` — a browser exploit, a malicious npm/cargo dep, a bad AI-agent tool call | **the most likely initial foothold** (§4.3) |
 | A8 | Physical | stolen thinkpad; no FDE today (`worktree-fde-secureboot-plan` is unmerged) | plausible for the laptop specifically |
 | A9 | Ransomware / destructive | anything that reaches the backup pool with delete authority (§4.5) | the worst case for asset #1 |
@@ -508,7 +585,21 @@ agent.
    correct for recovery media, where the point is unimpeded access to
    a broken box — but it is currently implicit, and recovery media
    gets booted on strange networks. P4.
-7. **Physical loss of the thinkpad.** (A8.) No FDE today; the plan
+8. **What protects `origin/master` on a public repo?** (§4.7, §4.1.)
+   Branch protection, required reviews, and whether any GitHub Actions
+   workflow runs on an untrusted PR or holds a credential. None of this
+   is visible from the repo contents, so it needs checking in the
+   GitHub settings directly. Given §4.1, this is the access control on
+   fleet root. P7 should flag what it cannot see; the answer is the
+   user's to supply.
+9. **Does the age-key set need rotating on a schedule?** (§4.7.) Since
+   the ciphertext is public and permanent, a key compromise is
+   retroactive across all history. That argues for treating age keys as
+   higher-value than they would be in a private repo, and possibly for
+   re-keying secrets that predate any host reinstall. P8, plus a user
+   decision on appetite.
+
+10. **Physical loss of the thinkpad.** (A8.) No FDE today; the plan
    exists on an unmerged branch. Out of scope for remediation, but the
    threat model should not pretend the risk is absent, and it changes
    how §4.1 reads — the laptop holds a key that is fleet root.

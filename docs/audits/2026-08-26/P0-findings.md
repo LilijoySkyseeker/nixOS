@@ -45,7 +45,11 @@ should confirm or refute rather than re-derive from scratch.
 - **Reachability:** A6 — anyone with push access to the GitHub repo,
   which includes both laptops' SSH keys (and therefore A7 and A8 by
   the chain in threat model §4.3), plus any PAT or CI credential with
-  write scope, plus GitHub itself.
+  write scope, plus GitHub itself. The repo is **public**, so the
+  deploy mechanism is fully documented to an attacker and anyone may
+  open a PR against it; whether that is a path depends on branch
+  protection and PR-triggered workflows, which are not visible from
+  the repo contents (threat model §4.7, open question §8.8).
 - **Rule:** new-rule candidate — `docs/hardening.md` says nothing about
   the deploy path's authenticity today.
 - **Finding:** homelab (`myAutoUpdate`) and both laptops
@@ -63,8 +67,10 @@ should confirm or refute rather than re-derive from scratch.
   decision*, not the presence of a bug.
 - **Proposed fix:** decision required. Options: (a) accept, and write
   it into `docs/hardening.md` as an explicit accepted risk with its
-  reasoning and the compensating controls (single admin, private repo,
-  2FA); (b) verify signatures in `fetch_and_merge_master` — `git
+  reasoning and the compensating controls (single admin, 2FA, branch
+  protection) — note the repo is **public**, so "few people know it
+  exists" is not among them, and PR-based paths into master must be
+  part of the accounting (threat model §4.7, open question §8.8); (b) verify signatures in `fetch_and_merge_master` — `git
   verify-commit` against an allowed-signers file, failing closed; (c)
   hybrid — signatures required on the hosts that matter most, accepted
   elsewhere. Note (b) meaningfully raises the cost of losing a laptop.
@@ -260,3 +266,56 @@ should confirm or refute rather than re-derive from scratch.
 - **Fix risk:** a stale pinned key breaks all unattended updates until
   corrected — GitHub rotates rarely but has done so.
 - **Owner:** P7, with P1 if the pin lands in the shared profile.
+
+### F-P0-08 — public, permanent ciphertext makes secret rotation non-retroactive
+
+- **File:** `secrets/secrets.yaml` (all 72 historical revisions),
+  `.sops.yaml`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** A6/A8 — anyone at all can archive the ciphertext
+  today, with no account, no rate limit and no trace. Decryption then
+  requires obtaining any recipient age key at any point in the future,
+  which is what a stolen thinkpad (A8) or a host compromise supplies.
+- **Rule:** new-rule candidate — `docs/hardening.md` covers secrets at
+  rest and swap, but says nothing about the repository being public.
+- **Finding:** the repo is public on GitHub, so `secrets/secrets.yaml`
+  and every one of its historical revisions are world-downloadable.
+  sops/age encryption is the only control; there is no network
+  boundary, access control, or rate limit in front of an offline
+  attack, and an attacker can retry forever. The consequence that is
+  easy to miss: **rotation does not undo exposure.** An age key
+  obtained years from now decrypts every secret the file ever held,
+  including ones rotated long ago, because the old ciphertext is
+  already in the attacker's possession. A host key compromise is
+  therefore a historical breach of everything that host could ever
+  read, not just a present one. This raises the value of every age key
+  and makes host-key handling (impermanence persistence, reinstall
+  procedure, the `bootstrap-host.sh` pre-generation flow) more
+  security-relevant than it looks.
+  Verified clean and worth recording: all 72 revisions are
+  sops-encrypted with no pre-sops plaintext era; no credential-shaped
+  filename was ever committed; and a scan of all 5,109 history blobs
+  for private keys, tailscale authkeys, GitHub/AWS/Slack tokens,
+  Discord webhooks, Cloudflare tokens and WireGuard private keys found
+  exactly one match, which is `modules/services/octodns.nix:142`'s
+  `env/CLOUDFLARE_TOKEN` indirection placeholder rather than a value.
+  So this is a property to manage, not damage to repair.
+- **Proposed fix:** no cleanup needed. Decisions to take: (a) treat age
+  keys as high-value credentials with a documented rotation and
+  re-keying posture, rather than as install-time incidentals; (b)
+  consider whether secrets predating any host reinstall should be
+  rotated *and* re-encrypted, accepting that the old ciphertext stays
+  public regardless; (c) write the "public repo" constraint into
+  `docs/hardening.md` and `docs/procedures/secrets.md`, so the next
+  person adding a secret understands the exposure model rather than
+  rediscovering it; (d) consider a pre-commit secret scan in
+  `.githooks/` so the currently-clean record stays clean, since a
+  single plaintext commit here is permanent and cannot be withdrawn.
+- **Fix risk:** none for (c)/(d). Re-keying under (b) touches every
+  host's ability to decrypt at boot and must not be done casually —
+  `docs/procedures/secrets.md` is explicit that secret operations are
+  manual and never performed by an agent.
+- **Owner:** P8 for the plumbing and the `.sops.yaml` recipient set;
+  P7 for the `.githooks/` scan; user decision on rotation appetite.
