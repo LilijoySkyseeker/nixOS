@@ -69,13 +69,18 @@ in
           ALLOW_FLIGHT = "TRUE";
           SPAWN_PROTECTION = "FALSE";
           SEED = "3522075773609978693";
-          # pause the JVM (SIGSTOP) when no clients are connected, resuming on
-          # the next connection attempt (knockd watches for it on the
-          # container's eth0). Requires max-tick-time disabled below — the
-          # server watchdog would otherwise self-kill on resume, since a
-          # single tick spans however long the process was paused.
-          ENABLE_AUTOPAUSE = "TRUE";
-          MAX_TICK_TIME = "-1";
+          # autopause (SIGSTOP-when-idle, via knockd) deliberately not used:
+          # pausing only ever saves CPU, not RAM (a stopped JVM keeps its
+          # full heap resident), and this port is public — DNAT'd through
+          # vps for friends without Tailscale — so it gets knocked by
+          # internet background scanners (confirmed: Oracle Cloud source
+          # IPs) every couple minutes regardless of real players. Measured
+          # live 2026-08-26: under knockd's default 120s re-pause window,
+          # that noise alone kept the JVM resumed ~65-75% of "idle" time,
+          # eating most of the CPU savings autopause exists for. Not worth
+          # the added complexity/attack surface (knockd needs NET_RAW,
+          # which in turn needs no-new-privileges dropped — see git history
+          # on this file if reconsidering autopause later).
           MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
           MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
           MODRINTH_PROJECTS = ''
@@ -113,9 +118,9 @@ in
         ];
         # container hardening: no capabilities beyond what a JVM needs (none)
         # plus the two the entrypoint needs to drop from root to the
-        # "minecraft" user (SETUID/SETGID, via gosu), no privilege escalation,
-        # and a read-only rootfs — everything the itzg entrypoint/JVM actually
-        # needs to write lives under /data (already a writable volume) or /tmp
+        # "minecraft" user (SETUID/SETGID, via gosu), and a read-only
+        # rootfs — everything the itzg entrypoint/JVM actually needs to
+        # write lives under /data (already a writable volume) or /tmp
         # (tmpfs below).
         #
         # TROUBLESHOOTING: if the container fails to start or crash-loops
@@ -136,9 +141,6 @@ in
           "--cap-drop=ALL"
           "--cap-add=SETUID"
           "--cap-add=SETGID"
-          # knockd (autopause) sniffs the connection attempt that wakes the
-          # paused JVM back up; needs raw-socket access to do that.
-          "--cap-add=NET_RAW"
           "--security-opt=no-new-privileges:true"
         ];
       };
