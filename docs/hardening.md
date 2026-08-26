@@ -41,6 +41,29 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
   won't cooperate with `sudo -u <user>` (e.g. a `nologin`-shelled
   system user like `crowdsec`, where run0-aliased sudo silently no-ops
   with exit 200), use `runuser -u <user> --` instead.
+  - **`security.sudo.enable = false` also changes third-party tools'
+    own wrapper behavior, not just this repo's code.** CrowdSec's own
+    `cscli` binary on `PATH` isn't the raw one — the NixOS module wraps
+    it (`pkgs.writeShellScriptBin "cscli"`, `environment.systemPackages`)
+    with a check that re-execs via `sudo -u <cfg.user>` when invoked as
+    the wrong user, but **hard-aborts** (`Aborting, cscli must be run as
+    user \`crowdsec\`!`) instead when `security.sudo.enable` is false —
+    which it always is here. Confirmed live on vps's own VM test: bare
+    `cscli` as root aborts every time, with no privilege-drop fallback.
+    A caller that needs `cscli` from a *different* unit's context (e.g.
+    `hosts/vps/configuration.nix`'s fail2ban `cscli.conf` ban action)
+    should call the package's raw binary by absolute store path
+    (`${config.services.crowdsec.package}/bin/cscli`) instead of the
+    wrapped name on `PATH`, bypassing this check entirely — and should
+    generally run as root rather than `runuser -u crowdsec --`-ing into
+    it, unless the calling unit's own `CapabilityBoundingSet` actually
+    includes `CAP_SETUID`/`CAP_SETGID` (`runuser` needs them to switch
+    UID, and `CapabilityBoundingSet` restricts every child process
+    regardless of nominal UID 0 — fail2ban's own systemd unit doesn't
+    grant these, so `runuser` from its action would fail; root already
+    has the file access this needs via `CAP_DAC_READ_SEARCH`, and
+    CrowdSec's local API only cares about the credentials file's
+    contents, not OS-level caller identity).
 - **SSH**: deny everything not explicitly needed —
   `passwordAuthentication no`, `PermitRootLogin prohibit-password`,
   `AuthenticationMethods publickey`, `X11Forwarding no`,
