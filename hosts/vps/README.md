@@ -23,7 +23,17 @@ If the running droplet is unreachable, don't fight a bad boot — destroy
 and recreate it in the DO dashboard (no DigitalOcean API tooling lives
 in this repo, so that step is manual): `DO-Regular`, 1 vCPU, 1GB RAM,
 25GB disk, same region, any SSH key added at creation just needs to
-get `nixos-anywhere` in the door.
+get `nixos-anywhere` in the door. A reserved IP pair survives a
+recreate if you reassign it — check the new droplet's actual public
+IPv4/IPv6 before assuming either changed.
+
+Before running the install — the fresh box needs a *working* key the
+moment it boots, not after: generate a new tailscale auth key in the
+admin console (the old device is stale after a droplet recreate), then
+set `tailscale_authkey_vps`'s value via `sops secrets/secrets.yaml`
+yourself — value rotation is user-only, see
+`docs/procedures/secrets.md`. Doing this after the install just means
+the first boot fails to connect on a key that was already dead.
 
 Then, from a machine with the flake checked out (never build on vps
 itself — 1 vCPU/1GB is too constrained):
@@ -45,14 +55,9 @@ updatekeys`, then the `nixos-anywhere` invocation itself.
 
 After install:
 
-- Update anything hardcoding the old public IP:
-  `modules/services/octodns.nix`'s `vpsPublicIp` and
-  `hosts/homelab/configuration.nix`'s wireguard peer `endpoint`.
-- Rotate the tailscale auth key: generate a new one in the tailscale
-  admin console (the old device is stale after a droplet recreate),
-  then set `tailscale_authkey_vps`'s value via `sops
-  secrets/secrets.yaml` yourself — value rotation is user-only, see
-  `docs/procedures/secrets.md`.
+- If the public IP did change, update `modules/services/octodns.nix`'s
+  `vpsPublicIp`(`6`) and `hosts/homelab/configuration.nix`'s wireguard
+  peer `endpoint`.
 - Confirm `crowdsec`, `crowdsec-firewall-bouncer`,
   `tailscaled-autoconnect`, `caddy`, and the fail2ban jail are all
   active before trusting the box, then exercise a real reboot — the
