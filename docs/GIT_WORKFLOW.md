@@ -1,9 +1,11 @@
 # Git workflow
 
 Solo repo, worked on from multiple machines concurrently (thinkpad, torrent,
-homelab, vps). Trunk-based: work directly on `master`, use a short-lived
-branch only for something risky enough to want to test in isolation before
-merging.
+homelab, vps). PR-based: branch, open a PR, merge via PR (a real merge
+commit — `gh pr merge` without `--squash`/`--rebase`, matching the existing
+`Merge pull request #N ...` history) — reserve a direct commit to `master`
+for something genuinely small (a typo, a one-line doc correction, a TODO.md
+note) where opening a PR would be pure ceremony.
 
 ## Setup (per machine)
 
@@ -64,19 +66,21 @@ content line (e.g. the test plan).
 
 - Pull before starting work on any machine: `git pull` (rebases, per config
   above).
-- Commit directly to `master` for normal changes.
+- Branch, then open a PR — this is the default for anything more than a
+  trivial change, not just "something risky." Rebase the branch onto
+  `master` first if it's fallen behind, then merge the PR (a real merge
+  commit, not squash/rebase) once it builds clean.
+- Commit directly to `master` only for something genuinely small (a typo, a
+  one-line doc correction, a TODO.md note) — if you're unsure whether a
+  change qualifies, open a PR.
 - Test with `nixos-rebuild build`/`dry-build` before committing anything that
   changes a host's config; only `switch` when you intend to deploy.
-- For something you want to iterate on across multiple commits before it's
-  trustworthy (e.g. a new service, a risky refactor of `modules/profiles/`), branch,
-  then merge (fast-forward preferred — rebase the branch onto `master` first)
-  once it builds clean.
 - Once a branch's content has landed on `master`, prune it if safe: delete
   the local branch (`git branch -d <branch>`, not `-D`, so it refuses if
   unmerged) and the remote one (`git push origin --delete <branch>`) or via
-  `gh pr merge --delete-branch` if a PR was opened. Skip pruning if the
-  branch is still needed for reference (e.g. an open PR under discussion) or
-  if another machine/worktree might still be using it.
+  `gh pr merge --delete-branch`. Skip pruning if the branch is still needed
+  for reference (e.g. an open PR under discussion) or if another
+  machine/worktree might still be using it.
 - If two machines diverge (forgot to pull before committing elsewhere), rebase
   on pull is already the default — resolve any `flake.lock` conflict by
   regenerating it (`nix flake lock`) rather than hand-editing.
