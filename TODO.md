@@ -214,6 +214,12 @@ them rot.
       severity rubric P1–P8 must apply, six recurring failure modes to
       probe for, and seven open questions. Every claim in it is cited
       by `file:line` and the citations were verified against source.
+      P0's own cross-cutting findings are recorded in the standard
+      finding schema at `docs/audits/2026-08-26/P0-findings.md`
+      (F-P0-01..07) so Phase 2 consolidates them rather than losing
+      them in prose; that file is also the format reference P1-P8
+      write against. Phase 1 dispatched 2026-08-26: eight audit
+      subagents running against the parts below.
       Two things it turned up that reframe the audit before it starts:
       `origin/master` on GitHub is an unsigned, unattended root
       credential for all four real hosts (§4.1), and there is no
