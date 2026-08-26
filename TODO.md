@@ -19,19 +19,36 @@ them rot.
       address (ISP RA-delegated), which quietly changes the risk model
       for every host-wide (non-interface-scoped) firewall rule on that
       box — a class of gap that was invisible under IPv4-only CGNAT.
-      sshd's host-wide exposure is already fixed (see the fix commit
-      referenced by this session), and jellyfin's is logged as its own
-      item below, still open. This item is for a broader pass beyond
-      just those two: audit homelab as a whole (not just IPv6-triggered
-      findings) — every `networking.firewall.allowedTCPPorts`/
-      `allowedUDPPorts`/`openFirewall` use, docker container hardening
-      (capabilities, read-only rootfs, network exposure — minecraft.nix/
-      factorio.nix already do this carefully, worth checking the rest
-      got the same treatment), systemd hardening completeness across
-      all of homelab's services (some services have detailed hardening
-      comments, e.g. jellyfin/samba/nfs — confirm nothing was missed
-      elsewhere), and whether anything else assumes "this box has no
-      real public address" the way sshd/jellyfin did. Not started.
+      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed and
+      deployed (see the fix commits referenced by this session; the
+      sibling item below tracks final reboot-survival confirmation
+      before it's fully closed out). This item is for a broader pass
+      beyond just those: audit homelab as a whole (not just
+      IPv6-triggered findings) — every `networking.firewall.
+      allowedTCPPorts`/`allowedUDPPorts`/`openFirewall` use, docker
+      container hardening (capabilities, read-only rootfs, network
+      exposure — minecraft.nix/factorio.nix already do this carefully,
+      worth checking the rest got the same treatment), systemd
+      hardening completeness across all of homelab's services (some
+      services have detailed hardening comments, e.g. jellyfin/samba/
+      nfs — confirm nothing was missed elsewhere), and whether anything
+      else assumes "this box has no real public address" the way
+      sshd/jellyfin did. Not started. Also fold in, surfaced while
+      working the sshd/jellyfin fix:
+      - `modules/profiles/PC.nix` sets `remotePlay.openFirewall = true`
+        (Steam Remote Play) host-wide for thinkpad/torrent — same
+        host-wide-rule pattern as the homelab findings above, though
+        lower urgency since these are laptops that roam between
+        networks rather than a fixed server always on one known
+        network; worth auditing whether that roaming actually makes it
+        *worse* (an unknown network's own IPv6/NAT posture is far less
+        predictable than a home ISP's).
+      - homelab currently has no intrusion detection at all (no
+        CrowdSec/fail2ban, unlike vps) — fine today since access is
+        gated entirely by tailscale's own device authorization (ACLs/
+        key approval) rather than exposed ports, but worth an explicit
+        decision on whether that trust boundary is sufficient long-term
+        or whether basic protections belong at the homelab layer too.
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —

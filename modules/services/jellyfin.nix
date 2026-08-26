@@ -94,12 +94,15 @@ in
       # configuration.nix's anubis.instances.jellyfin.settings.TARGET) — so
       # scope to just those two interfaces instead. This also drops
       # openFirewall's LAN auto-discovery ports (SSDP 1900/udp, jellyfin's
-      # own 7359/udp) and 8920/tcp (HTTPS, unused here) — deliberate,
-      # not an oversight.
+      # own 7359/udp) and 8920/tcp (HTTPS, unused here) — confirmed nothing
+      # on the LAN depends on direct/discovered access, so no client-side
+      # fallout. The old allowedUDPPorts = [ 8096 ] is also dropped here,
+      # not just re-scoped — jellyfin's own docs
+      # (https://jellyfin.org/docs/general/networking/#port-bindings) only
+      # list TCP 8096/8920 and discovery UDP 1900/7359 as real ports; UDP
+      # 8096 was never one of them.
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
-      networking.firewall.interfaces.tailscale0.allowedUDPPorts = [ 8096 ];
       networking.firewall.interfaces.wg0.allowedTCPPorts = [ 8096 ];
-      networking.firewall.interfaces.wg0.allowedUDPPorts = [ 8096 ];
 
       # persistence
       environment.persistence.${vars.persistRoot}.directories =
