@@ -450,38 +450,6 @@ them rot.
       (intentional, just needs to stay documented) and observing the
       `Persistent = false` deploy through an actual long-outage reboot.
 
-- [ ] **2026-08-18: sops-nix `age.keyFile` fallback doesn't actually
-      fire when `age.sshKeyPaths` fails during early boot** (torrent).
-      `profiles/PC.nix` configures both `sops.age.sshKeyPaths = [
-      "/home/lilijoy/.ssh/id_ed25519" ]` and `sops.age.keyFile =
-      "/var/lib/sops-nix/key.txt"`, with `keyFile` explicitly intended
-      as the early-boot fallback since `/home` isn't mounted yet during
-      initrd-stage activation (see the comment there). On a real boot,
-      the initrd-stage `sops-install-secrets` run failed entirely
-      (`Cannot read ssh key '/home/lilijoy/.ssh/id_ed25519': ... no such
-      file or directory` immediately followed by `Error getting data
-      key: 0 successful groups required, got 0`) instead of falling
-      back to `keyFile` — `/run/secrets` never got populated for the
-      rest of that boot (git identity, and presumably other
-      home/root-critical secrets, all missing) until manually re-run
-      post-boot via `run0 sops-install-secrets ...` (which then
-      succeeded immediately, confirming `key.txt` itself and its
-      `.sops.yaml` registration were never the problem). Looks like a
-      real sops-nix bug/limitation: a failed `sshKeyPaths` entry seems
-      to poison the whole identity list rather than gracefully falling
-      through to `keyFile`. Needs: check for a known upstream sops-nix
-      issue/fix, or restructure so boot-critical secrets don't depend on
-      an identity path that's guaranteed to fail during initrd (e.g.
-      drop `sshKeyPaths` from the boot-time identity list entirely and
-      rely on `keyFile` alone there). Not yet reproduced against a clean
-      reboot (holding off per the no-unconfirmed-local-restarts rule).
-
-      **Confirmed still present in code, 2026-08-25** (path moved to
-      `modules/profiles/PC.nix` post-dendritic, same content): both
-      `sops.age.sshKeyPaths` and `sops.age.keyFile` are still configured
-      in the same vulnerable order, unchanged. Still open, still
-      unreproduced against a clean reboot.
-
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
       ports — reviewed 2026-08-26, parked as a long-term/low-priority
       project, not actively planned.** (Minecraft 25565/19132, Factorio
