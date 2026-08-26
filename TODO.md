@@ -13,46 +13,212 @@ them rot.
 
 ## Active
 
-- [ ] **2026-08-26: do a full security audit / hardening pass on
-      homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
-      turned out to already carry a real, globally-routable public IPv6
-      address (ISP RA-delegated), which quietly changes the risk model
-      for every host-wide (non-interface-scoped) firewall rule on that
-      box — a class of gap that was invisible under IPv4-only CGNAT.
-      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed,
-      deployed, and reboot-verified (`f93ca49`, `deaf882`, `9134a47`,
-      `0a774e5` — see `docs/DONE.md`). This item is for a broader pass
-      beyond just those: audit homelab as a whole (not just
-      IPv6-triggered findings) — every `networking.firewall.
-      allowedTCPPorts`/`allowedUDPPorts`/`openFirewall` use, docker
-      container hardening (capabilities, read-only rootfs, network
-      exposure — minecraft.nix/factorio.nix already do this carefully,
-      worth checking the rest got the same treatment), systemd
-      hardening completeness across all of homelab's services (some
-      services have detailed hardening comments, e.g. jellyfin/samba/
-      nfs — confirm nothing was missed elsewhere), and whether anything
-      else assumes "this box has no real public address" the way
-      sshd/jellyfin did. Not started. Also fold in, surfaced while
-      working the sshd/jellyfin fix:
-      - `modules/profiles/PC.nix` sets `remotePlay.openFirewall = true`
-        (Steam Remote Play) host-wide for thinkpad/torrent — same
-        host-wide-rule pattern as the homelab findings above, though
-        lower urgency since these are laptops that roam between
-        networks rather than a fixed server always on one known
-        network; worth auditing whether that roaming actually makes it
-        *worse* (an unknown network's own IPv6/NAT posture is far less
-        predictable than a home ISP's).
-      - homelab currently has no intrusion detection at all (no
-        CrowdSec/fail2ban, unlike vps) — fine today since access is
-        gated entirely by tailscale's own device authorization (ACLs/
-        key approval) rather than exposed ports, but worth an explicit
-        decision on whether that trust boundary is sufficient long-term
-        or whether basic protections belong at the homelab layer too.
-      - `bootctl` warns on every boot that `/boot`'s mount point and its
+- [ ] **2026-08-26: fleet-wide security hardening audit + "is this
+      still needed?" config review, run as a multi-agent pass.**
+      Originally scoped to homelab only (see trigger below); widened
+      2026-08-26 to cover **every host and every shared module in this
+      repo**, on two axes at once:
+      1. **Hardening.** Conformance to `docs/hardening.md`'s standing
+         rules (dedicated service users, systemd sandboxing, SSH
+         lockdown, no-sudo/run0, swap/secrets, forwarded-port rate
+         limiting), *plus* general security review beyond what that
+         doc already codifies — anything an auditor would flag that
+         we simply never wrote a rule for.
+      2. **Needed/used.** Whether each option, service, package,
+         firewall hole, group membership, and secret is still
+         actually used and still actually justified. Dead config is a
+         security finding here, not just tidiness: an unused
+         `openFirewall`, a group nobody needs, or a service kept
+         "just in case" is attack surface with no owner.
+
+      **Why multi-agent.** ~6.9k lines of Nix across 5 hosts + shared
+      modules + flake infra, and a careful audit needs the pinned
+      nixpkgs source checked per option rather than recalled. That
+      does not fit one agent's context at the depth this deserves, so
+      the config is split into the parts below and a security-audit
+      subagent is dispatched per part, each producing a report to a
+      fixed schema, followed by a consolidation pass.
+
+      **Trigger (original homelab scope, still in force).** homelab's
+      LAN NIC turned out to already carry a real, globally-routable
+      public IPv6 address (ISP RA-delegated), which quietly changes
+      the risk model for every host-wide (non-interface-scoped)
+      firewall rule on that box — a class of gap that was invisible
+      under IPv4-only CGNAT. sshd/jellyfin/minecraft/factorio's
+      host-wide exposure is already fixed, deployed, and
+      reboot-verified (`f93ca49`, `deaf882`, `9134a47`, `0a774e5` —
+      see `docs/DONE.md`). The question this audit answers is what
+      *else*, on any host, assumes "this box has no real public
+      address" the way sshd/jellyfin did.
+
+      ### Phase 0 — threat model (do first, single agent)
+      Write `docs/audits/2026-08-26/00-threat-model.md`: the actual
+      adversaries and trust boundaries, so all eight audits rate
+      severity on the same scale instead of each inventing one. At
+      minimum: the public internet vs. `vps` (only host with a real
+      public IPv4 + listeners); the public internet vs. `homelab`'s
+      RA-delegated IPv6 on the LAN NIC; anything already on the LAN;
+      a tailnet-authorized device (today the *only* gate on most
+      services — is device authorization alone sufficient?); a
+      roaming laptop on an untrusted network (`thinkpad`, `torrent`,
+      whose own IPv6/NAT posture is unpredictable in a way a known
+      home ISP's is not); a compromised backup *source* host (zrepl's
+      pull direction was chosen for exactly this); supply chain via
+      the auto-update/deploy path; and local unprivileged-user → root
+      on the workstations.
+
+      ### Phase 1 — parallel audits (one subagent per part)
+      Each part is coherent enough to audit without the others.
+      Cross-cutting concerns are assigned to exactly one owner to
+      keep findings from being reported eight times.
+
+      - **P1 — shared baseline & profiles.**
+        `modules/profiles/{default,server,PC}.nix` (~635 lines).
+        Highest blast radius: every host inherits this. Owns
+        `networking.firewall.enable`, run0/sudo-alias,
+        `nix.settings.allowed-users`, auditd, and every
+        desktop-profile grant. Already-spotted seeds: `PC.nix:306`
+        `initialPassword = "123456"` on the login user; `PC.nix:289`
+        `services.avahi.openFirewall = true` (host-wide mDNS on
+        roaming laptops); `PC.nix:313` `docker` group on `lilijoy`
+        (docker socket membership is root-equivalent — check whether
+        the podman/`dockerCompat` setup at `PC.nix:113` makes it
+        unnecessary); `PC.nix:320` Steam `remotePlay.openFirewall`
+        host-wide (folded in from the original entry — and audit
+        whether roaming makes it *worse* than the fixed-server case,
+        not better).
+      - **P2 — `vps`, the internet-facing edge.**
+        `hosts/vps/{configuration,disko,hardware-configuration}.nix`
+        (~827 lines). The only host with real public listeners:
+        caddy, anubis, crowdsec + firewall bouncer, fail2ban,
+        wireguard `wg0`, `networking.nat` game-server forwarding and
+        the `firewall.extraCommands` rate limiting that backstops it,
+        cloud-init, GRUB, impermanence. Also owns the `vps-deploy`
+        identity: polkit rule, `nix.settings.trusted-users`, and the
+        `vpsDeployDispatcher` shell script — audit that dispatcher as
+        *hostile input handling*, since it is what a compromised
+        homelab would reach.
+      - **P3 — `homelab`, host config.**
+        `hosts/homelab/{configuration,disko,hardware-configuration}.nix`
+        (~742 lines). restic → Backblaze, docker daemon settings,
+        nvidia/GPU, `systemd.tmpfiles` permissions,
+        networkd-dispatcher, `boot.zfs.extraPools`, the impermanence
+        persist list, sshd. Folded in from the original entry:
+        `bootctl` warns every boot that `/boot`'s mount point and its
         `loader/random-seed` file are world-accessible ("which is a
-        security hole"), surfaced in the 2026-08-26 reboot's journal —
-        minor, but a real finding worth folding into this pass rather
-        than a one-off fix.
+        security hole"), surfaced in the 2026-08-26 reboot journal.
+      - **P4 — services: containers & network shares.**
+        `modules/services/{minecraft,factorio,jellyfin,samba,nfs,
+        copyparty-iso}.nix` (~625 lines). Container capability sets,
+        read-only rootfs, port exposure, share ACLs and auth
+        identities. `minecraft.nix`/`factorio.nix` were done
+        carefully and are the reference standard — confirm the rest
+        got the same treatment. Seed: `copyparty-iso.nix:43` opens
+        3923 host-wide while `:34-37` serves `/` with `A = [ "*" ]`
+        (admin, unauthenticated) — probably deliberate for a recovery
+        ISO, but it needs an explicit written justification rather
+        than an implicit one.
+      - **P5 — workstations: `thinkpad` + `torrent`.**
+        `hosts/thinkpad/*` and `hosts/torrent/*` (~550 lines).
+        Roaming/untrusted-network threat model, interaction with the
+        P1 desktop profile, `PermitRootLogin forced-commands-only`,
+        torrent's own exposure, nvidia.
+      - **P6 — backup & replication.**
+        `modules/nixos/{zrepl,zfs-space-guard,nfs-homelab-mounts}.nix`
+        (~1232 lines) plus homelab's restic jobs by reference. The
+        largest single module and a root-run daemon: audit the
+        `authorized_keys` forced-command boundary, the
+        server-side-fixed identity, the pull-not-push trust
+        direction, `zfs allow` delegations, and what a compromised
+        peer can actually reach.
+      - **P7 — deploy, update & control plane.**
+        `modules/nixos/{auto-update,pull-deploy,push-deploy,
+        iso-autobuild,health-alerts}.nix` (~899 lines),
+        `modules/flake/deploy-guards.nix`, `scripts/bootstrap-host.sh`.
+        This is the "what can cause code to run as root across the
+        fleet" surface — arguably the highest-value target after P2.
+        Audit authn/authz on every trigger path, what is signed or
+        verified vs. merely reachable, and the blast radius of a
+        compromised trigger.
+      - **P8 — supply chain, flake infra, secrets plumbing, user env.**
+        `flake.nix`, `modules/flake/*`, `modules/home-manager/*`
+        (incl. `claude-code.nix`), `modules/nixos/{tooling,kde,
+        virtual-machines,wooting}.nix`, `tests/*`, `files/`. Input
+        pinning and `flake.lock` provenance, substituters/trusted
+        public keys, `nix.settings` across hosts, udev rules, and the
+        **sops wiring** — `secrets/.sops.yaml` key/recipient policy
+        and per-host `sops.secrets` declarations, ownership and mode.
+        Strictly the plumbing: per `docs/procedures/secrets.md`, no
+        agent decrypts or edits `secrets/*`, ever.
+
+      ### Contract every audit subagent follows
+      - **Read-only.** No edits, no rebuilds against live hosts, no
+        `switch`, no secret decryption. Findings only.
+      - **Verify against the pinned nixpkgs**, not recall — what a
+        module option actually does in *this* flake's nixpkgs, since
+        defaults differ by version and that is exactly where a
+        hardening assumption silently fails.
+      - **Apply the Phase 0 threat model** for severity, and state
+        explicitly *who* reaches the issue and *from where*.
+      - **Cover both axes** — a part's report must address
+        needed/used, not just hardening.
+      - **Separate CONFIRMED from PLAUSIBLE**: say which lines were
+        actually read and which claims are inference.
+      - **Fixed output schema** per finding: id, `file:line`,
+        severity, reachability/threat path, confidence, whether it
+        violates an existing `docs/hardening.md` rule or is a
+        *candidate for a new one*, proposed fix, and the risk/blast
+        radius of applying that fix.
+      - Report to `docs/audits/2026-08-26/P<n>-<part>.md`.
+
+      ### Phase 2 — consolidation
+      Dedupe across the eight reports, reconcile severity, and write
+      `docs/audits/2026-08-26/findings.md`: one ranked list, with
+      fleet-wide/systemic findings (a whole class of mistake repeated
+      across hosts) called out separately from one-off ones — those
+      are the ones that become new baseline rules.
+
+      ### Phase 3 — remediation, in waves
+      Sequenced, not one giant branch. Shared-baseline changes (P1)
+      land first since they move every host at once and need the most
+      testing; per-host changes follow. Every wave goes through the
+      repo's own gates — `nixos-rebuild build --flake .#<host>` for
+      each affected host, a VM test where behaviour (not just config)
+      changes, and no `switch` without being asked. Anything
+      requiring the user's own sign-off (accepting a risk, moving a
+      trust boundary) is surfaced as a decision, not decided by an
+      agent.
+
+      ### Phase 4 — documentation harvest
+      The audit's real output is not just fixes but *knowledge*, and
+      it goes back into the docs rather than dying in a report:
+      - New standing rules and newly-understood gotchas → the
+        relevant `docs/` file, primarily `docs/hardening.md`, which
+        is already the codified baseline and so is where "we now
+        always do X" belongs.
+      - The written threat model → kept as a durable doc, since every
+        future service decision needs it.
+      - `docs/audits/` is a new directory: add a row for it to
+        `AGENTS.md`'s "Where things live" table, per
+        `docs/procedures/updating-documentation.md`.
+      - Accepted-risk items (audited and deliberately *not* fixed)
+        get written down with their justification, so a future pass
+        does not re-litigate them from scratch.
+      - Plus whatever the user directs into `TODO.md` as follow-up:
+        remediation that is deferred rather than done stays tracked
+        here, not in a report file nobody reads.
+
+      **Standing decision still open, carried over from the original
+      entry:** homelab has no intrusion detection at all (no
+      CrowdSec/fail2ban, unlike vps). Fine today *if* access really is
+      gated entirely by tailscale's own device authorization
+      (ACLs/key approval) rather than exposed ports — which is
+      precisely what Phase 0 and P3 must confirm rather than assume.
+      Needs an explicit decision on whether that trust boundary is
+      sufficient long-term or whether basic protections belong at the
+      homelab layer too.
+
+      Not started.
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
