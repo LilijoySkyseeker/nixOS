@@ -3,7 +3,6 @@
   flake.modules.homeManager.tooling =
     {
       pkgs-stable,
-      pkgs-unstable,
       config,
       lib,
       options,
@@ -106,22 +105,10 @@
         enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
       };
 
-      # KDE Connect
-      services.kdeconnect = {
-        enable = true;
-        indicator = true;
-      };
-
       # zoxide
       programs.zoxide = {
         enable = true;
         enableFishIntegration = true;
-      };
-
-      # OBS Studio
-      programs.obs-studio = {
-        enable = true;
-        plugins = with pkgs-stable.obs-studio-plugins; [ obs-pipewire-audio-capture ];
       };
 
       # BTOP
@@ -134,20 +121,6 @@
           proc_per_core = true;
           proc_sorting = "cpu direct";
         };
-      };
-
-      # Obsidian
-      programs.obsidian = {
-        enable = true;
-        package = pkgs-unstable.obsidian;
-        cli.enable = true;
-      };
-
-      # Firefox
-      programs.firefox = {
-        enable = true;
-        configPath = "${config.xdg.configHome}/mozilla/firefox";
-
       };
 
       # fish
