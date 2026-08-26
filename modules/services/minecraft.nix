@@ -113,9 +113,9 @@ in
         ];
         # container hardening: no capabilities beyond what a JVM needs (none)
         # plus the two the entrypoint needs to drop from root to the
-        # "minecraft" user (SETUID/SETGID, via gosu), no privilege escalation,
-        # and a read-only rootfs — everything the itzg entrypoint/JVM actually
-        # needs to write lives under /data (already a writable volume) or /tmp
+        # "minecraft" user (SETUID/SETGID, via gosu), and a read-only
+        # rootfs — everything the itzg entrypoint/JVM actually needs to
+        # write lives under /data (already a writable volume) or /tmp
         # (tmpfs below).
         #
         # TROUBLESHOOTING: if the container fails to start or crash-loops
@@ -139,7 +139,22 @@ in
           # knockd (autopause) sniffs the connection attempt that wakes the
           # paused JVM back up; needs raw-socket access to do that.
           "--cap-add=NET_RAW"
-          "--security-opt=no-new-privileges:true"
+          # deliberately no --security-opt=no-new-privileges here (unlike
+          # factorio.nix): itzg's image grants knockd NET_RAW via a build-time
+          # `setcap cap_net_raw=ep` file capability (PR itzg/docker-minecraft-
+          # server#2625), since gosu's setuid drop to the unprivileged
+          # "minecraft" user clears the process's own effective NET_RAW
+          # before knockd ever runs. no-new-privileges disables exactly that
+          # file-capability-on-exec mechanism (that's its purpose), so with
+          # it set knockd fails with "could not open eth0: ... Operation not
+          # permitted" and autopause never actually pauses — confirmed live
+          # 2026-08-26, root-caused via itzg/docker-minecraft-server#2421/
+          # #2625/#2813. Accepted trade-off: --cap-drop=ALL above already
+          # limits the bounding set to just SETUID/SETGID/NET_RAW, so
+          # dropping no-new-privileges only lets those three (already-
+          # granted) capabilities be exercised via setuid/file-cap binaries
+          # inside the container — it doesn't let the container acquire
+          # anything beyond what --cap-add already grants it.
         ];
       };
     };

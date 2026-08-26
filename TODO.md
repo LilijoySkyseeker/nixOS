@@ -286,6 +286,38 @@ them rot.
       routes around the packet-capture path entirely rather than hitting
       the same capability wall.
 
+      **2026-08-26: root-caused and fixed in code (not yet deployed).**
+      The image *does* have a post-setuid mechanism for this — itzg's
+      Dockerfile runs `setcap cap_net_raw=ep /usr/local/sbin/knockd` at
+      build time (added in itzg/docker-minecraft-server#2625, closing
+      #2421, specifically so knockd regains `NET_RAW` after gosu's setuid
+      drop to the unprivileged `minecraft` user without needing `sudo`).
+      File capabilities granted on `execve()` are exactly what Docker's
+      `--security-opt=no-new-privileges:true` disables by design (that's
+      the flag's entire purpose) — `modules/services/minecraft.nix` had
+      that flag set, so it was silently blocking the very mechanism the
+      image relies on. `AUTOPAUSE_KNOCK_INTERFACE` (interface-name
+      selection, default `eth0`) was a dead end, unrelated to this
+      permission failure. `--security-opt=no-new-privileges:true` removed
+      from `minecraft-vanilla-plus`'s `extraOptions`
+      (`modules/services/minecraft.nix`); `factorio.nix` keeps it
+      unchanged since factorio has no autopause/knockd. Accepted
+      trade-off documented inline: `--cap-drop=ALL` already limits the
+      bounding set to `SETUID`/`SETGID`/`NET_RAW`, so removing
+      no-new-privileges only lets those three already-granted
+      capabilities be exercised via setuid/file-cap binaries inside the
+      container — nothing beyond what `--cap-add` already grants.
+      `nixos-rebuild build --flake .#homelab` confirmed clean, and the
+      built unit's `ExecStart` was inspected directly in the nix store to
+      confirm `--security-opt=no-new-privileges` is gone while
+      `--cap-drop=ALL`/`--cap-add=SETUID`/`--cap-add=SETGID`/
+      `--cap-add=NET_RAW` are unchanged. **Not yet deployed** — needs
+      `nixos-rebuild switch` on homelab (will restart the container,
+      disrupting any players currently online) and then a real fresh
+      container start to confirm knockd actually launches this time and
+      autopause survives a full pause/knock/resume cycle without the
+      watchdog firing.
+
 - [ ] **2026-08-20: wg0 IPv4-endpoint fix — deployed and working; still
       needs to survive a real IPv6 address rotation unwatched.**
       `hosts/homelab/configuration.nix`'s wg0 peer now points at vps's
