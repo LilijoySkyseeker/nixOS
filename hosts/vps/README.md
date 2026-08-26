@@ -44,6 +44,10 @@ lose yet), run the install, then resize back down to `DO-Regular`/1GB
 once it succeeds. This is a real, recurring cost tradeoff for this
 host, not a one-off — expect to repeat it on every future reinstall
 until/unless a lower-memory install path is found.
+`scripts/bootstrap-host.sh` checks the target's total RAM (>= 1900MB
+— comfortably clears DO's 2GB tier at ~1962MB while rejecting the 1GB
+tier at ~956MB) before touching anything and refuses to proceed if
+it's short, rather than run headlong into the same OOM again.
 
 Before running the install — the fresh box needs a *working* key the
 moment it boots, not after: generate a new tailscale auth key in the

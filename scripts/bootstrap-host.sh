@@ -23,10 +23,12 @@ set -euo pipefail
 # kexec needs genuinely free, kernel-pinned physical RAM for the new
 # kernel+initrd -- confirmed live (twice) that a tiny/RAM-constrained
 # target can OOM-kill it even with swap added, since swap only helps
-# reclaim swappable pages and kexec's own allocation isn't one. This
-# script does not work around that; resize the target up for more real
-# RAM before installing if it's tight, then back down after. See
-# docs/procedures/new-host.md and hosts/vps/README.md.
+# reclaim swappable pages and kexec's own allocation isn't one. Refuses
+# to proceed against a real target with less than MIN_MEM_MB total RAM
+# (see below) rather than run headlong into the same OOM again --
+# resize the target up for more real RAM before installing if it's
+# tight, then back down after. See docs/procedures/new-host.md and
+# hosts/vps/README.md.
 #
 # Example (DigitalOcean, impermanence, needs --kexec-extra-flags -c):
 #   scripts/bootstrap-host.sh vps 164.90.1.2 --persist-root /persist -- --kexec-extra-flags -c
@@ -62,6 +64,36 @@ host_dir="$repo_root/hosts/$host"
 	echo "no such host: $host_dir" >&2
 	exit 1
 }
+
+# Checked against total RAM, not "available" -- total is a fixed
+# per-tier number, so it isn't affected by transient cache/buffer
+# state the way "available" is. 1900 reliably tells apart DigitalOcean's
+# 1GB tier (~956MiB reported) from its 2GB tier (~1950MiB reported)
+# without being thrown off by a few MB of reporting variance.
+min_mem_mb=1900
+if ! $vm_test; then
+	echo "==> checking $target has enough RAM for kexec (it needs genuinely free,"
+	echo "    kernel-pinned physical memory -- confirmed live that even a 1GB"
+	echo "    droplet with a swapfile added still OOM-kills kexec)"
+	ssh_check_opts=(-o ConnectTimeout=8 -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+	mem_total_kb=$(ssh "${ssh_check_opts[@]}" "root@$target" \
+		"awk '/MemTotal/{print \$2}' /proc/meminfo") || {
+		echo "couldn't check memory on root@$target -- unreachable, or its SSH host key" >&2
+		echo "changed (recreated droplet reusing an old IP?) -- see docs/procedures/new-host.md" >&2
+		exit 1
+	}
+	mem_total_mb=$((mem_total_kb / 1024))
+	if ((mem_total_mb < min_mem_mb)); then
+		cat >&2 <<-EOF
+			$target only has ${mem_total_mb}MB total RAM (want >= ${min_mem_mb}MB).
+			kexec needs real headroom beyond what this tier reliably provides -- confirmed
+			live that it OOM-kills even with a swapfile added. Resize the target up to a
+			bigger RAM tier, then re-run this script; resize back down once install succeeds.
+		EOF
+		exit 1
+	fi
+	echo "==> $target has ${mem_total_mb}MB total RAM, proceeding"
+fi
 
 work_dir=$(mktemp -d)
 cleanup() {
