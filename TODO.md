@@ -13,49 +13,15 @@ them rot.
 
 ## Active
 
-- [ ] **2026-08-26: `/storage`/`/storage-bulk` failed their first mount
-      attempt on boot, self-healed within the same boot — worth
-      understanding, not urgent.** Surfaced by the full homelab reboot
-      done to verify the tailscale0-only firewall re-scoping (see the
-      security-audit items below). Boot sequence from `journalctl -b`:
-      `zdata`'s import itself raced once (`cannot import 'zdata': no
-      such pool available`, retried ~2s later and succeeded — ZFS's own
-      import unit has built-in retry, worked as designed), then
-      immediately after the successful import, both `storage.mount` and
-      `storage-bulk.mount` (the `/etc/fstab`-generated units, from this
-      repo's `fileSystems."/storage"`/`"/storage-bulk"` entries) failed
-      their own mount attempt (`status=2/INVALIDARGUMENT`) within the
-      same second `zfs-mount.service` started — looks like the classic
-      ZFS-on-systemd race of having a dataset in both `/etc/fstab` *and*
-      relying on ZFS's own `zfs-mount.service`/mountpoint property, where
-      the fstab-generated unit's `mount.zfs` call loses the race against
-      ZFS's own mount. Both mounts show `active (mounted)` now (systemd
-      picked up the real mount once `zfs-mount.service` established it
-      via `/proc/self/mountinfo`, regardless of which process's `mount()`
-      call actually succeeded), `zpool status -x` reports "all pools are
-      healthy", `df -h` shows correct sizes/usage for both, and
-      `systemctl --failed` is empty — no data loss or lasting problem,
-      just a scary-looking boot log. Not caused by this session's
-      changes (firewall-only, no mount/import ordering touched) — this
-      is a pre-existing race that just hadn't been observed since this
-      box is rarely rebooted. Needs: either add explicit
-      `after`/`requires` ordering on the fstab-generated mount units
-      against the zfs import/mount units, or drop the `/etc/fstab`
-      entries entirely in favor of relying purely on each dataset's own
-      ZFS `mountpoint` property (the more idiomatic NixOS+ZFS pattern),
-      so this doesn't depend on a race resolving in the box's favor on
-      every future boot.
-
 - [ ] **2026-08-26: do a full security audit / hardening pass on
       homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
       turned out to already carry a real, globally-routable public IPv6
       address (ISP RA-delegated), which quietly changes the risk model
       for every host-wide (non-interface-scoped) firewall rule on that
       box — a class of gap that was invisible under IPv4-only CGNAT.
-      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed and
-      deployed (see the fix commits referenced by this session; the
-      sibling item below tracks final reboot-survival confirmation
-      before it's fully closed out). This item is for a broader pass
+      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed,
+      deployed, and reboot-verified (`f93ca49`, `deaf882`, `9134a47`,
+      `0a774e5` — see `docs/DONE.md`). This item is for a broader pass
       beyond just those: audit homelab as a whole (not just
       IPv6-triggered findings) — every `networking.firewall.
       allowedTCPPorts`/`allowedUDPPorts`/`openFirewall` use, docker
@@ -405,6 +371,13 @@ them rot.
       change lands, not before, so a retest failure can't be
       misattributed to the wrong change.
 
+      **2026-08-26: that firewall change has now landed and is
+      reboot-verified** (`deaf882`, `9134a47`, `0a774e5` — see
+      `docs/DONE.md`), so the client-join retest is unblocked. Still
+      needs a real game client to actually attempt joining
+      `new.factorio` — not something checkable from infra inspection
+      alone.
+
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended
       period (over a month), surfaced while reasoning through the full
@@ -587,55 +560,6 @@ them rot.
       pattern (interface-scoped firewall rules as the default, not the
       exception; dual-stack assumed rather than special-cased) is
       better understood across the whole fleet, not just vps/homelab.
-
-- [ ] **2026-08-26: homelab's host firewall has no real protection
-      against its own already-public IPv6 address — currently only
-      saved by the ISP router's own (undocumented, unconfigured-by-this-
-      repo) inbound IPv6 firewall.** Surfaced while reviewing whether to
-      add IPv6 to the vps's game-port forwarding (see the item above).
-      Confirmed live: homelab's LAN NIC (`enp3s0`) already has a real,
-      globally-routable IPv6 GUA (ISP RA-delegated, e.g.
-      `2600:1010:a022:496c::/64`) — unlike its IPv4 address, which stays
-      private/CGNAT'd behind the home router and is only reachable
-      externally via vps's DNAT'd WireGuard tunnel. Several of
-      homelab's services open their ports host-wide rather than
-      interface-scoped (unlike `modules/services/nfs.nix` and
-      `samba.nix`, which correctly scope to
-      `networking.firewall.interfaces.tailscale0.*`):
-      - `services.openssh` (`hosts/homelab/configuration.nix`) has no
-        `openFirewall = false` — vps's config explicitly sets this
-        ("force port 22 closed"), homelab never got the same treatment
-        — so NixOS's default `openFirewall = true` leaves port 22 open
-        on every interface.
-      - `services.jellyfin.openFirewall = true` plus an explicit
-        `networking.firewall.allowedTCPPorts`/`allowedUDPPorts = [ 8096 ]`
-        (`modules/services/jellyfin.nix`) — meant to be reached only via
-        vps's Caddy+Anubis proxy, but exposed raw and unchallenged on
-        every interface at the host level.
-      - `modules/services/minecraft.nix`/`factorio.nix` also open their
-        ports host-wide (relevant if the parked IPv6 game-ports item
-        above is ever revived).
-      Live-tested from vps (a genuine external vantage point, not a
-      self-connect) 2026-08-26: connections to homelab's real IPv6 GUA
-      on both port 22 and port 8096 timed out — not reachable in
-      practice right now — while a control connection from the same vps
-      to a known-good external IPv6 endpoint succeeded immediately,
-      ruling out a vps-side IPv6 egress problem. So something upstream
-      (almost certainly the ISP-provided router's own default-deny
-      inbound IPv6 firewall) is the only thing actually blocking this
-      today — not anything this repo declares or controls, and nothing
-      that would survive a router replacement/firmware change/ISP
-      config change unnoticed. Needs: decide on a fix (e.g. move sshd
-      and jellyfin to explicit `networking.firewall.interfaces.*`
-      scoping, matching the nfs.nix/samba.nix pattern) — note jellyfin
-      is more nuanced than a straight tailscale0-only copy, since
-      `openFirewall` likely also covers LAN auto-discovery (DLNA/
-      Chromecast-style clients), and IPv6 breaks the usual "LAN
-      interface ⇒ private-only" assumption since the LAN NIC now
-      carries a public address too — a same-interface allow can't
-      distinguish a real LAN neighbor from an internet host arriving on
-      that same NIC. Not yet fixed; flagged for a decision, not treated
-      as an active fire since nothing is currently reachable.
 
 - [ ] **2026-08-18: layer distributed builders across the tailnet**.
       vps's rebuilds are already offloaded off-box — homelab builds and

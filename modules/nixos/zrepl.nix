@@ -1057,9 +1057,13 @@
         # has to notice and fix by hand. This trades away the guarantee
         # that zrepl never starts before its filesystems are ready in
         # exchange for it never staying down over a transient mount
-        # hiccup; the underlying storage.mount race itself is still
-        # unfixed (untriaged: reproducible only on a real reboot so far,
-        # one data point).
+        # hiccup. 2026-08-26: the underlying storage.mount race itself is
+        # now fixed too (storage/storage and storage/storage-bulk moved to
+        # options.mountpoint = "legacy" in disko.nix, so zfs-mount.service
+        # no longer races the fstab-generated mount units for them --
+        # reboot-verified, see docs/DONE.md), but this Wants=/After=
+        # override is kept regardless as defense in depth against any
+        # other local mount having a bad boot.
         systemd.services.zrepl = {
           requires = lib.mkForce [ ];
           wants = [ "local-fs.target" ];
