@@ -472,6 +472,32 @@ them rot.
       normally). Still needs an actual reboot to confirm one way or the
       other whether the race recurs.
 
+      **Root cause identified and fix coded, 2026-08-26**
+      (`hosts/vps/configuration.nix`, branch
+      `worktree-caddy-anubis-boot-order`): confirmed against the pinned
+      nixpkgs source (`nixos/modules/services/networking/anubis.nix`)
+      that the anubis module sets `DynamicUser = true` with `Type =
+      simple` and no `systemd.sockets.*` unit — the unix socket is
+      created by the anubis process itself, and its `anubis` group is a
+      *transient* dynamic group that exists only while
+      `anubis-jellyfin.service` is active, not a static system group.
+      If caddy's process is spawned before that unit has started, its
+      one-time supplementary-group resolution (`extraGroups = [
+      "anubis" ]`) simply finds no such group — exactly matching the
+      observed "permission denied" signature confined to a narrow
+      post-boot window. Fix: added
+      `systemd.services.caddy.after`/`wants = [ "anubis-jellyfin.service"
+      ]`, which guarantees systemd allocates the dynamic group (part of
+      *starting* that unit, before `Type = simple`'s immediate
+      "started" transition) before caddy is even dispatched. Build-
+      tested (`nixos-rebuild build --flake .#vps`) and confirmed the
+      rendered `caddy.service.d/overrides.conf` drop-in carries both
+      directives. Not yet deployed to vps or reboot-tested — needs
+      `nixos-rebuild switch --target-host root@vps` (or the usual
+      push-deploy path) and then confirmation across a real reboot that
+      the `dial unix .../anubis.sock: permission denied` signature no
+      longer appears.
+
 ## Done
 
 Completed items live in [`docs/DONE.md`](docs/DONE.md), not here — move an

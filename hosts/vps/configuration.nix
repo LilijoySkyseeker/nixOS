@@ -455,6 +455,14 @@ in
   sops.secrets.vps_caddy_env = { }; # TODO: populate with DNS provider API token if using DNS-01 challenges
   # caddy needs group membership to reverse_proxy into anubis's unix socket
   users.users.caddy.extraGroups = [ "anubis" ];
+  # anubis's "anubis" group is transient (DynamicUser = true): it only exists
+  # while anubis-jellyfin.service is active. Without this ordering, a boot
+  # where caddy starts first spawns caddy before that group exists, so
+  # caddy's supplementary-group resolution misses it entirely and every
+  # request 502s with "permission denied" on the anubis socket until the
+  # next caddy restart. Seen live 2026-08-18/2026-08-21 right after reboots.
+  systemd.services.caddy.after = [ "anubis-jellyfin.service" ];
+  systemd.services.caddy.wants = [ "anubis-jellyfin.service" ];
   services.caddy = {
     enable = true;
     virtualHosts = {
