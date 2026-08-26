@@ -435,6 +435,28 @@ in
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
       --hashlimit-mode srcip --hashlimit-name http-new -j DROP
+
+    # IPv6 counterpart of the above: caddy already accepts real IPv6 traffic
+    # today (apex + jellyfin CNAME both carry AAAA records, native on this
+    # box — no forwarding involved), but until now that traffic skipped this
+    # whole raw-table rate-limit layer entirely since it was iptables-only.
+    # CrowdSec's own INPUT-chain bans are already dual-stack (confirmed live:
+    # ip6tables' CROWDSEC_CHAIN matches against a separate crowdsec6-blacklists
+    # ipset the bouncer maintains automatically), this just closes the gap for
+    # the pre-CrowdSec burst/flood layer. Game ports are deliberately not
+    # mirrored here — they're still IPv4-only (see TODO.md).
+    ${pkgs.ipset}/bin/ipset create -exist crowdsec6-blacklists-0 hash:net family inet6 \
+      hashsize 1024 maxelem 131072 timeout 300
+
+    ip6tables -t raw -N vps-ratelimit 2>/dev/null || ip6tables -t raw -F vps-ratelimit
+    ip6tables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
+      || ip6tables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
+
+    ip6tables -t raw -A vps-ratelimit -m set --match-set crowdsec6-blacklists-0 src -j DROP
+
+    ip6tables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
+      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
+      --hashlimit-mode srcip --hashlimit-name http-new6 -j DROP
   '';
 
   # narrow tailscale routing to "client", this box isn't an exit node/subnet router

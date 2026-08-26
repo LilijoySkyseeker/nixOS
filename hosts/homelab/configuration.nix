@@ -354,6 +354,16 @@
   services.openssh = {
     enable = true;
     allowSFTP = true;
+    # unlike vps, this was never set here — left port 22 open on every
+    # interface via NixOS's own openssh module default, including the LAN
+    # NIC, which (confirmed 2026-08-26) carries a real ISP-delegated public
+    # IPv6 address alongside its private IPv4 one. Access to this host is
+    # tailscale-only in practice anyway (getent hosts homelab resolves to
+    # its tailscale IP, not the LAN IP) — close the blanket allow and
+    # re-open explicitly on tailscale0 below, matching vps's own
+    # "force port 22 closed" precedent and the tailscale0-only scoping
+    # already used by nfs.nix/samba.nix.
+    openFirewall = false;
     settings.KbdInteractiveAuthentication = false;
     # PasswordAuthentication must be set as a structured option, not via
     # extraConfig — NixOS's openssh module renders its own default
@@ -381,6 +391,7 @@
       }
     ];
   };
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
   # zfs support
   boot.supportedFilesystems = [ "zfs" ];
