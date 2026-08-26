@@ -9,7 +9,6 @@ in
       # jellyfin
       services.jellyfin = {
         enable = true;
-        openFirewall = true;
         group = "multimedia";
         configDir = "/srv/jellyfin/config";
         cacheDir = "/srv/jellyfin/cache";
@@ -86,9 +85,21 @@ in
         "d ${config.services.jellyfin.logDir} 0770 jellyfin - - -"
       ];
 
-      # networking
-      networking.firewall.allowedTCPPorts = [ 8096 ];
-      networking.firewall.allowedUDPPorts = [ 8096 ];
+      # networking: dropped host-wide openFirewall/allowedTCPPorts (2026-08-26)
+      # — homelab's LAN NIC carries a real public IPv6 address (ISP
+      # RA-delegated), which turns any host-wide firewall rule into direct
+      # internet exposure. jellyfin is meant to be reached either directly
+      # over the tailnet, or via vps's Caddy+Anubis proxy (which connects
+      # in over the wg0 tunnel to 10.100.0.2, see hosts/vps/
+      # configuration.nix's anubis.instances.jellyfin.settings.TARGET) — so
+      # scope to just those two interfaces instead. This also drops
+      # openFirewall's LAN auto-discovery ports (SSDP 1900/udp, jellyfin's
+      # own 7359/udp) and 8920/tcp (HTTPS, unused here) — deliberate,
+      # not an oversight.
+      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
+      networking.firewall.interfaces.tailscale0.allowedUDPPorts = [ 8096 ];
+      networking.firewall.interfaces.wg0.allowedTCPPorts = [ 8096 ];
+      networking.firewall.interfaces.wg0.allowedUDPPorts = [ 8096 ];
 
       # persistence
       environment.persistence.${vars.persistRoot}.directories =

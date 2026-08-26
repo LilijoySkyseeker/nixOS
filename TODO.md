@@ -317,6 +317,18 @@ them rot.
       client-join retest to confirm the original Aug 21 report is
       actually resolved.
 
+      **2026-08-26: still marked as needing an actual fix, not just more
+      diagnosis** — flagged explicitly by the user rather than left to
+      linger as an open investigation. Note this now also intersects with
+      this session's homelab firewall re-scoping (see the security-audit
+      item above): `modules/services/factorio.nix`'s 34197/34198 UDP
+      rules moved from host-wide to `tailscale0`/`wg0`-interface-scoped
+      only, which is exactly the DNAT'd-through-wg0 path `new.factorio`
+      traffic already takes — shouldn't regress anything, but the
+      pending client-join retest should happen *after* that firewall
+      change lands, not before, so a retest failure can't be
+      misattributed to the wrong change.
+
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended
       period (over a month), surfaced while reasoning through the full
