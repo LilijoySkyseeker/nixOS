@@ -60,8 +60,20 @@ in
       ];
     in
     {
-      # networking
-      networking.firewall.allowedUDPPorts = [
+      # networking: dropped host-wide allowedUDPPorts (2026-08-26) —
+      # homelab's LAN NIC carries a real public IPv6 address (ISP
+      # RA-delegated), which turns any host-wide firewall rule into
+      # direct internet exposure. These ports only ever legitimately
+      # arrive two ways: over the tailnet directly, or over the wg0
+      # tunnel from vps (which is how vps's DNAT'd public game ports
+      # actually reach this host — see hosts/vps/configuration.nix's
+      # networking.nat.forwardPorts) — scope to just those two
+      # interfaces.
+      networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
+        34197 # old.factorio
+        34198 # new.factorio
+      ];
+      networking.firewall.interfaces.wg0.allowedUDPPorts = [
         34197 # old.factorio
         34198 # new.factorio
       ];

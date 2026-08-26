@@ -13,6 +13,81 @@ them rot.
 
 ## Active
 
+- [ ] **2026-08-26: `/storage`/`/storage-bulk` failed their first mount
+      attempt on boot, self-healed within the same boot — worth
+      understanding, not urgent.** Surfaced by the full homelab reboot
+      done to verify the tailscale0-only firewall re-scoping (see the
+      security-audit items below). Boot sequence from `journalctl -b`:
+      `zdata`'s import itself raced once (`cannot import 'zdata': no
+      such pool available`, retried ~2s later and succeeded — ZFS's own
+      import unit has built-in retry, worked as designed), then
+      immediately after the successful import, both `storage.mount` and
+      `storage-bulk.mount` (the `/etc/fstab`-generated units, from this
+      repo's `fileSystems."/storage"`/`"/storage-bulk"` entries) failed
+      their own mount attempt (`status=2/INVALIDARGUMENT`) within the
+      same second `zfs-mount.service` started — looks like the classic
+      ZFS-on-systemd race of having a dataset in both `/etc/fstab` *and*
+      relying on ZFS's own `zfs-mount.service`/mountpoint property, where
+      the fstab-generated unit's `mount.zfs` call loses the race against
+      ZFS's own mount. Both mounts show `active (mounted)` now (systemd
+      picked up the real mount once `zfs-mount.service` established it
+      via `/proc/self/mountinfo`, regardless of which process's `mount()`
+      call actually succeeded), `zpool status -x` reports "all pools are
+      healthy", `df -h` shows correct sizes/usage for both, and
+      `systemctl --failed` is empty — no data loss or lasting problem,
+      just a scary-looking boot log. Not caused by this session's
+      changes (firewall-only, no mount/import ordering touched) — this
+      is a pre-existing race that just hadn't been observed since this
+      box is rarely rebooted. Needs: either add explicit
+      `after`/`requires` ordering on the fstab-generated mount units
+      against the zfs import/mount units, or drop the `/etc/fstab`
+      entries entirely in favor of relying purely on each dataset's own
+      ZFS `mountpoint` property (the more idiomatic NixOS+ZFS pattern),
+      so this doesn't depend on a race resolving in the box's favor on
+      every future boot.
+
+- [ ] **2026-08-26: do a full security audit / hardening pass on
+      homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
+      turned out to already carry a real, globally-routable public IPv6
+      address (ISP RA-delegated), which quietly changes the risk model
+      for every host-wide (non-interface-scoped) firewall rule on that
+      box — a class of gap that was invisible under IPv4-only CGNAT.
+      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed and
+      deployed (see the fix commits referenced by this session; the
+      sibling item below tracks final reboot-survival confirmation
+      before it's fully closed out). This item is for a broader pass
+      beyond just those: audit homelab as a whole (not just
+      IPv6-triggered findings) — every `networking.firewall.
+      allowedTCPPorts`/`allowedUDPPorts`/`openFirewall` use, docker
+      container hardening (capabilities, read-only rootfs, network
+      exposure — minecraft.nix/factorio.nix already do this carefully,
+      worth checking the rest got the same treatment), systemd
+      hardening completeness across all of homelab's services (some
+      services have detailed hardening comments, e.g. jellyfin/samba/
+      nfs — confirm nothing was missed elsewhere), and whether anything
+      else assumes "this box has no real public address" the way
+      sshd/jellyfin did. Not started. Also fold in, surfaced while
+      working the sshd/jellyfin fix:
+      - `modules/profiles/PC.nix` sets `remotePlay.openFirewall = true`
+        (Steam Remote Play) host-wide for thinkpad/torrent — same
+        host-wide-rule pattern as the homelab findings above, though
+        lower urgency since these are laptops that roam between
+        networks rather than a fixed server always on one known
+        network; worth auditing whether that roaming actually makes it
+        *worse* (an unknown network's own IPv6/NAT posture is far less
+        predictable than a home ISP's).
+      - homelab currently has no intrusion detection at all (no
+        CrowdSec/fail2ban, unlike vps) — fine today since access is
+        gated entirely by tailscale's own device authorization (ACLs/
+        key approval) rather than exposed ports, but worth an explicit
+        decision on whether that trust boundary is sufficient long-term
+        or whether basic protections belong at the homelab layer too.
+      - `bootctl` warns on every boot that `/boot`'s mount point and its
+        `loader/random-seed` file are world-accessible ("which is a
+        security hole"), surfaced in the 2026-08-26 reboot's journal —
+        minor, but a real finding worth folding into this pass rather
+        than a one-off fix.
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
@@ -220,9 +295,30 @@ them rot.
       container (now named `minecraft-vanilla-plus`, up 21h, `healthy`)
       has `ENABLE_AUTOPAUSE=TRUE`, `MAX_TICK_TIME=-1`, `VERSION=LATEST`,
       and `CAP_NET_RAW` all present — the config-level rollout is done.
-      Still unverified: the actual Bedrock-client/nether-roof behavior,
-      and whether autopause/resume + the watchdog behave as intended —
-      none of that is checkable without a live game client.
+      Still unverified: the actual Bedrock-client/nether-roof behavior.
+
+      **2026-08-26: autopause confirmed broken**, surfaced for free by a
+      full homelab reboot (done to verify the tailscale0-only firewall
+      re-scoping survives a real boot, see the security-audit items
+      above). Container logs on fresh start:
+      `could not open eth0: ... Operation not permitted`,
+      `[Autopause loop] Failed to start knockd daemon`. Docker itself
+      does grant the capability (`docker inspect
+      minecraft-vanilla-plus --format '{{.HostConfig.CapAdd}}'` →
+      `[CAP_NET_RAW CAP_SETGID CAP_SETUID]`), but it doesn't survive the
+      entrypoint's privilege drop from root to the unprivileged
+      `minecraft` user — plain `setuid` clears effective capabilities
+      unless something explicitly keeps them (ambient caps / `prctl
+      PR_SET_KEEPCAPS` / file capabilities), none of which this image's
+      entrypoint appears to do for knockd. So autopause has likely never
+      actually worked since it was deployed 2026-08-20 — the container's
+      been running continuously since then, so this is the first fresh
+      start to reveal it. Needs a real fix, not just more testing: either
+      get `CAP_NET_RAW` into knockd's effective set post-setuid (image-side
+      fix, not something this repo controls) or use the workaround the
+      log itself suggests — `AUTOPAUSE_KNOCK_INTERFACE` env var — if that
+      routes around the packet-capture path entirely rather than hitting
+      the same capability wall.
 
 - [ ] **2026-08-20: wg0 IPv4-endpoint fix — deployed and working; still
       needs to survive a real IPv6 address rotation unwatched.**
@@ -296,6 +392,18 @@ them rot.
       holds as an explanation; what's still missing is a genuine
       client-join retest to confirm the original Aug 21 report is
       actually resolved.
+
+      **2026-08-26: still marked as needing an actual fix, not just more
+      diagnosis** — flagged explicitly by the user rather than left to
+      linger as an open investigation. Note this now also intersects with
+      this session's homelab firewall re-scoping (see the security-audit
+      item above): `modules/services/factorio.nix`'s 34197/34198 UDP
+      rules moved from host-wide to `tailscale0`/`wg0`-interface-scoped
+      only, which is exactly the DNAT'd-through-wg0 path `new.factorio`
+      traffic already takes — shouldn't regress anything, but the
+      pending client-join retest should happen *after* that firewall
+      change lands, not before, so a retest failure can't be
+      misattributed to the wrong change.
 
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended
@@ -402,10 +510,11 @@ them rot.
       unreproduced against a clean reboot.
 
 - [ ] **2026-08-18: add IPv6 support for the vps's forwarded game
-      ports** (Minecraft 25565/19132, Factorio 34197/34198 — the
-      latter added 2026-08-20 for `new.factorio`, same treatment
-      needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding` is
-      explicitly off on the vps and there are no `ip6tables` DNAT
+      ports — reviewed 2026-08-26, parked as a long-term/low-priority
+      project, not actively planned.** (Minecraft 25565/19132, Factorio
+      34197/34198 — the latter added 2026-08-20 for `new.factorio`, same
+      treatment needed). Currently IPv4-only: `net.ipv6.conf.all.forwarding`
+      is explicitly off on the vps and there are no `ip6tables` DNAT
       rules for these ports, so `minecraft`/`factorio`'s DNS records
       were made A-only (`modules/services/octodns.nix`) after a live
       bug where the AAAA records
@@ -414,16 +523,119 @@ them rot.
       IPv6 when a hostname resolves to both. The apex still has an
       AAAA record since Caddy on the vps itself is native IPv6, no
       forwarding needed — this item is specifically about the DNAT'd
-      raw TCP/UDP game ports. Needs: enable IPv6 forwarding for wg0
-      egress only (not blanket `net.ipv6.conf.all.forwarding`), add
-      matching `ip6tables`/`nat` DNAT + FORWARD-accept rules alongside
-      the existing IPv4 ones in `hosts/vps/configuration.nix`, an
-      IPv6-capable SNAT equivalent so return traffic survives
-      WireGuard's cryptokey routing (mirrors the existing IPv4
-      POSTROUTING SNAT rule), then re-add the AAAA records.
+      raw TCP/UDP game ports.
       **Confirmed still unaddressed, 2026-08-25**: `net.ipv6.conf.all.
       forwarding` is still `0` live on vps, no ip6tables DNAT rules for
       these ports exist beyond the stock empty `nixos-nat-pre` chain.
+
+      **2026-08-26 cost/benefit review, parked:** benefit is narrow —
+      dual-stack clients (the large majority in 2026) already connect
+      fine over the existing A records today; this would only help
+      clients with *no* IPv4 path at all (genuinely IPv6-only networks),
+      an unconfirmed and likely small slice of this server's actual
+      whitelisted/friends-and-family player base. Cost is real and
+      non-trivial, so not worth it speculatively:
+      - True per-interface IPv6 forwarding doesn't exist on current
+        mainline kernels (confirmed against an active 2025 LKML patch
+        thread, `force_forwarding`, proposing to add it) — the only
+        lever available is the blanket `net.ipv6.conf.all.forwarding`
+        sysctl, a broader posture change than "wg0 egress only" as
+        originally scoped above (narrowable via firewall FORWARD-chain
+        rules, but not avoidable at the sysctl level).
+      - Bigger issue found during this review: homelab's LAN interface
+        already carries a real, globally-routable IPv6 address today
+        (ISP RA-delegated, confirmed live). Making the game containers
+        IPv6-reachable needs Docker dual-stack
+        (`virtualisation.docker.daemon.settings.ipv6`), and
+        `modules/services/minecraft.nix`/`factorio.nix` currently open
+        their ports host-wide, not interface-scoped — so without *also*
+        re-scoping those to `wg0` only, this would make the game
+        containers directly reachable from the raw internet over IPv6,
+        bypassing every one of vps's defenses (CrowdSec, fail2ban,
+        per-IP rate limiting) entirely. This exact exposure pattern
+        (host-wide firewall rule + homelab's already-public IPv6)
+        already exists today for sshd/jellyfin, independent of this
+        item — see the new item immediately below.
+      - Full scope ends up touching wg0 addressing on both hosts, vps's
+        NAT/DNAT plus a full parallel set of ip6tables rate-limit rules,
+        homelab's Docker daemon (bounces both game containers on
+        deploy), CrowdSec's tailnet allowlist, and DNS — roughly
+        doubling the surface of an already carefully-tuned setup, in a
+        corner (dual-stack Docker + WireGuard + custom ip6tables chains)
+        fiddly enough that it's hard to fully validate without a real
+        client on a real IPv6 path — this repo's other "confirmed
+        deployed, not confirmed with a real client" items suggest that
+        gap tends to linger.
+      Conclusion: not worth pursuing unless a specific player is
+      confirmed IPv6-only. Revisit if that ever comes up; otherwise this
+      can sit indefinitely.
+
+      **2026-08-26: long-term direction, separate from the above
+      near-term "not worth it" call.** The parked verdict is about
+      *this specific, narrow* ask (game-port forwarding only, bolted on
+      ad hoc). The actual long-term goal for this repo is full dual-stack
+      IPv4+IPv6 support everywhere, with the architecture and docs
+      treating IPv6 as a first-class default going forward rather than
+      an afterthought retrofitted host-by-host — i.e. new services and
+      new hosts should be designed dual-stack from the start (including
+      the "does this interface's IPv6 address also happen to be public"
+      question this session kept running into), instead of repeating
+      the same host-wide-firewall-rule-plus-surprise-public-IPv6
+      discovery each time. That's a real architecture/documentation
+      project of its own — worth scoping once the homelab
+      security-audit item above has run its course and the general
+      pattern (interface-scoped firewall rules as the default, not the
+      exception; dual-stack assumed rather than special-cased) is
+      better understood across the whole fleet, not just vps/homelab.
+
+- [ ] **2026-08-26: homelab's host firewall has no real protection
+      against its own already-public IPv6 address — currently only
+      saved by the ISP router's own (undocumented, unconfigured-by-this-
+      repo) inbound IPv6 firewall.** Surfaced while reviewing whether to
+      add IPv6 to the vps's game-port forwarding (see the item above).
+      Confirmed live: homelab's LAN NIC (`enp3s0`) already has a real,
+      globally-routable IPv6 GUA (ISP RA-delegated, e.g.
+      `2600:1010:a022:496c::/64`) — unlike its IPv4 address, which stays
+      private/CGNAT'd behind the home router and is only reachable
+      externally via vps's DNAT'd WireGuard tunnel. Several of
+      homelab's services open their ports host-wide rather than
+      interface-scoped (unlike `modules/services/nfs.nix` and
+      `samba.nix`, which correctly scope to
+      `networking.firewall.interfaces.tailscale0.*`):
+      - `services.openssh` (`hosts/homelab/configuration.nix`) has no
+        `openFirewall = false` — vps's config explicitly sets this
+        ("force port 22 closed"), homelab never got the same treatment
+        — so NixOS's default `openFirewall = true` leaves port 22 open
+        on every interface.
+      - `services.jellyfin.openFirewall = true` plus an explicit
+        `networking.firewall.allowedTCPPorts`/`allowedUDPPorts = [ 8096 ]`
+        (`modules/services/jellyfin.nix`) — meant to be reached only via
+        vps's Caddy+Anubis proxy, but exposed raw and unchallenged on
+        every interface at the host level.
+      - `modules/services/minecraft.nix`/`factorio.nix` also open their
+        ports host-wide (relevant if the parked IPv6 game-ports item
+        above is ever revived).
+      Live-tested from vps (a genuine external vantage point, not a
+      self-connect) 2026-08-26: connections to homelab's real IPv6 GUA
+      on both port 22 and port 8096 timed out — not reachable in
+      practice right now — while a control connection from the same vps
+      to a known-good external IPv6 endpoint succeeded immediately,
+      ruling out a vps-side IPv6 egress problem. So something upstream
+      (almost certainly the ISP-provided router's own default-deny
+      inbound IPv6 firewall) is the only thing actually blocking this
+      today — not anything this repo declares or controls, and nothing
+      that would survive a router replacement/firmware change/ISP
+      config change unnoticed. Needs: decide on a fix (e.g. move sshd
+      and jellyfin to explicit `networking.firewall.interfaces.*`
+      scoping, matching the nfs.nix/samba.nix pattern) — note jellyfin
+      is more nuanced than a straight tailscale0-only copy, since
+      `openFirewall` likely also covers LAN auto-discovery (DLNA/
+      Chromecast-style clients), and IPv6 breaks the usual "LAN
+      interface ⇒ private-only" assumption since the LAN NIC now
+      carries a public address too — a same-interface allow can't
+      distinguish a real LAN neighbor from an internet host arriving on
+      that same NIC. Not yet fixed; flagged for a decision, not treated
+      as an active fire since nothing is currently reachable.
 
 - [ ] **2026-08-18: layer distributed builders across the tailnet**.
       vps's rebuilds are already offloaded off-box — homelab builds and

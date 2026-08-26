@@ -12,11 +12,25 @@ in
         OPS=${config.sops.placeholder.minecraft_username}
       '';
 
-      # networking
-      networking.firewall.allowedTCPPorts = [
+      # networking: dropped host-wide allowedTCPPorts/allowedUDPPorts
+      # (2026-08-26) — homelab's LAN NIC carries a real public IPv6
+      # address (ISP RA-delegated), which turns any host-wide firewall
+      # rule into direct internet exposure. These ports only ever
+      # legitimately arrive two ways: over the tailnet directly, or over
+      # the wg0 tunnel from vps (which is how vps's DNAT'd public game
+      # ports actually reach this host — see hosts/vps/configuration.nix's
+      # networking.nat.forwardPorts) — scope to just those two interfaces.
+      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
         25565
       ];
-      networking.firewall.allowedUDPPorts = [
+      networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
+        25565
+        19132 # Geyser Bedrock listener
+      ];
+      networking.firewall.interfaces.wg0.allowedTCPPorts = [
+        25565
+      ];
+      networking.firewall.interfaces.wg0.allowedUDPPorts = [
         25565
         19132 # Geyser Bedrock listener
       ];
