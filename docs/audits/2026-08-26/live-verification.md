@@ -71,3 +71,45 @@ bind address is not what determines exposure; the packet path is.
    that default holding. This is threat model §7.1 — a security property
    resting on an unstated assumption about the network — and it is the
    same class of mistake that triggered this entire audit.
+
+---
+
+## 2026-08-26 — torrent: is the "CGNAT illusion" also true here?
+
+**Why it needed a live check.** P1 reported that torrent holds a
+globally-routable IPv6 address and that the shared desktop profile
+opens 106 ports host-wide. The threat model's exposure table recorded
+torrent's public v6 as "unknown / varies". If P1 was right, the exact
+condition that triggered this whole audit exists on the daily driver
+too. This machine *is* torrent, so the check is a local unprivileged
+read.
+
+**Confirmed.**
+
+- `ip -6 addr show scope global` — a `2600:1010:a022:496c::/64`
+  RA-delegated GUA (one `mngtmpaddr` plus several privacy-extension
+  temporaries), alongside the tailscale `fd7a:115c:a1e0::/128`.
+- `ip -6 route show default` — `default via <router> dev enp8s0 proto
+  ra`. A real v6 default route, not link-local only.
+- IPv6 listeners on non-loopback addresses: `sshd [::]:22`, `rpcbind
+  [::]:111`, `LLMNR [::]:5355`, `mDNS [::]:5353`, and **`kdeconnectd`
+  on `*:1716`, TCP and UDP**, bound on all addresses including the GUA.
+- `getent group input` → `lilijoy` (P1's F-P1-01 keylogger path).
+- `getent group docker` → **does not exist**. Threat model §4.3 path 1
+  was wrong and has been corrected.
+- `getent group libvirtd` → `lilijoy`, arriving transitively via
+  `PC.nix:18` → `virtual-machines.nix:11`.
+
+**Could NOT be determined, and matters.** Reading the actual firewall
+ruleset requires root, and this audit does not escalate. An initial
+attempt appeared to return an empty `nixos-fw` chain; that was a
+**silent permission failure**, not an empty ruleset — recorded here
+because it is an easy and dangerous misreading, and reporting "the
+firewall is empty" on that basis would have been badly wrong.
+
+So the open question stands: **are those 106 host-wide ports, KDE
+Connect's 1716 especially, actually reachable on torrent's public IPv6
+from off-LAN?** If they are, it is a live internet exposure on the
+daily driver of the same class as the homelab finding that began this
+audit. P5 owns settling it.
+

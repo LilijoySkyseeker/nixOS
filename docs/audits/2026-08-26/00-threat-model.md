@@ -65,11 +65,24 @@ caused the finding that triggered this audit.
 |---|---|---|---|---|
 | `vps` | yes (DigitalOcean, `ens3`) | yes (apex + jellyfin AAAA, native) | 80, 443 tcp; 51820 udp; 25565 tcp + 19132/34197/34198 udp DNAT'd onward | the intended edge |
 | `homelab` | no (ISP CGNAT) | **yes — ISP RA-delegated on the LAN NIC** | nothing, after the 2026-08-26 fixes | the trap: see §2.1 |
-| `torrent` | no | unknown / varies | nothing intended | daily driver, mostly on the home LAN |
-| `thinkpad` | no | unknown / varies | nothing intended | **roams onto untrusted networks** |
+| `torrent` | no | **yes — confirmed live 2026-08-26** (RA-delegated GUA + v6 default route) | sshd, rpcbind/111, LLMNR/5355, mDNS/5353, KDE Connect 1716 all bound on `[::]`/`*` | daily driver; §2.1 applies to this host too, not just homelab |
+| `thinkpad` | no | assume yes | same profile-inherited set as torrent | **roams onto untrusted networks**, where the local v6 posture is unknowable in advance |
 | `isoimage` | n/a | n/a | 3923 tcp, host-wide (`modules/services/copyparty-iso.nix:43`) | recovery media, whatever network it is booted onto |
 
 ### 2.1 The CGNAT illusion
+
+> **Update, 2026-08-26, from P1's findings and confirmed live: this is
+> not homelab-only.** `torrent` also holds a globally-routable
+> RA-delegated IPv6 GUA with a v6 default route, right now, while the
+> shared desktop profile opens 106 ports host-wide (Steam remote play,
+> avahi, and KDE Connect's 1714-1764 TCP+UDP range). `kdeconnectd` is
+> confirmed listening on `*:1716` on both v4 and v6. So the exact
+> mistake described below — a host-wide rule justified by a belief
+> about the network — exists on the daily driver as well, and the
+> belief there ("it's just a desktop on the home LAN") is the same
+> shape as the one that was wrong on homelab. Whether the ports are
+> genuinely reachable from off-LAN depends on the firewall's real
+> state, which could not be read without root; P5 owns settling it.
 
 homelab has no public IPv4 — it is behind ISP CGNAT — and for years
 that made every host-wide firewall rule on it *effectively*
@@ -227,14 +240,34 @@ deploy flow entirely".
 
 Three distinct paths, all worth confirming:
 
-1. **`docker` group** (`modules/profiles/PC.nix:313`). Membership in
-   `docker` is root-equivalent by design — the socket will run a
-   container with the host filesystem bind-mounted. P1 should check
-   whether it is even needed, given `virtualisation.podman` with
-   `dockerCompat = true` is configured right there at `PC.nix:111-113`.
+1. ~~**`docker` group**~~ — **REFUTED by P1, 2026-08-26, and confirmed
+   live.** `PC.nix:313` does list `"docker"` in `extraGroups`, but
+   `users.groups.docker` is never declared anywhere in the repo, so the
+   group does not exist and the membership is inert: `getent group
+   docker` returns nothing on torrent. This was my error in the first
+   draft — I read the grant without checking the group existed. It is
+   dead config (a real needed/used finding, §7.4) but not a privilege
+   path. Two *actual* root-adjacent grants sit in its place, and both
+   are worse because neither is obvious from reading `PC.nix`'s group
+   list:
+   - **`input`** (`PC.nix:312`, present for plover). `/dev/input/event*`
+     are `root:input 0660` with no logind `uaccess` ACL, so group
+     membership is the entire grant — it is a raw keylogger for A7,
+     capturing the run0/polkit password, the lock screen, and any
+     password manager's master password. Confirmed live: `getent group
+     input` → `lilijoy`. P1 rates this HIGH and it is the single best
+     finding of that part.
+   - **`libvirtd`**, which never appears in `PC.nix`'s own list at all
+     — it arrives *transitively* via `PC.nix:18` →
+     `modules/nixos/virtual-machines.nix:11`. Confirmed live: `getent
+     group libvirtd` → `lilijoy`. A grant you cannot see by reading the
+     file that appears to define the user's groups is exactly the kind
+     of thing an audit exists to find.
 2. **`wheel`** (`modules/profiles/PC.nix:310`), with run0/polkit as the
    elevation path. Expected for a single-admin desktop; noted for
-   completeness.
+   completeness. Note its interaction with `input` above: a keylogger
+   that captures the polkit prompt turns this expected grant into an
+   A7 escalation.
 3. **root builds from a user-owned checkout.** This one is not
    obvious. `myPullDeploy` on both laptops points `flakeDir` at
    `/home/lilijoy/dotfiles` and reads
