@@ -241,6 +241,10 @@ in
   # tailscale allow
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
+  # log refused TCP connection attempts (closed-port scans) to the kernel log —
+  # off by default, so these were previously invisible everywhere, including to CrowdSec
+  networking.firewall.logRefusedConnections = true;
+
   # wireguard tunnel
   sops.secrets.vps_wireguard_private_key = { };
   sops.secrets.wireguard_vps_homelab_psk = { };
@@ -291,10 +295,22 @@ in
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
 
+    # crowdsec-firewall-bouncer.service is After=/PartOf=firewall.service, so it always
+    # creates this ipset *after* we get here — pre-create it (idempotent, matches the
+    # bouncer's own params exactly) so referencing it below doesn't fail on every boot
+    ${pkgs.ipset}/bin/ipset create -exist crowdsec-blacklists-0 hash:net family inet \
+      hashsize 1024 maxelem 131072 timeout 300
+
     # per-source-IP rate limiting on forwarded game ports (DNAT bypasses anubis/crowdsec)
     iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
     iptables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
       || iptables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
+
+    # apply CrowdSec's existing ban list (built from sshd/caddy scenarios) to DNAT'd game
+    # traffic too — it never reaches INPUT/CROWDSEC_CHAIN, so this reuses the bouncer's own
+    # ipset instead of duplicating ban logic. Must come first in the chain: banned IPs get
+    # dropped before spending any hashlimit budget below.
+    iptables -t raw -A vps-ratelimit -m set --match-set crowdsec-blacklists-0 src -j DROP
 
     # minecraft: cap new-connection attempts per source IP
     iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
@@ -343,6 +359,20 @@ in
   services.caddy = {
     enable = true;
     virtualHosts = {
+      # catch-all for plain-HTTP requests with no matching Host (bots hitting the raw
+      # IP, fake hostnames, etc.) — otherwise these produce zero log output anywhere.
+      # HTTPS/SNI-based probes aren't covered here: Caddy can't present a cert for an
+      # unlisted hostname without on-demand TLS, which is its own design/abuse-surface
+      # decision, not a quick add — left for a follow-up.
+      ":80" = {
+        logFormat = ''
+          output stdout
+          format json
+        '';
+        extraConfig = ''
+          respond 421
+        '';
+      };
       "jellyfin.${lib.removeSuffix "." vars.domain}" = {
         # without this, caddy emits no access logs for crowdsec's parser
         logFormat = ''
@@ -392,11 +422,20 @@ in
     ];
   };
   services.crowdsec-firewall-bouncer.enable = true;
-  # drop "crowdsec" from StateDirectory, collides with our impermanence bind-mount
+  # drop both "crowdsec" and "crowdsec-firewall-bouncer-register" from StateDirectory —
+  # both are real impermanence bind-mounts, and DynamicUser's StateDirectory= migration
+  # (moving the "pre-existing public" dir into /var/lib/private/<name> behind a symlink)
+  # deterministically fails with EBUSY against an active mountpoint. Confirmed live
+  # 2026-08-25: this unit's own directory hit exactly the failure the "crowdsec" drop
+  # below was already written to avoid, just never extended to itself.
   systemd.services.crowdsec-firewall-bouncer-register.serviceConfig = {
-    StateDirectory = lib.mkForce "crowdsec-firewall-bouncer-register";
-    # DynamicUser makes /var/lib/crowdsec read-only, but cscli needs to write
-    ReadWritePaths = [ "/var/lib/crowdsec" ];
+    StateDirectory = lib.mkForce [ ];
+    # DynamicUser makes these read-only otherwise; cscli needs to write /var/lib/crowdsec,
+    # and this unit needs to write its own state (api-key.cred) under the other path
+    ReadWritePaths = [
+      "/var/lib/crowdsec"
+      "/var/lib/crowdsec-firewall-bouncer-register"
+    ];
   };
   # symlink cscli's expected default config path into place
   systemd.tmpfiles.rules = [
@@ -420,7 +459,7 @@ in
   # this box has no real block devices for smartd to monitor
   services.smartd.enable = lib.mkForce false;
 
-    # firewall
+  # firewall
   networking.firewall.allowedTCPPorts = [
     80
     443
