@@ -22,6 +22,7 @@ encrypted with sops-nix.
 | `docs/style-guide.md` | Nix conventions actually in use (formatting, `my<Name>` options pattern, comment style, naming). |
 | `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
 | `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). |
+| `docs/audits/` | Point-in-time security audits, one dated directory each. `2026-08-26/00-threat-model.md` is the standing threat model — adversaries, trust boundaries, and the severity rubric; read it before deciding whether exposing something is acceptable. Findings that become standing rules move to `docs/hardening.md`. |
 | `docs/agents.md` | The reasoning *behind* the rules in this file and in `docs/procedures/workflow.md` — read when the summary alone isn't enough to act correctly. |
 | `docs/procedures/workflow.md` | Pre-work checks and hard-confirm rules (never switch/reboot/sudo unprompted, VM-test before real deploys, build locality). Read this before making any change. |
 | `docs/procedures/testing-changes.md` | Which validation layer to reach for (`nixfmt`/lint → `nix flake check` → `nixos-rebuild build` → `nvd diff` → switch) and what the git hooks already automate. |

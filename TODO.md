@@ -208,6 +208,19 @@ them rot.
         remediation that is deferred rather than done stays tracked
         here, not in a report file nobody reads.
 
+      **Progress.** Phase 0 done 2026-08-26:
+      `docs/audits/2026-08-26/00-threat-model.md` — exposure map,
+      principals, six trust-boundary analyses, nine adversaries, the
+      severity rubric P1–P8 must apply, six recurring failure modes to
+      probe for, and seven open questions. Every claim in it is cited
+      by `file:line` and the citations were verified against source.
+      Two things it turned up that reframe the audit before it starts:
+      `origin/master` on GitHub is an unsigned, unattended root
+      credential for all four real hosts (§4.1), and there is no
+      meaningful security boundary between homelab and vps — the
+      vps-deploy ForceCommand allowlist bounds shells and accidents,
+      not root (§4.2). Phase 1 not started.
+
       **Standing decision still open, carried over from the original
       entry:** homelab has no intrusion detection at all (no
       CrowdSec/fail2ban, unlike vps). Fine today *if* access really is
@@ -217,8 +230,6 @@ them rot.
       Needs an explicit decision on whether that trust boundary is
       sufficient long-term or whether basic protections belong at the
       homelab layer too.
-
-      Not started.
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
