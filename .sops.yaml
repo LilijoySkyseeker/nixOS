@@ -10,7 +10,7 @@ keys:
   # pre-generated vps host key, enrolled before install so sops works
   # on first boot — see hosts/vps/README.md step 1. Rotated 2026-08-25
   # for the post-brick reinstall (old key's droplet was destroyed).
-  - &vps age1uc86th6cf36pfsqzap9c9lmxu8hq6gn7v9qqjg26ay3pls0jxa0sj2lqc4
+  - &vps age1sc4cn2k4lwzzaj0k9q2kft20lhmj2575lh6n8k6qd4tyw5yfafpq8mt5aw
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
