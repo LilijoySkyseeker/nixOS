@@ -286,6 +286,20 @@ them rot.
         back at last check. The boot-race and allowlist fixes above are
         build- and VM-tested but **this exact combination has not yet
         been confirmed on a real vps boot**.
+      - **2026-08-25: vps declared bricked, unrecoverable as-is.**
+        Public `:80`, ICMP, and tailscale SSH all stayed unreachable
+        (connection timeouts, not refusals) across several checks over
+        an hour with no change — a genuine boot failure, not a repeat of
+        the earlier self-ban (that incident left `:80` serving fine).
+        User's call: stop chasing this boot and do a full reinstall via
+        `nixos-anywhere` instead of another rescue-ISO recovery. PR #12
+        merged as-is on the user's explicit instruction rather than
+        waiting for live confirmation on the old instance — its fixes
+        (this jail, the boot-race retries, the tailnet allowlist) still
+        apply to the reinstalled box and get validated by that install
+        instead. Follow-up reinstall work tracked in a new branch/
+        worktree (see `docs/DONE.md` once landed, or `git branch -a` for
+        the in-progress one if not yet landed).
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
