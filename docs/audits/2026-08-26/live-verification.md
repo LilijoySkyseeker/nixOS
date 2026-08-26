@@ -113,3 +113,54 @@ from off-LAN?** If they are, it is a live internet exposure on the
 daily driver of the same class as the homelab finding that began this
 audit. P5 owns settling it.
 
+---
+
+## 2026-08-26 — is torrent's host-wide port range actually reachable from the internet?
+
+**Why it needed a live check.** P5 confirmed, without root, that
+torrent's *host* firewall accepts KDE Connect's 1714-1764 and mDNS 5353
+on all interfaces (`firewall-start`'s store path matches the evaluated
+config, and it installs those rules via `ip46tables` with no `-i`),
+while `kdeconnectd` is bound `*:1716` and the host holds a routable
+IPv6 GUA. Only the ISP CPE stood between that and the open internet,
+and its behaviour is not knowable from any config in this repo.
+
+**Method.** Probe torrent's stable GUA from `vps`, which is off-LAN and
+on the public internet, with a sanity check against a known-open host
+to prove the probe path works.
+
+```
+port 1716: closed/filtered
+port 22:   closed/filtered
+port 5353: closed/filtered
+sanity — cloudflare 2606:4700:4700::1111 443: OPEN
+```
+
+**Result: not currently reachable.** The ISP CPE is filtering inbound
+IPv6. The sanity check rules out the probe itself being broken.
+
+**What this does and does not mean.** It is *not* "this is fine", and
+it is not the same as the ports being closed:
+
+- The host firewall is wide open on 102+ ports on a globally-routable
+  address. The **only** thing preventing internet exposure is a
+  third-party consumer router's default inbound filter — unversioned,
+  unmanaged by this repo, invisible to `nixos-rebuild`, and liable to
+  change on a firmware update, a settings reset, a router swap, or an
+  ISP configuration push. Nothing anywhere records that the daily
+  driver's security depends on it.
+- This is threat model §7.1 again, in its purest form: a security
+  property resting on an unstated assumption about the network. It is
+  the same shape as the homelab CGNAT assumption that triggered this
+  audit — and that one turned out to have quietly stopped being true.
+- **For thinkpad it provides nothing.** A roaming laptop on a
+  conference, hotel or coffee-shop network has no such CPE guarantee,
+  and many public networks hand out routable IPv6 with no inbound
+  filtering at all. The same 102 ports travel with it.
+
+So the correct framing for remediation is that the CPE is a
+coincidence, not a control. Interface-scoping these rules — the pattern
+`nfs.nix`/`samba.nix`/`jellyfin.nix` already use, and which port 22
+already uses on this very host, proving the mechanism works and simply
+was not applied here — removes the dependency entirely.
+

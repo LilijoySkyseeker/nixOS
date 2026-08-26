@@ -21,6 +21,18 @@ That is F-P4-02, and it is the single most important thing in this
 report because the file it lives in is the one other files are being
 told to copy.
 
+**Re-rated for a public repository.** Threat model §4.7 was added
+mid-audit: this repo is public on GitHub. Everything below was
+re-assessed against it before finalising, and three ratings moved as a
+result (F-P4-03 and F-P4-05 to HIGH, F-P4-13 to LOW). The rule applied
+is §4.7's: no control may be credited for being hard to find, and every
+reachability assessment treats "the adversary has read the config" as
+satisfied by default. For this part that is not a formality. The exact
+images, tags, capability sets, port maps, volume mounts, mod lists,
+export options, share names, gids and rate-limit thresholds protecting
+the two internet-exposed game servers are all published, which means A3
+selects an exploit from a known surface rather than probing for one.
+
 ---
 
 ## 1. Scope and method
@@ -115,9 +127,66 @@ Everything below was read out of `nix eval
 4. **Live state.** No SSH, no `iptables -L`, no `docker inspect`. Every
    runtime claim here is derived from the evaluated closure.
 
+### Re-rating pass against §4.7 (public repository)
+
+Added after the findings were first drafted. What I checked, given that
+an adversary reads this repo as easily as I do:
+
+- **Which of my findings rested on obscurity.** None did — reachability
+  in every case was argued from a network path, not from an attacker's
+  ignorance. So no rating went *down*, and none needed rescuing.
+- **Which findings become easier to act on for a reader of the repo.**
+  This is where the movement is. Anything where the published config
+  tells an adversary *which version of untrusted-input-parsing code is
+  running*, or *where a secret sits*, or *what the one remaining
+  control's numeric threshold is*, was re-rated on the assumption that
+  the lookup is free. F-P4-03 and F-P4-05 moved MEDIUM → HIGH,
+  F-P4-13 INFO → LOW.
+- **What the public config actually discloses within my scope**, put on
+  the record rather than re-derived later: image names and tags;
+  `VERSION = "LATEST"` and `TYPE = "FABRIC"`; the sixteen Modrinth mod
+  slugs and `MODRINTH_ALLOWED_VERSION_TYPE = "alpha"`; both factorio
+  engine pins including that `2.1.14` is the experimental line and why;
+  `UPDATE_MODS_ON_START` on both factorio servers; every capability
+  add-back and the absence of `--read-only` on factorio; every port map
+  and the full vps DNAT table; vps's hashlimit thresholds to the
+  packet; the NFS export options and the `100.64.0.0/10` CIDR;
+  `gids.multimedia = 999`; the samba share names, `valid users` and
+  `hosts allow`; copyparty's `A = [ "*" ]` on `/` and port 3923; the
+  domain and both vps public addresses; and the world seed.
+- **What is correctly *not* disclosed.** The minecraft whitelist/ops
+  usernames are sops-managed (`minecraft.nix:9-13`), and the factorio
+  game password, account token and username likewise
+  (`factorio.nix:100-102`). Under §4.7 that is the right instinct even
+  though a whitelist is not really a secret — see §4.
+
 ---
 
 ## 2. Findings
+
+
+Ordered most severe first. Ids were assigned during the first drafting
+pass and are **stable** — F-P4-03, F-P4-05 and F-P4-13 moved position
+when §4.7 changed their ratings, but no id was renumbered, so
+cross-references from other parts stay valid.
+
+| Order | Id | Severity | Title |
+|---|---|---|---|
+| 1 | F-P4-01 | HIGH | recovery ISO serves `/` with no authentication at all |
+| 2 | F-P4-03 | HIGH | game servers auto-install unpinned third-party code; surface is published |
+| 3 | F-P4-05 | HIGH | container egress reaches LAN, tailnet and vps unfiltered |
+| 4 | F-P4-02 | MEDIUM | docker published ports bypass the firewall; scoping rules inert |
+| 5 | F-P4-04 | MEDIUM | factorio secrets leave sops into a container volume and the backups |
+| 6 | F-P4-06 | MEDIUM | NFS `sec=sys` — reaching 2049 *is* the authorization |
+| 7 | F-P4-07 | LOW | no container rules in `docs/hardening.md`; no resource ceilings |
+| 8 | F-P4-08 | LOW | vps SNAT destroys game-client attribution; comment says otherwise |
+| 9 | F-P4-09 | LOW | factorio `--read-only` exception cites stale evidence |
+| 10 | F-P4-10 | LOW | octodns holds a cert-issuance credential; no CAA declared |
+| 11 | F-P4-11 | LOW | jellyfin lockout inert on first boot |
+| 12 | F-P4-13 | LOW | `factorio-new`'s floating tag does not float, and publishes the build |
+| 13 | F-P4-12 | INFO | dead UDP 25565 firewall rules |
+| 14 | F-P4-14 | INFO | samba `hosts allow`/`hosts deny` pair is IPv4-only |
+| 15 | F-P4-15 | INFO | needed/used sweep leftovers |
 
 ### F-P4-01 — the recovery ISO serves the entire filesystem with no authentication whatsoever, on a host-wide port
 
@@ -130,7 +199,11 @@ Everything below was read out of `nix eval
 - **Reachability:** A1/A4 — anyone with an IP path to the machine, on
   whatever network the recovery ISO is booted onto. No prior step, no
   credential, no tailnet membership. Threat model §2 already lists this
-  as the only thing `isoimage` listens on publicly.
+  as the only thing `isoimage` listens on publicly. Per §4.7 there is
+  additionally no discovery step: `copyparty-iso.nix` is public, so
+  anything answering on 3923 with copyparty's banner is known in advance
+  to grant anonymous `A` on `/`, and `no-robots` (`:20`) keeps it out of
+  search indexes without keeping it out of a scan.
 - **Rule:** new-rule candidate; also threat model open question §8.6,
   which asks precisely for the written justification that does not exist.
 - **Finding:** the generated copyparty config is:
@@ -202,6 +275,195 @@ Everything below was read out of `nix eval
   adopted, it must be tested by actually booting the ISO, not by
   building it.
 
+### F-P4-03 — both game servers auto-install unpinned third-party code on every start, and the exact surface is published
+
+- **File:** `modules/services/minecraft.nix:51`, `:56`, `:84-103`,
+  `:132-145`; `modules/services/factorio.nix:115-118`, `:144`, `:170`
+- **Severity:** HIGH — raised from MEDIUM under §4.7; see "Why this is
+  HIGH" below
+- **Confidence:** CONFIRMED for the configuration and the update
+  channels; PLAUSIBLE for exploitability, which depends on advisories I
+  did not enumerate
+- **Axis:** hardening
+- **Reachability:** two adversaries, not one.
+  **A6** — a compromised upstream: sixteen independent third-party
+  Modrinth projects on minecraft plus the Factorio mod portal on both
+  factorio servers, all fetched at container start with no version
+  constraint and no integrity check, any one of which is a sufficient
+  entry point.
+  **A1/A3** — and this is what §4.7 adds: an internet client can read
+  this file, derive the exact parsing surface it is talking to, and
+  match it against published advisories before sending a packet. A1 is
+  rated "constant, happening now". The landing spot in both cases is a
+  process handling untrusted internet traffic through vps's DNAT,
+  holding a writable bind mount, with the network position described in
+  F-P4-05.
+- **Rule:** new-rule candidate.
+- **Finding:** three unpinned supply-chain inputs stack here.
+
+  - `image = "itzg/minecraft-server"` (`:51`) carries **no tag at
+    all** — docker resolves that to `:latest`. This is looser than
+    `factorio.nix:159`'s `stable`, which at least has a written
+    justification (`:149-156`); the minecraft one has none and reads
+    like an oversight rather than a decision.
+  - `VERSION = "LATEST"` (`:56`) floats the Minecraft server version.
+  - `MODRINTH_PROJECTS` (`:86-103`) lists sixteen projects, resolved by
+    slug at every start, with `MODRINTH_ALLOWED_VERSION_TYPE = "alpha"`
+    (`:84`) explicitly widening resolution to pre-release builds and
+    `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further
+    transitive artifacts nobody has listed.
+
+  Partial mitigation, and it is real: `pull = "missing"` is the pinned
+  module's default (verified, `oci-containers.nix:315-328`), and
+  `/var/lib/docker` is on the impermanence persistence list
+  (`hosts/homelab/configuration.nix:482`), so the *image* is fetched
+  once and then stays. The **mods are not** — `MODRINTH_PROJECTS` is
+  re-resolved by the entrypoint on every container start, which is
+  every reboot and every `nixos-rebuild switch` that touches the unit.
+  That is the live channel.
+
+  **Factorio has the same channel**, which the first draft of this
+  report under-weighted. Both servers set `UPDATE_MODS_ON_START =
+  "true"` (`factorio.nix:144`, `:170`), so factoriotools' entrypoint
+  refreshes the installed mods from the Factorio mod portal on every
+  start, authenticating with the account token from F-P4-04; and
+  `docker-factorio-new`'s `preStart` rsyncs `old.factorio`'s mod
+  directory into `new.factorio` before every start (`:115-118`), so one
+  compromised mod reaches both servers by design. The installed mod set
+  lives in `/srv/factorio/*/mods` and is not declared in the repo, so
+  unlike minecraft the *list* is not public — but the auto-update
+  mechanism is, and it is not pinned, reviewed or version-constrained
+  anywhere.
+
+  **Why this is HIGH under §4.7.** Rated MEDIUM in the first draft on
+  the reasoning that the only adversary was A6, and a supply-chain
+  compromise is low-probability. That reasoning does not survive the
+  repository being public. An A1/A3 adversary does not need anyone
+  upstream to turn hostile: they read `minecraft.nix:56,84-103`, learn
+  that the server is Fabric on whatever Minecraft `LATEST` currently
+  resolves to, running sixteen *named* mods with alpha builds permitted
+  — including ViaVersion/ViaBackwards/ViaRewind, which deliberately
+  widen the accepted protocol range, and Geyser + Floodgate, which add
+  the entire Bedrock RakNet stack on 19132 — and check that list
+  against published advisories. All of that parsing happens before the
+  whitelist applies. The operator, meanwhile, cannot state which
+  versions are running, because `LATEST` and `alpha` mean the answer
+  changes at each restart with nothing recording it. That asymmetry —
+  the attacker can compute the running version and the defender cannot
+  — is what moves this out of MEDIUM. It is not a demonstrated RCE, so
+  it is not CRITICAL, and the confidence label stays PLAUSIBLE on
+  exploitability precisely because I did not go looking for a specific
+  advisory.
+
+  Blast radius if it fires: code execution inside the container. The
+  container hardening does its job here — `--cap-drop=ALL` with only
+  SETUID/SETGID, `--read-only`, `no-new-privileges` — so this is not a
+  host-root path by itself. But it is arbitrary code with the `/data`
+  volume writable, and per F-P4-05 with unrestricted network egress to
+  the LAN, the tailnet and wg0. Note also that `--tmpfs=/tmp` is
+  mounted **`exec`** (`:140`), necessarily so for netty and
+  DistantHorizons native extraction, which means the read-only rootfs
+  does not prevent a compromised mod from writing and executing a
+  native payload. The comment at `:136-139` explains why `exec` is
+  required and is correct; it just does not note the cost.
+
+  Separately, and worth naming for A3: `viafabric`, `viabackwards` and
+  `viarewind` deliberately widen the set of protocol versions the
+  server will parse from unauthenticated clients, and Geyser + Floodgate
+  add the entire Bedrock (RakNet) protocol on 19132. All of that is
+  pre-authentication parsing surface reachable from the open internet
+  through vps's DNAT, in front of a whitelist that only applies after
+  login. That is not a misconfiguration — it is the point of the
+  server — but it is why the mod supply chain matters more here than it
+  would on a tailnet-only service.
+- **Proposed fix:** pin what can be pinned without breaking the game.
+  (a) Tag the image at minimum, digest it ideally:
+  `itzg/minecraft-server@sha256:…`. (b) Drop
+  `MODRINTH_ALLOWED_VERSION_TYPE = "alpha"` to `release` unless a
+  specific mod genuinely needs alpha, in which case name that mod in a
+  comment. (c) Consider `MODRINTH_PROJECTS` entries with explicit
+  version ids rather than bare slugs — itzg supports
+  `slug:version-id` — turning sixteen floating fetches into sixteen
+  reviewed ones. (d) If (c) is too much churn, at least record in the
+  file that mods are auto-updated from upstream on every start, so the
+  next reader knows.
+- **Fix risk:** pinning mods means they stop tracking Minecraft version
+  bumps, and with `VERSION = "LATEST"` the server version *will* move
+  under them, producing a start-time mod/engine mismatch. Pin (b) and
+  (a) first — they are nearly free — and treat (c) as coupled to
+  pinning `VERSION` as well. Any change here needs a real container
+  start and a client connection to verify, not just a build.
+
+### F-P4-05 — a compromised game container reaches the LAN, the whole tailnet, and vps, because containers have unrestricted egress
+
+- **File:** `modules/services/minecraft.nix:47-146`,
+  `modules/services/factorio.nix:126-174`,
+  `hosts/homelab/configuration.nix:39-44`, `:404-412`;
+  cross-ref `hosts/vps/configuration.nix:341`
+- **Severity:** HIGH — raised from MEDIUM once F-P4-03 became HIGH. The
+  rubric's HIGH band explicitly rates an adversary who has already
+  achieved a plausible first step, and F-P4-03 is now that step.
+- **Confidence:** CONFIRMED for the network paths; PLAUSIBLE for the
+  end-to-end chain, which depends on F-P4-03/A3 landing first
+- **Axis:** hardening
+- **Reachability:** A3 or A6 — code execution in either game container,
+  via a protocol bug or via the unpinned mod channel — then lateral
+  movement. Per §4.7 the pivot needs no reconnaissance either: that
+  homelab is a subnet router and exit node, that wg0 is
+  `10.100.0.1`/`10.100.0.2`, that the LAN is `192.168.1.0/24`, and that
+  vps sets `trustedInterfaces = [ "tailscale0" ]` are all published. An
+  attacker landing in the container already has the map.
+- **Rule:** new-rule candidate.
+- **Finding:** all three containers run on docker's default bridge
+  (`networks = []`, verified). Docker `MASQUERADE`s
+  `-s 172.17.0.0/16 ! -o docker0`, homelab has
+  `net.ipv4.ip_forward = 1` and `net.ipv6.conf.all.forwarding = 1`
+  (`hosts/homelab/configuration.nix:404-407`), and homelab is a
+  tailscale subnet router and exit node (`:409-412`). So a process
+  inside a game container can originate traffic to:
+
+  - `192.168.1.0/24` — the whole home LAN, A4's territory in reverse.
+  - `100.64.0.0/10` — every tailnet peer, source-NAT'd to homelab's
+    own tailscale address, which is exactly the identity the flat ACL
+    (F-P0-04) grants everything to.
+  - `10.100.0.0/24` over wg0 — vps.
+
+  The last one is the sharp edge. Per threat model §4.4, vps sets
+  `trustedInterfaces = [ "tailscale0" ]`, bypassing its packet filter
+  wholesale for that interface. A container that can emit tailnet
+  traffic as homelab therefore has *unfiltered* access to every port on
+  the fleet's internet edge, having started from a Minecraft mod.
+
+  What does hold: traffic from the container back to **homelab's own**
+  services arrives on `INPUT` with `-i docker0`, which matches none of
+  the `interfaces.tailscale0` / `interfaces.wg0` allow rules, so
+  homelab's own sshd, NFS, SMB and jellyfin are correctly closed to the
+  container. That asymmetry is worth knowing: the bypass in F-P4-02 is
+  inbound-only; outbound is governed by ordinary forwarding, and
+  ordinary forwarding is wide open.
+
+  Also confirmed clean and worth recording: `users.groups.docker.members`
+  is `[]` on homelab, so there is no A7-style docker-socket path here
+  (unlike `PC.nix:313`, which is P1's).
+- **Proposed fix:** the general answer is a dedicated docker network
+  with egress restrictions, but the cheap and targeted version is a
+  `DOCKER-USER` chain rule dropping `172.17.0.0/16 → 100.64.0.0/10`,
+  `192.168.1.0/24` and `10.100.0.0/24`, added alongside the existing
+  `networking.firewall.extraCommands` pattern the repo already uses on
+  vps. `DOCKER-USER` is the one chain docker guarantees it will not
+  overwrite, which makes it the right place. Note that the game
+  containers need *no* outbound access at all except DNS and HTTPS to
+  Modrinth/factorio.com at start — a default-deny egress with two
+  exceptions is achievable.
+- **Fix risk:** the game containers do legitimately fetch at start
+  (mods, DLC, factorio.com auth), so a default-deny that is too tight
+  turns into a crash loop on the next restart — and per the comment at
+  `factorio.nix:41-47`, this codebase has already lost two days to
+  exactly that failure shape, with `docker ps` reporting "Up" the whole
+  time. Stage it: add the three LAN/tailnet/wg0 drops first (they
+  cannot affect upstream fetches), and only consider full default-deny
+  after.
+
 ### F-P4-02 — every game port is published by docker, which bypasses the NixOS firewall; the interface scoping in the reference-standard files is inert
 
 - **File:** `modules/services/minecraft.nix:23-36` and `:50-53`;
@@ -270,6 +532,11 @@ Everything below was read out of `nix eval
     `0.0.0.0`, then minecraft and both factorio servers are directly
     internet-reachable from A1/A2 with no rate limiting and no
     firewall rule capable of stopping them, and this becomes CRITICAL.
+    §4.7 sharpens the urgency rather than the rating: the port map, the
+    fact that homelab has a public IPv6, the LAN prefix, the wg0
+    addressing and the domain are all published, so if the IPv6 path is
+    live an adversary needs no scanning to find it — only a `dig` and a
+    read of `hosts/homelab/configuration.nix:357-366`.
     My static reading says it does not: the default bridge is
     IPv4-only (`ipv6` is not set in `daemon.settings`, verified), and
     `userland-proxy = false` (`hosts/homelab/configuration.nix:39-41`)
@@ -307,82 +574,7 @@ Everything below was read out of `nix eval
   is homelab's exposure surface, and P2 should note that vps's rate
   limiter is bypassable from the LAN side.
 
-### F-P4-03 — the minecraft server auto-installs an untagged image and sixteen unpinned Modrinth mods, alpha channel enabled, into an internet-exposed JVM
-
-- **File:** `modules/services/minecraft.nix:51`, `:84-103`, `:132-145`
-- **Severity:** MEDIUM
-- **Confidence:** CONFIRMED
-- **Axis:** hardening
-- **Reachability:** A6 — a compromised upstream. Not the image registry
-  alone: sixteen independent third-party Modrinth projects, any one of
-  which is a sufficient entry point, all fetched at container start
-  with no version constraint and no integrity check. The landing spot
-  is a process that also handles A1/A3 traffic from the open internet
-  and holds a writable bind mount of `/srv/minecraft/vanilla-plus`.
-- **Rule:** new-rule candidate.
-- **Finding:** three unpinned supply-chain inputs stack here.
-
-  - `image = "itzg/minecraft-server"` (`:51`) carries **no tag at
-    all** — docker resolves that to `:latest`. This is looser than
-    `factorio.nix:159`'s `stable`, which at least has a written
-    justification (`:149-156`); the minecraft one has none and reads
-    like an oversight rather than a decision.
-  - `VERSION = "LATEST"` (`:56`) floats the Minecraft server version.
-  - `MODRINTH_PROJECTS` (`:86-103`) lists sixteen projects, resolved by
-    slug at every start, with `MODRINTH_ALLOWED_VERSION_TYPE = "alpha"`
-    (`:84`) explicitly widening resolution to pre-release builds and
-    `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further
-    transitive artifacts nobody has listed.
-
-  Partial mitigation, and it is real: `pull = "missing"` is the pinned
-  module's default (verified, `oci-containers.nix:315-328`), and
-  `/var/lib/docker` is on the impermanence persistence list
-  (`hosts/homelab/configuration.nix:482`), so the *image* is fetched
-  once and then stays. The **mods are not** — `MODRINTH_PROJECTS` is
-  re-resolved by the entrypoint on every container start, which is
-  every reboot and every `nixos-rebuild switch` that touches the unit.
-  That is the live channel.
-
-  Blast radius if it fires: code execution inside the container. The
-  container hardening does its job here — `--cap-drop=ALL` with only
-  SETUID/SETGID, `--read-only`, `no-new-privileges` — so this is not a
-  host-root path by itself. But it is arbitrary code with the `/data`
-  volume writable, and per F-P4-05 with unrestricted network egress to
-  the LAN, the tailnet and wg0. Note also that `--tmpfs=/tmp` is
-  mounted **`exec`** (`:140`), necessarily so for netty and
-  DistantHorizons native extraction, which means the read-only rootfs
-  does not prevent a compromised mod from writing and executing a
-  native payload. The comment at `:136-139` explains why `exec` is
-  required and is correct; it just does not note the cost.
-
-  Separately, and worth naming for A3: `viafabric`, `viabackwards` and
-  `viarewind` deliberately widen the set of protocol versions the
-  server will parse from unauthenticated clients, and Geyser + Floodgate
-  add the entire Bedrock (RakNet) protocol on 19132. All of that is
-  pre-authentication parsing surface reachable from the open internet
-  through vps's DNAT, in front of a whitelist that only applies after
-  login. That is not a misconfiguration — it is the point of the
-  server — but it is why the mod supply chain matters more here than it
-  would on a tailnet-only service.
-- **Proposed fix:** pin what can be pinned without breaking the game.
-  (a) Tag the image at minimum, digest it ideally:
-  `itzg/minecraft-server@sha256:…`. (b) Drop
-  `MODRINTH_ALLOWED_VERSION_TYPE = "alpha"` to `release` unless a
-  specific mod genuinely needs alpha, in which case name that mod in a
-  comment. (c) Consider `MODRINTH_PROJECTS` entries with explicit
-  version ids rather than bare slugs — itzg supports
-  `slug:version-id` — turning sixteen floating fetches into sixteen
-  reviewed ones. (d) If (c) is too much churn, at least record in the
-  file that mods are auto-updated from upstream on every start, so the
-  next reader knows.
-- **Fix risk:** pinning mods means they stop tracking Minecraft version
-  bumps, and with `VERSION = "LATEST"` the server version *will* move
-  under them, producing a start-time mod/engine mismatch. Pin (b) and
-  (a) first — they are nearly free — and treat (c) as coupled to
-  pinning `VERSION` as well. Any change here needs a real container
-  start and a client connection to verify, not just a build.
-
-### F-P4-04 — the factorio account token and game password are written in plaintext into a container-visible volume that is snapshotted and shipped offsite
+### F-P4-04 — the factorio account token and game password leave sops into a container-visible volume, and into every snapshot derived from it
 
 - **File:** `modules/services/factorio.nix:13-32` (the jq patch),
   `:100-123`, `:142`, `:167`; `hosts/homelab/configuration.nix:110`,
@@ -422,12 +614,23 @@ Everything below was read out of `nix eval
      `disko.nix:197-199` puts on `zroot/local/state`, which
      `hosts/homelab/configuration.nix:110` names as one of the two
      datasets the weekly restic job snapshots and pushes to Backblaze.
-     The factorio.com account token and the game password are
-     therefore in the offsite backup in plaintext, protected only by
-     the restic repo password — a materially different protection
-     model from sops, and one nobody chose deliberately.
+     Stated precisely, because the first draft of this report overstated
+     it: restic encrypts its repository, so the value is **not**
+     plaintext at Backblaze. What is true is that the secret has left
+     sops' protection and is now covered by two different mechanisms
+     instead — plaintext on the homelab root pool and in every
+     `zbackup` snapshot derived from it (root-readable), and inside the
+     restic repo under the restic password, itself a separate sops
+     secret. Rotating the sops entry does not rotate any of those
+     copies.
   3. Both servers share the same credentials by explicit decision
      (`:97-99`), so this is one secret in two places.
+  4. Under §4.7 the *location* is published too: `factorio.nix:13-32`
+     states in a public file exactly which fields land in
+     `/factorio/config/server-settings.json`, and the comment at
+     `:95-97` helpfully identifies `token` as "a factorio.com account
+     auth token, equally sensitive". Anything executing in that
+     container knows where to look without exploring.
 - **Proposed fix:** the write cannot be avoided, so bound it.
   (a) Restrict the file: have the `preStart` `chmod 0600` the patched
   `server-settings.json` after `mv`, so at least it is not
@@ -446,70 +649,6 @@ Everything below was read out of `nix eval
   `server-settings.json` until the image regenerates it from its
   template, and the patch would then need to run *after* that, not
   before. Test on a scratch volume, not on `main`.
-
-### F-P4-05 — a compromised game container reaches the LAN, the whole tailnet, and vps, because containers have unrestricted egress
-
-- **File:** `modules/services/minecraft.nix:47-146`,
-  `modules/services/factorio.nix:126-174`,
-  `hosts/homelab/configuration.nix:39-44`, `:404-412`;
-  cross-ref `hosts/vps/configuration.nix:341`
-- **Severity:** MEDIUM
-- **Confidence:** CONFIRMED for the network paths; PLAUSIBLE for the
-  end-to-end chain, which depends on F-P4-03/A3 landing first
-- **Axis:** hardening
-- **Reachability:** A3 or A6 — code execution in either game container,
-  via a protocol bug or via the unpinned mod channel — then lateral
-  movement.
-- **Rule:** new-rule candidate.
-- **Finding:** all three containers run on docker's default bridge
-  (`networks = []`, verified). Docker `MASQUERADE`s
-  `-s 172.17.0.0/16 ! -o docker0`, homelab has
-  `net.ipv4.ip_forward = 1` and `net.ipv6.conf.all.forwarding = 1`
-  (`hosts/homelab/configuration.nix:404-407`), and homelab is a
-  tailscale subnet router and exit node (`:409-412`). So a process
-  inside a game container can originate traffic to:
-
-  - `192.168.1.0/24` — the whole home LAN, A4's territory in reverse.
-  - `100.64.0.0/10` — every tailnet peer, source-NAT'd to homelab's
-    own tailscale address, which is exactly the identity the flat ACL
-    (F-P0-04) grants everything to.
-  - `10.100.0.0/24` over wg0 — vps.
-
-  The last one is the sharp edge. Per threat model §4.4, vps sets
-  `trustedInterfaces = [ "tailscale0" ]`, bypassing its packet filter
-  wholesale for that interface. A container that can emit tailnet
-  traffic as homelab therefore has *unfiltered* access to every port on
-  the fleet's internet edge, having started from a Minecraft mod.
-
-  What does hold: traffic from the container back to **homelab's own**
-  services arrives on `INPUT` with `-i docker0`, which matches none of
-  the `interfaces.tailscale0` / `interfaces.wg0` allow rules, so
-  homelab's own sshd, NFS, SMB and jellyfin are correctly closed to the
-  container. That asymmetry is worth knowing: the bypass in F-P4-02 is
-  inbound-only; outbound is governed by ordinary forwarding, and
-  ordinary forwarding is wide open.
-
-  Also confirmed clean and worth recording: `users.groups.docker.members`
-  is `[]` on homelab, so there is no A7-style docker-socket path here
-  (unlike `PC.nix:313`, which is P1's).
-- **Proposed fix:** the general answer is a dedicated docker network
-  with egress restrictions, but the cheap and targeted version is a
-  `DOCKER-USER` chain rule dropping `172.17.0.0/16 → 100.64.0.0/10`,
-  `192.168.1.0/24` and `10.100.0.0/24`, added alongside the existing
-  `networking.firewall.extraCommands` pattern the repo already uses on
-  vps. `DOCKER-USER` is the one chain docker guarantees it will not
-  overwrite, which makes it the right place. Note that the game
-  containers need *no* outbound access at all except DNS and HTTPS to
-  Modrinth/factorio.com at start — a default-deny egress with two
-  exceptions is achievable.
-- **Fix risk:** the game containers do legitimately fetch at start
-  (mods, DLC, factorio.com auth), so a default-deny that is too tight
-  turns into a crash loop on the next restart — and per the comment at
-  `factorio.nix:41-47`, this codebase has already lost two days to
-  exactly that failure shape, with `docker ps` reporting "Up" the whole
-  time. Stage it: add the three LAN/tailnet/wg0 drops first (they
-  cannot affect upstream fetches), and only consider full default-deny
-  after.
 
 ### F-P4-06 — NFS authenticates nothing; reaching `tailscale0:2049` *is* the authorization
 
@@ -544,6 +683,13 @@ Everything below was read out of `nix eval
   second factor of any kind — which distinguishes this from the other
   two tailnet services: samba requires a password (F-P4-14 context) and
   jellyfin requires a login.
+
+  §4.7 removes the last soft spot in that path. The export options, the
+  `100.64.0.0/10` CIDR, the share paths and — the operative detail —
+  `gids.multimedia = 999` are all published, the last of them as a named
+  constant in `modules/flake/vars.nix:22` carrying a comment that
+  explains NFS authorizes by numeric gid. An A5 device does not have to
+  discover which gid to assert; the repo names it.
 
   This is the concrete instance that makes F-P0-04 bite, and it is
   rated MEDIUM rather than HIGH to avoid double-counting the parent
@@ -684,6 +830,17 @@ Everything below was read out of `nix eval
     per-source control and it acts before the SNAT, so it works — it
     just cannot ban, only rate-limit.
 
+  §4.7 puts a second edge on that last point: the hashlimit is not only
+  the sole control, its exact thresholds are published — `15/minute`
+  burst 10 on 25565/tcp, `1000/second` burst 500 on 19132/udp,
+  `2000/second` burst 1000 on both factorio ports
+  (`hosts/vps/configuration.nix:415-432`). An adversary who wants to
+  probe or brute-force rather than flood simply stays underneath them,
+  and knows precisely where "underneath" is. That does not make the
+  rate limiter worthless — it still does the volumetric job it was
+  built for — but it does mean it must never be counted as a control
+  against a deliberate, patient attacker, only against A1's noise.
+
   Note the contrast with jellyfin, where the equivalent problem was
   spotted and solved: `jellyfin.nix:52-71` patches `KnownProxies` for
   precisely this reason, and the comment there gets the reasoning right.
@@ -743,7 +900,11 @@ Everything below was read out of `nix eval
 
   This matters because the comment is long, confident and cites live
   evidence, which is exactly the shape of comment a future reader will
-  not re-examine.
+  not re-examine. Under §4.7 it is read by people other than future
+  maintainers too: `factorio.nix:33-60` tells an adversary, before they
+  touch anything, that the factorio containers have a writable rootfs
+  and hold `CAP_DAC_OVERRIDE` and `CAP_CHOWN` — i.e. which of the two
+  game servers is the softer landing spot for F-P4-05's pivot.
 - **Proposed fix:** re-test `--read-only` once, now that DAC_OVERRIDE
   is granted, on the `new` server only. If it still fails, replace the
   citation with the actual failure (`usermod` on a read-only `/etc`)
@@ -789,9 +950,11 @@ Everything below was read out of `nix eval
   Three things to raise:
 
   1. **What the credential is.** A Cloudflare DNS-edit token for
-     `skyseekerlabs.net` is not only a DNS credential — it satisfies
-     ACME DNS-01, and by repointing the apex A/AAAA it satisfies
-     HTTP-01 too. Whoever holds it can obtain a publicly-trusted
+     `skyseekerlabs.net` — a domain named in a public file
+     (`modules/flake/vars.nix:18`) pointing at two hardcoded public
+     addresses (`octodns.nix:21-22`) — is not only a DNS credential: it
+     satisfies ACME DNS-01, and by repointing the apex A/AAAA it
+     satisfies HTTP-01 too. Whoever holds it can obtain a publicly-trusted
      certificate for the apex and for `jellyfin.` from essentially any
      CA, and then MITM the one internet-facing service that takes user
      passwords. Nothing in the repo characterises the token this way;
@@ -869,6 +1032,15 @@ Everything below was read out of `nix eval
   install — small, but it is precisely the window in which the
   admin password is also newest.
 
+  §4.7 note: jellyfin is the one service in this part with a
+  password-authenticated login exposed to the internet, and its exact
+  version is derivable from the public flake pin (10.11.11 at the
+  current lock). A credential-stuffer or a CVE-matcher reads it off the
+  repo rather than off a banner. That does not change this finding's
+  rating — the lockout gap is the same size either way — but it is why
+  keeping the nixpkgs pin moving matters more here than on a
+  tailnet-only service.
+
   Also noted while checking the unit, both minor and both fine to
   leave: `ProtectSystem` is `true` rather than `"strict"` — set
   directly by the upstream module at
@@ -888,41 +1060,16 @@ Everything below was read out of `nix eval
   variant risks racing jellyfin's own first write. The logging variant
   is free and probably sufficient given the window is one boot.
 
-### F-P4-12 — dead config: UDP 25565 is opened on two interfaces and nothing has ever listened on it
-
-- **File:** `modules/services/minecraft.nix:26-29`, `:33-36`, `:50-53`;
-  `hosts/vps/configuration.nix:368-373`
-- **Severity:** INFO
-- **Confidence:** CONFIRMED
-- **Axis:** needed-used
-- **Reachability:** none.
-- **Rule:** failure mode §7.4.
-- **Finding:** `minecraft.nix` opens `25565/udp` on both `tailscale0`
-  and `wg0`. Minecraft Java Edition is TCP-only; Bedrock arrives on
-  19132/udp via Geyser. Confirmed from both ends: the container
-  publishes `25565:25565` (TCP, the docker default) and
-  `19132:19132/udp` — no UDP 25565 — and vps forwards 25565 with
-  `proto = "tcp"` (`hosts/vps/configuration.nix:370-372`). Nothing
-  binds it, nothing forwards it, nothing needs it. Harmless, and
-  exactly the kind of accretion §7.4 is about: a rule whose reason
-  never existed rather than one that expired.
-
-  Per F-P4-02 all four of these interface entries are inert anyway, so
-  this one is doubly dead. If F-P4-02's fix keeps the rules as
-  documentation of intent, drop the UDP 25565 pair while doing it.
-- **Proposed fix:** delete `25565` from
-  `interfaces.tailscale0.allowedUDPPorts` and
-  `interfaces.wg0.allowedUDPPorts`, keeping `19132` in both.
-- **Fix risk:** none.
-
 ### F-P4-13 — `factorio-new`'s floating `stable` tag does not do the thing it is documented to do
 
-- **File:** `modules/services/factorio.nix:149-159`;
+- **File:** `modules/services/factorio.nix:129-140`, `:149-159`;
   `hosts/homelab/configuration.nix:482`
-- **Severity:** INFO
+- **Severity:** LOW — raised from INFO under §4.7; the documentation
+  half is still INFO-grade, the version-disclosure half is not
 - **Confidence:** CONFIRMED
-- **Axis:** documentation / needed-used
-- **Reachability:** n/a
+- **Axis:** documentation / needed-used / hardening
+- **Reachability:** A3 — an internet client reading the repo to
+  determine which Factorio engine it is talking to.
 - **Rule:** failure mode §7.5.
 - **Finding:** the brief flagged `factorio.nix:152`'s floating `stable`
   tag as a possible supply-chain path. It is a floating tag, and it is
@@ -950,6 +1097,24 @@ Everything below was read out of `nix eval
   republished `2.1.14` would be picked up on any host that has to pull
   it fresh. Neither container is pinned in the sense that would
   actually resist A6.
+
+  **What §4.7 changes here.** The comment at `:129-139` does not merely
+  pin a version, it publishes one, together with the reasoning: that
+  `2.1.14` is on the *experimental* line, that it was chosen for save
+  compatibility rather than because it is the maintained release, and
+  that reverting is blocked by a gap in the snapshot history. An A3
+  client reading that knows the exact engine build behind 34197 and
+  knows it is not the branch upstream patches first. For `factorio-new`
+  the disclosure is weaker but the *control* is worse — `stable` means
+  the running build is whatever upstream last called stable at the
+  moment the image happened to be fetched, which neither the operator
+  nor the config records anywhere. Same defender-blind /
+  attacker-informed asymmetry as F-P4-03, one notch smaller because
+  Factorio's pre-authentication surface is far narrower than modded
+  Minecraft's. Raised to LOW on that basis; it would be MEDIUM if the
+  factorio servers carried anything like minecraft's mod surface, and
+  per F-P4-03's `UPDATE_MODS_ON_START` paragraph that is not guaranteed
+  to stay true.
 - **Proposed fix:** correct the comment, and either set
   `pull = "newer"` on `factorio-new` if automatic engine updates are
   genuinely wanted (accepting the supply-chain trade explicitly), or
@@ -959,6 +1124,33 @@ Everything below was read out of `nix eval
   on an internet-exposed container and makes every restart dependent on
   Docker Hub reachability. Digest-pinning `factorio-main` is safe but
   means a manual step for every future upgrade.
+
+### F-P4-12 — dead config: UDP 25565 is opened on two interfaces and nothing has ever listened on it
+
+- **File:** `modules/services/minecraft.nix:26-29`, `:33-36`, `:50-53`;
+  `hosts/vps/configuration.nix:368-373`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** none.
+- **Rule:** failure mode §7.4.
+- **Finding:** `minecraft.nix` opens `25565/udp` on both `tailscale0`
+  and `wg0`. Minecraft Java Edition is TCP-only; Bedrock arrives on
+  19132/udp via Geyser. Confirmed from both ends: the container
+  publishes `25565:25565` (TCP, the docker default) and
+  `19132:19132/udp` — no UDP 25565 — and vps forwards 25565 with
+  `proto = "tcp"` (`hosts/vps/configuration.nix:370-372`). Nothing
+  binds it, nothing forwards it, nothing needs it. Harmless, and
+  exactly the kind of accretion §7.4 is about: a rule whose reason
+  never existed rather than one that expired.
+
+  Per F-P4-02 all four of these interface entries are inert anyway, so
+  this one is doubly dead. If F-P4-02's fix keeps the rules as
+  documentation of intent, drop the UDP 25565 pair while doing it.
+- **Proposed fix:** delete `25565` from
+  `interfaces.tailscale0.allowedUDPPorts` and
+  `interfaces.wg0.allowedUDPPorts`, keeping `19132` in both.
+- **Fix risk:** none.
 
 ### F-P4-14 — samba's `hosts allow`/`hosts deny` pair is IPv4-only, in a tailnet that is dual-stack
 
@@ -1044,6 +1236,13 @@ Everything below was read out of `nix eval
     (`nfsd.nix` `preStart` does the mkdir). Correctness, not security:
     clients cannot reclaim locks across a server reboot. Flagging in
     case P3 wants it.
+  - **The world seed is public.** `minecraft.nix:71` commits
+    `SEED = "3522075773609978693"` to a public repository. Not a
+    security finding under this threat model — no asset in §1 is
+    touched — but a §4.7 consequence worth stating once, because it is
+    almost certainly not a decision anyone made: anyone can generate
+    the identical world offline and locate every structure, slime chunk
+    and ore vein on a server whose whole point is survival play.
   - **`modules/services/README.md` does not exist**, though
     `docs/procedures/new-service.md` step 6's surrounding text points
     at it as the service inventory and its "Gotchas" section. Several
@@ -1065,8 +1264,8 @@ distinction is the whole of F-P4-02.
 | Service | Firewall scoping | Capabilities | Read-only rootfs | no-new-privs | Dedicated user | systemd sandboxing | Image / version pinning |
 |---|---|---|---|---|---|---|---|
 | **minecraft** (container) | ⚠️ rules written, **inert** — docker DNAT bypasses `INPUT`; open on all IPv4 incl. LAN (F-P4-02) | ✅ `--cap-drop=ALL` + SETUID/SETGID, justified | ✅ `--read-only`, but `/tmp` is `exec` by necessity | ✅ | ⚠️ image-internal drop only; no `--user`, no `userns-remap` | ❌ n/a — unit is a `docker run` wrapper, no hardening | ❌ **untagged** (`:latest`) + 16 unpinned Modrinth mods, alpha allowed (F-P4-03) |
-| **factorio-main** (container) | ⚠️ same as above | ✅ `--cap-drop=ALL` + CHOWN/DAC_OVERRIDE/SETUID/SETGID | ❌ documented exception; evidence partly stale, never re-tested (F-P4-09) | ✅ | ⚠️ same as above | ❌ same; plus an unsandboxed root `preStart` handling secrets | ⚠️ tag `2.1.14`, mutable, not a digest |
-| **factorio-new** (container) | ⚠️ same as above | ✅ same | ❌ same | ✅ | ⚠️ same | ❌ same | ⚠️ floating `stable`, and it does not float (F-P4-13) |
+| **factorio-main** (container) | ⚠️ same as above | ✅ `--cap-drop=ALL` + CHOWN/DAC_OVERRIDE/SETUID/SETGID | ❌ documented exception; evidence partly stale, never re-tested (F-P4-09) | ✅ | ⚠️ same as above | ❌ same; plus an unsandboxed root `preStart` handling secrets | ❌ tag `2.1.14`, mutable, not a digest, publicly declared as the experimental line + `UPDATE_MODS_ON_START` (F-P4-13, F-P4-03) |
+| **factorio-new** (container) | ⚠️ same as above | ✅ same | ❌ same | ✅ | ⚠️ same | ❌ same | ❌ floating `stable`, and it does not float; + `UPDATE_MODS_ON_START` and a mod mirror from `main` (F-P4-13, F-P4-03) |
 | **jellyfin** | ✅ real — tailscale0 + wg0, enforced in `INPUT` | ✅ `CapabilityBoundingSet=[""]`; `render` grant bounded by `DeviceAllow` | ⚠️ `ProtectSystem=true` (upstream), not `"strict"` | ✅ | ✅ `jellyfin`, group `multimedia` | ✅ full upstream stack incl. `SystemCallFilter`, `PrivateUsers`, `ProtectProc` | ✅ nixpkgs pin (10.11.11) |
 | **samba** | ✅ real — tailscale0:445, plus `hosts allow` (IPv4-only, F-P4-14) | ➖ n/a (not containerised) | ➖ n/a | ✅ | ⚠️ `smbd` is root — documented and genuinely unavoidable; `android-smb` is a proper auth-only user | ⚠️ deliberate partial set on `smbd`, with a stated reason; `samba-user-provision` gets the **full** stack | ✅ nixpkgs pin (4.23.10) |
 | **nfs** | ✅ real — tailscale0:2049 only; `root_squash`; but `sec=sys` authenticates nothing (F-P4-06) | ➖ n/a | ➖ n/a | ➖ kernel server | ➖ kernel server, root by nature | ➖ nothing meaningful to sandbox | ✅ nixpkgs pin |
@@ -1074,6 +1273,10 @@ distinction is the whole of F-P4-02.
 | **octodns** | ➖ no listener | ➖ n/a | ➖ | ✅ | ✅ `octodns:octodns` | ⚠️ meets `docs/hardening.md`'s list; thinner than this repo's own `samba-user-provision` (F-P4-10) | ✅ `pkgs-unstable` pin |
 
 Legend: ✅ meets the standard · ⚠️ partial, or written-but-not-effective · ❌ gap · ➖ not applicable
+
+Every cell in this table is public (§4.7). Read the ❌s in the last
+column as things an internet client can look up about the two services
+it is allowed to speak to, not merely as maintenance debt.
 
 **What the table says.** The 2026-08-26 pass did *not* leave the other
 services behind — jellyfin, samba and nfs all carry the
@@ -1086,6 +1289,15 @@ hardening is genuinely good — better than most homelabs — and their
 looked at, copyparty-iso and octodns, are the two with no
 interface-scoping story at all: one because it is deliberately
 host-wide, one because it has no listener.
+
+**What §4.7 changes about the table.** The rightmost column stops being
+a hygiene metric and becomes an exposure one. The three ⚠️/❌ entries
+there all sit on the two services reachable from the open internet, and
+the repository publishes both the pin and the reasoning behind it —
+so the version an A3 client is talking to is a lookup, not a probe, on
+all three containers. That is why F-P4-03 is the HIGH in this part
+rather than a supply-chain footnote, and it is the one column where the
+containerised services are worse than every native service beside them.
 
 ---
 
@@ -1166,6 +1378,19 @@ store (`:117`, `--mount … :ro` verified in the argv). No security
 surface: no auth settings, no listener config, no credentials. The
 upstream issue is cited. Nothing to report.
 
+**Secrets that are correctly kept out of a public repo.** The minecraft
+whitelist and ops list are sops-rendered into an `--env-file` rather
+than written into the module (`minecraft.nix:9-13,112`), and the
+factorio game password, account token and username likewise
+(`factorio.nix:100-102`). A whitelist is not really a secret — the op
+list of a public Minecraft server is discoverable in-game — but under
+§4.7 the instinct is right, and it is worth noting that this repo
+already reaches for sops in the marginal cases rather than only the
+obvious ones. Verified against the threat model's own history scan
+(§4.7): the only credential-shaped string ever committed anywhere in
+this repo's history is `octodns.nix`'s `env/CLOUDFLARE_TOKEN`
+placeholder, which is an indirection, not a value.
+
 **Threat-model claims that held up on inspection.** §2 is right that
 `isoimage` listens on 3923 host-wide. §2.2's list of interface-scoped
 services is accurate for jellyfin/samba/nfs and, in intent but not
@@ -1177,19 +1402,38 @@ have per-client attribution.
 
 ## 5. Summary
 
-**15 findings: 1 HIGH, 5 MEDIUM, 5 LOW, 4 INFO.**
+**15 findings: 3 HIGH, 3 MEDIUM, 6 LOW, 3 INFO.**
 
-By axis: 8 hardening, 4 documentation (F-P4-08, F-P4-09, F-P4-13, and
-the documentation half of F-P4-02), 3 needed-used.
+By axis: 9 hardening, 3 documentation (F-P4-08, F-P4-09, and the
+documentation halves of F-P4-02 and F-P4-13), 3 needed-used.
+
+Movement from the pre-§4.7 draft: F-P4-03 MEDIUM → HIGH,
+F-P4-05 MEDIUM → HIGH, F-P4-13 INFO → LOW. Nothing moved down. One
+substantive correction independent of §4.7: F-P4-04's first draft said
+the factorio secrets sit in plaintext at Backblaze — restic encrypts
+its repository, so that was wrong and is now stated accurately.
 
 The three that matter most:
 
-1. **F-P4-02** — docker publishes all four game ports on `0.0.0.0`, so
-   the interface-scoped firewall rules in the repo's reference-standard
-   files constrain nothing; verify the IPv6 case before anything else,
-   because it decides between MEDIUM and CRITICAL.
-2. **F-P4-01** — the recovery ISO grants anonymous read/write/delete
-   over `/` on a host-wide port, with literally zero accounts defined.
-3. **F-P4-03** — sixteen unpinned Modrinth mods with the alpha channel
-   enabled are re-resolved on every start into an internet-exposed JVM
-   that also runs an untagged image.
+1. **F-P4-03** (HIGH) — both game servers pull unpinned third-party
+   code on every start (sixteen named Modrinth mods with alpha builds
+   allowed on minecraft; `UPDATE_MODS_ON_START` on both factorio
+   servers, mirrored between them), and because the repo is public an
+   A1/A3 client can enumerate that exact surface and match it against
+   advisories without probing — while the operator cannot say what
+   versions are running.
+2. **F-P4-02** (MEDIUM, conditionally CRITICAL) — docker publishes all
+   four game ports on `0.0.0.0`, so the interface-scoped firewall rules
+   in the repo's reference-standard files constrain nothing. Verify the
+   IPv6 case before anything else in this report; it is the one open
+   question that could reclassify a finding to CRITICAL.
+3. **F-P4-01** (HIGH) — the recovery ISO grants anonymous
+   read/write/delete over `/` on a host-wide port, with literally zero
+   accounts defined, and the config saying so is public.
+
+Remediation order differs slightly from severity order, because two of
+these are cheap and one is a decision: pin minecraft's image and drop
+`alpha` (hours, F-P4-03); bind the container publishes to addresses
+(hours, F-P4-02); add the three `DOCKER-USER` egress drops (hours,
+F-P4-05); then take the copyparty decision (F-P4-01) and the NFS/ACL
+decision (F-P4-06), both of which need the user rather than an agent.

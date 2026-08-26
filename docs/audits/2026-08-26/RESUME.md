@@ -1,8 +1,7 @@
 # Audit state / resume point
 
 Written so this audit can be picked up cleanly in a new session. Last
-updated 2026-08-26, after Phase 1 part reports P1, P3, P4, P6, P7
-landed.
+updated 2026-08-26, after **all eight Phase 1 part reports landed**.
 
 **Branch:** `worktree-worktree-security-audit-plan`
 **Worktree:** `.claude/worktrees/worktree-security-audit-plan`
@@ -40,24 +39,46 @@ being authorised, then deal with the snapshot copies. Found by P7
 | Phase | State |
 |---|---|
 | 0 — threat model | **done** — `00-threat-model.md`, `P0-findings.md` (F-P0-01..08) |
-| 1 — part audits | **5 of 8 in**: P1, P3, P4, P6, P7. **Outstanding: P2 (vps), P5 (workstations), P8 (supply chain/secrets)** |
+| 1 — part audits | **DONE — all 8 in** (P1..P8) |
 | 2 — consolidation | not started — produces `findings.md` |
 | 3 — remediation waves | not started |
 | 4 — documentation harvest | not started |
 
-If resuming with P2/P5/P8 still missing, check whether their report
-files exist in `docs/audits/2026-08-26/`. If a file is absent, that
-part must be re-dispatched; the prompts follow the pattern recorded in
-`TODO.md`'s Phase 1 section, and every agent must be given
-`00-threat-model.md` + `P0-findings.md` (schema) + `docs/hardening.md`
-to read first.
+**Next action: Phase 2 consolidation** — dedupe the nine reports
+(P0..P8) into a single ranked `findings.md`, separating systemic
+findings (a class repeated across hosts, which become new
+`docs/hardening.md` rules) from one-offs. Roughly 145 findings across
+~11,000 lines of report.
 
 ---
 
-## Running tally (5 of 8 parts)
+## Running tally — all 8 parts
 
-**2 CRITICAL-or-equivalent, 11 HIGH.** Counts by part: P1 3H/3M/6L/4I ·
-P3 3H/7M/7L/7I · P4 1H/5M/5L/4I · P6 1C/3H/3M/5L/3I · P7 5H/6M/6L/1I.
+**3 CRITICAL, 19 HIGH**, ~145 findings total. By part: P1 3H/3M/6L/4I ·
+P2 1H/7M/6L/7I · P3 3H/7M/7L/7I · P4 1H/5M/5L/4I · P5 6H/1M/7L/4I ·
+P6 1C/3H/3M/5L/3I · P7 5H/6M/6L/1I · P8 2C/3H/6M/6L/6I · plus P0 F-P0-01..08.
+
+### Worst single finding — F-P8-02 (CRITICAL)
+
+**Three *retired* vps age keys decrypt today's live credentials out of
+public git history.** `secrets/secrets.yaml` has had 14 distinct age
+recipients across its 72 revisions; only 7 are current. P8 established
+by ciphertext comparison alone — no decryption — that each of the three
+vps keys retired during the 2026-08-25 reinstall was a recipient of a
+public revision containing the **byte-identical current** ciphertext for
+`homelab_vps_deploy_key`, `homelab_zrepl_key`,
+`homelab_backblaze_restic_password`, `cloudflare_octodns_token`, both
+WireGuard private keys, the PSK, and three tailscale auth keys.
+
+The reinstall rotated the *recipient* three times and rotated exactly
+**one value out of thirty-one** (`tailscale_authkey_vps`). That is the
+concrete, already-happened instance of F-P0-08's "rotation is not
+retroactive": the ciphertext is public and permanent, so retiring a key
+accomplishes nothing unless the *values* are rotated at the provider.
+
+Remediation is value rotation at each provider (Backblaze, Cloudflare,
+tailscale, WireGuard, and the deploy/zrepl keypairs), not re-keying.
+Manual, per `docs/procedures/secrets.md`.
 
 ### The through-line
 
@@ -71,9 +92,20 @@ permanently downloadable, and rotation is therefore *not retroactive*),
 any single age key ever obtained decrypts the fleet's entire secret
 history. P3 adds that homelab's age key *is* its SSH host key and exists
 in plaintext in four places including inside the offsite Backblaze
-repo. thinkpad has no FDE. Found independently by P6 (F-P6-01,
-CRITICAL), P1 (F-P1-02) and P3 (F-P3-01). **P8 owns the remediation
-design and had not reported at the time of writing.**
+repo. thinkpad has no FDE. Found independently by **five** parts — P6
+(F-P6-01), P1 (F-P1-02), P3 (F-P3-01), P2 (F-P2-01) and P8 (F-P8-01,
+which owns the three-step remediation: restructure `.sops.yaml` → move
+values → **rotate at the provider**, since re-keying alone fixes
+nothing retroactively).
+
+Two shorter paths to the same place, both CONFIRMED:
+`/home/lilijoy/.config/sops/age/keys.txt` is an age secret key at mode
+**0644** on the daily driver (verified live; parent dirs 0755, so only
+`/home/lilijoy` being 0700 protects it) — P5 F-P5-02, P8 F-P8-03. And
+`~/.ssh/id_ed25519` on torrent is **byte-identical** to the third entry
+in `flake.vars.publicSshKeys`, i.e. root on homelab/vps/isoimage plus
+`origin/master` push, with no passphrase — P5 F-P5-01, P8 F-P8-04. A7
+needs no escalation at all.
 
 ### Other items needing a human decision
 
@@ -95,6 +127,16 @@ design and had not reported at the time of writing.**
 - **F-P3-10** — answers the standing TODO question: **no**, homelab is
   not gated entirely by tailscale. `wg0` and vps's DNAT put A1/A3 on
   homelab code with no device authorization in the path.
+- **Tailnet ACL drift is live, not hypothetical** — P8 found an
+  untagged Android phone (`Pixel 6a`) is a tailnet member covered by
+  `autogroup:member` in all four grants and appears nowhere in the
+  repo. Also: the highest-value fix for F-P0-04 is not the ACL but
+  `trustedInterfaces = ["tailscale0"]` on vps, which leaves that host
+  with no packet filter at all from the tailnet.
+- **torrent's 102 host-wide ports are not currently internet-reachable**
+  — probed from vps, filtered by the ISP CPE (see
+  `live-verification.md`). But the CPE is a coincidence, not a control:
+  unversioned, unmanaged, and worth nothing to thinkpad when roaming.
 
 ### Corrections already folded into the threat model
 
