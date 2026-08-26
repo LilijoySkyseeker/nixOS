@@ -190,15 +190,28 @@ in
       nix.settings.allowed-users = [ "@wheel" ];
 
       # sops config
-      # ssh key is only usable once /home is mounted (interactive `sops` edits as
-      # lilijoy). Boot-time secret decryption (e.g. for services that need a
-      # secret before login, like tailscale's authkey) needs an identity that
-      # lives on the root filesystem instead, since /home isn't mounted yet
-      # during early activation. generateKey creates that identity on first
-      # activation if it doesn't already exist, so it's reproducible from a
-      # fresh install: its public key just needs to be added to .sops.yaml
-      # afterwards (see secrets/README or repo history for the one-time step).
-      sops.age.sshKeyPaths = [ "/home/lilijoy/.ssh/id_ed25519" ];
+      # Boot-time secret decryption (e.g. for services that need a secret
+      # before login, like tailscale's authkey) needs an identity that lives
+      # on the root filesystem, since /home isn't mounted yet during early
+      # activation. generateKey creates that identity on first activation if
+      # it doesn't already exist, so it's reproducible from a fresh install:
+      # its public key just needs to be added to .sops.yaml afterwards (see
+      # docs/procedures/secrets.md's "Adding a recipient" runbook for the
+      # one-time step).
+      #
+      # Deliberately NOT setting sops.age.sshKeyPaths to lilijoy's
+      # ~/.ssh key here: that NixOS option only feeds sops-install-secrets'
+      # boot-time manifest (which can never read it, since /home isn't
+      # mounted yet -- upstream confirms this whole class of "configured ssh
+      # key path missing at activation time" as a still-open sops-nix
+      # limitation, https://github.com/Mic92/sops-nix/issues/167) and has no
+      # effect on interactive `sops` edits, which are driven entirely by the
+      # `sops` CLI's own identity discovery (SOPS_AGE_SSH_PRIVATE_KEY_FILE
+      # env var or ~/.config/sops/age/keys.txt on whatever machine runs the
+      # command), independent of this module. So it was pure downside with
+      # no upside -- confirmed as the fix for TODO.md's "sops-nix
+      # age.keyFile fallback doesn't fire" item (it was never a fallback
+      # that could fire in the first place).
       sops.age.keyFile = "/var/lib/sops-nix/key.txt";
       sops.age.generateKey = true;
 
