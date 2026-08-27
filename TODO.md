@@ -68,20 +68,51 @@ them rot.
         rebuildable artefacts in an hourly-snapshotted, replicated
         dataset. torrent's replica on homelab is 3.16T.
 
-      **Candidate moves, none decided:**
+      **Direction, decided 2026-08-27:**
 
-      - `boot.tmp.cleanOnBoot = true` or `useTmpfs = true` — **no
-        `boot.tmp.*` is set anywhere in this repo today**, so `/tmp`
-        is on-disk and never cleaned on all four hosts. Cheapest single
-        improvement; `useTmpfs` also makes `/dev/shm`-style hygiene the
-        default rather than something to remember.
-      - Split `~/.cache`, `~/.local/share/Trash` and `~/Downloads` into
-        their own datasets, excluded from `serve.datasets`. Note
-        `~/Downloads` is a judgement call — 957 GB of it is not obviously
+      - **All hosts get impermanence.** homelab is the model, not the
+        exception — the laptops should get the same wipe-on-boot root.
+        That settles the `/tmp` and `/var/tmp` half of this entry
+        structurally: a root that rolls back to `@blank` every boot
+        cannot accumulate temp data for a snapshot to capture, which is
+        exactly why homelab's `zroot/local/root` carries one snapshot
+        and torrent's carries 61. It also folds in the thinkpad
+        impermanence scaffolding already flagged as inert (`F-P5-14`:
+        `environment.persistence` evaluates to `{}` and there is no
+        `zfs rollback …@blank` in its initrd, so `/` is durable today and
+        `@blank` is decorative) — that becomes real work rather than a
+        comment.
+      - **`boot.tmp.useTmpfs = true` — agreed, worth doing.** No
+        `boot.tmp.*` is set anywhere in this repo today, so `/tmp` is
+        on-disk and never cleaned on all four hosts. This is the cheapest
+        single improvement and is worth landing *ahead of* the
+        impermanence work rather than waiting for it: it is one option,
+        it needs no disko changes, and it makes `/dev/shm`-style hygiene
+        the default instead of something to remember at exactly the
+        moment you are handling a private key. Watch the memory cost on
+        hosts that build large derivations in `/tmp`.
+
+      **Impermanence does not finish the job — be clear about what is
+      left.** It fixes `/`, and therefore `/tmp` and `/var/tmp`. It does
+      **not** touch `/home`, which is persisted by design and is where
+      the volume actually is: `~/.cache` at 22 GB and `~/Downloads` at
+      957 GB, both inside the hourly-snapshotted, replicated
+      `zroot/local/home`. Those still need the dataset split, because of
+      the whole-dataset constraint above. So the plan is two independent
+      pieces, and landing impermanence should not be read as closing this
+      entry.
+
+      **Still undecided:**
+
+      - Split `~/.cache` and `~/.local/share/Trash` into their own
+        datasets, excluded from `serve.datasets`. Low controversy —
+        both are regenerable by definition.
+      - `~/Downloads` is a judgement call. 957 GB of it is not obviously
         disposable, and "not backed up" is a promise to the user as much
-        as a storage decision.
-      - Decide deliberately whether `zroot/local/root` needs replicating
-        on a laptop at all, given `/nix` is excluded already and the
+        as a storage decision. Splitting the `iso-autobuild` output
+        directory out of it may be the narrower, better move.
+      - Whether `zroot/local/root` needs replicating on a laptop at all
+        once it is impermanent, given `/nix` is excluded already and the
         config is in this repo.
 
       **Do not treat this as a prerequisite for rotation item 9.**
