@@ -86,6 +86,7 @@ All build-verified on all four hosts. **Not switched.**
 | `ba8cd4e` | `initialPassword = "123456"` removed; inert `ssh` block deleted from the ACL reference copy | F-P1-03, F-P0-05/P8-12 |
 | `40255bd` | `github.com` host key pinned fleet-wide, verified against GitHub's published fingerprint | F-P7-04/P3-05/P0-07 |
 | `abdd049` | `myHealthAlerts` enabled on torrent and thinkpad, `checkSmart = false` on both; `sops.secrets.vps_caddy_env` deleted; `user-actions.md` added | F-P7-09, F-P2-13/P8-18, F-P8-11 |
+| `6b623c0` | **wave 2 starts.** Full sshd baseline on both laptops as `settings`, `allowSFTP = false`; `docs/hardening.md`'s false `AllowTcpForwarding` claim corrected | F-P5-07, F-P2-09/P3-18 |
 
 ### Consequences to know before deploying any of it
 
@@ -100,6 +101,14 @@ All build-verified on all four hosts. **Not switched.**
 - **`40255bd` fails closed.** If GitHub rotates that key, unattended
   deploys stop until it is updated. That is the intended trade, but it
   is why F-P7-09 (nothing notices a failed deploy) matters.
+- **`6b623c0` changes what SSH to the laptops can do.** Nothing in the
+  repo relies on any of it, and nothing can log in interactively there
+  today, but if that ever changes: `scp`/`sftp` to torrent and thinkpad
+  no longer work (`allowSFTP = false`, and modern `scp` speaks SFTP);
+  `ssh -L`/`-D` through them no longer works; and idle sessions are now
+  dropped after 5 minutes (`ClientAliveInterval 60` ×
+  `ClientAliveCountMax 5`). All three fail immediately and obviously
+  rather than silently.
 - **`abdd049` starts sending traffic to Discord from two new hosts.** The
   timer is `Persistent`, so a laptop returning from weeks offline fires
   one catch-up batch for everything that failed while it was down — that
