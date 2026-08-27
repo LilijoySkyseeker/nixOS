@@ -87,7 +87,23 @@ early precisely because it is low-stakes practice for the pattern.
 
 - **You** — Discord → channel → Integrations → Webhooks → create a new
   webhook, copy the URL. Keep the old one for now.
-- **You** — `sops secrets/secrets.yaml`, replace `homelab_discord_webhook`.
+- **You** — `sops secrets/secrets.yaml`, set `discord_webhook`.
+
+  > **The value is not a bare URL.** `myHealthAlerts` runs
+  > `curl -sS -K <file>`, and `-K` is *config-file* mode — deliberately,
+  > so the URL never appears in argv or the process list. The value must
+  > therefore be a curl config line, newline-terminated:
+  >
+  > ```
+  > url = "https://discord.com/api/webhooks/XXXX/YYYY"
+  > ```
+  >
+  > A bare `https://…` makes curl fail with `config file option 'https'
+  > is unknown`, exit 2 — and **silently**, because `notify` only runs
+  > when something is already wrong and sends curl's output to
+  > `/dev/null`. This was hit for real on 2026-08-27 and caught only by
+  > the verification step below. See the `TODO.md` entry on the alert
+  > sink never being verified.
 - **Me** — deploy homelab, run `health-check` by hand, confirm a message
   arrives in the channel.
 - **You** — confirm you saw it, then delete the old webhook.

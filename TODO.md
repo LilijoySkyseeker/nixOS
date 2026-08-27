@@ -245,6 +245,40 @@ them rot.
       keeping the lock bump deliberately. That is a judgement call on a
       live host's git state, so it is yours.
 
+- [ ] **Nothing ever verifies that the alert sink actually works.**
+      Found 2026-08-27 while rotating `discord_webhook`: the new value
+      was pasted as a bare URL, but `myHealthAlerts` calls
+      `curl -sS -K <file>`, and `-K` is *config-file* mode — it needs
+      `url = "https://…"`. A bare URL makes curl fail with
+      `config file option 'https' is unknown`, exit 2.
+
+      **The failure is completely silent in normal operation**, which is
+      the actual finding. `notify` only runs when something is already
+      wrong, its curl output goes to `/dev/null`, and its exit status is
+      discarded — so a broken sink is invisible until the moment you
+      need it, and then it fails at exactly the wrong time. It was
+      caught only because the rotation runbook has an explicit
+      "send a real message and confirm it arrives" step.
+
+      Worth fixing in at least one of these ways:
+
+      - **Check curl's exit status in `notify`** and log loudly on
+        failure. Cheapest, and turns a silent failure into a journal
+        line the failed-units check can eventually see.
+      - **A periodic heartbeat/canary post** — the only thing that
+        proves the whole path works end to end, including the URL still
+        being valid at Discord's side. Would also catch a webhook
+        deleted at the provider, which nothing detects today.
+      - **Validate the file shape at build time** (an assertion that the
+        secret is a curl config, not a bare URL) — cannot be done from
+        the encrypted value, but the *rendered* template could be
+        checked, and the option description could be much louder.
+
+      Related: this is the same class as `F-P7-09` — a control that
+      reports nothing when it is broken — but one level further out. The
+      audit made deploy *failures* visible; nothing makes the reporting
+      channel itself visible.
+
 - [ ] **The whole fleet deploys at once, with no randomisation and no
       reboot window.** Surfaced 2026-08-27 while researching D11.
       `auto-switch` (homelab), `pull-deploy` (torrent, thinkpad) and
