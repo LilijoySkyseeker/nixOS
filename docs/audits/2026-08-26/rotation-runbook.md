@@ -10,6 +10,14 @@ decryption needed. The repo is public, so that ciphertext is permanently
 downloadable and `updatekeys` cannot un-publish it. **Rotation at the
 provider is the only thing that retracts anything.**
 
+**Eight of the ten actually need rotating.** Items 3 and 4 — the two
+Tailscale auth keys — were exposed but are **spent single-use enrollment
+keys**, so the published plaintext has no remaining power. Exposure is
+not the same as impact, and the action follows from impact. See those
+items for the evidence. Worth checking each of the remaining eight the
+same way rather than rotating on reflex: the point is to retract
+something, not to complete a list.
+
 ## How to use this
 
 Each item lists **You** (things only you can do — providers, sops) and
@@ -30,9 +38,9 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | # | sops key | Risk | Status |
 |---|---|---|---|
 | 1 | `cloudflare_octodns_token` | low | **[x] 2026-08-27** — new token verified live; old token pending deletion by user |
-| 2 | `homelab_discord_webhook` | low | [ ] |
-| 3 | `tailscale_authkey_homelab` | low | [ ] |
-| 4 | `tailscale_authkey_torrent` | low | [ ] |
+| 2 | `homelab_discord_webhook` → `discord_webhook` | low | **[x] 2026-08-27** — rotated + consolidated; verified from homelab and vps |
+| 3 | `tailscale_authkey_homelab` | low | **[x] not required** — spent single-use key, see item |
+| 4 | `tailscale_authkey_torrent` | low | **[x] not required** — spent single-use key, see item |
 | 5 | `wireguard_vps_homelab_psk` | med | [ ] |
 | 6 | `homelab_wireguard_private_key` | med | [ ] |
 | 7 | `vps_wireguard_private_key` | med | [ ] |
@@ -139,20 +147,57 @@ redeployed and verified on the new one.
 
 Consumed at `modules/profiles/default.nix:94` as `authKeyFile`.
 
-**These are *enrollment* keys.** They are used when a node first joins
-the tailnet. Already-enrolled nodes are unaffected by revoking one — so
-these are much lower-stakes than they look. The risk of exposure is that
-someone else enrolls a node into your tailnet, which §4.4 of the threat
-model treats as fleet access.
+> ## NOT REQUIRED — resolved 2026-08-27
+>
+> **These two need no rotation.** Challenged by the user and the
+> challenge holds: they are **single-use** enrollment keys that have
+> already been consumed, so the exposed plaintext is a credential
+> Tailscale will refuse.
+>
+> The design is internally consistent, which is what makes the argument
+> solid rather than hopeful:
+>
+> - `modules/profiles/default.nix:94` documents each host as using its
+>   own **non-reusable** pre-authorized key.
+> - `hosts/homelab/configuration.nix:622` persists `/var/lib/tailscale`
+>   through impermanence, with the comment *"node identity/state; without
+>   this, a non-reusable authKeyFile…"*.
+>
+> So the key is used exactly once, at enrollment, and every later boot
+> reuses the persisted node identity without touching it. Both hosts are
+> enrolled. Tailscale auth keys additionally expire (90 days max), which
+> is a second, independent reason these are dead.
+>
+> **This does not contradict `F-P8-02`.** The exposure it proved is
+> real — the ciphertext for these two *was* readable by retired keys.
+> What does not follow is the *action*: an exposed credential with no
+> remaining power needs no rotation. Exposure confirmed, impact nil,
+> rotation not required.
+>
+> **One free confirmation, if you want it:** the Tailscale console lists
+> each key with its reusable flag and whether it has been used or
+> expired. One glance settles it from the authoritative source rather
+> than from this repo's own comments — which is worth doing precisely
+> because two other comments in this repo turned out to be wrong during
+> this audit.
+>
+> Optional tidying, not rotation: delete the spent keys from the console
+> so the key list reflects reality.
+>
+> **Correction to an earlier draft of this runbook.** It said to mint
+> replacements matching "the existing properties: **reusable**". That was
+> wrong twice over — the keys are *non*-reusable, and following it would
+> have replaced a spent single-use credential with a **standing** one,
+> leaving the fleet worse off than doing nothing. If these are ever
+> genuinely reissued (a rebuild, a new host), keep them **non-reusable,
+> pre-authorized and tagged** so a leak grants one host's identity rather
+> than open enrollment.
 
-- **You** — Tailscale admin console → Settings → Keys → generate a new
-  auth key for each. Match the existing properties: **reusable**,
-  **pre-authorized**, and **tagged** (the profile comment says the key is
-  already tagged; keep the same tag so ACLs still apply).
-- **You** — `sops secrets/secrets.yaml`, replace both keys.
-- **Me** — deploy homelab; confirm `tailscale status` still healthy.
-  (No re-enrollment happens, so this mostly proves nothing broke.)
-- **You** — revoke the old keys in the console.
+Consumed at `modules/profiles/default.nix:94` as `authKeyFile`. They are
+used when a node first joins the tailnet; already-enrolled nodes are
+unaffected. The risk exposure *would* pose is someone enrolling a node
+into the tailnet, which §4.4 of the threat model treats as fleet access —
+hence the check above rather than a shrug.
 
 `tailscale_authkey_vps` is **not** in this list — it was already rotated
 by `507bd11` during the reinstall.

@@ -203,10 +203,10 @@ remains published and decryptable by any key that was ever a recipient.
 
   | # | sops key | What it actually is | Rotate how | Risk |
   |---|---|---|---|---|
-  | 1 | `cloudflare_octodns_token` | DNS API token (`octodns.nix:151`) | Cloudflare dashboard: create new token, update sops, run octodns, then revoke old | low |
-  | 2 | `homelab_discord_webhook` | alert sink (`myHealthAlerts`) | Discord channel settings: new webhook URL, update sops, delete old | low |
-  | 3 | `tailscale_authkey_homelab` | node **enrollment** key | Tailscale console: revoke. Already-enrolled nodes are unaffected — this key is only used at first join | low |
-  | 4 | `tailscale_authkey_torrent` | same, for torrent | same | low |
+  | 1 | `cloudflare_octodns_token` | DNS API token (`octodns.nix:151`) | **DONE 2026-08-27** — verified via `octodns-sync`; old token still to delete | low |
+  | 2 | `homelab_discord_webhook` | alert sink (`myHealthAlerts`) | **DONE 2026-08-27** — rotated *and* consolidated to one `discord_webhook`; verified from both hosts | low |
+  | 3 | `tailscale_authkey_homelab` | node **enrollment** key | **NOT REQUIRED** — spent single-use key; see the runbook | none |
+  | 4 | `tailscale_authkey_torrent` | same, for torrent | **NOT REQUIRED** — same | none |
   | 5 | `wireguard_vps_homelab_psk` | shared PSK, **same value both ends** | new PSK into sops, deploy **both** hosts | med |
   | 6 | `homelab_wireguard_private_key` | homelab wg0 identity | new keypair; vps's peer `publicKey` must change in the same commit | med |
   | 7 | `vps_wireguard_private_key` | vps wg0 identity | new keypair; homelab's peer `publicKey` must change in the same commit | med |
