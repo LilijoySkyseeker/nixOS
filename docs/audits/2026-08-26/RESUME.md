@@ -93,6 +93,8 @@ All build-verified on all four hosts. **Not switched.**
 | `3ce7d7a` | `zfs-emergency-prune` sandboxed (**VM-tested**); `crowdsec-allowlist-tailnet` sandboxed and moved off root to the `crowdsec` user; `push-deploy-vps`'s false `ReadOnlyPaths` claim corrected | F-P6-06, F-P2-08, F-P7-06 |
 | `e5744f5` | vps firewall no longer fails open: `ipset create` moved to its own unit, match-set rules guarded, raw chain torn down on stop (**VM-tested, including the drift scenario**) | F-P2-02 |
 | `d6236cb` | **plover removed entirely** (user declared it unused), taking the `input` and `dialout` grants, the `uinput` udev rule, wooting.nix's duplicate grant and the `plover-flake` input with it — nine lock nodes gone | F-P1-01/P8-09, F-P8-21, F-P1-15 |
+| `628e3f0` | 8bitdo udev rules dropped — dead config that never took effect (overridden by `50-qmk.rules`/`60-steam-input.rules`) | F-P1-15 |
+| `08428eb` | `zrepl-protect-blank` holds `@blank` against the puller; `recv.properties` pins what a sender may set (**VM-tested, incl. a hostile sender**) | F-P6-04, F-P6-03 |
 
 ### Consequences to know before deploying any of it
 
@@ -177,7 +179,7 @@ reasoning and the verification for each one done so far.
 | 2.5 | NFS mount options | **done** (`516ef31`) |
 | 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
 | 2.7 | fail-open `ipset create` | **done** (`e5744f5`) |
-| 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | **done** (`{{2.8}}`) — zrepl test extended, all 9 subtests pass |
+| 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | **done** (`08428eb`) — zrepl test extended, all 9 subtests pass |
 | 2.9 | firewall interface-scoping (moved out of wave 1) | **blocked** on a user decision |
 
 **Two things a next session should not re-derive.**
