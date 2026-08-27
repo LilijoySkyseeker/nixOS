@@ -50,6 +50,40 @@ in
       # and setuid/setgid for usermod/groupmod/runuser) still meaningfully
       # restricts it.
       factorioExtraOptions = [
+        # Resource ceilings (docs/hardening.md standing rule 10). Without
+        # them, container OOM pressure is *host* OOM pressure on the box
+        # holding zbackup, and the kernel picks its own victim among
+        # jellyfin, smbd, nfsd and the restic job. Before this, both
+        # containers ran with memory.max = "max" and the host-default
+        # pids.max of 19038.
+        #
+        # --memory: user decision D15 — "no container may exceed 50% of
+        # host memory". homelab's MemTotal is 15.54 GiB, so half is
+        # 7.77 GiB; 7g is the round value comfortably under that. This is
+        # deliberately a *bound on the blast radius*, not a tuned figure:
+        # the server is mostly idle playerwise, so there is no real
+        # load data to size from, and the measured 1.06 GB peak
+        # (2026-08-27, 37 minutes uptime, idle) is a floor rather than a
+        # peak. Sizing down toward that measurement is the thing not to
+        # do — a ceiling below what the runtime needs becomes an OOM-kill
+        # loop that reads as a game crash.
+        #
+        # NB both containers carry the same 50% cap, so if both ever hit
+        # it at once the host is exhausted. That is inherent in a
+        # per-container percentage and is accepted: it still stops any
+        # *single* runaway from taking the whole machine, which is the
+        # failure this guards against. Revisit together with real load
+        # data (D16-style re-measure), not one container at a time.
+        #
+        # This figure is homelab-specific. If these game servers ever run
+        # on another host, recompute it there.
+        "--memory=7g"
+        # --pids-limit: measured peak was 19. 512 is ~27x that and still
+        # 37x below the host default, so it stops a fork bomb without any
+        # realistic chance of refusing a thread the server actually
+        # wanted. Erring generous is deliberate — too low fails as
+        # "cannot spawn thread", which looks nothing like its cause.
+        "--pids-limit=512"
         "--tmpfs=/tmp:rw,nosuid,nodev,size=512m"
         "--cap-drop=ALL"
         "--cap-add=CHOWN"

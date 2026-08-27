@@ -166,6 +166,30 @@ in
         # anticipated here. Fix by adding another `--tmpfs=/path` for that
         # specific directory, not by dropping --read-only outright.
         extraOptions = [
+          # Resource ceilings (docs/hardening.md standing rule 10) — see
+          # modules/services/factorio.nix for the full reasoning; the
+          # short version is that without them a leak here is host OOM
+          # pressure on the box holding zbackup.
+          #
+          # --memory: user decision D15, "no container may exceed 50% of
+          # host memory". homelab's MemTotal is 15.54 GiB, half is
+          # 7.77 GiB, 7g is the round value under that.
+          #
+          # Do NOT size this from MEMORY = "4G" below. That is the JVM
+          # *heap*; measured RSS on 2026-08-27 was 4.90 GB, ~0.9 GB above
+          # it, because metaspace, GC structures, direct/native buffers,
+          # the DistantHorizons native libraries and the 1 GiB /tmp tmpfs
+          # all sit on top of the heap. A ceiling set at 4G would have
+          # OOM-killed a healthy server. That measurement is also a floor,
+          # not a peak — 37 minutes uptime with no player load — which is
+          # exactly why the ceiling is a generous bound rather than a
+          # tuned one.
+          "--memory=7g"
+          # --pids-limit: measured peak was 123 threads at idle. A JVM
+          # with mods spawns more under real load (chunk workers, netty
+          # I/O, DH threads), so 1024 leaves ~8x room while still sitting
+          # ~19x below the host default of 19038.
+          "--pids-limit=1024"
           "--read-only"
           # exec is required: netty and DistantHorizons both extract and run
           # native .so libraries from /tmp at startup — Docker's --tmpfs

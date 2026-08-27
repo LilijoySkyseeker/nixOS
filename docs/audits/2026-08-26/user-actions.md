@@ -420,7 +420,30 @@ neither has an acceptance write-up to draft. Leave §2 at D1–D14.
       last execution path from a homelab-controlled filesystem onto both
       laptops. *(F-P6-05)*
 
-- [ ] **D15 — what `--memory` ceiling should the game containers get?**
+- [x] **D15 — what `--memory` ceiling should the game containers get?**
+      **ANSWERED AND DONE 2026-08-27: "no container may exceed 50% of the
+      host's memory."** Applied as `--memory=7g` on both containers
+      (MemTotal 15.54 GiB, half is 7.77 GiB, 7g is the round value under
+      it), together with the `--pids-limit` half — 512 for
+      `factorio-main`, 1024 for `minecraft-vanilla-plus`. Build-verified
+      and confirmed in the rendered start scripts; **not deployed.**
+
+      The user flagged this explicitly as **an estimate, not a measured
+      figure**, because the servers are mostly idle playerwise and cannot
+      produce real load data. That framing is the right one and is
+      recorded here rather than lost: this is a bound on the blast
+      radius, not a tuned ceiling.
+
+      **The one caveat worth re-reading before trusting it.** Both
+      containers carry the same 50% cap, so if both ever hit it at once
+      the host is exhausted. That is inherent in a per-container
+      percentage and is accepted — it still stops any *single* runaway
+      from taking the whole machine, which is the failure rule 10 is
+      about. Revisit with real load data rather than tightening one
+      container in isolation. `--cpus` remains unset and undecided.
+
+      Original text follows.
+
       Blocks the `--memory` half of the container-resource-ceilings item
       (`docs/hardening.md` standing rule 10, still unapplied). The
       `--pids-limit` half needs no decision and can land whenever.

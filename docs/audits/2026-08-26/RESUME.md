@@ -294,7 +294,17 @@ tailscale module sets the former.
    session.** All four hosts watch `/nix/var/nix/profiles/system` for
    staleness, and `onSuccess` is replaced by a gated
    `myAutoUpdate.onDeployUnits`. See below.
-3. **Container resource ceilings** — no `--pids-limit`/`--memory`/`--cpus`
+3. ~~**Container resource ceilings**~~ — **done 2026-08-27** for
+   `--memory` and `--pids-limit`, build-verified, **not deployed**. D15
+   answered "no container may exceed 50% of host memory" →
+   `--memory=7g` on both, plus `--pids-limit` 512 (factorio) and 1024
+   (minecraft). `--cpus` is still unset and undecided. The user framed
+   the memory figure as an estimate rather than a measurement, since the
+   servers are idle playerwise; see D15 in `user-actions.md` for the
+   caveat that both containers share the same 50% cap. Original note
+   follows.
+
+   No `--pids-limit`/`--memory`/`--cpus`
    on any container. **First measurement taken 2026-08-27** and recorded
    in `TODO.md`: `factorio-main` peaked at 1.06 GB / 19 pids,
    `minecraft-vanilla-plus` at 4.90 GB / 123 pids, both with
@@ -432,3 +442,12 @@ expensive.
   harness refuses the command. `nixos-rebuild build` plus reading the
   rendered unit out of `./result` gets the same answer, and is what the
   "verify the fix, not the build" rule wanted anyway.
+- **When verifying a rendered unit, grep the payload, not the wrapper.**
+  A `.service` file usually only holds
+  `ExecStart=/nix/store/…-unit-script-<name>-start/bin/<name>-start`, and
+  that store path is a *directory*. The fourth session twice concluded a
+  change had not landed — once for `health-check`, once for the container
+  `--memory`/`--pids-limit` flags — because it grepped the `.service` or
+  the directory rather than `…/bin/<name>-start`. Both had landed
+  correctly. A false "the fix did not apply" costs as much as a false
+  "it did".

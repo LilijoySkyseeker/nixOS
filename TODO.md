@@ -342,6 +342,24 @@ them rot.
         target**, and a wrong guess means vps silently stops updating.
       - A resumed `zfs recv` is not covered by 2.8's new test. `-o` on
         resume has historically been fussy; noted in the test header.
+      - ~~**The containers have no resource ceilings.**~~ **Done
+        2026-08-27** for `--memory` and `--pids-limit`, build-verified
+        and confirmed in the rendered start scripts, **not deployed.**
+        D15 was answered "no container may exceed 50% of the host's
+        memory" → `--memory=7g` on both (MemTotal 15.54 GiB), with
+        `--pids-limit=512` on `factorio-main` and `1024` on
+        `minecraft-vanilla-plus`, both far above their measured peaks of
+        19 and 123 and far below the host default of 19038.
+
+        The memory figure is **an estimate, not a measurement** — the
+        user said so explicitly, since the servers are mostly idle
+        playerwise. It bounds the blast radius rather than tuning
+        anything. Caveat recorded at D15: both containers carry the same
+        50% cap, so simultaneous worst cases still exhaust the host;
+        that is inherent in a per-container percentage and accepted,
+        since it stops any *single* runaway. `--cpus` remains unset and
+        undecided. Original note follows.
+
       - **The three containers have no resource ceilings.** Phase 4
         wrote the rule (`docs/hardening.md` standing rule 10); it is not
         yet applied. None of minecraft, `factorio-main` or
