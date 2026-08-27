@@ -23,6 +23,13 @@
 #     snapshot's data -- confirming the module's own claim that zrepl's
 #     replication cursor surviving locally destructive pruning doesn't
 #     also mean it silently keeps the space you were trying to reclaim
+#   * the systemd sandbox is applied AND the service still works under it
+#     (F-P6-06). Both halves matter: the unit was missing the whole
+#     hardening stack, and the failure mode of adding it wrongly is "the
+#     break-glass service doesn't work when you need it at 2am". The
+#     subtests below start the unit for real under the sandbox, so a
+#     sandbox that breaks `zfs destroy` fails the run rather than waiting
+#     for an emergency.
 #
 
 # Kept as a regression test: the failure mode (destroying the wrong thing,
@@ -63,6 +70,39 @@ pkgs.testers.runNixOSTest {
     def snap_names(dataset):
         out = guard.succeed(f"zfs list -H -o name -t snapshot -s creation {dataset}")
         return [line.split("@", 1)[1] for line in out.strip().splitlines() if line]
+
+    def unit_prop(name):
+        return guard.succeed(
+            f"systemctl show zfs-emergency-prune.service -p {name} --value"
+        ).strip()
+
+    with subtest("the sandbox is actually applied to the unit"):
+        # F-P6-06: this unit had none of docs/hardening.md's sandboxing
+        # stack. Asserting it here means a future edit that drops it fails
+        # loudly rather than silently -- the whole reason the omission
+        # survived this long is that nothing looked.
+        for prop, want in [
+            ("NoNewPrivileges", "yes"),
+            ("ProtectSystem", "strict"),
+            ("ProtectHome", "yes"),
+            ("ProtectKernelModules", "yes"),
+            ("ProtectKernelTunables", "yes"),
+            ("ProtectKernelLogs", "yes"),
+            ("ProtectControlGroups", "yes"),
+        ]:
+            got = unit_prop(prop)
+            assert got == want, f"{prop} should be {want}, got {got!r}"
+        # PrivateTmp renders as yes/no on some systemd versions and
+        # connected/disconnected on others -- assert only that it is on.
+        assert unit_prop("PrivateTmp") not in ("no", ""), (
+            f"PrivateTmp should be enabled, got {unit_prop('PrivateTmp')!r}"
+        )
+        # PrivateDevices must stay OFF: the unit needs /dev/zfs, and
+        # turning it on would hide it. This is the one piece of the stack
+        # that is deliberately absent, so pin that too.
+        assert unit_prop("PrivateDevices") == "no", (
+            "PrivateDevices must stay off -- the unit needs /dev/zfs"
+        )
 
     with subtest("pool and datasets exist before any check runs"):
         guard.succeed("zpool create -f guardpool /dev/vdb")

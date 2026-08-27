@@ -176,10 +176,72 @@ Behaviour changes, not just config. Each needs
 | 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
 | 2.4 | Replace the `input` group grant with `hardware.uinput.enable` | C2 (`F-P1-01` `F-P8-09`) | plover must still work; this is a real functional dependency, not dead config |
 | 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
-| 2.6 | Sandbox the three under-hardened root units | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
+| 2.6 | **Two of three done.** `zfs-emergency-prune` sandboxed and VM-tested; `crowdsec-allowlist-tailnet` sandboxed and dropped from root to the `crowdsec` user. **`push-deploy-vps` deferred** — comment corrected, sandbox not applied; see the note | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | Guard the `ipset create` calls so a parameter drift cannot take the whole packet filter down fail-open | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.6 — two units hardened, one deliberately deferred.**
+
+**`zfs-emergency-prune` (`F-P6-06`) — done, and actually VM-tested.**
+The full `health-alerts.nix` stack, minus `PrivateDevices` (the unit
+needs `/dev/zfs`). It stays root: `zfs destroy` is not delegable to a
+service user here, so root is the blast radius being *bounded*, not
+removed. `tests/zfs-space-guard.nix` already started the unit for real,
+so the finding's instruction — "extend that test rather than trusting
+the build" — was followed: a new subtest asserts each sandbox property
+is actually in effect (and that `PrivateDevices` stays **off**), and the
+pre-existing subtests then start the unit under that sandbox and check
+`zfs destroy` still reclaims space. All seven subtests pass. This
+matters because the failure mode is "the break-glass service doesn't
+work when you need it at 2am", which no build could ever have caught.
+
+**`crowdsec-allowlist-tailnet` (`F-P2-08`) — done, and no longer root.**
+`User`/`Group` set to `services.crowdsec.user`/`.group` plus the full
+stack and an empty `CapabilityBoundingSet`. Verified in the rendered
+unit.
+
+One deliberate departure from the finding's proposed fix: it claimed
+`ProtectSystem = "strict"` needs **no** `ReadWritePaths`, because "the
+allowlist lives in CrowdSec's own database via the LAPI". Two pieces of
+evidence say otherwise, so `ReadWritePaths = [ "/var/lib/crowdsec" ]` is
+granted:
+
+- `crowdsec-firewall-bouncer-register`, twenty lines below it in the
+  same file, already carries the comment "cscli needs to write
+  `/var/lib/crowdsec`" and grants exactly that.
+- The live state directory on vps holds a SQLite `crowdsec.db`
+  (`/var/lib/crowdsec/state/crowdsec.db`, `0640 crowdsec:crowdsec`),
+  checked read-only over SSH — and `cscli` reaches the database directly
+  for several subcommands rather than going through the LAPI.
+
+Granting it is strictly safer than omitting it: if `cscli` turns out not
+to need the write, nothing is lost, whereas omitting it and being wrong
+means the tailnet exemption stops applying and CrowdSec starts banning
+the admin's own IP — the exact problem this unit exists to prevent, and
+one already observed live on 2026-08-26.
+
+**`push-deploy-vps` (`F-P7-06`) — sandbox deferred, comment fixed.** The
+documentation half is the safe half and is done: the comment claimed
+"`ReadOnlyPaths` on `${cfg.flakeDir}` plus `NoNewPrivileges` is enough
+for now", which was false in both halves — no `ReadOnlyPaths` was ever
+set, and none *could* be, because the unit's first action is
+`fetch_and_merge_master`, which writes to `flakeDir`. That is §7.5 at
+module scope, so it is corrected in place rather than left for a future
+reader to budget against.
+
+The sandbox itself is **not** applied, deliberately. `nixos-rebuild
+--target-host` shells out to `ssh` and `nix-copy-closure`, and the
+finding's own fix risk names two concrete hazards: `PrivateTmp` breaking
+the SSH control-master socket path, and `ProtectSystem = "strict"`
+breaking nix's fetcher cache under `/root/.cache`. Its stated
+requirement is a VM test **with a real remote target** — which means
+building a full system closure inside a test VM and pushing it to a
+second node, far heavier than the zrepl two-node test and probably
+impractical as written. Getting it wrong means vps silently stops
+updating, and `F-P7-09`'s skipped-deploy half is still open, so nothing
+would say so. Guessing here is the one thing this wave should not do.
+The corrected comment now records exactly what is still owed.
 
 **Note on 2.5 — the row said three options; the finding says two.** This
 row read "add `nosuid`/`nodev`/`noexec`", but `F-P6-05`'s proposed fix

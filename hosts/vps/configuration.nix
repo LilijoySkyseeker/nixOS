@@ -641,6 +641,46 @@ in
       RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = "15s";
+
+      # This was the one custom unit in the repo running as unsandboxed
+      # root, on the internet-facing host (F-P2-08). Root is not required:
+      # the script reads /etc/crowdsec/config.yaml (a symlink into the
+      # world-readable store, per the tmpfiles rule below) and talks to
+      # the LAPI using /var/lib/crowdsec/local_api_credentials.yaml, which
+      # is crowdsec-owned. services.crowdsec.user is a real static system
+      # user, not a DynamicUser-only name, so User= can simply be set.
+      User = config.services.crowdsec.user;
+      Group = config.services.crowdsec.group;
+
+      # ReadWritePaths is a deliberate departure from F-P2-08's proposed
+      # fix, which claimed strict needs none because "the allowlist lives
+      # in CrowdSec's own database via the LAPI". Two pieces of evidence
+      # say otherwise, and the cost of being wrong here is that the
+      # tailnet exemption silently stops applying and CrowdSec starts
+      # banning the admin's own IP -- which is exactly what prompted this
+      # unit in the first place:
+      #   - crowdsec-firewall-bouncer-register just below carries the
+      #     comment "cscli needs to write /var/lib/crowdsec", and grants
+      #     precisely that.
+      #   - the live state dir on vps holds a SQLite crowdsec.db
+      #     (/var/lib/crowdsec/state/crowdsec.db, 0640 crowdsec:crowdsec),
+      #     and cscli reaches the database directly for several
+      #     subcommands rather than going through the LAPI.
+      # Granting it is strictly safer than omitting it: if cscli turns out
+      # not to need the write, nothing is lost.
+      ProtectSystem = "strict";
+      ReadWritePaths = [ "/var/lib/crowdsec" ];
+
+      NoNewPrivileges = true;
+      ProtectHome = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      PrivateTmp = true;
+      CapabilityBoundingSet = [ "" ];
+
       ExecStart = pkgs.writeShellScript "crowdsec-allowlist-tailnet" ''
         set -eu
         cscli=${config.services.crowdsec.package}/bin/cscli

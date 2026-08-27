@@ -71,7 +71,34 @@
         systemd.services.zfs-emergency-prune = {
           description = "Immediately destroy every local snapshot except @blank on ${lib.concatStringsSep ", " cfg.datasets}";
           path = [ pkgs.zfs ];
-          serviceConfig.Type = "oneshot";
+          serviceConfig = {
+            Type = "oneshot";
+
+            # docs/hardening.md's sandboxing baseline, which this unit was
+            # simply missing (F-P6-06) -- every other custom module in
+            # modules/nixos/ applies it, and the deliberately-partial ones
+            # (pull-deploy, push-deploy) say in a comment why. This one was
+            # a plain omission rather than a decision.
+            #
+            # This stays root: `zfs destroy` is not delegable to a service
+            # user here. Root is the blast radius being bounded, not
+            # removed.
+            #
+            # health-alerts.nix is the direct in-repo precedent that the
+            # full stack is compatible with running zfs/zpool commands --
+            # it does exactly that under ProtectSystem = "strict".
+            # Deliberately NOT PrivateDevices: this unit needs /dev/zfs,
+            # and PrivateDevices would hide it.
+            NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            ProtectKernelModules = true;
+            ProtectKernelTunables = true;
+            ProtectKernelLogs = true;
+            ProtectControlGroups = true;
+            RestrictNamespaces = true;
+            PrivateTmp = true;
+          };
           script = ''
             set -uo pipefail
             ${lib.concatMapStringsSep "\n" (dataset: ''
