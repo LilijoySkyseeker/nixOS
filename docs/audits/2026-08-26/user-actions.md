@@ -185,18 +185,61 @@ remains published and decryptable by any key that was ever a recipient.
       of public revisions holding the byte-identical **currently-live**
       values for all ten:
 
-  | # | Credential | Where to rotate |
-  |---|---|---|
-  | 1 | Backblaze application key | Backblaze console |
-  | 2 | Cloudflare API token | Cloudflare dashboard |
-  | 3 | Tailscale auth key(s) | Tailscale admin console |
-  | 4 | WireGuard keypair — homelab | regenerate both ends together |
-  | 5 | WireGuard keypair — vps | regenerate both ends together |
-  | 6 | WireGuard preshared key | regenerate both ends together |
-  | 7 | Discord webhook | Discord channel settings |
-  | 8 | vps-deploy keypair | regenerate, update `authorized_keys` |
-  | 9 | zrepl keypair | see the next item — order matters |
-  | 10 | Samba `android-smb` password | reset via `smbpasswd` |
+  **This table was rewritten 2026-08-27 — the previous version had two
+  errors that would have cost you.** It listed "Backblaze application
+  key" (the wrong secret — see #3) and "Samba `android-smb` password",
+  which is **not** one of `F-P8-02`'s ten at all, while collapsing the
+  two Tailscale auth keys into one row. Working it literally would have
+  rotated something irrelevant, missed a key, and — following the
+  Backblaze row — risked locking you out of the offsite backup.
+
+  The ten are exactly the sops keys `F-P8-02` names, in the order they
+  should be done. Every one follows **add-new → verify → remove-old**;
+  never remove first.
+
+  | # | sops key | What it actually is | Rotate how | Risk |
+  |---|---|---|---|---|
+  | 1 | `cloudflare_octodns_token` | DNS API token (`octodns.nix:151`) | Cloudflare dashboard: create new token, update sops, run octodns, then revoke old | low |
+  | 2 | `homelab_discord_webhook` | alert sink (`myHealthAlerts`) | Discord channel settings: new webhook URL, update sops, delete old | low |
+  | 3 | `tailscale_authkey_homelab` | node **enrollment** key | Tailscale console: revoke. Already-enrolled nodes are unaffected — this key is only used at first join | low |
+  | 4 | `tailscale_authkey_torrent` | same, for torrent | same | low |
+  | 5 | `wireguard_vps_homelab_psk` | shared PSK, **same value both ends** | new PSK into sops, deploy **both** hosts | med |
+  | 6 | `homelab_wireguard_private_key` | homelab wg0 identity | new keypair; vps's peer `publicKey` must change in the same commit | med |
+  | 7 | `vps_wireguard_private_key` | vps wg0 identity | new keypair; homelab's peer `publicKey` must change in the same commit | med |
+  | 8 | `homelab_vps_deploy_key` | SSH key → `vps-deploy@vps`, i.e. **root on vps** | add new pubkey to vps `authorized_keys`, verify a deploy, then remove old | **high** |
+  | 9 | `homelab_zrepl_key` | SSH key → **root on torrent and thinkpad** | see the separate item below — ordering matters, and the public half is `vars.zreplPullerKey` in this repo | **high** |
+  | 10 | `homelab_backblaze_restic_password` | the restic **repository password** | **not a console action** — see the warning below | **highest** |
+
+  **#10 is the one that can lose data, and the old row got it wrong.**
+  `homelab_backblaze_restic_password` is restic's `passwordFile`
+  (`hosts/homelab/configuration.nix:182`) — the password that unlocks
+  the repository's master key. It is **not** the Backblaze application
+  key; that is a *different, separate* secret
+  (`homelab_backblaze_rclone_config`, the `rcloneConfigFile`), and it is
+  **not** among `F-P8-02`'s ten.
+
+  Simply replacing the value in sops does **not** rotate it — it makes
+  restic unable to open the repository at all, which is losing access to
+  the offsite copy of asset #1. Restic keeps multiple key slots, so the
+  correct sequence is:
+
+  1. `restic-backblazeWeekly key add` (the `createWrapper` wrapper is
+     already on homelab's PATH) — adds a new password, old still valid
+  2. put the new password in sops, deploy homelab
+  3. **verify**: a `restic-backblazeWeekly snapshots` succeeds with only
+     the new password in place
+  4. `restic-backblazeWeekly key list`, then `key remove <old-id>`
+
+  Do **not** do step 4 before step 3 succeeds.
+
+  **Ordering rationale.** 1–4 are independent and reversible, so they
+  build confidence first. 5–7 are the WireGuard set: the PSK is a single
+  shared value and the two private keys each require the *other* host's
+  peer stanza to change, so all three want one commit and a deploy of
+  both hosts. 8 and 9 are the two the finding names as costliest to get
+  wrong (the only deploy path to vps, and root on both laptops) — do
+  them with console access available. 10 last, because it is the only
+  one where a mistake is not recoverable by redeploying.
 
 - [ ] **Rotate the zrepl key, and only then delete
       `/tmp/homelab_zrepl_key`.** It is the live private half of
