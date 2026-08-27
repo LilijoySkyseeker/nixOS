@@ -89,6 +89,7 @@ All build-verified on all four hosts. **Not switched.**
 | `6b623c0` | **wave 2 starts.** Full sshd baseline on both laptops as `settings`, `allowSFTP = false`; `docs/hardening.md`'s false `AllowTcpForwarding` claim corrected | F-P5-07, F-P2-09/P3-18 |
 | `516ef31` | `nosuid` + `nodev` on both NFS client mounts; `noexec` considered and declined | F-P6-05 |
 | `3ce7d7a` | `zfs-emergency-prune` sandboxed (**VM-tested**); `crowdsec-allowlist-tailnet` sandboxed and moved off root to the `crowdsec` user; `push-deploy-vps`'s false `ReadOnlyPaths` claim corrected | F-P6-06, F-P2-08, F-P7-06 |
+| `e5744f5` | vps firewall no longer fails open: `ipset create` moved to its own unit, match-set rules guarded, raw chain torn down on stop (**VM-tested, including the drift scenario**) | F-P2-02 |
 
 ### Consequences to know before deploying any of it
 
@@ -103,6 +104,12 @@ All build-verified on all four hosts. **Not switched.**
 - **`40255bd` fails closed.** If GitHub rotates that key, unattended
   deploys stop until it is updated. That is the intended trade, but it
   is why F-P7-09 (nothing notices a failed deploy) matters.
+- **`e5744f5` adds a unit whose failure is now the signal.** If
+  `crowdsec-ipset-precreate` ever fails, the firewall still comes up but
+  the CrowdSec pre-drop on DNAT'd game traffic is absent. That is the
+  intended degradation, and it is why the unit must stay visible in
+  `systemctl --failed` — do not "fix" a failing pre-create by adding
+  `|| true` to it.
 - **`3ce7d7a` changes who runs `crowdsec-allowlist-tailnet`.** It drops
   from root to the `crowdsec` user. If the tailnet exemption ever stops
   applying after deploying it, check that unit first — a CrowdSec that
@@ -157,7 +164,7 @@ reasoning and the verification for each one done so far.
 | 2.4 | `input` → `hardware.uinput` | not started |
 | 2.5 | NFS mount options | **done** (`516ef31`) |
 | 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
-| 2.7 | fail-open `ipset create` | not started |
+| 2.7 | fail-open `ipset create` | **done** (`e5744f5`) |
 | 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | not started |
 | 2.9 | firewall interface-scoping (moved out of wave 1) | **blocked** on a user decision |
 
