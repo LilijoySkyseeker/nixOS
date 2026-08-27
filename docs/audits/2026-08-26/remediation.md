@@ -174,12 +174,60 @@ Behaviour changes, not just config. Each needs
 | 2.1 | Stop docker publishing past the firewall — bind published ports to a specific address, or add a host-level `DOCKER-USER` allowlist for both v4 and v6 | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
 | 2.2 | Pin the container images by digest and pin the Modrinth mod set | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
 | 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
-| 2.4 | Replace the `input` group grant with `hardware.uinput.enable` | C2 (`F-P1-01` `F-P8-09`) | plover must still work; this is a real functional dependency, not dead config |
+| 2.4 | **Done, and better than planned** — plover was declared unused by the user (2026-08-27), so the grant is *removed* rather than narrowed. No `hardware.uinput.enable` needed. See the note | C2 (`F-P1-01` `F-P8-09`), also `F-P8-21` | the functional dependency turned out not to exist |
 | 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
 | 2.6 | **Two of three done.** `zfs-emergency-prune` sandboxed and VM-tested; `crowdsec-allowlist-tailnet` sandboxed and dropped from root to the `crowdsec` user. **`push-deploy-vps` deferred** — comment corrected, sandbox not applied; see the note | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | **Done** — all four parts of the proposed fix, VM-tested including the drift scenario itself | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.4 — the premise changed, so the fix got simpler and
+stronger.** The whole item was shaped around "plover must still work;
+this is a real functional dependency, not dead config". On 2026-08-27
+the user declared plover unused. That removes the constraint the fix was
+built around, so instead of swapping `input` for a narrower `uinput`
+group, **plover is removed outright and both grants go with it**. No
+`hardware.uinput.enable`, no new group, nothing left to narrow later.
+
+Removed: the `programs.plover` home-manager block and its module import,
+the hand-written `KERNEL=="uinput"` udev rule, `"dialout"` and `"input"`
+from `lilijoy`'s `extraGroups`, and the `plover-flake` flake input.
+
+The duplicate `input` grant in `modules/nixos/wooting.nix` is gone too,
+and it had to be: that module merges into the same `extraGroups` list,
+so dropping `input` from `PC.nix` alone would have left the grant fully
+intact while looking like a fix (`F-P1-15`). Removing it is safe,
+checked rather than assumed — `hardware.wooting.enable`'s only access
+mechanism is `services.udev.packages = [ pkgs.wooting-udev-rules ]`, and
+every rule in that package is `TAG+="uaccess"`, which grants the
+logged-in user access through a logind ACL rather than a group.
+
+**A supply-chain win comes free with it.** `plover-flake` was the input
+`F-P8-21` singled out as the one that *actually builds packages* from
+its own unfollowed nixpkgs into both PC closures. Dropping it removed
+**nine lock nodes** — `plover-flake` itself, its `nixpkgs`, its
+`treefmt-nix` and that in turn its own `nixpkgs`, plus five plugin
+inputs — and the lock diff is **0 insertions, 155 deletions**, so no
+other pin moved.
+
+Verified in the evaluated config rather than by build alone: on torrent
+the `input` group now has **zero members**, `dialout` likewise, the
+`uinput` rule is absent from the rendered `99-local.rules`, and
+`nix path-info -r` over the built closure returns **zero** plover paths.
+
+Two things noticed while doing it, neither fixed here:
+
+- **The 8bitdo hidraw rules never took effect.** They set `MODE="0660"
+  GROUP="input"`, but live on torrent every `/dev/hidraw*` is `0666
+  root:plugdev` with a uaccess ACL, because `50-qmk.rules` (all hidraw,
+  `GROUP=plugdev`, `TAG+=uaccess`) and `60-steam-input.rules` (vendor
+  `2dc8`, `TAG+=uaccess`) sort after `99-local.rules`. Controller access
+  comes from uaccess, not the group, so those rules grant `lilijoy`
+  nothing now. Left in place with a comment; dead config worth revisiting
+  on its own terms rather than inside a plover change.
+- **`/dev/uinput` already carried `user:lilijoy:rw-`** from a logind
+  uaccess ACL, independent of the group — so even the narrowing fix would
+  have been partly redundant.
 
 **Note on 2.7 — all four parts done, and the drift scenario is tested.**
 

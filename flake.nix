@@ -34,8 +34,6 @@
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
-    plover-flake.url = "github:openstenoproject/plover-flake";
-
     # provides the services.copyparty NixOS module used on hosts/isoimage
     copyparty.url = "github:9001/copyparty";
     copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";

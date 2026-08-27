@@ -142,10 +142,17 @@ in
         KERNEL=="hidraw*", ATTRS{idProduct}=="6012", ATTRS{idVendor}=="2dc8", MODE="0660", GROUP="input"
         # Bluetooth
         KERNEL=="hidraw*", KERNELS=="*2DC8:6012*", MODE="0660", GROUP="input"
-
-        # plover
-        KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
       '';
+      # Note on the two rules above: their MODE/GROUP do not actually take
+      # effect. Checked live on torrent -- every /dev/hidraw* is 0666
+      # root:plugdev with a uaccess ACL, because 50-qmk.rules (GROUP=plugdev,
+      # TAG+=uaccess, matching *all* hidraw) and 60-steam-input.rules
+      # (TAG+=uaccess for vendor 2dc8) both sort after 99-local.rules for
+      # these attributes. So controller access comes from uaccess, not from
+      # group membership, and these rules no longer grant lilijoy anything
+      # now that the `input` membership below is gone. Left in place rather
+      # than removed as part of a plover change; worth revisiting as dead
+      # config on its own terms.
 
       # home-manager
       home-manager.users.lilijoy = {
@@ -154,7 +161,6 @@ in
           homeManagerModules."tooling-desktop"
           homeManagerModules."virt-manager"
           homeManagerModules."claude-code"
-          inputs.plover-flake.homeManagerModules.plover
         ];
         home = {
           stateVersion = "23.11";
@@ -170,17 +176,6 @@ in
 
         stylix.targets.firefox.profileNames = [ "default" ];
         stylix.targets.qt.platform = "qtct";
-
-        programs.plover = {
-          enable = true;
-          package = inputs.plover-flake.packages.${pkgs-unstable.system}.plover-full;
-          settings = {
-            "Machine Configuration" = {
-              machine_type = "Gemini PR";
-              auto_start = true;
-            };
-          };
-        };
       };
 
       # service for yubikey
@@ -315,11 +310,22 @@ in
         # If a declarative password is ever wanted here, use
         # hashedPasswordFile pointing at a sops secret -- never a literal.
         description = "Lilijoy";
+        # `dialout` and `input` were both here "for plover", and plover is
+        # gone (declared unused, 2026-08-27). `input` in particular was the
+        # single worst grant on these hosts (F-P1-01): /dev/input/event* is
+        # root:input 0660 with no uaccess ACL -- systemd deliberately does
+        # not uaccess-tag keyboards -- so the membership was the *only*
+        # thing granting it, and it granted read of every input device on
+        # the machine. Under Wayland, which otherwise blocks X11-style input
+        # snooping, evdev read is the bypass. Anything running as lilijoy
+        # could capture, in plaintext, the run0/polkit password (typed on
+        # every elevation, since wheelNeedsPassword is true), the
+        # lock-screen password, the Bitwarden master password and the
+        # YubiKey PIN -- then register its own polkit agent and answer its
+        # own prompt for root, with no further vulnerability and no race.
         extraGroups = [
           "networkmanager"
           "wheel"
-          "dialout" # for plover
-          "input" # for plover
           "docker"
         ];
       };
