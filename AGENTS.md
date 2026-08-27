@@ -64,6 +64,26 @@ root SSH from anywhere, by design; `thinkpad` may also simply be offline
 (it's a laptop). Full key model and per-host detail:
 `docs/procedures/remote-access.md`.
 
+## Missing tooling is a bug, not an obstacle to route around
+
+If a tool you need for debugging isn't there, **add it declaratively** —
+don't work around it with raw `/nix/store/...` paths. Order of preference:
+
+1. **`modules/flake/devshell.nix`** — anything that runs on the machine
+   you're working *from*. It already carries `jq`, `dig`, `nvd`, `sops`,
+   `wireguard-tools`, `gh`.
+2. **The host configuration** — only for what must run *on* the target
+   host, where the devshell doesn't reach. `modules/profiles/server.nix`
+   is the right place for headless-host debugging tools.
+
+Prefer tools already in the host's closure: putting one on `PATH` then
+costs no new code, only discoverability. Working around a missing tool
+with a store path is slow, easy to get wrong, and has produced a **false
+negative** here — an `ipset list` that printed nothing and looked like
+"the sets are gone" when the command simply wasn't on `PATH`. Note the
+same trap with an unprivileged `ip6tables -S`, which returns what looks
+like an empty chain when it is really permission denied.
+
 ## The two rules that matter most
 
 - **Never run `nixos-rebuild switch` or push a build to a live remote host
