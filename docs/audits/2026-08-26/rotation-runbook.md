@@ -92,10 +92,32 @@ early precisely because it is low-stakes practice for the pattern.
   arrives in the channel.
 - **You** — confirm you saw it, then delete the old webhook.
 
-Note the same secret is used on torrent/thinkpad (they read
-`homelab_discord_webhook` too — see the separate `user-actions.md` item
-about minting per-host webhooks). Those hosts keep working on the old
-value until they are next deployed, which is fine.
+**Folded together with a consolidation, 2026-08-27.** There were two sops
+keys holding the same URL — `homelab_discord_webhook` (read by homelab,
+torrent *and* thinkpad) and `vps_discord_webhook` — so the host prefix
+described nothing real. All four hosts now read one unprefixed
+`discord_webhook`, and the rotation supplies its value, so the rename and
+the rotation are a single edit.
+
+**Delete the two old keys in the same sops edit.** An earlier draft of
+this runbook said to keep them until the laptops were deployed. That was
+wrong, for two independent reasons:
+
+- **`secrets/secrets.yaml` is version-controlled and flake-pinned.** A
+  running system pins an immutable *store copy* of it (verified on
+  torrent: its manifest references
+  `/nix/store/2m5yagb…-secrets.yaml`), so deleting a key from git cannot
+  affect a host that has not rebuilt. And because git commits are atomic,
+  every commit — including an older one rolled back to — carries matching
+  references and keys.
+- **Neither laptop reads the webhook today anyway.** `myHealthAlerts` was
+  enabled on torrent and thinkpad in wave 1 but never deployed, so
+  torrent's live manifest contains no discord entry at all. There is no
+  host quietly posting to the old webhook.
+
+The one real constraint is the *provider* side, not git: the old
+**Discord** webhook should not be deleted until homelab and vps have been
+redeployed and verified on the new one.
 
 ## 3 and 4 — `tailscale_authkey_homelab`, `tailscale_authkey_torrent`
 

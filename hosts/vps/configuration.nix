@@ -863,13 +863,13 @@ in
   '';
 
   # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
-  sops.secrets.vps_discord_webhook = {
+  sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
   };
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.vps_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkZfs = false;
     checkSmart = false;
     # This host does not deploy itself — homelab builds its closure and

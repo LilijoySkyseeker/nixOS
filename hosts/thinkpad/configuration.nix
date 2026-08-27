@@ -168,13 +168,13 @@
   # legitimately offline for long stretches, so "no news" has always been
   # indistinguishable from "deploying fine" -- and it is the host the
   # audit could not verify live at all, precisely because it was dark.
-  sops.secrets.homelab_discord_webhook = {
+  sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
   };
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkSmart = false;
     # A laptop that wakes after weeks off will fire one batch of alerts
     # for anything that failed while it was down. That is the intended

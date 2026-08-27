@@ -168,7 +168,7 @@
   sops.secrets = {
     homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
-    homelab_discord_webhook = {
+    discord_webhook = {
       owner = "health-check";
       group = "health-check";
     };
@@ -430,7 +430,7 @@
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     interval = "*:0/15";
     # Paths carry the full source dataset path because zrepl extends
     # root_fs with it (see myZrepl above) — these are NOT the old syncoid
