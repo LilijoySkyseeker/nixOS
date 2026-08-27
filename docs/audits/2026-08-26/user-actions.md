@@ -195,6 +195,37 @@ repeated here so this file is the single place to work through.
       a port set that contains one nobody can account for. *(wave 2
       §2.9 port inventory)*
 
+- [ ] **D13 — should LAN clients reach the game servers directly?**
+      Blocks wave 2 item **2.1**. The four published game ports on
+      homelab bypass the NixOS firewall completely (docker DNATs before
+      the routing decision, so nothing traverses `nixos-fw`), which means
+      anything on `192.168.1.0/24` — a guest phone, an IoT device, a
+      compromised laptop — can reach them, and does so without passing
+      vps's rate limiter, the only control in front of these servers.
+
+      Both candidate fixes (binding the publishes to an address, or a
+      `DOCKER-USER` allowlist) close that LAN path. So the question is
+      simply: **do you ever connect to minecraft or factorio from a
+      machine on the LAN, rather than over the tailnet or through vps?**
+      If no, this is a clean fix. If yes, it needs a LAN-scoped
+      exception, which is the same shape as D9. Getting it wrong makes
+      four live game servers unreachable, which is why it is not being
+      guessed at. *(F-P4-02, F-P3-04)*
+
+      Already done and needing no decision: the load-bearing dependency
+      is now written down in `hosts/homelab/configuration.nix` — the only
+      thing keeping these ports off homelab's real public IPv6 is
+      docker's IPv6-off default, and nothing had recorded that.
+
+- [ ] **D14 — pin the game container images by digest?** Wave 2 item
+      **2.2**. `factorio-new` tracks a floating `stable` tag and
+      `factorio-main` a mutable `2.1.14`; the Modrinth mod set is
+      unpinned too. Pinning is the right call in principle, but it
+      changes what actually runs and the finding asks for a
+      start-and-play check afterwards — which needs you, not an agent.
+      Worth pairing with D13 since both touch the same four servers.
+      *(F-P4-03, F-P4-13)*
+
 - [ ] **D12 — should the NFS shares be `noexec` too?** Low stakes, and
       only worth answering if the answer is easy. Wave 2 item 2.5 added
       `nosuid` and `nodev` to `/home/lilijoy/storage{,-bulk}` and

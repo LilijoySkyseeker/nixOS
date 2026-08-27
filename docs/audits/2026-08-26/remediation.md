@@ -171,8 +171,8 @@ Behaviour changes, not just config. Each needs
 
 | # | Fix | Finding | Why it needs more than a build |
 |---|---|---|---|
-| 2.1 | Stop docker publishing past the firewall — bind published ports to a specific address, or add a host-level `DOCKER-USER` allowlist for both v4 and v6 | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
-| 2.2 | Pin the container images by digest and pin the Modrinth mod set | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
+| 2.1 | **Blocked on D13** — the load-bearing IPv6 dependency is now documented in `hosts/homelab/configuration.nix` (zero-risk half done); the packet-path change needs a user decision. See the note | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
+| 2.2 | **Blocked on D14** — pinning changes what runs and the finding requires a start-and-play check, which is not an agent's to do | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
 | 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
 | 2.4 | **Done, and better than planned** — plover was declared unused by the user (2026-08-27), so the grant is *removed* rather than narrowed. No `hardware.uinput.enable` needed. See the note | C2 (`F-P1-01` `F-P8-09`), also `F-P8-21` | the functional dependency turned out not to exist |
 | 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
@@ -233,6 +233,37 @@ Two things noticed while doing it, neither fixed here:
 - **`/dev/uinput` already carried `user:lilijoy:rw-`** from a logind
   uaccess ACL, independent of the group — so even the narrowing fix would
   have been partly redundant.
+
+**Note on 2.1 — the zero-risk half is done; the rest is a user
+decision (D13).**
+
+Both candidate fixes — binding the publishes to an address, or a
+`DOCKER-USER` allowlist — close the LAN path to the four game servers.
+Whether that is correct depends on something no source file answers: does
+anyone connect to minecraft or factorio from a machine on
+`192.168.1.0/24`, rather than over the tailnet or through vps? Guessing
+wrong makes four live servers unreachable. Logged as **D13**.
+
+What *was* done needs no decision and carries no behavioural risk: the
+load-bearing dependency is now written into
+`hosts/homelab/configuration.nix` next to the setting it rests on. The
+four ports are LAN-reachable because docker DNATs in `nat/PREROUTING`
+before the routing decision, so nothing traverses `nixos-fw` — and the
+only thing keeping them off this host's real globally-routable IPv6 is
+docker's default of not enabling IPv6 for containers, with
+`userland-proxy = false` sitting right there as an unremarked
+performance tweak. That is exactly threat model §7.1, and the same class
+of unstated assumption that triggered this whole audit. Setting
+`ipv6 = true` or restoring the userland proxy would silently convert a
+LAN exposure into an internet one; now the file says so.
+
+The build output is **the identical store path** before and after, which
+is the proof that it is comment-only.
+
+The severity question is settled and does not need re-deriving: the live
+probe on 2026-08-26 found **no IPv6 DNAT rules** for any of the four
+ports and all four listeners bound on `0.0.0.0` with none on `::`. So
+exposure is LAN-wide (A4), not internet-wide.
 
 **Note on 2.8 — both halves landed, and `F-P6-03` has one wrong key
 name.**

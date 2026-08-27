@@ -36,6 +36,39 @@
   };
 
   # docker settings
+  #
+  # SECURITY-LOAD-BEARING, which it does not look like. This host's four
+  # published game ports (25565/tcp, 19132/udp, 34197/udp, 34198/udp)
+  # bypass the NixOS firewall entirely: a bare `-p` binds 0.0.0.0 and
+  # makes docker DNAT in nat/PREROUTING before the routing decision, so
+  # the packet is forwarded and never traverses nixos-fw in INPUT. The
+  # pinned oci-containers module says so in its own option docs
+  # ("Publishing a port bypasses the NixOS firewall"), and
+  # networking.firewall.filterForward = false means NixOS does not manage
+  # FORWARD either. So the interface-scoped tailscale0/wg0 rules in
+  # modules/services/{minecraft,factorio}.nix are decorative for these
+  # four ports -- they render, and they constrain nothing (F-P4-02).
+  #
+  # That makes those ports reachable from anything on 192.168.1.0/24.
+  # What keeps them off the *internet* is narrower than it looks, and is
+  # the reason this comment exists: this host's LAN NIC carries a real
+  # globally-routable ISP-delegated IPv6 address, and the only thing
+  # stopping the game servers being directly internet-reachable on it is
+  # docker's default of not enabling IPv6 for containers -- `ipv6` is
+  # unset in these settings, and userland-proxy = false (below, added as
+  # a performance tweak) removes the userland proxy whose dual-stack
+  # listener historically caused exactly this.
+  #
+  # Verified live 2026-08-26: `ip6tables -t nat -S` matches nothing for
+  # any of the four ports, and all four listeners are bound by dockerd on
+  # 0.0.0.0 with none on ::. So the exposure today is LAN-wide, not
+  # internet-wide.
+  #
+  # Do not set `ipv6 = true` here, and do not restore userland-proxy,
+  # without first scoping these publishes to an address (or adding a
+  # DOCKER-USER allowlist). Either change silently converts a LAN
+  # exposure into an internet one, with no firewall rule in this repo
+  # capable of stopping it.
   virtualisation.docker.daemon.settings = {
     userland-proxy = false;
   };
