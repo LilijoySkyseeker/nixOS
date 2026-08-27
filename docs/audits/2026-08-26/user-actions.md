@@ -207,9 +207,9 @@ remains published and decryptable by any key that was ever a recipient.
   | 2 | `homelab_discord_webhook` | alert sink (`myHealthAlerts`) | **DONE 2026-08-27** — rotated *and* consolidated to one `discord_webhook`; verified from both hosts | low |
   | 3 | `tailscale_authkey_homelab` | node **enrollment** key | **NOT REQUIRED** — spent single-use key; see the runbook | none |
   | 4 | `tailscale_authkey_torrent` | same, for torrent | **NOT REQUIRED** — same | none |
-  | 5 | `wireguard_vps_homelab_psk` | shared PSK, **same value both ends** | new PSK into sops, deploy **both** hosts | med |
-  | 6 | `homelab_wireguard_private_key` | homelab wg0 identity | new keypair; vps's peer `publicKey` must change in the same commit | med |
-  | 7 | `vps_wireguard_private_key` | vps wg0 identity | new keypair; homelab's peer `publicKey` must change in the same commit | med |
+  | 5 | `wireguard_vps_homelab_psk` | shared PSK, **same value both ends** | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
+  | 6 | `homelab_wireguard_private_key` | homelab wg0 identity | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
+  | 7 | `vps_wireguard_private_key` | vps wg0 identity | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
   | 8 | `homelab_vps_deploy_key` | SSH key → `vps-deploy@vps`, i.e. **root on vps** | add new pubkey to vps `authorized_keys`, verify a deploy, then remove old | **high** |
   | 9 | `homelab_zrepl_key` | SSH key → **root on torrent and thinkpad** | see the separate item below — ordering matters, and the public half is `vars.zreplPullerKey` in this repo | **high** |
   | 10 | `homelab_backblaze_restic_password` | the restic **repository password** | **not a console action** — see the warning below | **highest** |

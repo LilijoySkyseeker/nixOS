@@ -48,9 +48,9 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 2 | `homelab_discord_webhook` → `discord_webhook` | low | **[x] 2026-08-27** — rotated + consolidated; verified from homelab and vps |
 | 3 | `tailscale_authkey_homelab` | low | **[x] not required** — spent single-use key, see item |
 | 4 | `tailscale_authkey_torrent` | low | **[x] not required** — spent single-use key, see item |
-| 5 | `wireguard_vps_homelab_psk` | med | [ ] |
-| 6 | `homelab_wireguard_private_key` | med | [ ] |
-| 7 | `vps_wireguard_private_key` | med | [ ] |
+| 5 | `wireguard_vps_homelab_psk` | med | **[x] 2026-08-27** — deployed and verified live; see item |
+| 6 | `homelab_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
+| 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 8 | `homelab_vps_deploy_key` | **high** | [ ] |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
@@ -250,6 +250,66 @@ affect my access to either host (Tailscale).
 - **Me** — verify: `wg show` on both ends shows a recent handshake, and
   the DNAT'd game port still reaches homelab.
 - **You** — shred the temporary key files.
+
+
+**Done 2026-08-27, and it took one unplanned step.** Deployed vps first,
+then homelab, then verified against a baseline captured at 16:25:50
+before either deploy.
+
+Verified at 16:38:11, both ends:
+
+```
+homelab wg0  public key: d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=
+             peer:       ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=
+             latest handshake: 54 seconds ago
+vps wg0      public key: ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=
+             peer:       d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=
+             latest handshake: 1 minute, 2 seconds ago
+```
+
+Both interface keys are new, each end pins the other's new public key, the
+handshake is live in both directions, `25565/tcp` is reachable over the
+tunnel from vps at ~27ms, and both hosts report zero failed units.
+
+> ### The step that was not in the plan — read before doing item 8
+>
+> **homelab's deploy reported success and did not apply the key.**
+> Activation logged `modifying secrets: homelab_wireguard_private_key,
+> wireguard_vps_homelab_psk` and finished with zero failed units, and
+> `wg show` still reported the *old* interface public key.
+>
+> `wireguard-wg0.service` is `Type=oneshot` with `RemainAfterExit=true`:
+> it reads `privateKeyFile` once, when the link is created, and never
+> re-runs. sops-nix rewrote the file underneath a live interface that had
+> already read it. Its last start was the previous day.
+>
+> What *did* restart was the **peer** unit, whose name is derived from
+> the peer's public key — which is exactly why the deploy looked applied.
+> Had this rotation changed only the private key and not the peer's, there
+> would have been no visible sign at all.
+>
+> vps had the same latent bug by a different route: its wg0 is a
+> systemd-networkd `.netdev`, and networkd restarted only because the peer
+> key changed and rewrote `40-wg0.netdev`. Rotating vps's own key alone
+> would have left it equally stale. **It worked by luck, not by
+> construction.**
+>
+> Fixed declaratively in `61f55cb` — `restartUnits` on the WireGuard
+> secrets on both hosts, verified present in the sops manifest. Note the
+> fix could not repair the state that exposed it: `restartUnits` fires
+> when `sops-install-secrets` sees the secret *content* change, and that
+> change had already happened in the prior activation. wg0 needed one
+> `systemctl restart wireguard-wg0.service` to pick up a key it was
+> already holding on disk.
+>
+> **The general lesson, which applies directly to items 8, 9 and 10:**
+> a clean activation log is not evidence that a rotated secret reached the
+> thing that consumes it. Only exercising the credential is. Item 8
+> already says to verify by running `push-deploy-vps` rather than by
+> reading the log — that instruction is now known to be load-bearing
+> rather than cautious. For item 10, `restic-backblazeWeekly snapshots`
+> plays the same role.
+
 
 ## 8 — `homelab_vps_deploy_key`
 
