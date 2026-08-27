@@ -179,7 +179,53 @@ Behaviour changes, not just config. Each needs
 | 2.6 | **Two of three done.** `zfs-emergency-prune` sandboxed and VM-tested; `crowdsec-allowlist-tailnet` sandboxed and dropped from root to the `crowdsec` user. **`push-deploy-vps` deferred** — comment corrected, sandbox not applied; see the note | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | **Done** — all four parts of the proposed fix, VM-tested including the drift scenario itself | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | **Done** — both halves, and `tests/zrepl-replication.nix` extended to cover them (it now does). One correction to `F-P6-03`'s text; see the note | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
-| 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+| 2.9 | **Done** — Steam remote play disabled outright, KDE Connect scoped to `tailscale0`, avahi already removed. **No per-host LAN-interface option was needed**, and it resolved D10 as a side effect. See the note | H4 (`F-P1-04` `F-P5-06`) | needed a `mkForce` of the host-wide lists; the LAN-interface option and the thinkpad test both turned out unnecessary |
+
+**Note on 2.9 — three of the four port groups were removed, not
+scoped, so the hard part evaporated.** The item was scoped as needing a
+new per-host LAN-interface option (thinkpad declares no interface names)
+and thinkpad online to test. Neither turned out to be necessary, because
+the user's D9 answers deleted rather than narrowed:
+
+- **mDNS/avahi** — removed entirely (D9 option c, static printer address
+  instead). Ports gone, no scoping needed.
+- **Steam remote play** — `remotePlay.openFirewall` dropped. Ports gone.
+- **KDE Connect** — the only one actually scoped, to `tailscale0`.
+
+With nothing left that wants LAN access, there is no LAN interface to
+name. The whole item came down to two edits in `modules/profiles/PC.nix`.
+
+**KDE Connect needed `mkForce`, because the module gives you no choice.**
+`nixos/modules/programs/kdeconnect.nix` at the pinned rev sets
+`networking.firewall.allowedTCPPortRanges` unconditionally inside its own
+`mkIf cfg.enable`, with no `openFirewall` option — checked against the
+source rather than assumed. So the host-wide lists are forced empty and
+the range re-added under
+`networking.firewall.interfaces.tailscale0`. That `mkForce` is safe only
+because kdeconnect is now the *only* range contributor on these hosts; a
+comment at the setting says so, and says how to check.
+
+**2.9 answered D10, which was a separate open decision.** The
+unattributable UDP 10400/10401 were **Steam's**:
+`programs.steam.remotePlay.openFirewall` opens TCP 27036/27037, UDP
+27031-27035 *and* UDP 10400/10401 together, in
+`nixos/modules/programs/steam.nix`. Attributed by evaluating
+`options.networking.firewall.allowedUDPPorts.definitionsWithLocations`,
+which names the defining nixpkgs file for each entry — the reason the
+audit's own grep failed is that the numbers appear nowhere as literals in
+this repo.
+
+**Why it stayed a mystery is the transferable part.** The wave-2 port
+inventory listed TCP 27036/27037 and UDP 10400/10401 as separate line
+items and never connected them, so one `openFirewall = true` presented as
+two findings — one understood, one unexplained. **Attribute a port to the
+option that opens it, not to the port number.**
+
+**Verified in the rendered firewall script**, which is the only check
+worth anything for this class of change: the sole surviving port range is
+`1714:1764`, both of its rules end in `-i tailscale0`, and `10400`,
+`10401` and `2703x` match nothing. Built on torrent and thinkpad. Not
+switched.
 
 **Note on 2.1 — the fix had to move chains, not just tighten a rule.**
 D13 was answered "never from the LAN — only tailnet or the public

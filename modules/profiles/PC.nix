@@ -11,6 +11,7 @@ in
       pkgs-stable,
       inputs,
       config,
+      lib,
       ...
     }:
     {
@@ -254,6 +255,43 @@ in
         enable = true;
       };
 
+      # Scope KDE Connect to the tailnet (audit decision D9, 2026-08-27).
+      #
+      # `programs.kdeconnect` opens TCP+UDP 1714-1764 host-wide and gives
+      # you no say in it: the pinned nixpkgs module sets
+      # `networking.firewall.allowedTCPPortRanges` unconditionally inside
+      # its own `mkIf cfg.enable`, with no `openFirewall` option to turn
+      # off (checked against nixos/modules/programs/kdeconnect.nix at the
+      # pinned rev, not assumed). So the only way to narrow it is to
+      # mkForce the host-wide lists empty and re-add the range scoped to
+      # an interface.
+      #
+      # mkForce on the *whole list* is safe here only because kdeconnect
+      # is the only thing left contributing a port range on these hosts —
+      # Steam's remote play (27031-27035) is disabled just below, and
+      # avahi is gone entirely. If a future module adds a range and it
+      # silently disappears, this is why. The rendered firewall script is
+      # the place to check: `grep -oE 'dport [0-9]+:[0-9]+'` over it
+      # should list 1714:1764 and nothing else.
+      networking.firewall = {
+        allowedTCPPortRanges = lib.mkForce [ ];
+        allowedUDPPortRanges = lib.mkForce [ ];
+        interfaces.tailscale0 = {
+          allowedTCPPortRanges = [
+            {
+              from = 1714;
+              to = 1764;
+            }
+          ];
+          allowedUDPPortRanges = [
+            {
+              from = 1714;
+              to = 1764;
+            }
+          ];
+        };
+      };
+
       # LD fix
       programs.nix-ld.enable = true;
       programs.nix-ld.libraries = with pkgs-unstable; [
@@ -340,9 +378,16 @@ in
       };
 
       # steam
+      #
+      # `remotePlay.openFirewall` dropped 2026-08-27 (audit decision D9):
+      # it opened TCP 27036/27037 and UDP 27031-27036 host-wide, on a
+      # desktop and on a laptop that roams onto untrusted networks, for a
+      # feature that is not used. Steam itself is unaffected — this only
+      # ever controlled the in-home-streaming listener, not the client,
+      # not the store, not games. If remote play is ever wanted again,
+      # turn it back on scoped to an interface rather than host-wide.
       programs.steam = {
         enable = true;
-        remotePlay.openFirewall = true;
       };
       hardware.steam-hardware.enable = true;
 

@@ -287,15 +287,24 @@ them rot.
       be picked up cold.
 
       **Deferred out of wave 1, tracked so it does not get lost:**
-      - Item **2.9** (interface-scoping the desktop profile's host-wide
-        firewall openings) was moved from wave 1 to wave 2. It is not a
-        mechanical edit: KDE Connect's 1714-1764 range is opened by the
-        nixpkgs module itself with no `openFirewall` toggle, thinkpad
-        declares no interface names at all, and it needs a decision on
-        whether LAN discovery keeps working.
-      - **UDP 10400/10401 are open on torrent and are not attributable
-        to anything in this repo.** An unexplained open port is its own
-        finding; identify it before 2.9 scopes a port set containing it.
+      - ~~Item **2.9** (interface-scoping the desktop profile's host-wide
+        firewall openings)~~ **DONE 2026-08-27**, and smaller than
+        scoped: the user's D9 answers *removed* two of the three port
+        groups (Steam remote play, avahi/mDNS) rather than narrowing
+        them, leaving only KDE Connect to scope to `tailscale0`. No
+        per-host LAN-interface option was needed and thinkpad did not
+        need to be online.
+      - ~~UDP 10400/10401 unattributable~~ **RESOLVED 2026-08-27.** They
+        were Steam Remote Play's, opened by
+        `programs.steam.remotePlay.openFirewall` alongside TCP
+        27036/27037 and UDP 27031-27035, and closed when 2.9 dropped that
+        option. Found by evaluating
+        `options.networking.firewall.allowedUDPPorts.definitionsWithLocations`
+        rather than grepping — the numbers appear nowhere as literals in
+        this repo, which is why the original search failed. Lesson worth
+        keeping: **attribute a port to the option that opens it, not to
+        the port number**; the audit's inventory listed 27036/27037 and
+        10400/10401 as separate items and never connected them.
       - The *skipped*-deploy half of `F-P7-09` is still open. Wave 1
         item 1.9 made a **failed** deploy visible on the laptops; a
         skipped one is still silent, because every guard in

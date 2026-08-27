@@ -186,7 +186,7 @@ reasoning and the verification for each one done so far.
 | 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
 | 2.7 | fail-open `ipset create` | **done** (`e5744f5`) |
 | 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | **done** (`08428eb`) — zrepl test extended, all 9 subtests pass |
-| 2.9 | firewall interface-scoping (moved out of wave 1) | **blocked** on a user decision |
+| 2.9 | firewall interface-scoping (moved out of wave 1) | **done** — Steam remote play off, KDE Connect on `tailscale0`, avahi gone; also resolved D10 |
 
 **Two things a next session should not re-derive.**
 

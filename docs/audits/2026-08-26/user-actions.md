@@ -215,14 +215,22 @@ drafted.
       on the LAN?** Blocks wave 2 item **2.9** (interface-scoping the
       desktop profile's host-wide firewall openings).
 
-      **PARTIALLY ANSWERED 2026-08-27:**
-      - **KDE Connect → tailnet only.** Scope TCP/UDP 1714-1764 to
-        `tailscale0`. Note the nixpkgs `programs.kdeconnect` module opens
-        that range itself with no `openFirewall` toggle, so this needs a
-        `mkForce` on the host-wide list rather than flipping an option.
-      - **Steam remote play → disable.** Drop
-        `remotePlay.openFirewall = true` (`PC.nix:330`) outright, which
-        closes TCP 27036/27037 and UDP 27031-27036. `programs.steam`
+      **ANSWERED AND DONE 2026-08-27** — wave 2 item 2.9 is complete,
+      and it turned out much smaller than scoped, because two of the four
+      port groups were removed rather than narrowed. No per-host
+      LAN-interface option was needed after all: nothing is left that
+      wants LAN scoping.
+
+      **ANSWERED 2026-08-27:**
+      - **KDE Connect → TAILNET ONLY.** TCP/UDP 1714-1764 now carry
+        `-i tailscale0` in the rendered firewall. The nixpkgs module
+        opens the range unconditionally with no `openFirewall` toggle
+        (checked against the pinned source), so this needed `mkForce` on
+        the host-wide lists plus a re-add under
+        `networking.firewall.interfaces.tailscale0`.
+      - **Steam remote play → DISABLED.** `remotePlay.openFirewall`
+        dropped outright, closing TCP 27036/27037, UDP 27031-27035 **and
+        UDP 10400/10401 — which is D10's mystery port pair**. Steam
         itself stays enabled; only the in-home-streaming listener goes.
       - **mDNS → REMOVED (option c), 2026-08-27.** It was
         `services.avahi.openFirewall` (`PC.nix:275-279`), there for one
@@ -239,15 +247,42 @@ drafted.
         is now a deliberate placeholder (`drivers = [ ]`, no printer
         declared) and the setup is tracked as its own `TODO.md` entry.
 
-      Still needs a per-host LAN-interface option (thinkpad declares no
-      interface names at all) and thinkpad online to test.
-      *(F-P1-04, F-P5-06)*
+      Built on torrent and thinkpad and verified in the *rendered*
+      firewall script, which is the only check that means anything here:
+      the sole remaining port range is `1714:1764`, and both its rules
+      end in `-i tailscale0`. **Not switched.** *(F-P1-04, F-P5-06)*
 
-- [ ] **D10 — identify what opens UDP 10400/10401.** Evaluated on
-      torrent but **not attributable to anything in this repo**. An
-      unexplained open port is its own finding, and 2.9 should not scope
-      a port set that contains one nobody can account for. *(wave 2
-      §2.9 port inventory)*
+- [x] **D10 — identify what opens UDP 10400/10401.** **ANSWERED AND
+      CLOSED 2026-08-27. They were Steam's.**
+
+      `programs.steam.remotePlay.openFirewall` opens them, in the pinned
+      nixpkgs `nixos/modules/programs/steam.nix`:
+
+      ```nix
+      (lib.mkIf cfg.remotePlay.openFirewall {
+        allowedTCPPorts = [ 27036 27037 ];
+        allowedUDPPorts = [ 10400 10401 ];
+        allowedUDPPortRanges = [ { from = 27031; to = 27035; } ];
+      })
+      ```
+
+      Established by evaluating
+      `options.networking.firewall.allowedUDPPorts.definitionsWithLocations`,
+      which attributes each entry to its defining nixpkgs file — not by
+      grepping, which is why the audit's own search failed: the ports
+      appear nowhere as literals in this repo.
+
+      **Why it went unattributed for so long is worth keeping.** The
+      audit's wave-2 port inventory listed TCP 27036/27037 and UDP
+      10400/10401 as *separate* line items and never connected them, so a
+      single `openFirewall = true` read as two unrelated findings — one
+      understood, one mysterious. The lesson is to attribute a port to the
+      **option that opens it**, not to the port number.
+
+      **Already closed** by the same change that answered D9: dropping
+      `remotePlay.openFirewall` removes all of it. Verified in the
+      rendered firewall script — no `10400`, `10401` or `2703x` rule
+      remains. *(D9, F-P1-04, F-P5-06)*
 
 - [ ] **D13 — should LAN clients reach the game servers directly?**
       Blocks wave 2 item **2.1**. The four published game ports on

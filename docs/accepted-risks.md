@@ -232,8 +232,8 @@ it leaves this file entirely.
 | D6 | That any tailnet device reaches nearly everything | ACL cluster |
 | D7 | That homelab has no intrusion detection at all | H8 |
 | D8 | That the recovery ISO serves the whole filesystem unauthenticated | H6 |
-| D9 | That the desktop profile's firewall openings stay host-wide. **Partly answered:** KDE Connect → tailnet-only, Steam remote play → disabled, mDNS → **removed outright**, so nothing is accepted for it. The remaining host-wide openings are still pending. | `F-P1-04`, `F-P5-06` |
-| D10 | An open port (UDP 10400/10401) nobody can attribute | wave 2 §2.9 |
+| ~~D9~~ | **Answered 2026-08-27 — nothing accepted, all three fixed.** KDE Connect scoped to `tailscale0`; Steam remote play and avahi/mDNS removed outright. | `F-P1-04`, `F-P5-06` |
+| ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
 | D11 | That `flake-update-test` auto-merges upstream updates to fleet root on build success alone | `F-P7-10` |
 | D12 | That the NFS shares stay executable — see AR-6 | `F-P6-05` |
 | ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
