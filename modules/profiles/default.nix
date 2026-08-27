@@ -76,7 +76,21 @@
       # that one host's identity/tag rather than a shared credential.
       services.tailscale = {
         enable = true;
-        useRoutingFeatures = "both";
+        # "client", not "both": `useRoutingFeatures = "both"` makes the
+        # tailscale module force net.ipv{4,6}.conf.all.forwarding on, and only
+        # homelab is actually an exit node / subnet router. Defaulting to
+        # "both" therefore turned on IP forwarding across the whole fleet for
+        # the benefit of one host -- including on two laptops that never route
+        # anything, one of which roams onto untrusted networks. This inverts
+        # the default to fail safe; homelab opts back in with mkForce.
+        #
+        # docs/hardening.md's "Tailscale forwarding sysctls" rule already said
+        # to narrow this per host, but it had only ever been applied to vps.
+        #
+        # Note the module sets those sysctls at mkOverride 97, so a plain
+        # boot.kernel.sysctl assignment loses to it silently -- changing this
+        # option is the only thing that actually moves them.
+        useRoutingFeatures = "client";
         authKeyFile = config.sops.secrets."tailscale_authkey_${config.networking.hostName}".path;
         # --ssh (Tailscale's own SSH server/auth implementation) is
         # deliberately NOT enabled: once on, it intercepts ALL SSH

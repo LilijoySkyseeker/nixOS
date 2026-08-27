@@ -409,11 +409,22 @@
   };
   networking.hostId = "e0019fd8";
 
-  # tailscale: advertise the LAN subnet and act as an exit node
-  boot.kernel.sysctl = {
-    "net.ipv4.ip_forward" = 1;
-    "net.ipv6.conf.all.forwarding" = 1;
-  };
+  # tailscale: advertise the LAN subnet and act as an exit node.
+  #
+  # This is the one host in the fleet that genuinely routes, so it opts back
+  # in to the forwarding features that modules/profiles/default.nix now
+  # withholds by default. Keep this and the profile default in sync: if this
+  # mkForce is ever dropped while the advertise flags below stay, the exit
+  # node and the 192.168.1.0/24 subnet route silently stop working -- that
+  # failure is visible in `tailscale status`, not in a build.
+  services.tailscale.useRoutingFeatures = lib.mkForce "both";
+  # The explicit net.ipv4.ip_forward / net.ipv6.conf.all.forwarding sysctls
+  # that used to sit here are gone: the tailscale module already sets both
+  # (at mkOverride 97) whenever useRoutingFeatures is "both", so they were
+  # redundant restatements of something the option above controls. They are
+  # removed in the same commit as the profile-default inversion deliberately
+  # -- removing them first, while the default was still "both", would have
+  # been a no-op that quietly became load-bearing later.
   services.tailscale.extraUpFlags = lib.mkAfter [
     "--advertise-routes=192.168.1.0/24"
     "--advertise-exit-node"

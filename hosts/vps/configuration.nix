@@ -459,8 +459,12 @@ in
       --hashlimit-mode srcip --hashlimit-name http-new6 -j DROP
   '';
 
-  # narrow tailscale routing to "client", this box isn't an exit node/subnet router
-  services.tailscale.useRoutingFeatures = lib.mkForce "client";
+  # tailscale routing: nothing needed here any more. This box isn't an exit
+  # node or a subnet router, and "client" is now the fleet-wide default in
+  # modules/profiles/default.nix rather than something each host has to
+  # remember to opt out of -- so the mkForce override that used to sit here
+  # is redundant. homelab is the only host that overrides it, in the other
+  # direction.
 
   # this box never needs to forward IPv6
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
