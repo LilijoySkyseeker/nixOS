@@ -13,6 +13,155 @@ them rot.
 
 ## Active
 
+- [ ] **PROJECT: rebuild the update/build/deploy pipeline properly.**
+      Scoped 2026-08-27 out of the D11 analysis
+      (`docs/audits/2026-08-26/D11-analysis.md`), which found the
+      current pipeline is not a small fix away from correct — it is the
+      wrong shape. This entry is the design brief. **The goal is to do
+      this right, not to do it cheaply**; it is explicitly allowed to be
+      slow and to change a lot.
+
+      **Status: auto-updates are DISABLED fleet-wide in the meantime**
+      (see the entry below). That is deliberate and temporary — active
+      development means the hosts are getting deployed by hand anyway,
+      so the scheduled path buys nothing right now while carrying all of
+      the risk below. **This project is to be implemented before focused
+      development pauses**, because the moment hand-deploys stop is the
+      moment the fleet silently goes stale.
+
+      ### 1. The problem
+
+      Today one systemd unit on homelab does all three of: fetch new
+      inputs, decide whether they are acceptable, and publish them to
+      the branch every host deploys from. Those are three different
+      jobs with three different trust levels, and collapsing them is
+      what produces every specific defect below.
+
+      Facts, all verified rather than assumed (details and sources in
+      `D11-analysis.md`):
+
+      - **The gate covers 1 of 4 hosts.** `flake-update-test` builds
+        only `.#homelab`, which is the sole host on `nixpkgs-stable`;
+        vps, torrent and thinkpad run `nixpkgs-unstable`. It cannot see
+        breakage in the nixpkgs most of the fleet uses.
+      - **Two inputs are never built at all.** `stylix` and `nvf` are
+        imported only by `profile-pc`, which homelab does not use.
+      - **The repo's five VM tests never run.** The gate is
+        `nixos-rebuild build`, not `nix flake check`, and there is no CI
+        (`.github/` does not exist).
+      - **The update runs on a deploy target**, writing to homelab's
+        `/etc/nixos`. The machine being tested is the machine doing the
+        testing.
+      - **It pushes straight to `master`** — unattended fleet root — with
+        no PR, no diff, no revert point.
+      - **Eleven third-party inputs are tracked at branch HEAD** with no
+        cooldown, versus the two nixpkgs channels which are gated
+        upstream by Hydra.
+      - **Nothing rolls back** a switch that builds fine but leaves a
+        host unreachable.
+      - **All four hosts deploy at `Thu 03:00`** with no randomisation
+        and no reboot window, and homelab — which the laptops
+        NFS/Samba-mount — reboots unconditionally on kernel change.
+
+      ### 2. Target architecture — three stages, deliberately separate
+
+      This is the industry-consensus shape, and upstream nixpkgs is the
+      proof it works unattended: `nixos-unstable` is **not** `master`;
+      it advances only after Hydra's `trunk-combined/tested` job passes.
+      Nobody approves a channel bump — a gate that covers everything
+      shipped does. Copy that principle, not the scale.
+
+      1. **Propose.** Update `flake.lock` on a schedule, **off the
+         deploy targets**, and open a **PR**. Never push to `master`.
+      2. **Gate.** Build **every** host configuration, run `nix flake
+         check` (all VM tests), publish a per-host `nvd` closure diff on
+         the PR. Automerge on green is fine and keeps it unattended —
+         the point is coverage and an audit trail, not a human.
+      3. **Adopt.** Hosts consume the reviewed lock and **never resolve
+         inputs themselves** (`--no-update-lock-file`), so every machine
+         converges on the same package set. Staggered, with a reboot
+         window, and with automatic rollback.
+
+      ### 3. Where the build farm fits — this is the same project
+
+      The reason this is one project and not two: **stage 2 needs
+      somewhere to build all four hosts, and stage 3 needs the results
+      to be cheap to fetch.** That is exactly what the stale
+      `worktree-distributed-build-todo` and `worktree-nix-cache`
+      branches were reaching for.
+
+      The general directions worth keeping from them:
+
+      - **homelab serves a binary cache** (harmonia was the vehicle) so
+        the laptops and vps fetch closures instead of rebuilding them.
+        vps especially — it has ~2 GB RAM and a from-scratch build was
+        measured at ~1.7 GB + swap, which is why it stopped building
+        for itself.
+      - **Distributed builds across the fleet**, with homelab as the
+        primary builder.
+      - **homelab pre-builds the other hosts' closures** to warm the
+        cache before they deploy — which, done in the new shape, *is*
+        stage 2's gate. Building all four hosts stops being an
+        expensive addition and becomes the thing that makes stage 3
+        fast.
+      - **Stagger the fleet's scheduled jobs across the week** rather
+        than firing them together.
+
+      **Treat those branches' actual implementations as suspect.** They
+      predate this audit, were written with less knowledge, and will be
+      redone — take the direction, re-derive the code. Specifically
+      re-check: the cache signing-key model, the builder SSH key model
+      (per-worker vs per-edge), and anything touching host-key
+      verification, since `push-deploy`'s TOFU gap is a known open
+      issue.
+
+      ### 4. Design questions to settle before writing code
+
+      - **Where does the gate run?** GitHub Actions is free for a public
+        repo but has no fleet cache and slow cold builds. homelab has
+        the CPU and the store but is a deploy target. A hybrid —
+        homelab builds and *proposes*, CI verifies — may be right.
+        Decide deliberately; this is the crux.
+      - **Does `master` stay the deploy branch**, or do hosts track a
+        separate `deployed`/`release` ref that only advances when the
+        gate passes? The latter decouples "I pushed work" from "the
+        fleet takes it", which matters given active hand-deploys.
+      - **Cooldown or pinning for the eleven third-party inputs?**
+        Renovate's `minimumReleaseAge` is the ecosystem answer; pinning
+        to tags is the manual equivalent. This is the *only* lever that
+        touches supply-chain risk — no build gate addresses it.
+      - **Rollback mechanism.** `deploy-rs`-style magic rollback
+        (canary + confirm-or-revert on the target) is the reference.
+        Adopting deploy-rs wholesale vs borrowing the confirm-or-revert
+        timer into the existing push/pull modules.
+      - **Signature verification** — D2 and `F-P0-01` option (b). If the
+        fleet auto-adopts a ref, verifying who signed it is the control
+        that makes that safe. Settle alongside, not after.
+      - **Does `vps` move to `nixpkgs-stable` first?** (own entry
+        below). It shrinks the gate's surface and makes stage 2 cheaper.
+
+      ### 5. Definition of done
+
+      - No host resolves flake inputs by itself.
+      - Nothing reaches a deploy target that has not had **its own**
+        configuration built and the VM tests run.
+      - A bad deploy reverts without a human.
+      - Every fleet-wide change has a diff and a revert point.
+      - Losing any single host does not stop the others updating.
+      - `docs/architecture.md` and `docs/procedures/workflow.md`
+        describe the new shape, and the old auto-update entries in this
+        file are moved to `docs/DONE.md`.
+
+      ### 6. Related entries
+
+      The two smaller items below (simultaneous deploys, no automatic
+      rollback) are subsumed by this project — keep them for now as the
+      concrete symptoms, and close them out with it. `vps` →
+      `nixpkgs-stable` is a useful prerequisite. `F-P7-09`'s
+      profile-staleness check (done 2026-08-27) is the safety net that
+      makes disabling the timers survivable: if the fleet stops
+      deploying, `myHealthAlerts` now says so within three weeks.
+
 - [ ] **The whole fleet deploys at once, with no randomisation and no
       reboot window.** Surfaced 2026-08-27 while researching D11.
       `auto-switch` (homelab), `pull-deploy` (torrent, thinkpad) and

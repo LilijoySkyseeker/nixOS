@@ -17,6 +17,21 @@ the evidence without re-deriving it.
 
 ## 0. Time-critical — two timers are running
 
+> **2026-08-27: the fleet's scheduled deploys are disabled *on this
+> branch*, and that is exactly the problem.** `scheduleEnable = false`
+> now removes the `flake-update-test`, `auto-switch`, `push-deploy-vps`
+> and both `pull-deploy` timers — verified absent from all four built
+> systems. **But nothing is deployed.** The live hosts are still running
+> the configuration that has those timers armed, so **both deadlines
+> below are still real** until someone switches homelab.
+>
+> Deploying homelab is the single action that defuses both: it removes
+> the `flake-update-test` timer (so D11 cannot fire Wed) and the
+> `auto-switch` timer (so the Thu revert cannot fire). That is a
+> `switch` on a live host and is **not** something to do unprompted —
+> it needs your go-ahead.
+
+
 Everything else in this file waits patiently. These two do not: they act
 on their own, and both are live **because** the audit repaired the deploy
 path in `929efa3`, which homelab is now running. While that path was

@@ -10,6 +10,15 @@ session needs is here or linked from here.
 
 ## READ THIS FIRST — two clocks are running
 
+> **Update 2026-08-27:** the fix for both clocks is written but **not
+> deployed**. `scheduleEnable = false` removes every scheduled deploy
+> timer fleet-wide (verified absent from all four built systems), which
+> defuses both rows below. Until homelab is switched, **the live hosts
+> still have the timers armed and both deadlines stand.** Deploying
+> homelab is the one action that stops both; it is a `switch` on a live
+> host, so it needs the user's go-ahead.
+
+
 The audit branch is **deployed on homelab and nowhere else**, and
 homelab's `/etc/nixos` was deliberately left on `master`. Two timers will
 act on that without anyone doing anything:

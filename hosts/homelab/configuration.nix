@@ -369,6 +369,26 @@
     # switch-to-configuration restarts any unit whose definition changed, so
     # a same-cycle switch would kill it mid-run. Defer instead (see TODO.md).
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
+    # DISABLED 2026-08-27, deliberately and temporarily. Removes both the
+    # flake-update-test and auto-switch timers; the services stay, so
+    # `systemctl start auto-switch-now` is still the manual deploy path.
+    #
+    # Two reasons. There is active development, so these hosts are being
+    # deployed by hand anyway — the scheduled path buys nothing right now
+    # while carrying every risk in the D11 analysis. And the pipeline is
+    # being rebuilt rather than patched (TODO.md, "rebuild the
+    # update/build/deploy pipeline properly"), so leaving the old shape
+    # armed would mean maintaining something already known to be wrong.
+    #
+    # This also stops D11 firing on its own: flake-update-test can no
+    # longer auto-merge to master unattended. It does NOT answer D11 —
+    # the decision is deferred into the project, not made.
+    #
+    # RE-ENABLE with the new pipeline, not before. The safety net for
+    # being disabled is myHealthAlerts' staleness check on
+    # /nix/var/nix/profiles/system: if the fleet stops being deployed,
+    # it says so within three weeks rather than never.
+    scheduleEnable = false;
     # Replaces `systemd.services.auto-switch.onSuccess`, which fired this
     # on a *skipped* switch too — observed live 2026-08-25T13:18:15, where
     # the min-interval guard deferred the switch and systemd started the
@@ -392,6 +412,16 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
+    # Disabled with the rest of the fleet's schedules, 2026-08-27 — see
+    # myAutoUpdate above. The unit remains, so `systemctl start
+    # push-deploy-vps` is still how vps gets deployed by hand.
+    #
+    # Belt and braces: onDeployUnits below would only fire this after a
+    # real auto-switch activation, and auto-switch no longer has a timer,
+    # so the chain is already dead. Disabling the periodic fallback too
+    # means there is exactly one way vps gets deployed right now, and it
+    # is a human.
+    scheduleEnable = false;
     # dates left at its default (Thu 03:15) as a periodic fallback —
     # the onSuccess wiring below is the primary trigger, right after
     # homelab's own myAutoUpdate switch, so this reuses the same

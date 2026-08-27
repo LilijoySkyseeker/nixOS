@@ -63,6 +63,30 @@ in
           description = "systemd OnCalendar spec for the push/switch job — a periodic fallback independent of any onSuccess wiring the caller may also set up.";
         };
 
+        scheduleEnable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Whether the periodic `push-deploy-<hostAttr>` **timer** is
+            installed. False keeps the service defined and manually
+            startable (`systemctl start push-deploy-vps`) — which is how
+            the target gets deployed by hand — while stopping it
+            happening on a schedule.
+
+            Note this only governs the timer. If the caller also wires
+            this unit into `myAutoUpdate.onDeployUnits`, it still runs
+            after a real activation of the *deploying* host; disabling
+            that host's own schedule is what stops the chain.
+
+            The timer is removed rather than merely un-wanted, so a
+            `switch` actually stops a running timer instead of leaving it
+            armed until the next reboot.
+
+            Currently false fleet-wide — see TODO.md's "rebuild the
+            update/build/deploy pipeline properly".
+          '';
+        };
+
         minSwitchInterval = lib.mkOption {
           type = lib.types.ints.positive;
           default = 7 * 24 * 60 * 60;
@@ -169,7 +193,7 @@ in
           };
         };
 
-        systemd.timers."push-deploy-${cfg.hostAttr}" = {
+        systemd.timers."push-deploy-${cfg.hostAttr}" = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.dates;

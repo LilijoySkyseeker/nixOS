@@ -185,6 +185,32 @@ in
           '';
         };
 
+        scheduleEnable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Whether the `flake-update-test` and `auto-switch` **timers**
+            are installed. Setting this false keeps every service defined
+            and manually startable (`systemctl start auto-switch-now`,
+            or `auto-switch` itself) while stopping anything from
+            happening on a schedule.
+
+            This is a deliberate half-measure and exists to be
+            temporary. It is not `enable = false` because that would
+            also remove `auto-switch-now`, which is the manual
+            "deploy this host now" path and has no timer to begin with.
+
+            The timers are removed rather than merely un-wanted, so that
+            a `switch` actually stops a running timer instead of leaving
+            it armed until the next reboot.
+
+            Fleet-wide this is currently **false** — see TODO.md's
+            "rebuild the update/build/deploy pipeline properly". The
+            profile-staleness check in `myHealthAlerts` is what makes
+            that survivable: if the fleet stops deploying, it says so.
+          '';
+        };
+
         onDeployUnits = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
@@ -292,7 +318,7 @@ in
           };
         };
 
-        systemd.timers.flake-update-test = {
+        systemd.timers.flake-update-test = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.updateDates;
@@ -326,7 +352,7 @@ in
           chainOnDeploy = false;
         };
 
-        systemd.timers.auto-switch = {
+        systemd.timers.auto-switch = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.switchDates;
