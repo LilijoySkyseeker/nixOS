@@ -12,24 +12,6 @@ in
     }:
     {
       environment.systemPackages = with pkgs; [
-        # Debugging tools for the headless hosts. Both are **already in
-        # this system's closure** -- health-check ships jq in its unit
-        # `path`, and the firewall/CrowdSec bouncer reference
-        # `${pkgs.ipset}/bin/ipset` -- so putting them on PATH adds no new
-        # code to the system, only discoverability. That is the whole
-        # justification, and it is why this list stays this short: tools
-        # that are *not* already in the closure (tcpdump, conntrack) are
-        # deliberately absent until something actually needs them.
-        #
-        # Added 2026-08-27 after debugging sessions repeatedly hit
-        # "command not found" on these two and worked around it with raw
-        # /nix/store paths -- which is slow, easy to get wrong, and once
-        # produced a false "the ipsets are missing" reading when they
-        # were fine. Reach for the devshell first for anything that runs
-        # on the *deploying* machine; this list is only for what has to
-        # run on the host itself.
-        jq # JSON on the command line: tailscale status --json, health-check payloads
-        ipset # inspect CrowdSec's blacklist sets, which the firewall rules match on
       ];
 
       #security

@@ -67,22 +67,27 @@ root SSH from anywhere, by design; `thinkpad` may also simply be offline
 ## Missing tooling is a bug, not an obstacle to route around
 
 If a tool you need for debugging isn't there, **add it declaratively** —
-don't work around it with raw `/nix/store/...` paths. Order of preference:
+don't work around it with raw `/nix/store/...` paths.
 
-1. **`modules/flake/devshell.nix`** — anything that runs on the machine
-   you're working *from*. It already carries `jq`, `dig`, `nvd`, `sops`,
-   `wireguard-tools`, `gh`.
-2. **The host configuration** — only for what must run *on* the target
-   host, where the devshell doesn't reach. `modules/profiles/server.nix`
-   is the right place for headless-host debugging tools.
+**`modules/flake/debug-tools.nix` is the single source of truth**, shared
+by the devshell *and* every host (via `profiles/default.nix`, which
+`profile-pc` also imports). Add a tool there once and it lands in both
+places, so the two can never drift into "I have it locally but not on the
+host I'm debugging". Always resolved against **unstable**, including on
+homelab, which is otherwise stable-pinned — debug tooling should behave
+identically everywhere.
 
-Prefer tools already in the host's closure: putting one on `PATH` then
-costs no new code, only discoverability. Working around a missing tool
-with a store path is slow, easy to get wrong, and has produced a **false
-negative** here — an `ipset list` that printed nothing and looked like
-"the sets are gone" when the command simply wasn't on `PATH`. Note the
-same trap with an unprivileged `ip6tables -S`, which returns what looks
-like an empty chain when it is really permission denied.
+Only put dev-machine-only tooling (`nixfmt`, `statix`, `gh`, `sops`,
+`nixos-anywhere`) directly in `devshell.nix`. Keep the shared list short:
+it lands on every host including the public-facing one, so add on demand,
+not speculatively.
+
+Working around a missing tool with a store path is slow, easy to get
+wrong, and has produced a **false negative** here — an `ipset list` that
+printed nothing and looked like "the sets are gone" when the command
+simply wasn't on `PATH`. Note the same trap with an unprivileged
+`ip6tables -S`, which returns what looks like an empty chain when it is
+really permission denied.
 
 ## The two rules that matter most
 
