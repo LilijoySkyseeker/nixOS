@@ -107,6 +107,15 @@ All build-verified on all four hosts. **Not switched.**
 - **`40255bd` fails closed.** If GitHub rotates that key, unattended
   deploys stop until it is updated. That is the intended trade, but it
   is why F-P7-09 (nothing notices a failed deploy) matters.
+- **`d6236cb` needs one live check: the Wooting keyboard.** Removing
+  `input` from `wooting.nix` should be a no-op, because
+  `wooting-udev-rules` grants access with `TAG+="uaccess"` rather than a
+  group — but that is source-reading, not a keyboard. After the first
+  switch, confirm it still types and that **wootility** still detects
+  the device and can read/write profiles; that path talks to `hidraw`
+  directly and is the part most likely to notice. Tracked in
+  [`user-actions.md`](user-actions.md) §1. If it breaks, the fix is a
+  `uaccess`-scoped grant, **not** putting `input` back.
 - **`e5744f5` adds a unit whose failure is now the signal.** If
   `crowdsec-ipset-precreate` ever fails, the firewall still comes up but
   the CrowdSec pre-drop on DNAT'd game traffic is absent. That is the
@@ -168,7 +177,7 @@ reasoning and the verification for each one done so far.
 | 2.5 | NFS mount options | **done** (`516ef31`) |
 | 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
 | 2.7 | fail-open `ipset create` | **done** (`e5744f5`) |
-| 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | not started |
+| 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | **done** (`{{2.8}}`) — zrepl test extended, all 9 subtests pass |
 | 2.9 | firewall interface-scoping (moved out of wave 1) | **blocked** on a user decision |
 
 **Two things a next session should not re-derive.**
@@ -253,6 +262,11 @@ The four with the best ratio of value to effort, unchanged:
   `sshd -T` against the *old* rendered config, not just from the man
   page. The doc now also says to write these as `settings` rather than
   `extraConfig`, and to verify with `sshd -T`.
+- **Known finding error:** `F-P6-03` says a compromised source sets
+  `send.properties: true`. There is no such key — zrepl 0.7.0's is
+  `send_properties` (`SendOptions`, `internal/config/config.go:95`), and
+  the wrong spelling makes the daemon **refuse to start** rather than
+  being ignored. Corrected in the 2.8 note and in the test.
 - **Corrected during the audit:** the threat model originally claimed
   `docker` group membership on `lilijoy` was a privilege path. It is
   not — the group is never declared, so the membership is inert. Dead

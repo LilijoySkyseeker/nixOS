@@ -28,6 +28,25 @@ the evidence without re-deriving it.
       already-set password, so if thinkpad was ever installed with it,
       the published password is still live there. *(F-P1-03)*
 
+- [ ] **Test the Wooting keyboard after deploying `d6236cb`.** That
+      commit removed `users.users.lilijoy.extraGroups = [ "input" ]` from
+      `modules/nixos/wooting.nix`. The reasoning says it should be a
+      no-op: `hardware.wooting.enable`'s only access mechanism is
+      `services.udev.packages = [ pkgs.wooting-udev-rules ]`, and every
+      rule in that package is `TAG+="uaccess"`, which grants the
+      logged-in user access through a logind ACL rather than a group —
+      checked against the pinned nixpkgs module and the rules package
+      itself. But that is source-reading, not a keyboard.
+
+      Worth a minute after the first switch: confirm the keyboard still
+      types, and open **wootility** and confirm it still detects the
+      device and can read/write profiles — the analog/rapid-trigger
+      configuration path is the part that talks to `hidraw` directly and
+      so the part most likely to notice a permissions change. If it
+      breaks, `getfacl` on the relevant `/dev/hidraw*` will say whether
+      the uaccess ACL is present; the fix would be a `uaccess`-scoped
+      grant, not putting `input` back. *(F-P1-01, F-P8-09)*
+
 - [ ] **Check GitHub branch protection** on the public repo. There is no
       CI anywhere and never has been — confirmed by a full-history scan
       — so branch protection is the *only* remaining control on a commit

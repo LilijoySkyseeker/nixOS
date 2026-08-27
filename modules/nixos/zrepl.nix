@@ -198,8 +198,52 @@
       # (placeholdercreationencryptionproperty_enumer.go). zbackup is not
       # encrypted, so "off" is right here; "inherit" is for receiving into
       # an encrypted root.
+      # The properties below pin what an incoming stream may set (F-P6-03).
+      #
+      # The module's headline argument -- "a compromised source host has no
+      # RPC handle on this machine at all" -- is true about *RPC* and
+      # incomplete about *data*. Under pull, this host still feeds an
+      # entirely source-controlled `zfs send` stream into a root `zfs recv`,
+      # and three facts combined badly:
+      #
+      #   1. The *sender* decides whether properties travel at all:
+      #      Sender.sendMakeArgs reads the source host's own
+      #      `send.properties`, so a source whose root is compromised turns
+      #      it on and the puller has no say and no way to detect it.
+      #   2. The receiver applied whatever arrived. mkRecv set only
+      #      placeholder.encryption, so buildRecvFlags emitted no -x and
+      #      no -o.
+      #   3. Nothing stopped a mount: ZFSRecv never passes -u, and a
+      #      *received* property outranks the inherited mountpoint=none the
+      #      zbackup containers get from the pool root.
+      #
+      # So a hostile `mountpoint=/etc` (or /root/.ssh) plus canmount=on in
+      # the stream could land as a root-owned mount over a live path on the
+      # backup server; sharenfs/sharesmb are the same shape with a
+      # different payoff. Pinning them here costs nothing and does not
+      # depend on that full escalation reproducing.
+      #
+      # -o and -x for the same property are mutually exclusive, so each
+      # property appears in exactly one of these two lists: override for
+      # the two that must take a specific value, inherit for the ones that
+      # simply must not come from the wire.
       mkRecv = {
         placeholder.encryption = cfg.placeholderEncryption;
+        properties = {
+          override = {
+            mountpoint = "none";
+            canmount = "off";
+          };
+          # quoted: `inherit` is a Nix keyword, so it cannot be a bare
+          # attribute name here even though it is zrepl's own key name.
+          "inherit" = [
+            "sharenfs"
+            "sharesmb"
+            "exec"
+            "setuid"
+            "devices"
+          ];
+        };
       };
 
       # ---- job builders, one per role ------------------------------
@@ -1068,6 +1112,68 @@
           requires = lib.mkForce [ ];
           wants = [ "local-fs.target" ];
           after = [ "local-fs.target" ];
+        };
+
+        # A sender-side backstop the puller cannot override (F-P6-04).
+        #
+        # Under pull, the puller holds destroy authority over this host's
+        # snapshots and there is no veto on this side: zrepl's
+        # Sender.DestroySnapshots runs `zfs destroy` for every snapshot the
+        # client names and evaluates no keep rules, and config.SourceJob has
+        # no Pruning field at all in 0.7.0. This host's own protectRegexes
+        # and its snap job's ceiling are *local pruning policy*; they do not
+        # gate an incoming destroy. So a compromised homelab -- or simply a
+        # `protectRegexes` typo on homelab -- can destroy every snapshot
+        # here, including @blank, which is the impermanence rollback point
+        # and is not regenerable without reinstalling.
+        #
+        # A plain `zfs hold` fixes that asymmetry locally. zrepl only
+        # recognises and releases holds tagged zrepl_STEP_J_* /
+        # zrepl_last_received_J_*, so a foreign tag is invisible to it and
+        # cannot be released over any RPC, while doDestroySnapshots
+        # tolerates the resulting failure rather than aborting the run
+        # (already covered by tests/zfs-space-guard.nix's "a zrepl-style
+        # hold is tolerated" subtest).
+        #
+        # Only ever @blank. Holding a zrepl_-prefixed snapshot would pin the
+        # pool, since those are exactly the ones retention must be free to
+        # destroy.
+        systemd.services.zrepl-protect-blank = lib.mkIf (cfg.serve.enable && cfg.serve.datasets != [ ]) {
+          description = "Hold @blank on served datasets so a puller cannot destroy it";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "zfs-mount.service" ];
+          path = [ pkgs.zfs ];
+          script = ''
+            set -uo pipefail
+            ${lib.concatMapStringsSep "\n" (dataset: ''
+              snap=${lib.escapeShellArg dataset}@blank
+              if ! zfs list -t snapshot -H -o name "$snap" >/dev/null 2>&1; then
+                # No @blank: a host not yet on impermanence, or a test
+                # pool. Nothing to protect, and not an error.
+                echo "zrepl-protect-blank: $snap does not exist, skipping"
+              elif zfs holds -H "$snap" | cut -f2 | grep -qx protect; then
+                echo "zrepl-protect-blank: $snap already held"
+              else
+                echo "zrepl-protect-blank: holding $snap"
+                zfs hold protect "$snap"
+              fi
+            '') cfg.serve.datasets}
+          '';
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            # Same stack as zfs-emergency-prune, and NOT PrivateDevices
+            # for the same reason: this needs /dev/zfs.
+            NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            ProtectKernelModules = true;
+            ProtectKernelTunables = true;
+            ProtectKernelLogs = true;
+            ProtectControlGroups = true;
+            RestrictNamespaces = true;
+            PrivateTmp = true;
+          };
         };
 
         # Forced-command keys for every ssh+stdinserver peer. The command

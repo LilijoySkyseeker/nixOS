@@ -17,6 +17,14 @@
       # It also mattered more than a duplicate normally would: this module
       # merged with PC.nix's own list, so dropping `input` there alone
       # would have left the grant fully intact and looked like a fix.
+      #
+      # Still owed one live check, since the above is source-reading and
+      # not a keyboard: after the first switch, confirm the board types
+      # and that wootility still detects it and can read/write profiles
+      # (that path talks to hidraw directly). Tracked in
+      # docs/audits/2026-08-26/user-actions.md. If it does break, the fix
+      # is a uaccess-scoped grant -- not restoring `input`, which is read
+      # of every evdev node on the machine.
       hardware.wooting.enable = true;
     };
 }

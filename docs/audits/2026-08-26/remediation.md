@@ -178,7 +178,7 @@ Behaviour changes, not just config. Each needs
 | 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
 | 2.6 | **Two of three done.** `zfs-emergency-prune` sandboxed and VM-tested; `crowdsec-allowlist-tailnet` sandboxed and dropped from root to the `crowdsec` user. **`push-deploy-vps` deferred** — comment corrected, sandbox not applied; see the note | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | **Done** — all four parts of the proposed fix, VM-tested including the drift scenario itself | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
-| 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
+| 2.8 | **Done** — both halves, and `tests/zrepl-replication.nix` extended to cover them (it now does). One correction to `F-P6-03`'s text; see the note | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
 
 **Note on 2.4 — the premise changed, so the fix got simpler and
@@ -233,6 +233,74 @@ Two things noticed while doing it, neither fixed here:
 - **`/dev/uinput` already carried `user:lilijoy:rw-`** from a logind
   uaccess ACL, independent of the group — so even the narrowing fix would
   have been partly redundant.
+
+**Note on 2.8 — both halves landed, and `F-P6-03` has one wrong key
+name.**
+
+**`zrepl-protect-blank` (`F-P6-04`).** A new oneshot in
+`modules/nixos/zrepl.nix`, active on any host with `serve.enable`,
+holding `<dataset>@blank` with the tag `protect`. This is the piece the
+finding calls "the highest-value fix", and the reason it works is that
+zrepl only recognises and releases its own `zrepl_STEP_J_*` /
+`zrepl_last_received_J_*` tags — a foreign tag is invisible to it and
+cannot be released over any RPC, while `doDestroySnapshots` tolerates the
+resulting failure. It holds `@blank` and nothing else: holding a
+`zrepl_`-prefixed snapshot would pin the pool, since those are exactly
+the ones retention must be free to destroy.
+
+Worth being precise about what it fixes. `protectRegexes` is the
+*puller's pruning policy*, and a policy is not a control:
+`Sender.DestroySnapshots` evaluates no keep rules and `config.SourceJob`
+has no `Pruning` field at all, so before this a compromised — or merely
+mistyped — homelab could destroy `@blank` on both laptops, and `@blank`
+is not regenerable without reinstalling.
+
+It is a no-op on torrent today, by design and correctly:
+`hosts/torrent/README.md` records that the impermanence migration has not
+happened there, so torrent has no `@blank` (confirmed live — 116
+snapshots, all `zrepl_`-prefixed, none named `blank`). thinkpad creates
+one at install via `disko`'s `postCreateHook`, so the hold applies there
+now, and torrent picks it up automatically whenever it migrates.
+
+**`recv.properties` (`F-P6-03`).** `mkRecv` now pins `mountpoint = "none"`
+and `canmount = "off"` via `override`, and strips `sharenfs`, `sharesmb`,
+`exec`, `setuid`, `devices` via `inherit`. Checked against the pinned
+zrepl source rather than the docs: `PropertyRecvOptions` is
+`Inherit []zfsprop.Property` + `Override map[zfsprop.Property]string`
+(`internal/config/config.go:140-143`), which is exactly this shape. Note
+`inherit` has to be quoted in Nix — it is a keyword.
+
+**The correction.** `F-P6-03` says a compromised source "sets
+`send.properties: true` in its own `/etc/zrepl/zrepl.yml`". There is no
+such key. zrepl 0.7.0's `SendOptions` field is
+`SendProperties bool \`yaml:"send_properties"\``
+(`internal/config/config.go:95`). This is not a harmless slip: zrepl
+unmarshals strictly, so the wrong spelling makes the daemon refuse to
+start with `field properties not found in type config.SendOptions` — which
+is precisely how the VM test caught it. Anyone reproducing that finding
+by hand would hit the same wall.
+
+**Verified in `tests/zrepl-replication.nix`, which now covers both.** All
+nine subtests pass. The two new ones:
+
+- `zrepl-protect-blank` is started for real, `@blank` is confirmed to
+  carry the `protect` hold, `zfs destroy tank/data@blank` is asserted to
+  **fail**, and the unit is re-run to prove it is idempotent (it runs on
+  every boot, and an existing hold would otherwise make `zfs hold` error).
+- The hostile sender is simulated faithfully rather than approximated:
+  the source dataset is poisoned with `mountpoint`, `canmount`, `setuid`,
+  `exec`, `devices`, and the source's **own `zrepl.yml` is rewritten** to
+  set `send_properties: true` — because the sender alone decides whether
+  properties travel, and an attacker with root there would edit that file,
+  not go through this module. After a fresh receive, the receiver is
+  asserted to still report `mountpoint=none` and `canmount=off`, and the
+  `inherit` properties are asserted not to have arrived (`source` is never
+  `received`).
+
+**Not covered:** a resumed receive, which the finding also asks for.
+`-o` on resume has historically been fussy, and orchestrating an
+interrupted send is a separate piece of work. Recorded in the test header
+rather than left implied.
 
 **Note on 2.7 — all four parts done, and the drift scenario is tested.**
 
