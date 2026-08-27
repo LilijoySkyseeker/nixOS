@@ -123,10 +123,23 @@
   services.openssh = {
     enable = true;
     openFirewall = false;
+    # docs/hardening.md's full SSH baseline (F-P5-07). See
+    # hosts/torrent/configuration.nix for why these are `settings` rather
+    # than `extraConfig`, and for the OpenSSH 10.4p1 default each one
+    # replaces -- both hosts rendered the identical sshd.conf-final, down
+    # to the same store path, so the gap and the fix are identical too.
+    allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
+      AuthenticationMethods = "publickey";
+      AllowAgentForwarding = false;
+      AllowStreamLocalForwarding = false;
+      AllowTcpForwarding = false;
+      PermitTunnel = "no";
+      ClientAliveInterval = 60;
+      ClientAliveCountMax = 5;
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];

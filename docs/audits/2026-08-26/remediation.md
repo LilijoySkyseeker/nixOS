@@ -173,13 +173,50 @@ Behaviour changes, not just config. Each needs
 |---|---|---|---|
 | 2.1 | Stop docker publishing past the firewall — bind published ports to a specific address, or add a host-level `DOCKER-USER` allowlist for both v4 and v6 | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
 | 2.2 | Pin the container images by digest and pin the Modrinth mod set | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
-| 2.3 | Bring both laptops' sshd up to the repo's own baseline, and correct the `AllowTcpForwarding` default claim in the doc | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verify with `sshd -T` against the pinned module, per P3's method — do not assume a directive takes effect |
+| 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
 | 2.4 | Replace the `input` group grant with `hardware.uinput.enable` | C2 (`F-P1-01` `F-P8-09`) | plover must still work; this is a real functional dependency, not dead config |
 | 2.5 | Add `nosuid`/`nodev`/`noexec` to the NFS client mounts | MEDIUM (`F-P6-05`) | could break execution from `/storage` if anything relies on it |
 | 2.6 | Sandbox the three under-hardened root units | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | Guard the `ipset create` calls so a parameter drift cannot take the whole packet filter down fail-open | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.3 — verified by `sshd -T`, and the doc error is confirmed
+empirically.** The rendered `sshd_config` was extracted from each host's
+built closure, its `HostKey` lines swapped for a throwaway key, and the
+pinned OpenSSH 10.4p1 `sshd` asked for its *effective* configuration —
+before and after. thinkpad's and torrent's rendered configs are
+byte-identical, as `F-P5-07` observed.
+
+| Directive | Before | After |
+|---|---|---|
+| `AllowTcpForwarding` | **yes** | `no` |
+| `AllowAgentForwarding` | **yes** | `no` |
+| `AllowStreamLocalForwarding` | **yes** | `no` |
+| `AuthenticationMethods` | **any** | `publickey` |
+| `ClientAliveInterval` | **0** — no idle timeout at all | `60` |
+| `ClientAliveCountMax` | `3` | `5` |
+| `PermitTunnel` | `no` | `no` — already correct, by accident |
+| sftp subsystem | **present** | gone |
+
+The "before" column is the direct disproof of `docs/hardening.md`'s old
+sentence "`AllowTcpForwarding` defaults to `no`". It defaults to **yes**,
+and so do the two other forwarding directives. That sentence is now
+corrected, and the doc additionally says to write these as `settings`
+rather than `extraConfig` and to verify with `sshd -T`.
+
+`allowSFTP = false` is safe on these two specifically, checked rather
+than assumed: zrepl uses `ssh+stdinserver` rather than sftp, root is
+`forced-commands-only`, and `/home/lilijoy/.ssh/` on torrent contains no
+`authorized_keys` — so no interactive login exists to scp *from*. The
+same question is still open for homelab, where it stays a needs-check.
+
+**Not included, deliberately:** homelab and vps carry the identical
+directive set in `extraConfig`, where it is inert (`F-P2-09`,
+`F-P3-18`). Moving it to `settings` is byte-identical in output and a
+real change in safety, but it touches the two server hosts and belongs
+with 2.6's sandboxing pass rather than being smuggled into a laptop
+change.
 
 **2.9 port inventory**, as evaluated on torrent, so it does not have to
 be re-derived: TCP ranges 1714-1764; UDP ranges 27031-27035 and

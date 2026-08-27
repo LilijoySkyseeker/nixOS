@@ -198,9 +198,13 @@ The four with the best ratio of value to effort, unchanged:
     inside what reads as a shell comment. Cost two failed builds.
   - Checking the wrong sysctl key: the tailscale module sets
     `net.ipv4.conf.all.forwarding`, **not** `net.ipv4.ip_forward`.
-- **Known doc error:** `docs/hardening.md` says `AllowTcpForwarding`
-  defaults to `no`. It defaults to **`yes`** (pinned OpenSSH 10.4p1).
-  Fix in Phase 4.
+- ~~**Known doc error:** `docs/hardening.md` says `AllowTcpForwarding`
+  defaults to `no`.~~ **Fixed** in wave 2 item 2.3. It defaults to
+  **`yes`**, as do `AllowAgentForwarding` and
+  `AllowStreamLocalForwarding` — confirmed empirically by running
+  `sshd -T` against the *old* rendered config, not just from the man
+  page. The doc now also says to write these as `settings` rather than
+  `extraConfig`, and to verify with `sshd -T`.
 - **Corrected during the audit:** the threat model originally claimed
   `docker` group membership on `lilijoy` was a privilege path. It is
   not — the group is never declared, so the membership is inert. Dead

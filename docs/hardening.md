@@ -69,8 +69,25 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
   `AuthenticationMethods publickey`, `X11Forwarding no`,
   `AllowAgentForwarding no`, `AllowStreamLocalForwarding no`,
   `PermitTunnel no`, `ClientAliveInterval 60`/`ClientAliveCountMax 5`,
-  `allowSFTP = false` unless actually used. `AllowTcpForwarding`
-  defaults to `no` — only flip to `yes` for a specific confirmed need.
+  `allowSFTP = false` unless actually used, and `AllowTcpForwarding no`.
+
+  Two things about that list are easy to get wrong, and both were got
+  wrong in this repo before the 2026-08-26 audit caught them:
+
+  - **`AllowTcpForwarding` defaults to `yes`, not `no`.** This bullet
+    used to say the opposite. It is wrong: the pinned NixOS `sshd.nix`
+    declares no default for it, so nothing renders it, and OpenSSH's own
+    `sshd_config.5` says "`yes` (the default)". The same is true of
+    `AllowAgentForwarding` and `AllowStreamLocalForwarding`. Anything not
+    written out explicitly is **on**, so write them out. (`PermitTunnel`
+    really does default to `no`.)
+  - **Write these as structured `settings`, never `extraConfig`.**
+    `sshd_config` is first-directive-wins, and the module emits
+    `settings` into the `configFile` half that sshd reads *before*
+    `extraConfig`. A directive placed in `extraConfig` that the module
+    also emits is therefore silently inert — it renders, it looks right
+    in a diff, and it does nothing. Verified with `sshd -T`, not by
+    reading the generated file.
 - **Dedicated service users.** Any new `systemd.services.<name>` should
   run under its own dedicated, purpose-specific `users.users.<name>`
   (system user, no login shell) rather than `root`, unless root is

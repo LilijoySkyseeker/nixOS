@@ -101,10 +101,45 @@
   services.openssh = {
     enable = true;
     openFirewall = false;
+    # Modern OpenSSH implements scp over the SFTP protocol, so this
+    # removes both scp and sftp. Nothing copies files to this host --
+    # zrepl uses ssh+stdinserver, not sftp -- and there is no interactive
+    # login here to use them from: root is forced-commands-only and no
+    # non-root user has an authorized_keys (checked on-box).
+    allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
+
+      # The rest of docs/hardening.md's SSH baseline, which this host was
+      # missing entirely (F-P5-07): of the nine directives the rule
+      # lists, only three were rendered, so OpenSSH's own defaults
+      # applied to the other six -- and three of those defaults are the
+      # opposite of what the rule asks for.
+      #
+      # These go in `settings`, not `extraConfig`, deliberately.
+      # sshd_config is first-directive-wins, and the module emits
+      # `settings` into the configFile half that sshd reads *first*
+      # (sshd.nix:82-89, :893), so a directive written here cannot be
+      # silently overridden. The same set written into `extraConfig` on
+      # homelab and vps is inert for exactly that reason -- it works
+      # there only because nothing else emits those keys, i.e. by luck
+      # (threat model §7.2, F-P2-09/F-P3-18).
+      #
+      # Each "was" is the pinned OpenSSH 10.4p1's own documented default,
+      # read out of sshd_config.5 rather than assumed. Note the third
+      # one: docs/hardening.md claimed AllowTcpForwarding already
+      # defaults to `no`. It does not -- it defaults to `yes`, so
+      # forwarding has been on everywhere it was not explicitly set. That
+      # sentence is corrected in the same commit as this change.
+      AuthenticationMethods = "publickey"; # was: any
+      AllowAgentForwarding = false; # was: yes
+      AllowStreamLocalForwarding = false; # was: yes
+      AllowTcpForwarding = false; # was: yes
+      PermitTunnel = "no"; # was: no -- the one already correct, by accident
+      ClientAliveInterval = 60; # was: 0, i.e. no idle timeout at all
+      ClientAliveCountMax = 5; # was: 3
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
