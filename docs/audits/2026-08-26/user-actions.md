@@ -84,6 +84,25 @@ the evidence without re-deriving it.
       `factorio-main` still uses, so treat it as exposed until rotated at
       factorio.com — and rotating means updating sops too. *(F-P4-04)*
 
+- [ ] **After deploying, confirm the deploy path actually recovers.**
+      As of 2026-08-27 **the fleet is not deploying at all**: both
+      `auto-switch.service` and `push-deploy-vps.service` on homelab have
+      failed on every run since 2026-08-25 with `could not lock config
+      file /root/.config/git/config: Read-only file system`, because the
+      guards wrote to a path home-manager owns as a store symlink. Fixed
+      on this branch and covered by `tests/deploy-guards.nix`, but the
+      fix only takes effect once the branch is deployed — and it cannot
+      deploy itself, precisely because the deploy path is what is broken.
+      **The first switch has to be run by hand.**
+
+      Afterwards, on homelab: `systemctl start auto-switch.service` and
+      check it reaches its guards instead of dying on line one, and
+      confirm `systemctl --failed` is empty. Note the guards
+      intentionally `exit 0` when they skip, so "no failure" is not the
+      same as "it deployed" — check
+      `stat -c %y /nix/var/nix/profiles/system` to see whether a switch
+      actually happened. *(F-P7-09)*
+
 - [ ] **Delete the `ssh` block in the Tailscale console.** `ba8cd4e`
       removed it from `docs/tailscale-acl.json`, but that file is only a
       reference copy — the live policy is console state and must be

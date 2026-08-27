@@ -181,6 +181,63 @@ Behaviour changes, not just config. Each needs
 | 2.8 | **Done** — both halves, and `tests/zrepl-replication.nix` extended to cover them (it now does). One correction to `F-P6-03`'s text; see the note | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | **Done** — Steam remote play disabled outright, KDE Connect scoped to `tailscale0`, avahi already removed. **No per-host LAN-interface option was needed**, and it resolved D10 as a side effect. See the note | H4 (`F-P1-04` `F-P5-06`) | needed a `mkForce` of the host-wide lists; the LAN-interface option and the thinkpad test both turned out unnecessary |
 
+**Note on the deploy-guards `safe.directory` fix (found 2026-08-27,
+outside the wave plan).** Discovered incidentally while clearing a
+stopped unit's failed state on homelab: **both halves of the deploy path
+were failing, and had been since 2026-08-25.**
+
+```
+auto-switch.service       failed
+push-deploy-vps.service   failed
+error: could not lock config file /root/.config/git/config: Read-only file system
+```
+
+`require_clean_master()` opened with
+`git config --global --add safe.directory "$(pwd)"`. Root's
+`~/.config/git/config` is a **home-manager symlink into the nix store**;
+git creates its lockfile beside the config it is writing; the store is
+read-only. So the guard aborted on its first line, before any of its
+actual checks, and took every scheduled deploy with it. Last successful
+`auto-switch`: 2026-08-25 13:18.
+
+**This is `F-P7-09` demonstrated rather than argued.** The audit rated
+"nothing notices a failed deploy" and half-fixed it in wave 1 item 1.9;
+here is the other half happening for real — two days of no deploys on
+homelab *and* no pushes to vps, with nothing raising a hand. It also
+sharpens the finding: the failure was visible in `systemctl --failed`
+the whole time, so the gap is not detection but *notification*.
+
+**The fix does not write anything.** The guards now define
+`git() { command git -c safe.directory="$PWD" "$@"; }` once, at the top
+of the fragment. `-c` is "command" scope, which git-config(1)'s SCOPES
+section counts as **protected** configuration — and `safe.directory` is
+only honoured in protected scopes, so this genuinely applies where a
+repo-local value would be silently ignored. Checked against git's own
+documentation, not assumed.
+
+Wrapped rather than added per call site because the consuming modules run
+about nineteen git commands between them; patching call sites means a
+later addition silently misses the flag and reintroduces the bug.
+
+**The underlying mistake is worth naming**: the guard mutated a dotfile
+that another part of the system owns declaratively. Home-manager won that
+fight the moment it took over root's git config, and it would have won it
+silently on any host. It is also the same `safe.directory` that
+`docs/hardening.md` rule 7 warns about suppressing — the fix narrows it
+from a persisted global grant to a single command's scope, which is
+strictly better on that axis too.
+
+**Verified by `tests/deploy-guards.nix`, six subtests**, two of which
+assert the *premise* rather than the fix, so the test cannot quietly stop
+testing anything: it proves the global config really is read-only in the
+harness, and that git really does refuse the repo for dubious ownership.
+Then: the guard completes on a clean master despite both, still skips a
+dirty tree, still skips a non-master branch, and leaves the store symlink
+untouched with no `config.lock` beside it. Built on all four hosts.
+
+**Not switched, so the fleet is still not deploying.** This lands only
+when the branch does.
+
 **Note on 2.9 — three of the four port groups were removed, not
 scoped, so the hard part evaporated.** The item was scoped as needing a
 new per-host LAN-interface option (thinkpad declares no interface names)

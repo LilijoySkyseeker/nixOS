@@ -309,6 +309,20 @@ them rot.
         item 1.9 made a **failed** deploy visible on the laptops; a
         skipped one is still silent, because every guard in
         `deploy-guards.nix` ends in `exit 0`.
+
+        **2026-08-27: this stopped being hypothetical.** Both
+        `auto-switch` and `push-deploy-vps` on homelab had been failing
+        every run since 2026-08-25 — `could not lock config file
+        /root/.config/git/config: Read-only file system`, because the
+        guards wrote `safe.directory` into a path home-manager owns as a
+        store symlink. Two days of no deploys on homelab and no pushes to
+        vps, noticed only by accident while clearing an unrelated failed
+        unit. The guard is fixed on the audit branch
+        (`tests/deploy-guards.nix`), but the episode sharpens what is
+        still missing: the failure *was* in `systemctl --failed` the
+        whole time, so the gap is **notification, not detection**.
+        Whatever closes the skipped-deploy half should also make a
+        failed one reach a human.
       - **`push-deploy-vps` is the one piece of 2.6 not done**, and it is
         deferred on purpose. Its misleading comment is corrected; the
         sandbox is not applied, because `nixos-rebuild --target-host`

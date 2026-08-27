@@ -21,5 +21,10 @@
         pkgs = config.flake.pkgsUnstable;
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
       };
+
+      checks.deploy-guards = import ../../tests/deploy-guards.nix {
+        pkgs = config.flake.pkgsUnstable;
+        deployGuardsScript = config.flake.deployGuardsScript;
+      };
     };
 }

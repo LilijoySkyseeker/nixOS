@@ -15,13 +15,37 @@
   # `config` shadows the flake-parts one (see docs/architecture.md's
   # "config shadowing" gotcha).
   flake.deployGuardsScript = ''
+    # Supply safe.directory per-invocation instead of writing it into
+    # git's global config.
+    #
+    # A service running as root against a user-owned flakeDir (e.g.
+    # myPullDeploy on a PC host, ~lilijoy/dotfiles) otherwise hits git's
+    # "dubious ownership" refusal on every git command.
+    #
+    # This was `git config --global --add safe.directory "$(pwd)"`, which
+    # broke every scheduled deploy on the fleet: root's
+    # ~/.config/git/config is a home-manager symlink into the nix store,
+    # git writes its lockfile beside the target, and the store is
+    # read-only. So the guard died on its very first line with "could not
+    # lock config file ...: Read-only file system", taking auto-switch and
+    # push-deploy-vps with it -- silently, for two days, because a guard
+    # failure is not something anything watches (F-P7-09). Writing to a
+    # dotfile that another part of the system owns declaratively was the
+    # underlying mistake; not writing at all is the fix.
+    #
+    # `-c` is "command" scope, which git-config(1) SCOPES counts as
+    # *protected* configuration, and safe.directory is only honoured in
+    # protected scopes -- so this genuinely applies where a repo-local
+    # value would be silently ignored. Verified against git's own docs
+    # rather than assumed.
+    #
+    # Wrapped as a function rather than added to each call site because
+    # the consumers of this fragment run ~19 git commands between them:
+    # patching call sites means a later one silently misses the flag and
+    # reintroduces this. `command git` avoids recursing into the wrapper.
+    git() { command git -c safe.directory="$PWD" "$@"; }
+
     require_clean_master() {
-      # a service running as root against a user-owned flakeDir (e.g.
-      # myPullDeploy on a PC host, ~lilijoy/dotfiles) otherwise hits git's
-      # "dubious ownership" refusal on every run -- idempotent, harmless
-      # to repeat, and scoped to $PWD (the caller has already cd'd into
-      # flakeDir before sourcing this).
-      git config --global --add safe.directory "$(pwd)"
       if [ -n "$(git status --porcelain)" ]; then
         echo "Working tree dirty, skipping this scheduled run."
         exit 0
