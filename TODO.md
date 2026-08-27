@@ -303,8 +303,8 @@ them rot.
       makes disabling the timers survivable: if the fleet stops
       deploying, `myHealthAlerts` now says so within three weeks.
 
-- [ ] **homelab's `/etc/nixos` has diverged from origin and holds an
-      unpushed auto-update commit.** Found 2026-08-27 while checking
+- [x] **homelab's `/etc/nixos` has diverged from origin and holds an
+      unpushed auto-update commit.** — resolved 2026-08-27, see below. Found 2026-08-27 while checking
       gates for the vps deploy. `git rev-list --left-right --count
       master...origin/master` on homelab returns **1 31** — one
       local-only commit, thirty-one behind:
@@ -343,12 +343,29 @@ them rot.
       homelab's scheduled deploys would have kept failing after the
       guard fix, for a second and unrelated reason.
 
-      **Not urgent, and deliberately not fixed by an agent**: the
-      timers are off, so nothing acts on this state. Resolving it means
-      either discarding `1c2eec5` (`git reset --hard origin/master`,
-      which is what `flake-update-test` itself does on every run) or
-      keeping the lock bump deliberately. That is a judgement call on a
-      live host's git state, so it is yours.
+      **RESOLVED 2026-08-27, on the user's decision.** Surfaced again
+      while preparing rotation item 8, whose verification step is
+      `systemctl start push-deploy-vps` on homelab — and
+      `myPushDeploy.flakeDir` is `/etc/nixos`. Running it in that state
+      would have built `.#vps` from a pre-audit tree still containing
+      `publicKey = "GH5vw+bR1d28…"` and pushed it to vps, taking back the
+      old WireGuard key, breaking the tunnel a second time, and reverting
+      the config vps is actually running. The rotation would have looked
+      like it failed for reasons unrelated to the key.
+
+      The user chose to discard the commit. `/etc/nixos` is now checked
+      out on `worktree-worktree-security-audit-plan` at `eb8ce08` with a
+      clean tree, local `master` reset to `origin/master` (`9f39873`),
+      and `1c2eec5` abandoned. Verified afterwards that the checkout
+      carries both the rotated peer key and the `restartUnits` fix.
+
+      **Two consequences to keep in mind while the branch is deployed:**
+      `push-deploy-vps` and `auto-switch-now` both build from
+      `/etc/nixos`, so they now deploy the *audit branch*, not master.
+      That is what we want during this work and wrong afterwards — put
+      `/etc/nixos` back on `master` once the branch lands. All the
+      relevant timers are off, so only a manual `systemctl start` acts on
+      this.
 
 - [ ] **Nothing ever verifies that the alert sink actually works.**
       Found 2026-08-27 while rotating `discord_webhook`: the new value
