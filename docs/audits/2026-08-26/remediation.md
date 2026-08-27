@@ -177,9 +177,58 @@ Behaviour changes, not just config. Each needs
 | 2.4 | Replace the `input` group grant with `hardware.uinput.enable` | C2 (`F-P1-01` `F-P8-09`) | plover must still work; this is a real functional dependency, not dead config |
 | 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
 | 2.6 | **Two of three done.** `zfs-emergency-prune` sandboxed and VM-tested; `crowdsec-allowlist-tailnet` sandboxed and dropped from root to the `crowdsec` user. **`push-deploy-vps` deferred** — comment corrected, sandbox not applied; see the note | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
-| 2.7 | Guard the `ipset create` calls so a parameter drift cannot take the whole packet filter down fail-open | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
+| 2.7 | **Done** — all four parts of the proposed fix, VM-tested including the drift scenario itself | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.7 — all four parts done, and the drift scenario is tested.**
+
+`F-P2-02`'s fix had four parts and all four landed:
+
+1. **Both `--match-set … -j DROP` rules now end in `|| true`.** They fail
+   with "Set … doesn't exist" if the sets are missing, and an unguarded
+   failure aborts the firewall script before it arms the filter.
+2. **Both `ipset create` calls moved out of `extraCommands`** into
+   `systemd.services.crowdsec-ipset-precreate`, ordered `Before =
+   [ "firewall.service" ]` with `RequiredBy`/`PartOf` deliberately unset,
+   so the firewall can never fail because of it.
+3. **`networking.firewall.extraStopCommands` added**, tearing down the
+   raw `vps-ratelimit` chain and its PREROUTING jump for both families.
+   Every line guarded, because `extraStopCommands` is spliced into a `-e`
+   script too and a half-torn-down firewall is worse than a skipped rule.
+4. **Confirmed the alerting is real.** `myHealthAlerts` runs
+   `systemctl --failed --no-legend --plain` with no filtering, so a
+   failed `crowdsec-ipset-precreate` does page. This mattered: it is the
+   precondition the finding names for part 1 being the right trade.
+
+**Why a unit rather than just `|| true` on the create lines.** `|| true`
+alone would make the firewall *succeed* with the ban layer silently
+missing, alerting nobody — trading a fail-open for a fail-silent. As its
+own unit the failure is both contained and visible.
+
+`ProtectKernelModules = true` on that unit is only safe because
+`boot.kernelModules` now declares `ip_set` and `ip_set_hash_net`
+explicitly (names confirmed by `lsmod` on the live host). Otherwise
+creating a `hash:net` set relies on the kernel autoloading the module at
+create time — an implicit dependency that should not sit between this
+host and a working packet filter.
+
+**Verified in a throwaway VM test**, since none of this is build-visible.
+Four subtests, all passing: the sandboxed unit succeeds; both sets exist
+with the expected parameters; re-running is idempotent as `-exist`
+implies; and — the one that matters — after destroying a set and
+recreating it with a **different `maxelem`**, exactly the drift `F-P2-02`
+describes, `systemctl restart` leaves *that unit* in `failed` while the
+firewall is untouched. That is the whole point of the change,
+demonstrated rather than argued. The test was deleted afterwards per
+`docs/procedures/vm-testing.md` — it verified a one-off migration and
+will not be run again.
+
+Live state checked read-only on vps beforehand: the running sets do still
+match the repo's parameters exactly (`hash:net`, `hashsize 1024`,
+`maxelem 131072`, `timeout 300`), so there is no drift today. The fix is
+against the drift that a nixpkgs bump or one hand-made `ipset` would
+introduce.
 
 **Note on 2.6 — two units hardened, one deliberately deferred.**
 
