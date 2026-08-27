@@ -7,9 +7,13 @@ session needs is here or linked from here.
 ## Where things are
 
 - **Branch:** `worktree-worktree-security-audit-plan`, pushed to origin,
-  fully committed. The worktree it was built in has been released — make
-  a new one from the branch (`git fetch && EnterWorktree`, then check the
-  branch out) or work on the branch directly.
+  fully committed, working tree clean. It has a live worktree at
+  `.claude/worktrees/worktree-security-audit-plan` — enter that rather
+  than making a new one. If it is gone, make one from the branch
+  (`git fetch && EnterWorktree`, then check the branch out) or work on
+  the branch directly.
+- **Last session ended 2026-08-27** having finished wave 1 and taken
+  wave 2 as far as an agent can. Phase 4 is next and is already scoped.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
 - **Nothing has ever been switched.** Every change is build-verified
@@ -33,8 +37,8 @@ session needs is here or linked from here.
 | 0 — threat model | **done** |
 | 1 — eight part audits | **done** — 158 findings |
 | 2 — consolidation | **done** |
-| 3 — remediation | **wave 1 done**; wave 2 in progress; waves 3–4 not started |
-| 4 — docs harvest | **not started** — `findings.md` §4 has the eleven rules to fold into `docs/hardening.md` |
+| 3 — remediation | **waves 1–2 done as far as an agent can take them.** 2.1/2.2/2.9 are blocked on user decisions, not work; `push-deploy-vps`'s sandbox is deliberately deferred. Wave 3 is user-only by definition |
+| 4 — docs harvest | **not started — and it is the next thing to do.** Scoped and rule-by-rule triaged in [`remediation.md`](remediation.md)'s Wave 4 section: nine of the eleven rules are new, two need finishing, three judgement calls are open. Documentation only — no build, no VM test |
 
 Headline counts: **3 CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**,
 consolidated into 3 CRITICAL clusters, 10 HIGH clusters, and 34 tail
@@ -202,10 +206,27 @@ online to test. Evaluated port inventory is in `remediation.md`,
 including that **UDP 10400/10401 are opened by something outside this
 repo and were never attributed**.
 
-**Wave 4 / Phase 4** — fold `findings.md` §4's eleven rules into
-`docs/hardening.md`, keep the threat model as a standing doc, write down
-accepted risks, add a `docs/audits/` row to `AGENTS.md` (already done),
-and log deferred items to `TODO.md`.
+**Wave 4 / Phase 4 — this is the next thing to do.** Fold
+`findings.md` §4's eleven rules into `docs/hardening.md`, promote the
+threat model to a standing doc, write down accepted risks, and log
+deferred items to `TODO.md`. The `AGENTS.md` row is already done.
+
+**It is already scoped — read [`remediation.md`](remediation.md)'s Wave
+4 section before starting, and do not re-derive the triage there.** In
+short: rule 10 is **done** (`6b623c0`); rule 9 exists but is scoped to
+SSH only; rule 4 is written into `hosts/homelab/configuration.nix`
+(`bd6db07`) but not stated fleet-wide; the other **nine are new**.
+
+Three judgement calls are open and were deliberately not decided:
+how much reasoning goes inline (`docs/hardening.md` is a tight 138-line
+checklist and doubling it may make it go unread — the proposal was short
+imperative rules with evidence linked, not inlined); where the threat
+model should live; and that the accepted-risks file cannot be *finished*
+until decisions D1–D14 are answered, only scaffolded.
+
+Phase 4 touches **no host configuration** — documentation only, so no
+build and no VM test are needed. That is a real difference from waves
+1–3.
 
 ---
 
@@ -264,6 +285,19 @@ The four with the best ratio of value to effort, unchanged:
   `sshd -T` against the *old* rendered config, not just from the man
   page. The doc now also says to write these as `settings` rather than
   `extraConfig`, and to verify with `sshd -T`.
+- **Traps hit on 2026-08-27:**
+  - **`inherit` is a Nix keyword**, so zrepl's `recv.properties.inherit`
+    has to be written `"inherit" = [ … ]`. A bare one is a syntax error.
+  - **`modules/flake/hosts.nix` was already unformatted at `HEAD`.**
+    Check before running `nixfmt` on a file — reformatting it would add
+    unrelated churn to a security branch.
+  - **A comment-only change should build to the identical store path.**
+    Used deliberately in `bd6db07` as proof it changed nothing; a
+    differing path would have meant the "comment" was not one.
+  - **A throwaway VM test still has to be `git add`ed** to be visible to
+    the flake, and its `checks.nix` registration removed again
+    afterwards — the staged copy outlives the working-tree edit unless
+    you re-stage.
 - **Known finding error:** `F-P6-03` says a compromised source sets
   `send.properties: true`. There is no such key — zrepl 0.7.0's is
   `send_properties` (`SendOptions`, `internal/config/config.go:95`), and

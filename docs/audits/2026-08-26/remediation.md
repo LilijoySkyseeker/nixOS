@@ -558,8 +558,90 @@ rather than preserving (`F-P7-08`).
 
 ## Wave 4 — documentation harvest
 
-Phase 4 of the audit proper. The eleven systemic rules in
-[`findings.md`](findings.md) §4 go into `docs/hardening.md`, the threat
-model becomes a standing doc, accepted risks get written down with
-their reasoning, and deferred items land in `TODO.md`. Tracked
-separately.
+Phase 4 of the audit proper, and its durable output: everything up to
+here either fixed a defect or recorded one, while this turns the
+recurring patterns into standing rules so the next service written in
+this repo does not reintroduce them.
+
+**Four parts.**
+
+1. Fold [`findings.md`](findings.md) §4's eleven systemic rules into
+   `docs/hardening.md`.
+2. Promote the threat model to a standing doc — it currently lives
+   inside a dated audit directory.
+3. Write down accepted risks with their reasoning. **No such document
+   exists**: the only matches for "accepted risk" anywhere in `docs/`
+   are inside `docs/audits/`.
+4. Log deferred items to `TODO.md` — largely done already as the waves
+   went.
+
+The `AGENTS.md` row pointing at `docs/audits/` was added earlier in the
+audit and needs nothing further.
+
+**Phase 4 touches no host configuration.** It is documentation only, so
+nothing in it needs a build or a VM test, and nothing changes deploy
+behaviour. That is a meaningful difference from waves 1–3 and should
+make it fast.
+
+### Rule-by-rule status, checked against `docs/hardening.md` on 2026-08-27
+
+Do not re-derive this. `docs/hardening.md` is 138 lines; these were
+grepped against it directly.
+
+| # | Rule (short) | State |
+|---|---|---|
+| 1 | Recipient rotation is not value rotation | absent |
+| 2 | Give each host only the secrets it consumes | absent |
+| 3 | Never generate key material on a snapshotted/replicated filesystem | absent |
+| 4 | Docker-published ports bypass the NixOS firewall entirely | **partial** |
+| 5 | Scope every firewall rule to an interface | absent |
+| 6 | Put privilege on the unit, not the user | absent |
+| 7 | Never point a root service at a user-writable path | absent |
+| 8 | Keep one backup copy outside any single root's authority | absent |
+| 9 | Verify that `extraConfig` actually takes effect | **partial** |
+| 10 | `AllowTcpForwarding` defaults to `yes`, not `no` | **done** |
+| 11 | Container hardening has no rules at all yet | absent |
+
+So **nine are genuinely new**, and two need finishing rather than
+writing:
+
+- **Rule 10 is done.** Corrected in `6b623c0` as part of wave 2 item
+  2.3. Nothing left.
+- **Rule 9 is scoped to SSH only.** `6b623c0` added the
+  first-directive-wins / verify-with-`sshd -T` guidance *inside* the SSH
+  bullet. The general principle — NixOS modules render their own
+  defaults first, and many config formats are first-directive-wins — is
+  still not stated as a rule of its own.
+- **Rule 4 is on one host, not the fleet.** `bd6db07` wrote it into
+  `hosts/homelab/configuration.nix` as a comment beside the setting it
+  rests on. `docs/hardening.md` has a related but *different* bullet
+  ("Forwarded/DNAT'd ports get zero protection" from CrowdSec/Anubis/
+  Caddy), which is about rate limiting, not about the packet never
+  reaching `nixos-fw`. The rule still needs stating fleet-wide.
+
+Worth remembering why these are worth writing: most were found
+repeatedly *because* the doc did not say them. Rule 6 is the
+`health-check` `disk`-group finding; rule 9 is why `PermitRootLogin`
+sits inert in `extraConfig` on homelab and vps; rule 4 is why eight
+interface-scoped firewall entries on homelab are decorative.
+
+### Three judgement calls, deliberately left to the user
+
+None was decided, and none should be decided silently:
+
+1. **How much reasoning goes inline.** `docs/hardening.md` is currently
+   a tight 138-line checklist. Eleven rules with full justification
+   could roughly double it and make it less likely to be read — which
+   defeats the purpose. The proposal put to the user was: keep each rule
+   **short and imperative** in `hardening.md`, and leave the *evidence*
+   in this audit directory, linked. Not yet answered.
+2. **Where the threat model lives.** Moving `00-threat-model.md` out of
+   the dated directory makes it a living document but breaks the audit's
+   internal links; copying it duplicates a 
+   long file that will drift. A pointer from `docs/` into the audit copy
+   may be cleanest.
+3. **Accepted risks is a new file, and cannot be finished yet.** Its
+   content depends partly on decisions **D1–D14**, which are still open
+   (see [`user-actions.md`](user-actions.md)). It can be scaffolded now
+   — the structure and the risks whose acceptance is not in question —
+   but not completed.
