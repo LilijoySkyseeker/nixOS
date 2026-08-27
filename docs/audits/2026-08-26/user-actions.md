@@ -185,6 +185,10 @@ remains published and decryptable by any key that was ever a recipient.
       of public revisions holding the byte-identical **currently-live**
       values for all ten:
 
+  **Step-by-step instructions for each of the ten, in order, with the
+  exact commands and what to verify: [`rotation-runbook.md`](rotation-runbook.md).**
+  Work from that; this table is the index.
+
   **This table was rewritten 2026-08-27 — the previous version had two
   errors that would have cost you.** It listed "Backblaze application
   key" (the wrong secret — see #3) and "Samba `android-smb` password",
