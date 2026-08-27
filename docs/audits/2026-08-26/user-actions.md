@@ -17,16 +17,17 @@ the evidence without re-deriving it.
 
 ## 1. Do these first — free, reversible, no decision needed
 
-- [ ] **`chmod 600 ~/.config/sops/age/keys.txt`** on the daily driver.
-      Verified live at **0644**, i.e. world-readable. This file is the
-      editing identity that decrypts all 31 secrets. Nothing depends on
-      the loose mode. *(F-P8-03)*
+- [x] **`chmod 600 ~/.config/sops/age/keys.txt`** on the daily driver.
+      Was **0644**, i.e. world-readable. This file is the editing
+      identity that decrypts all 31 secrets. **Done 2026-08-27 (user).**
+      *(F-P8-03)*
 
-- [ ] **`passwd -S lilijoy` on thinkpad** when it is next online. This is
-      the one verification the audit still owes. Removing
-      `initialPassword = "123456"` in `ba8cd4e` does **not** change an
-      already-set password, so if thinkpad was ever installed with it,
-      the published password is still live there. *(F-P1-03)*
+- [x] **`passwd -S lilijoy` on thinkpad.** **Resolved 2026-08-27 — the
+      user confirms the password is not the published one.** Removing
+      `initialPassword = "123456"` in `ba8cd4e` does not change an
+      already-set password, so this was the one verification the audit
+      still owed; `F-P1-03` is now closed on the live side as well as
+      the config side. *(F-P1-03)*
 
 - [ ] **Test the Wooting keyboard after deploying `d6236cb`.** That
       commit removed `users.users.lilijoy.extraGroups = [ "input" ]` from
@@ -190,13 +191,28 @@ drafted.
 
 ### Decisions blocking specific remediation work
 
-- [ ] **D9 — should KDE Connect, Steam remote play and mDNS keep working
+- [~] **D9 — should KDE Connect, Steam remote play and mDNS keep working
       on the LAN?** Blocks wave 2 item **2.9** (interface-scoping the
-      desktop profile's host-wide firewall openings). If yes, they get
-      scoped to a host-declared LAN interface; if no, they can go
-      `tailscale0`-only or be dropped. Also needs a new per-host
-      LAN-interface option — thinkpad declares no interface names at all
-      — and thinkpad online to test. *(F-P1-04, F-P5-06)*
+      desktop profile's host-wide firewall openings).
+
+      **PARTIALLY ANSWERED 2026-08-27:**
+      - **KDE Connect → tailnet only.** Scope TCP/UDP 1714-1764 to
+        `tailscale0`. Note the nixpkgs `programs.kdeconnect` module opens
+        that range itself with no `openFirewall` toggle, so this needs a
+        `mkForce` on the host-wide list rather than flipping an option.
+      - **Steam remote play → disable.** Drop
+        `remotePlay.openFirewall = true` (`PC.nix:330`) outright, which
+        closes TCP 27036/27037 and UDP 27031-27036. `programs.steam`
+        itself stays enabled; only the in-home-streaming listener goes.
+      - **mDNS → still open.** It is `services.avahi.openFirewall`
+        (`PC.nix:275-279`), and it is there for **network printing** —
+        the Brother printer via `services.printing` + `brlaser` directly
+        above it. Scoping UDP 5353 to the LAN interface keeps printing
+        working; `tailscale0`-only would break it. Pending.
+
+      Still needs a per-host LAN-interface option (thinkpad declares no
+      interface names at all) and thinkpad online to test.
+      *(F-P1-04, F-P5-06)*
 
 - [ ] **D10 — identify what opens UDP 10400/10401.** Evaluated on
       torrent but **not attributable to anything in this repo**. An
@@ -213,13 +229,17 @@ drafted.
       vps's rate limiter, the only control in front of these servers.
 
       Both candidate fixes (binding the publishes to an address, or a
-      `DOCKER-USER` allowlist) close that LAN path. So the question is
-      simply: **do you ever connect to minecraft or factorio from a
-      machine on the LAN, rather than over the tailnet or through vps?**
-      If no, this is a clean fix. If yes, it needs a LAN-scoped
-      exception, which is the same shape as D9. Getting it wrong makes
-      four live game servers unreachable, which is why it is not being
-      guessed at. *(F-P4-02, F-P3-04)*
+      `DOCKER-USER` allowlist) close that LAN path.
+
+      **ANSWERED 2026-08-27 — no.** The user never connects from a LAN
+      machine: game access is over the tailnet, or over the public
+      address through vps. So no LAN-scoped exception is needed and the
+      clean fix applies. The two paths that must keep working are
+      therefore exactly: **wg0 `10.100.0.2`** (public players, DNAT'd by
+      vps) and **`tailscale0`** (the user's own devices). Anything on
+      `192.168.1.0/24` should go from working to refused — that is the
+      intended, verifiable behaviour change.
+      **Unblocks wave 2 item 2.1.** *(F-P4-02, F-P3-04)*
 
       Already done and needing no decision: the load-bearing dependency
       is now written down in `hosts/homelab/configuration.nix` — the only
