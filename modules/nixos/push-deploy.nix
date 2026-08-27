@@ -63,6 +63,30 @@ in
           description = "systemd OnCalendar spec for the push/switch job — a periodic fallback independent of any onSuccess wiring the caller may also set up.";
         };
 
+        scheduleEnable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Whether the periodic `push-deploy-<hostAttr>` **timer** is
+            installed. False keeps the service defined and manually
+            startable (`systemctl start push-deploy-vps`) — which is how
+            the target gets deployed by hand — while stopping it
+            happening on a schedule.
+
+            Note this only governs the timer. If the caller also wires
+            this unit into `myAutoUpdate.onDeployUnits`, it still runs
+            after a real activation of the *deploying* host; disabling
+            that host's own schedule is what stops the chain.
+
+            The timer is removed rather than merely un-wanted, so a
+            `switch` actually stops a running timer instead of leaving it
+            armed until the next reboot.
+
+            Currently false fleet-wide — see TODO.md's "rebuild the
+            update/build/deploy pipeline properly".
+          '';
+        };
+
         minSwitchInterval = lib.mkOption {
           type = lib.types.ints.positive;
           default = 7 * 24 * 60 * 60;
@@ -141,17 +165,35 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
-            # this unit runs `nixos-rebuild switch`/`boot` against a remote
+            # This unit runs `nixos-rebuild switch`/`boot` against a remote
             # target, not this machine — no local system activation happens
-            # here, so unlike pull-deploy/auto-switch this genuinely could
-            # be sandboxed further, but ReadOnlyPaths on ${cfg.flakeDir}
-            # plus NoNewPrivileges is enough for now given it doesn't touch
-            # this machine's own kernel/units at all.
+            # here, so unlike pull-deploy/auto-switch the carve-out in
+            # docs/hardening.md does not apply to it and it genuinely
+            # should be sandboxed further. It is not, and NoNewPrivileges
+            # is all it has (F-P7-06).
+            #
+            # This comment used to claim "ReadOnlyPaths on ${cfg.flakeDir}
+            # plus NoNewPrivileges is enough for now". That was false in
+            # both halves: no ReadOnlyPaths was ever set, and none could
+            # be, because the unit's first action is fetch_and_merge_master
+            # which *writes* to flakeDir. Corrected rather than left to
+            # have a future reader budget for a control that never existed.
+            #
+            # Still to do: the full stack, with ProtectHome off (git and
+            # ssh read /root) and ReadWritePaths covering flakeDir,
+            # /root/.ssh and /root/.cache. Deliberately not done blind:
+            # `nixos-rebuild --target-host` shells out to ssh and
+            # nix-copy-closure, and PrivateTmp plus ProtectSystem=strict
+            # can break the SSH control-master socket path and nix's
+            # fetcher cache. A wrong guess here means vps silently stops
+            # updating, which nothing currently alerts on (F-P7-09's
+            # skipped-deploy half is still open), so it needs a real
+            # remote-target test rather than a build.
             NoNewPrivileges = true;
           };
         };
 
-        systemd.timers."push-deploy-${cfg.hostAttr}" = {
+        systemd.timers."push-deploy-${cfg.hostAttr}" = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.dates;

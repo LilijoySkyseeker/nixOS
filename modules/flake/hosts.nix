@@ -23,6 +23,7 @@ in
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."health-alerts"
       ];
     };
     #==================================================
@@ -42,6 +43,7 @@ in
         nixosModules."iso-autobuild"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."health-alerts"
       ];
     };
     #==================================================
@@ -61,6 +63,7 @@ in
         nixosModules."health-alerts"
         nixosModules."push-deploy"
         nixosModules."zrepl"
+        nixosModules."docker-publish-guard"
         nixosModules.jellyfin
         nixosModules.minecraft
         nixosModules.factorio

@@ -379,12 +379,7 @@ in
       {
         destination = "10.100.0.2:34197";
         proto = "udp";
-        sourcePort = 34197; # old.factorio
-      }
-      {
-        destination = "10.100.0.2:34198";
-        proto = "udp";
-        sourcePort = 34198; # new.factorio
+        sourcePort = 34197; # factorio
       }
     ];
   };
@@ -394,11 +389,10 @@ in
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
 
-    # crowdsec-firewall-bouncer.service is After=/PartOf=firewall.service, so it always
-    # creates this ipset *after* we get here — pre-create it (idempotent, matches the
-    # bouncer's own params exactly) so referencing it below doesn't fail on every boot
-    ${pkgs.ipset}/bin/ipset create -exist crowdsec-blacklists-0 hash:net family inet \
-      hashsize 1024 maxelem 131072 timeout 300
+    # NOTE: the two `ipset create` calls that used to live here have moved
+    # to systemd.services.crowdsec-ipset-precreate below (F-P2-02). They
+    # must not run in this script — see that unit's comment for why an
+    # `ipset` failure here took the whole packet filter down, fail-open.
 
     # per-source-IP rate limiting on forwarded game ports (DNAT bypasses anubis/crowdsec)
     iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
@@ -409,7 +403,11 @@ in
     # traffic too — it never reaches INPUT/CROWDSEC_CHAIN, so this reuses the bouncer's own
     # ipset instead of duplicating ban logic. Must come first in the chain: banned IPs get
     # dropped before spending any hashlimit budget below.
-    iptables -t raw -A vps-ratelimit -m set --match-set crowdsec-blacklists-0 src -j DROP
+    # `|| true` is load-bearing: this rule fails with "Set ... doesn't exist"
+    # if the pre-create unit did not run or failed, and an unguarded failure
+    # here aborts the firewall script before it arms the filter (F-P2-02).
+    # Degrading the ban layer is survivable; losing the firewall is not.
+    iptables -t raw -A vps-ratelimit -m set --match-set crowdsec-blacklists-0 src -j DROP || true
 
     # minecraft: cap new-connection attempts per source IP
     iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
@@ -426,11 +424,6 @@ in
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
 
-    # new.factorio: same as old.factorio
-    iptables -t raw -A vps-ratelimit -p udp --dport 34198 \
-      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
-      --hashlimit-mode srcip --hashlimit-name factorio-new-flood -j DROP
-
     # base rate limit for caddy's public HTTP(S) entry (80/443)
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
@@ -445,22 +438,127 @@ in
     # ipset the bouncer maintains automatically), this just closes the gap for
     # the pre-CrowdSec burst/flood layer. Game ports are deliberately not
     # mirrored here — they're still IPv4-only (see TODO.md).
-    ${pkgs.ipset}/bin/ipset create -exist crowdsec6-blacklists-0 hash:net family inet6 \
-      hashsize 1024 maxelem 131072 timeout 300
-
+    # (crowdsec6-blacklists-0 is pre-created by the same unit as its v4 twin)
     ip6tables -t raw -N vps-ratelimit 2>/dev/null || ip6tables -t raw -F vps-ratelimit
     ip6tables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
       || ip6tables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
 
-    ip6tables -t raw -A vps-ratelimit -m set --match-set crowdsec6-blacklists-0 src -j DROP
+    # same reasoning as the v4 rule above: fail soft, never take the filter down
+    ip6tables -t raw -A vps-ratelimit -m set --match-set crowdsec6-blacklists-0 src -j DROP || true
 
     ip6tables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
       --hashlimit-mode srcip --hashlimit-name http-new6 -j DROP
   '';
 
-  # narrow tailscale routing to "client", this box isn't an exit node/subnet router
-  services.tailscale.useRoutingFeatures = lib.mkForce "client";
+  # Tear down the raw-table chain this host adds in extraCommands above.
+  #
+  # The NixOS firewall's own stop path only reaches the nat and filter tables
+  # (extraStopCommands is non-empty already, but it is the nat module's
+  # flushNat), so without this the vps-ratelimit chain and its PREROUTING
+  # jump survive `systemctl stop firewall` (F-P2-02). Two consequences, both
+  # bad in a debugging session: raw-table DROP rules keep applying on a box
+  # you believe you have just unfirewalled, and the chain persists across a
+  # parameter change rather than being rebuilt from scratch.
+  #
+  # Every line is guarded. extraStopCommands is spliced into a `-e` script
+  # exactly like extraCommands is, and a stop path that aborts halfway
+  # through leaves a *partially* torn-down firewall, which is worse than one
+  # that skips a rule it could not find.
+  networking.firewall.extraStopCommands = ''
+    iptables -t raw -D PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null || true
+    iptables -t raw -F vps-ratelimit 2>/dev/null || true
+    iptables -t raw -X vps-ratelimit 2>/dev/null || true
+    ip6tables -t raw -D PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null || true
+    ip6tables -t raw -F vps-ratelimit 2>/dev/null || true
+    ip6tables -t raw -X vps-ratelimit 2>/dev/null || true
+  '';
+
+  # Pre-create CrowdSec's ipsets, out of the firewall's own start script.
+  #
+  # These two `ipset create` calls used to sit in
+  # networking.firewall.extraCommands, which was fail-OPEN on the one
+  # internet-facing host in the fleet (F-P2-02). NixOS renders the firewall
+  # start script with `#! ${runtimeShell} -e` and splices extraCommands in
+  # *immediately before* the `ip46tables -A INPUT -j nixos-fw` that actually
+  # arms the filter. Any non-zero exit in between and that jump is never
+  # installed: no INPUT filtering at all. On a reload it is worse, because
+  # reloadScript falls back to stopScript, which removes the jump and the
+  # rpfilter hook outright. sshd binds 0.0.0.0:22 here and the packet filter
+  # is the *only* thing keeping port 22 off the public internet
+  # (services.openssh.openFirewall = false is not an sshd setting), so the
+  # blast radius of one failed `ipset create` was OpenSSH pre-auth exposed
+  # to the internet, plus the loss of the rate limiter and the DNAT rules.
+  #
+  # `-exist` does not save it. ipset(8) only suppresses the error when the
+  # setname *and the create parameters* are identical, and those parameters
+  # are pinned by nothing: nixpkgs' crowdsec-firewall-bouncer module sets
+  # only the set names, and ipset_type/ipset_size/timeouts/the -N suffix all
+  # come from cs-firewall-bouncer's own defaults. A nixpkgs bump that moves
+  # that package -- or one ipset made by hand while troubleshooting -- turned
+  # the next firewall reload into a total loss of the firewall. (Checked live
+  # 2026-08-27: the running sets do still match these parameters exactly.)
+  #
+  # As its own unit, that failure is contained *and* visible: the firewall
+  # comes up regardless, and this lands in `systemctl --failed`, which
+  # myHealthAlerts already pages on. That visibility is the reason this is a
+  # unit rather than just `|| true` on the original lines -- `|| true` alone
+  # would have made the firewall succeed silently and told nobody the ban
+  # layer had gone missing.
+  #
+  # Deliberately ordered Before= firewall.service but NOT RequiredBy/PartOf
+  # it: the firewall must never be able to fail because of this. Before= only
+  # orders the two when both are already in the same transaction, which they
+  # are at boot via multi-user.target.
+  systemd.services.crowdsec-ipset-precreate = {
+    description = "Pre-create CrowdSec's ipsets before the firewall references them";
+    before = [ "firewall.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "crowdsec-ipset-precreate" ''
+        set -eu
+        ipset=${pkgs.ipset}/bin/ipset
+        "$ipset" create -exist crowdsec-blacklists-0 hash:net family inet \
+          hashsize 1024 maxelem 131072 timeout 300
+        "$ipset" create -exist crowdsec6-blacklists-0 hash:net family inet6 \
+          hashsize 1024 maxelem 131072 timeout 300
+      '';
+      # ipset speaks netlink to netfilter; CAP_NET_ADMIN is the whole need.
+      AmbientCapabilities = [ "CAP_NET_ADMIN" ];
+      CapabilityBoundingSet = [ "CAP_NET_ADMIN" ];
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      # ProtectKernelModules is safe here only because the modules are
+      # declared in boot.kernelModules below. Creating a hash:net set
+      # otherwise relies on the kernel autoloading ip_set_hash_net at
+      # create time, which is exactly the kind of implicit dependency that
+      # should not sit between this host and a working packet filter.
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      PrivateTmp = true;
+    };
+  };
+  # Load ipset's modules at boot rather than relying on autoload from inside
+  # the sandboxed unit above. Names confirmed against the live host
+  # (`lsmod`): ip_set is the core, ip_set_hash_net backs the hash:net type
+  # both CrowdSec sets use.
+  boot.kernelModules = [
+    "ip_set"
+    "ip_set_hash_net"
+  ];
+
+  # tailscale routing: nothing needed here any more. This box isn't an exit
+  # node or a subnet router, and "client" is now the fleet-wide default in
+  # modules/profiles/default.nix rather than something each host has to
+  # remember to opt out of -- so the mkForce override that used to sit here
+  # is redundant. homelab is the only host that overrides it, in the other
+  # direction.
 
   # this box never needs to forward IPv6
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
@@ -474,7 +572,6 @@ in
   };
 
   # caddy: public HTTPS entry point, jellyfin routes through anubis
-  sops.secrets.vps_caddy_env = { }; # TODO: populate with DNS provider API token if using DNS-01 challenges
   # caddy needs group membership to reverse_proxy into anubis's unix socket
   users.users.caddy.extraGroups = [ "anubis" ];
   # anubis's "anubis" group is transient (DynamicUser = true): it only exists
@@ -638,6 +735,46 @@ in
       RemainAfterExit = true;
       Restart = "on-failure";
       RestartSec = "15s";
+
+      # This was the one custom unit in the repo running as unsandboxed
+      # root, on the internet-facing host (F-P2-08). Root is not required:
+      # the script reads /etc/crowdsec/config.yaml (a symlink into the
+      # world-readable store, per the tmpfiles rule below) and talks to
+      # the LAPI using /var/lib/crowdsec/local_api_credentials.yaml, which
+      # is crowdsec-owned. services.crowdsec.user is a real static system
+      # user, not a DynamicUser-only name, so User= can simply be set.
+      User = config.services.crowdsec.user;
+      Group = config.services.crowdsec.group;
+
+      # ReadWritePaths is a deliberate departure from F-P2-08's proposed
+      # fix, which claimed strict needs none because "the allowlist lives
+      # in CrowdSec's own database via the LAPI". Two pieces of evidence
+      # say otherwise, and the cost of being wrong here is that the
+      # tailnet exemption silently stops applying and CrowdSec starts
+      # banning the admin's own IP -- which is exactly what prompted this
+      # unit in the first place:
+      #   - crowdsec-firewall-bouncer-register just below carries the
+      #     comment "cscli needs to write /var/lib/crowdsec", and grants
+      #     precisely that.
+      #   - the live state dir on vps holds a SQLite crowdsec.db
+      #     (/var/lib/crowdsec/state/crowdsec.db, 0640 crowdsec:crowdsec),
+      #     and cscli reaches the database directly for several
+      #     subcommands rather than going through the LAPI.
+      # Granting it is strictly safer than omitting it: if cscli turns out
+      # not to need the write, nothing is lost.
+      ProtectSystem = "strict";
+      ReadWritePaths = [ "/var/lib/crowdsec" ];
+
+      NoNewPrivileges = true;
+      ProtectHome = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      PrivateTmp = true;
+      CapabilityBoundingSet = [ "" ];
+
       ExecStart = pkgs.writeShellScript "crowdsec-allowlist-tailnet" ''
         set -eu
         cscli=${config.services.crowdsec.package}/bin/cscli
@@ -735,6 +872,24 @@ in
     webhookUrlFile = config.sops.secrets.vps_discord_webhook.path;
     checkZfs = false;
     checkSmart = false;
+    # This host does not deploy itself — homelab builds its closure and
+    # pushes it (myPushDeploy). So "homelab silently stopped updating me" is
+    # invisible from here *and* from homelab, whose push-deploy-vps exits 0
+    # when a guard defers it. The profile symlink's mtime is the one signal
+    # that lives on the right side of that link: it only advances when this
+    # host actually got activated.
+    #
+    # This is not hypothetical. push-deploy-vps failed on 2026-08-25 (the
+    # vps-deploy forced-command allowlist rejected its `stat`) and again on
+    # 2026-08-27 (read-only git config); the second entered systemctl
+    # --failed on homelab, but a run the *guards* skip never would.
+    #
+    # 504h = 21 days, matching homelab's own entry — dates is weekly and
+    # minSwitchInterval is 7 days, giving a 14-day normal ceiling plus one
+    # deferral of slack.
+    staleMarkerFiles = {
+      "/nix/var/nix/profiles/system" = 504;
+    };
   };
 
   # this box has no real block devices for smartd to monitor

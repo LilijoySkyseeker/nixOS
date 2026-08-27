@@ -36,8 +36,82 @@
   };
 
   # docker settings
+  #
+  # SECURITY-LOAD-BEARING, which it does not look like.
+  #
+  # A docker-published port bypasses the NixOS firewall entirely: a bare
+  # `-p` binds 0.0.0.0 and makes docker DNAT in nat/PREROUTING before the
+  # routing decision, so the packet is forwarded and never traverses
+  # nixos-fw in INPUT. The pinned oci-containers module says so in its
+  # own option docs ("Publishing a port bypasses the NixOS firewall"),
+  # and networking.firewall.filterForward = false means NixOS does not
+  # manage FORWARD either. So the interface-scoped tailscale0/wg0 rules
+  # in modules/services/{minecraft,factorio}.nix cannot constrain the
+  # published game ports -- they render, and they do nothing (F-P4-02).
+  # That left those ports reachable from anything on 192.168.1.0/24.
+  #
+  # RESOLVED 2026-08-27 by myDockerPublishGuard below, which adds the
+  # DOCKER-USER allowlist. The published ports are now filtered in
+  # FORWARD, where DNAT'd traffic actually goes, rather than in INPUT,
+  # where it never arrives. The LAN path is closed; the wg0 and
+  # tailscale0 paths are unchanged.
+  #
+  # The IPv6 half is the part still live, and it is why this comment
+  # stays. What keeps these ports off the *internet* is narrower than it
+  # looks: this host's LAN NIC carries a real globally-routable
+  # ISP-delegated IPv6 address, and the only thing stopping the game
+  # servers being directly internet-reachable on it is docker's default
+  # of not enabling IPv6 for containers -- `ipv6` is unset in these
+  # settings, and userland-proxy = false (below, added as a performance
+  # tweak) removes the userland proxy whose dual-stack listener
+  # historically caused exactly this. Verified live 2026-08-26:
+  # `ip6tables -t nat -S` matched nothing for any published port, and
+  # every listener was bound by dockerd on 0.0.0.0 with none on ::.
+  #
+  # The guard is IPv4-only for the same reason -- docker's ip6tables
+  # chains do not exist while container IPv6 is off, so an ip6tables rule
+  # would have nothing to attach to. Do not set `ipv6 = true` here, and
+  # do not restore userland-proxy, without extending the guard to
+  # ip6tables first. Either change silently converts a LAN exposure into
+  # an internet one.
   virtualisation.docker.daemon.settings = {
     userland-proxy = false;
+  };
+
+  # Make the intent that modules/services/{minecraft,factorio}.nix
+  # already declare actually true. Those files scope the game ports to
+  # tailscale0 and wg0 via networking.firewall.interfaces, which reads
+  # correctly and constrains nothing for a published port (F-P4-02);
+  # this is the same policy expressed where it can take effect.
+  #
+  # D13, answered 2026-08-27: the user never reaches these servers from a
+  # LAN machine — only over the tailnet, or over the public address,
+  # which arrives here as wg0 traffic DNAT'd by vps. So there is no LAN
+  # exception to carve out, and anything on 192.168.1.0/24 should go from
+  # working to refused.
+  myDockerPublishGuard = {
+    enable = true;
+    allowedInterfaces = [
+      "wg0" # public players, DNAT'd in by vps (its networking.nat.forwardPorts)
+      "tailscale0" # our own devices
+    ];
+    ports = [
+      {
+        port = 25565;
+        protocol = "tcp";
+        comment = "minecraft: java edition";
+      }
+      {
+        port = 19132;
+        protocol = "udp";
+        comment = "minecraft: geyser bedrock listener";
+      }
+      {
+        port = 34197;
+        protocol = "udp";
+        comment = "factorio";
+      }
+    ];
   };
 
   # oci containers
@@ -77,7 +151,15 @@
 
   # directory permissions
   systemd.tmpfiles.rules = [
-    "d /srv 0770 - root root -"
+    # Fields are: type path mode user group age [argument]. This previously
+    # read "d /srv 0770 - root root -", which puts "-" in the user field and
+    # shifts everything right, landing "root" in the *age* field --
+    # systemd-tmpfiles rejects the whole line with "Invalid age 'root'" and
+    # carries on, so /srv was silently left at its default 0755 for the
+    # entire life of this config. That matters because /srv holds factorio's
+    # server directories (which contain the account token and game password)
+    # and jellyfin's config, so they were world-readable throughout.
+    "d /srv 0770 root root -"
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
@@ -287,6 +369,32 @@
     # switch-to-configuration restarts any unit whose definition changed, so
     # a same-cycle switch would kill it mid-run. Defer instead (see TODO.md).
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
+    # DISABLED 2026-08-27, deliberately and temporarily. Removes both the
+    # flake-update-test and auto-switch timers; the services stay, so
+    # `systemctl start auto-switch-now` is still the manual deploy path.
+    #
+    # Two reasons. There is active development, so these hosts are being
+    # deployed by hand anyway — the scheduled path buys nothing right now
+    # while carrying every risk in the D11 analysis. And the pipeline is
+    # being rebuilt rather than patched (TODO.md, "rebuild the
+    # update/build/deploy pipeline properly"), so leaving the old shape
+    # armed would mean maintaining something already known to be wrong.
+    #
+    # This also stops D11 firing on its own: flake-update-test can no
+    # longer auto-merge to master unattended. It does NOT answer D11 —
+    # the decision is deferred into the project, not made.
+    #
+    # RE-ENABLE with the new pipeline, not before. The safety net for
+    # being disabled is myHealthAlerts' staleness check on
+    # /nix/var/nix/profiles/system: if the fleet stops being deployed,
+    # it says so within three weeks rather than never.
+    scheduleEnable = false;
+    # Replaces `systemd.services.auto-switch.onSuccess`, which fired this
+    # on a *skipped* switch too — observed live 2026-08-25T13:18:15, where
+    # the min-interval guard deferred the switch and systemd started the
+    # vps closure build 0 seconds later anyway. This only fires after a
+    # real activation (F-P7-09).
+    onDeployUnits = [ "push-deploy-vps.service" ];
   };
 
   # vps builds nothing itself anymore (myPullDeploy removed there — a
@@ -304,13 +412,21 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
+    # Disabled with the rest of the fleet's schedules, 2026-08-27 — see
+    # myAutoUpdate above. The unit remains, so `systemctl start
+    # push-deploy-vps` is still how vps gets deployed by hand.
+    #
+    # Belt and braces: onDeployUnits below would only fire this after a
+    # real auto-switch activation, and auto-switch no longer has a timer,
+    # so the chain is already dead. Disabling the periodic fallback too
+    # means there is exactly one way vps gets deployed right now, and it
+    # is a human.
+    scheduleEnable = false;
     # dates left at its default (Thu 03:15) as a periodic fallback —
     # the onSuccess wiring below is the primary trigger, right after
     # homelab's own myAutoUpdate switch, so this reuses the same
     # already-vetted master checkout instead of racing/duplicating it.
   };
-  systemd.services.auto-switch.onSuccess = [ "push-deploy-vps.service" ];
-
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
@@ -346,6 +462,22 @@
     # worst-case 1-week run before alerting on a missed/stuck run.
     staleMarkerFiles = {
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 336;
+      # F-P7-09's skipped-deploy half. A *failed* auto-switch already pages
+      # via the failed-units check (confirmed working: the 2026-08-27 03:00
+      # read-only-git-config failure did enter systemctl --failed). A
+      # *skipped* one does not — the guards exit 0 — so a host that defers
+      # every week, or whose timer stops firing, drifts silently forever.
+      # This watches the outcome instead: the profile symlink's mtime is the
+      # last real activation by any route, scheduled or manual.
+      #
+      # 504h = 21 days. The normal ceiling is 14: switchDates is weekly and
+      # minSwitchInterval is 7 days, so a deploy on day 0 defers the day-7
+      # run and lands on day 14. 21 allows one further deferral for the
+      # protectedUnits restic run (weekly, and able to run for days), which
+      # is the realistic third week. Tighten once there is real cadence data
+      # — a threshold this loose still turns "silently stopped deploying"
+      # from never-detected into detected-within-three-weeks.
+      "/nix/var/nix/profiles/system" = 504;
     };
   };
 
@@ -401,11 +533,22 @@
   };
   networking.hostId = "e0019fd8";
 
-  # tailscale: advertise the LAN subnet and act as an exit node
-  boot.kernel.sysctl = {
-    "net.ipv4.ip_forward" = 1;
-    "net.ipv6.conf.all.forwarding" = 1;
-  };
+  # tailscale: advertise the LAN subnet and act as an exit node.
+  #
+  # This is the one host in the fleet that genuinely routes, so it opts back
+  # in to the forwarding features that modules/profiles/default.nix now
+  # withholds by default. Keep this and the profile default in sync: if this
+  # mkForce is ever dropped while the advertise flags below stay, the exit
+  # node and the 192.168.1.0/24 subnet route silently stop working -- that
+  # failure is visible in `tailscale status`, not in a build.
+  services.tailscale.useRoutingFeatures = lib.mkForce "both";
+  # The explicit net.ipv4.ip_forward / net.ipv6.conf.all.forwarding sysctls
+  # that used to sit here are gone: the tailscale module already sets both
+  # (at mkOverride 97) whenever useRoutingFeatures is "both", so they were
+  # redundant restatements of something the option above controls. They are
+  # removed in the same commit as the profile-default inversion deliberately
+  # -- removing them first, while the default was still "both", would have
+  # been a no-op that quietly became load-bearing later.
   services.tailscale.extraUpFlags = lib.mkAfter [
     "--advertise-routes=192.168.1.0/24"
     "--advertise-exit-node"

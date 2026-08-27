@@ -15,13 +15,37 @@
   # `config` shadows the flake-parts one (see docs/architecture.md's
   # "config shadowing" gotcha).
   flake.deployGuardsScript = ''
+    # Supply safe.directory per-invocation instead of writing it into
+    # git's global config.
+    #
+    # A service running as root against a user-owned flakeDir (e.g.
+    # myPullDeploy on a PC host, ~lilijoy/dotfiles) otherwise hits git's
+    # "dubious ownership" refusal on every git command.
+    #
+    # This was `git config --global --add safe.directory "$(pwd)"`, which
+    # broke every scheduled deploy on the fleet: root's
+    # ~/.config/git/config is a home-manager symlink into the nix store,
+    # git writes its lockfile beside the target, and the store is
+    # read-only. So the guard died on its very first line with "could not
+    # lock config file ...: Read-only file system", taking auto-switch and
+    # push-deploy-vps with it -- silently, for two days, because a guard
+    # failure is not something anything watches (F-P7-09). Writing to a
+    # dotfile that another part of the system owns declaratively was the
+    # underlying mistake; not writing at all is the fix.
+    #
+    # `-c` is "command" scope, which git-config(1) SCOPES counts as
+    # *protected* configuration, and safe.directory is only honoured in
+    # protected scopes -- so this genuinely applies where a repo-local
+    # value would be silently ignored. Verified against git's own docs
+    # rather than assumed.
+    #
+    # Wrapped as a function rather than added to each call site because
+    # the consumers of this fragment run ~19 git commands between them:
+    # patching call sites means a later one silently misses the flag and
+    # reintroduces this. `command git` avoids recursing into the wrapper.
+    git() { command git -c safe.directory="$PWD" "$@"; }
+
     require_clean_master() {
-      # a service running as root against a user-owned flakeDir (e.g.
-      # myPullDeploy on a PC host, ~lilijoy/dotfiles) otherwise hits git's
-      # "dubious ownership" refusal on every run -- idempotent, harmless
-      # to repeat, and scoped to $PWD (the caller has already cd'd into
-      # flakeDir before sourcing this).
-      git config --global --add safe.directory "$(pwd)"
       if [ -n "$(git status --porcelain)" ]; then
         echo "Working tree dirty, skipping this scheduled run."
         exit 0
@@ -57,6 +81,31 @@
     # switch (/nix/var/nix/profiles/system's mtime, local or remote).
     check_min_switch_interval() {
       local min_seconds="$1" last_switch_epoch="$2" now elapsed
+      # $2 is NOT necessarily local: myPushDeploy feeds it from
+      # `ssh <targetHost> stat -c %Y /nix/var/nix/profiles/system`, so its
+      # value is whatever the *remote* host chose to print. Bash evaluates
+      # arithmetic operands recursively, and an array-subscript payload of
+      # the form `x[$(...)]` runs a command substitution inside $(( )) --
+      # so passing this straight into arithmetic gave a compromised target
+      # host code execution as root on the deployer, reversing the one
+      # direction of that relationship the threat model treated as a
+      # boundary. Reject anything that is not a plain decimal integer
+      # before it reaches arithmetic context.
+      #
+      # This fails CLOSED (exit 1), unlike the skip-guards below which
+      # deliberately exit 0: a non-numeric timestamp means the target is
+      # either broken or lying, and neither is a reason to carry on.
+      # NB: the empty-string pattern below is written with double quotes
+      # rather than the more idiomatic pair of single quotes. This whole
+      # fragment lives inside a Nix indented string, and a bare pair of
+      # single quotes terminates that string -- including inside what looks
+      # to a reader like a shell comment.
+      case "$last_switch_epoch" in
+        "" | *[!0-9]*)
+          echo "Refusing non-numeric last-switch timestamp from target: [$last_switch_epoch]" >&2
+          exit 1
+          ;;
+      esac
       now=$(date +%s)
       elapsed=$(( now - last_switch_epoch ))
       if [ "$elapsed" -lt "$min_seconds" ]; then

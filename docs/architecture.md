@@ -52,6 +52,30 @@ key:
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
 | `isoimage` | unstable | `copyparty-iso` |
 
+### Which nixpkgs a host tracks
+
+**The rule: servers track `nixpkgs-stable`, PCs track
+`nixpkgs-unstable`.** Servers want boring and predictable — they run
+unattended, they hold the data, and a surprise version bump on them is
+a problem in a way it is not on a desktop. The PCs are where new
+packages are actually wanted, and a human is sitting in front of them
+when something breaks.
+
+**Known deviation: `vps` is on unstable and should be on stable.** It is
+a server and the only host with a public interface, so it belongs on
+the stable branch with `homelab`. It is not there, and moving it is an
+open `TODO.md` item — check it before assuming the table above reflects
+the intent.
+
+This rule was written down on 2026-08-27 because it existed nowhere:
+it had to be inferred from the table above, and inferring it from the
+code gives the *wrong* answer, since `vps` contradicts it. That is
+likely how `vps` drifted in the first place. It also has a second-order
+effect worth knowing — `flake-update-test`'s auto-merge gate builds only
+`homelab`, so it only ever exercises `nixpkgs-stable`; the more hosts
+that legitimately sit on stable, the more of the fleet that gate covers
+(see `docs/audits/2026-08-26/D11-analysis.md` §2).
+
 `homelab`'s stable pin still means the same thing it always did: a module
 option that exists in unstable may not exist yet in the pinned stable
 release. `modules/flake/hosts.nix` handles this the same way `flake.nix`

@@ -68,10 +68,19 @@ generally use it directly:
   (`command="...",restrict` in `authorizedKeys`) that allows exactly
   three things: copying a built closure in, activating it via
   `switch-to-configuration switch`, and rebooting if the switch
-  changed the kernel. The forced-command allowlist is the actual
-  security boundary, not the account's polkit grant (which is
-  necessarily coarse — see `hosts/vps/configuration.nix`'s comment on
-  why).
+  changed the kernel.
+- **This is not a security boundary, and this doc used to claim it
+  was.** The 2026-08-26 audit checked the dispatcher itself and found
+  it sound — no injection, no `set -eu` gap, it cannot yield a shell,
+  `restrict` verified against OpenSSH 10.4p1 (`F-P2-10`). Root arrives
+  anyway, by the other half: the account's polkit grant covers
+  `StartTransientUnit` via the run0 shim, which is "run anything as
+  root" (`F-P8-13`). So the allowlist bounds *shells and accidents*,
+  not privilege, and **homelab → root on vps is by design**
+  (`F-P0-02`). Treat the two hosts as one blast radius. See
+  `hosts/vps/configuration.nix`'s comment, and
+  [`docs/audits/2026-08-26/findings.md`](../audits/2026-08-26/findings.md)
+  H5.
 - It can never get an interactive shell, regardless of what shell is
   configured for it — the SSH key itself can't request anything other
   than the forced command.

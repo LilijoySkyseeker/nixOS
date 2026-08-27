@@ -16,5 +16,20 @@
         pkgs = config.flake.pkgsUnstable;
         zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
       };
+
+      checks.docker-publish-guard = import ../../tests/docker-publish-guard.nix {
+        pkgs = config.flake.pkgsUnstable;
+        dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
+      };
+
+      checks.deploy-guards = import ../../tests/deploy-guards.nix {
+        pkgs = config.flake.pkgsUnstable;
+        deployGuardsScript = config.flake.deployGuardsScript;
+      };
+
+      checks.deploy-chain = import ../../tests/deploy-chain.nix {
+        pkgs = config.flake.pkgsUnstable;
+        autoUpdateModule = config.flake.modules.nixos."auto-update";
+      };
     };
 }

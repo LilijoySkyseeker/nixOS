@@ -13,6 +13,7 @@ them rot.
 
 ## Active
 
+
 - [ ] **2026-08-27: decide what to do with the 9 branches left after the
       merged-worktree prune — 6 of them exist only on this machine and
       are one `rm -rf` away from being lost.** A cleanup pass removed 34
@@ -48,46 +49,851 @@ them rot.
       vs. rebase vs. abandon per branch, rather than discovering a gap
       after something is already gone.
 
-- [ ] **2026-08-26: do a full security audit / hardening pass on
-      homelab.** Triggered by the IPv6 review above: homelab's LAN NIC
-      turned out to already carry a real, globally-routable public IPv6
-      address (ISP RA-delegated), which quietly changes the risk model
-      for every host-wide (non-interface-scoped) firewall rule on that
-      box — a class of gap that was invisible under IPv4-only CGNAT.
-      sshd/jellyfin/minecraft/factorio's host-wide exposure is fixed,
-      deployed, and reboot-verified (`f93ca49`, `deaf882`, `9134a47`,
-      `0a774e5` — see `docs/DONE.md`). This item is for a broader pass
-      beyond just those: audit homelab as a whole (not just
-      IPv6-triggered findings) — every `networking.firewall.
-      allowedTCPPorts`/`allowedUDPPorts`/`openFirewall` use, docker
-      container hardening (capabilities, read-only rootfs, network
-      exposure — minecraft.nix/factorio.nix already do this carefully,
-      worth checking the rest got the same treatment), systemd
-      hardening completeness across all of homelab's services (some
-      services have detailed hardening comments, e.g. jellyfin/samba/
-      nfs — confirm nothing was missed elsewhere), and whether anything
-      else assumes "this box has no real public address" the way
-      sshd/jellyfin did. Not started. Also fold in, surfaced while
-      working the sshd/jellyfin fix:
-      - `modules/profiles/PC.nix` sets `remotePlay.openFirewall = true`
-        (Steam Remote Play) host-wide for thinkpad/torrent — same
-        host-wide-rule pattern as the homelab findings above, though
-        lower urgency since these are laptops that roam between
-        networks rather than a fixed server always on one known
-        network; worth auditing whether that roaming actually makes it
-        *worse* (an unknown network's own IPv6/NAT posture is far less
-        predictable than a home ISP's).
-      - homelab currently has no intrusion detection at all (no
-        CrowdSec/fail2ban, unlike vps) — fine today since access is
-        gated entirely by tailscale's own device authorization (ACLs/
-        key approval) rather than exposed ports, but worth an explicit
-        decision on whether that trust boundary is sufficient long-term
-        or whether basic protections belong at the homelab layer too.
-      - `bootctl` warns on every boot that `/boot`'s mount point and its
+- [ ] **PROJECT: rebuild the update/build/deploy pipeline properly.**
+      Scoped 2026-08-27 out of the D11 analysis
+      (`docs/audits/2026-08-26/D11-analysis.md`), which found the
+      current pipeline is not a small fix away from correct — it is the
+      wrong shape. This entry is the design brief. **The goal is to do
+      this right, not to do it cheaply**; it is explicitly allowed to be
+      slow and to change a lot.
+
+      **Status: auto-updates are DISABLED fleet-wide in the meantime**
+      (see the entry below). That is deliberate and temporary — active
+      development means the hosts are getting deployed by hand anyway,
+      so the scheduled path buys nothing right now while carrying all of
+      the risk below. **This project is to be implemented before focused
+      development pauses**, because the moment hand-deploys stop is the
+      moment the fleet silently goes stale.
+
+      ### 1. The problem
+
+      Today one systemd unit on homelab does all three of: fetch new
+      inputs, decide whether they are acceptable, and publish them to
+      the branch every host deploys from. Those are three different
+      jobs with three different trust levels, and collapsing them is
+      what produces every specific defect below.
+
+      Facts, all verified rather than assumed (details and sources in
+      `D11-analysis.md`):
+
+      - **The gate covers 1 of 4 hosts.** `flake-update-test` builds
+        only `.#homelab`, which is the sole host on `nixpkgs-stable`;
+        vps, torrent and thinkpad run `nixpkgs-unstable`. It cannot see
+        breakage in the nixpkgs most of the fleet uses.
+      - **Two inputs are never built at all.** `stylix` and `nvf` are
+        imported only by `profile-pc`, which homelab does not use.
+      - **The repo's five VM tests never run.** The gate is
+        `nixos-rebuild build`, not `nix flake check`, and there is no CI
+        (`.github/` does not exist).
+      - **The update runs on a deploy target**, writing to homelab's
+        `/etc/nixos`. The machine being tested is the machine doing the
+        testing.
+      - **It pushes straight to `master`** — unattended fleet root — with
+        no PR, no diff, no revert point.
+      - **Eleven third-party inputs are tracked at branch HEAD** with no
+        cooldown, versus the two nixpkgs channels which are gated
+        upstream by Hydra.
+      - **Nothing rolls back** a switch that builds fine but leaves a
+        host unreachable.
+      - **All four hosts deploy at `Thu 03:00`** with no randomisation
+        and no reboot window, and homelab — which the laptops
+        NFS/Samba-mount — reboots unconditionally on kernel change.
+
+      ### 2. Target architecture — three stages, deliberately separate
+
+      This is the industry-consensus shape, and upstream nixpkgs is the
+      proof it works unattended: `nixos-unstable` is **not** `master`;
+      it advances only after Hydra's `trunk-combined/tested` job passes.
+      Nobody approves a channel bump — a gate that covers everything
+      shipped does. Copy that principle, not the scale.
+
+      1. **Propose.** Update `flake.lock` on a schedule, **off the
+         deploy targets**, and open a **PR**. Never push to `master`.
+      2. **Gate.** Build **every** host configuration, run `nix flake
+         check` (all VM tests), publish a per-host `nvd` closure diff on
+         the PR. Automerge on green is fine and keeps it unattended —
+         the point is coverage and an audit trail, not a human.
+      3. **Adopt.** Hosts consume the reviewed lock and **never resolve
+         inputs themselves** (`--no-update-lock-file`), so every machine
+         converges on the same package set. Staggered, with a reboot
+         window, and with automatic rollback.
+
+      ### 3. Where the build farm fits — this is the same project
+
+      The reason this is one project and not two: **stage 2 needs
+      somewhere to build all four hosts, and stage 3 needs the results
+      to be cheap to fetch.** That is exactly what the stale
+      `worktree-distributed-build-todo` and `worktree-nix-cache`
+      branches were reaching for.
+
+      The general directions worth keeping from them:
+
+      - **homelab serves a binary cache** (harmonia was the vehicle) so
+        the laptops and vps fetch closures instead of rebuilding them.
+        vps especially — it has ~2 GB RAM and a from-scratch build was
+        measured at ~1.7 GB + swap, which is why it stopped building
+        for itself.
+      - **Distributed builds across the fleet**, with homelab as the
+        primary builder.
+      - **homelab pre-builds the other hosts' closures** to warm the
+        cache before they deploy — which, done in the new shape, *is*
+        stage 2's gate. Building all four hosts stops being an
+        expensive addition and becomes the thing that makes stage 3
+        fast.
+      - **Stagger the fleet's scheduled jobs across the week** rather
+        than firing them together.
+
+      **Treat those branches' actual implementations as suspect.** They
+      predate this audit, were written with less knowledge, and will be
+      redone — take the direction, re-derive the code. Specifically
+      re-check: the cache signing-key model, the builder SSH key model
+      (per-worker vs per-edge), and anything touching host-key
+      verification, since `push-deploy`'s TOFU gap is a known open
+      issue.
+
+      ### 4. Design questions to settle before writing code
+
+      - **Where does the gate run?** GitHub Actions is free for a public
+        repo but has no fleet cache and slow cold builds. homelab has
+        the CPU and the store but is a deploy target. A hybrid —
+        homelab builds and *proposes*, CI verifies — may be right.
+        Decide deliberately; this is the crux.
+      - **Does `master` stay the deploy branch**, or do hosts track a
+        separate `deployed`/`release` ref that only advances when the
+        gate passes? The latter decouples "I pushed work" from "the
+        fleet takes it", which matters given active hand-deploys.
+      - **Cooldown or pinning for the eleven third-party inputs?**
+        Renovate's `minimumReleaseAge` is the ecosystem answer; pinning
+        to tags is the manual equivalent. This is the *only* lever that
+        touches supply-chain risk — no build gate addresses it.
+      - **Rollback mechanism.** `deploy-rs`-style magic rollback
+        (canary + confirm-or-revert on the target) is the reference.
+        Adopting deploy-rs wholesale vs borrowing the confirm-or-revert
+        timer into the existing push/pull modules.
+      - **Signature verification** — D2 and `F-P0-01` option (b). If the
+        fleet auto-adopts a ref, verifying who signed it is the control
+        that makes that safe. Settle alongside, not after.
+      - **Does `vps` move to `nixpkgs-stable` first?** (own entry
+        below). It shrinks the gate's surface and makes stage 2 cheaper.
+
+      ### 5. Definition of done
+
+      - No host resolves flake inputs by itself.
+      - Nothing reaches a deploy target that has not had **its own**
+        configuration built and the VM tests run.
+      - A bad deploy reverts without a human.
+      - Every fleet-wide change has a diff and a revert point.
+      - Losing any single host does not stop the others updating.
+      - `docs/architecture.md` and `docs/procedures/workflow.md`
+        describe the new shape, and the old auto-update entries in this
+        file are moved to `docs/DONE.md`.
+
+      ### 6. Related entries
+
+      The two smaller items below (simultaneous deploys, no automatic
+      rollback) are subsumed by this project — keep them for now as the
+      concrete symptoms, and close them out with it. `vps` →
+      `nixpkgs-stable` is a useful prerequisite. `F-P7-09`'s
+      profile-staleness check (done 2026-08-27) is the safety net that
+      makes disabling the timers survivable: if the fleet stops
+      deploying, `myHealthAlerts` now says so within three weeks.
+
+- [ ] **homelab's `/etc/nixos` has diverged from origin and holds an
+      unpushed auto-update commit.** Found 2026-08-27 while checking
+      gates for the vps deploy. `git rev-list --left-right --count
+      master...origin/master` on homelab returns **1 31** — one
+      local-only commit, thirty-one behind:
+
+          1c2eec5 chore: automated flake.lock update
+
+      That commit **exists nowhere else** — not on origin, not on any
+      branch in the repo (`git log --all --grep` finds nothing, even
+      after a fetch). Working tree is clean.
+
+      **This is `flake-update-test` having actually run.** It bumped
+      `flake.lock`, built successfully, merged to local `master` — and
+      then failed to `git push`, which is exactly `F-P7-10`: that unit
+      had no `openssh` on its `PATH`, so any git operation over SSH
+      fails. The commit has sat there ever since.
+
+      Two things follow, both worth recording:
+
+      - **The audit's evidence for `F-P7-10` was right about the remote
+        and wrong about the machine.** "Not one `chore: automated
+        flake.lock update` commit in the repository's 1371-commit
+        history" is still true of the repo; it was not true of
+        homelab's checkout. The run happened, it just could not
+        publish.
+      - **D11 was closer to firing than documented.** The auto-merge
+        chain works end to end *except* the push, and this branch adds
+        `openssh` to `flake-update-test`'s `path`. On the fixed code
+        that push would have succeeded and it would have auto-merged to
+        `origin/master` unattended. Worth adding to
+        `docs/audits/2026-08-26/D11-analysis.md` when D11 is decided.
+
+      **Also means `auto-switch` was doubly broken.** Even with the
+      read-only-git-config fix, `fetch_and_merge_master` runs
+      `git merge --ff-only origin/master`, which **fails on a diverged
+      branch** — confirmed with `git merge-base --is-ancestor`. So
+      homelab's scheduled deploys would have kept failing after the
+      guard fix, for a second and unrelated reason.
+
+      **Not urgent, and deliberately not fixed by an agent**: the
+      timers are off, so nothing acts on this state. Resolving it means
+      either discarding `1c2eec5` (`git reset --hard origin/master`,
+      which is what `flake-update-test` itself does on every run) or
+      keeping the lock bump deliberately. That is a judgement call on a
+      live host's git state, so it is yours.
+
+- [ ] **The whole fleet deploys at once, with no randomisation and no
+      reboot window.** Surfaced 2026-08-27 while researching D11.
+      `auto-switch` (homelab), `pull-deploy` (torrent, thinkpad) and
+      `push-deploy-vps` all fire at **`Thu 03:00`**-ish, and homelab
+      reboots unconditionally on a kernel change
+      (`reboot-if-kernel-changed`) with no window.
+
+      homelab is the NFS/Samba server the laptops mount, so the
+      worst case is homelab rebooting into a broken generation at the
+      same moment both laptops are mid-deploy against it.
+
+      Upstream's `system.autoUpgrade` has `randomizedDelaySec`,
+      `fixedRandomDelay`, `rebootWindow` and `persistent` for exactly
+      this (verified in the pinned nixpkgs,
+      `nixos/modules/tasks/auto-upgrade.nix`). This repo replaced that
+      module with `modules/nixos/auto-update.nix` and **dropped all of
+      them**. Cheap fix: stagger the `OnCalendar` values and add a
+      reboot window. See `docs/audits/2026-08-26/D11-analysis.md` §7.
+
+- [ ] **Adopt a real deployment tool — `deploy-rs` or equivalent — so a
+      bad change rolls itself back.** Raised from the D11 research and
+      sharpened by the 2026-08-27 deploys, which made the gap concrete
+      rather than theoretical.
+
+      **The problem.** `nixos-rebuild switch --target-host` has no
+      safety net. A change that *builds perfectly* but leaves the host
+      unreachable — a bad firewall rule, a broken sshd, a network
+      change — is unrecoverable except by hand, and on **vps** that
+      means the provider's console. Nothing detects it, nothing
+      reverts it, and the deploying side cannot tell "activated fine"
+      from "activated and fell off the network", because both look like
+      a closed SSH connection.
+
+      **This is not hypothetical here.** vps was deployed on
+      2026-08-27 with changes that rewrote the raw-table firewall
+      chains on a public-facing remote host, including a *new* IPv6
+      PREROUTING chain. It went fine — but the only reason anyone knows
+      that is a human ran ~8 verification commands afterwards
+      (ipsets present, both `vps-ratelimit` chains correct, DNAT right,
+      CrowdSec allowlist intact, site serving over v4 **and** v6).
+      Had it not gone fine, the recovery path was a console login.
+      A deploy where correctness depends on someone remembering to
+      check is not a deploy process.
+
+      **What the tooling buys, in priority order:**
+
+      1. **Confirm-or-revert (the actual point).** `deploy-rs`'s "magic
+         rollback": after activation it writes a canary and reconnects
+         to confirm the host is still reachable; if confirmation never
+         arrives, *the target* rolls itself back on a timer. This is
+         the one feature that makes remote deploys safe, and it must
+         run on the target, since the deployer may be exactly what got
+         cut off.
+      2. **Health checks as a gate**, not as a human checklist — the
+         verification above expressed as code that runs every time.
+      3. **Multi-host orchestration** with per-host success/failure,
+         replacing the current split of `myPushDeploy` (vps) and
+         `myPullDeploy` (laptops) and their duplicated guard logic.
+      4. **A real dry-run/diff step** before activation.
+
+      **Evaluate, do not assume `deploy-rs`.** It is the best-known
+      option for magic rollback, but `colmena` is the other serious
+      contender (better multi-host ergonomics, no equivalent rollback
+      last time this was checked — verify rather than trust that).
+      Weigh adopting a tool wholesale against borrowing just the
+      confirm-or-revert timer into the existing modules: this repo's
+      push/pull modules already carry real logic (the deploy guards,
+      the arithmetic-injection fix, `onDeployUnits`) that should not be
+      thrown away casually.
+
+      **Sequencing.** This belongs to stage 3 ("adopt") of the pipeline
+      project above and should be decided with it, not separately —
+      the same decision about where deploys are driven from determines
+      what tool makes sense. **Highest value on `vps`**: remote,
+      public-facing, push-deployed, and the only host where a mistake
+      costs a console session rather than a walk to the machine.
+
+      References: [deploy-rs](https://github.com/serokell/deploy-rs),
+      [Serokell's write-up](https://serokell.io/blog/deploy-rs),
+      [colmena](https://colmena.cli.rs/), and
+      `docs/audits/2026-08-26/D11-analysis.md` §7.
+
+- [ ] **Move `vps` from `nixpkgs-unstable` to `nixpkgs-stable`.** Raised
+      2026-08-27 while writing the D11 analysis, which surfaced the
+      split: `modules/flake/hosts.nix` builds **homelab** from
+      `nixpkgs-stable` (nixos-26.05) with `home-manager-stable`, but
+      **vps**, **torrent** and **thinkpad** from `nixpkgs-unstable`.
+
+      vps is the other *server*, and the only host with a public
+      interface — it should track the same conservative branch homelab
+      does, not the fast-moving one. Today it takes unstable's churn on
+      the box running Caddy, CrowdSec and the wireguard endpoint, and it
+      is deployed unattended (homelab builds its closure and pushes it).
+
+      Two reasons this is more than tidiness:
+
+      - **It shrinks D11's blast radius directly.** The auto-merge gate
+        builds only homelab, i.e. only `nixpkgs-stable`. Moving vps to
+        stable means two of the four hosts are covered by the input the
+        gate actually tests, instead of one.
+      - vps has ~2GB RAM and builds nothing itself; a stable branch
+        means fewer, smaller rebuilds pushed to it.
+
+      Not a one-liner: check what on vps needs unstable (`copyparty` is
+      isoimage-only, so probably nothing), whether the stable branch has
+      the CrowdSec/Caddy versions in use, and swap `home-manager` for
+      `home-manager-stable` in its `specialArgs` the way homelab does to
+      avoid a version mismatch. Build-verify before deploying, and diff
+      the closure with `nvd` — this changes essentially every package on
+      the host. See `docs/audits/2026-08-26/D11-analysis.md` §2.
+
+      **Write the rule down as part of this.** The intended convention
+      is **servers track `nixpkgs-stable`, PCs track
+      `nixpkgs-unstable`** — servers want boring and predictable, and
+      the desktops are where new packages are actually wanted. That
+      rule currently exists nowhere: it has to be inferred from
+      `modules/flake/hosts.nix`, and inferring it from today's code
+      gives the *wrong* answer, because vps contradicts it. That is
+      probably how vps drifted in the first place, and it is exactly
+      the "durable convention living only in someone's head" case
+      `docs/procedures/updating-documentation.md` exists for.
+
+      **The rule is now written** — `docs/architecture.md`, "Which
+      nixpkgs a host tracks", with vps named as a known deviation
+      pointing back here. Done ahead of the move itself, deliberately:
+      the undocumented convention is the part that keeps costing, and a
+      rule with a named exception beats no rule. What remains here is
+      the actual move, after which that deviation note comes out.
+
+- [ ] **2026-08-26: fleet-wide security hardening audit + "is this
+      still needed?" config review, run as a multi-agent pass.**
+      Originally scoped to homelab only (see trigger below); widened
+      2026-08-26 to cover **every host and every shared module in this
+      repo**, on two axes at once:
+      1. **Hardening.** Conformance to `docs/hardening.md`'s standing
+         rules (dedicated service users, systemd sandboxing, SSH
+         lockdown, no-sudo/run0, swap/secrets, forwarded-port rate
+         limiting), *plus* general security review beyond what that
+         doc already codifies — anything an auditor would flag that
+         we simply never wrote a rule for.
+      2. **Needed/used.** Whether each option, service, package,
+         firewall hole, group membership, and secret is still
+         actually used and still actually justified. Dead config is a
+         security finding here, not just tidiness: an unused
+         `openFirewall`, a group nobody needs, or a service kept
+         "just in case" is attack surface with no owner.
+
+      **Why multi-agent.** ~6.9k lines of Nix across 5 hosts + shared
+      modules + flake infra, and a careful audit needs the pinned
+      nixpkgs source checked per option rather than recalled. That
+      does not fit one agent's context at the depth this deserves, so
+      the config is split into the parts below and a security-audit
+      subagent is dispatched per part, each producing a report to a
+      fixed schema, followed by a consolidation pass.
+
+      **Trigger (original homelab scope, still in force).** homelab's
+      LAN NIC turned out to already carry a real, globally-routable
+      public IPv6 address (ISP RA-delegated), which quietly changes
+      the risk model for every host-wide (non-interface-scoped)
+      firewall rule on that box — a class of gap that was invisible
+      under IPv4-only CGNAT. sshd/jellyfin/minecraft/factorio's
+      host-wide exposure is already fixed, deployed, and
+      reboot-verified (`f93ca49`, `deaf882`, `9134a47`, `0a774e5` —
+      see `docs/DONE.md`). The question this audit answers is what
+      *else*, on any host, assumes "this box has no real public
+      address" the way sshd/jellyfin did.
+
+      ### Phase 0 — threat model (do first, single agent)
+      Write `docs/audits/2026-08-26/00-threat-model.md`: the actual
+      adversaries and trust boundaries, so all eight audits rate
+      severity on the same scale instead of each inventing one. At
+      minimum: the public internet vs. `vps` (only host with a real
+      public IPv4 + listeners); the public internet vs. `homelab`'s
+      RA-delegated IPv6 on the LAN NIC; anything already on the LAN;
+      a tailnet-authorized device (today the *only* gate on most
+      services — is device authorization alone sufficient?); a
+      roaming laptop on an untrusted network (`thinkpad`, `torrent`,
+      whose own IPv6/NAT posture is unpredictable in a way a known
+      home ISP's is not); a compromised backup *source* host (zrepl's
+      pull direction was chosen for exactly this); supply chain via
+      the auto-update/deploy path; and local unprivileged-user → root
+      on the workstations.
+
+      ### Phase 1 — parallel audits (one subagent per part)
+      Each part is coherent enough to audit without the others.
+      Cross-cutting concerns are assigned to exactly one owner to
+      keep findings from being reported eight times.
+
+      - **P1 — shared baseline & profiles.**
+        `modules/profiles/{default,server,PC}.nix` (~635 lines).
+        Highest blast radius: every host inherits this. Owns
+        `networking.firewall.enable`, run0/sudo-alias,
+        `nix.settings.allowed-users`, auditd, and every
+        desktop-profile grant. Already-spotted seeds: `PC.nix:306`
+        `initialPassword = "123456"` on the login user; `PC.nix:289`
+        `services.avahi.openFirewall = true` (host-wide mDNS on
+        roaming laptops); `PC.nix:313` `docker` group on `lilijoy`
+        (docker socket membership is root-equivalent — check whether
+        the podman/`dockerCompat` setup at `PC.nix:113` makes it
+        unnecessary); `PC.nix:320` Steam `remotePlay.openFirewall`
+        host-wide (folded in from the original entry — and audit
+        whether roaming makes it *worse* than the fixed-server case,
+        not better).
+      - **P2 — `vps`, the internet-facing edge.**
+        `hosts/vps/{configuration,disko,hardware-configuration}.nix`
+        (~827 lines). The only host with real public listeners:
+        caddy, anubis, crowdsec + firewall bouncer, fail2ban,
+        wireguard `wg0`, `networking.nat` game-server forwarding and
+        the `firewall.extraCommands` rate limiting that backstops it,
+        cloud-init, GRUB, impermanence. Also owns the `vps-deploy`
+        identity: polkit rule, `nix.settings.trusted-users`, and the
+        `vpsDeployDispatcher` shell script — audit that dispatcher as
+        *hostile input handling*, since it is what a compromised
+        homelab would reach.
+      - **P3 — `homelab`, host config.**
+        `hosts/homelab/{configuration,disko,hardware-configuration}.nix`
+        (~742 lines). restic → Backblaze, docker daemon settings,
+        nvidia/GPU, `systemd.tmpfiles` permissions,
+        networkd-dispatcher, `boot.zfs.extraPools`, the impermanence
+        persist list, sshd. Folded in from the original entry:
+        `bootctl` warns every boot that `/boot`'s mount point and its
         `loader/random-seed` file are world-accessible ("which is a
-        security hole"), surfaced in the 2026-08-26 reboot's journal —
-        minor, but a real finding worth folding into this pass rather
-        than a one-off fix.
+        security hole"), surfaced in the 2026-08-26 reboot journal.
+      - **P4 — services: containers & network shares.**
+        `modules/services/{minecraft,factorio,jellyfin,samba,nfs,
+        copyparty-iso}.nix` (~625 lines). Container capability sets,
+        read-only rootfs, port exposure, share ACLs and auth
+        identities. `minecraft.nix`/`factorio.nix` were done
+        carefully and are the reference standard — confirm the rest
+        got the same treatment. Seed: `copyparty-iso.nix:43` opens
+        3923 host-wide while `:34-37` serves `/` with `A = [ "*" ]`
+        (admin, unauthenticated) — probably deliberate for a recovery
+        ISO, but it needs an explicit written justification rather
+        than an implicit one.
+      - **P5 — workstations: `thinkpad` + `torrent`.**
+        `hosts/thinkpad/*` and `hosts/torrent/*` (~550 lines).
+        Roaming/untrusted-network threat model, interaction with the
+        P1 desktop profile, `PermitRootLogin forced-commands-only`,
+        torrent's own exposure, nvidia.
+      - **P6 — backup & replication.**
+        `modules/nixos/{zrepl,zfs-space-guard,nfs-homelab-mounts}.nix`
+        (~1232 lines) plus homelab's restic jobs by reference. The
+        largest single module and a root-run daemon: audit the
+        `authorized_keys` forced-command boundary, the
+        server-side-fixed identity, the pull-not-push trust
+        direction, `zfs allow` delegations, and what a compromised
+        peer can actually reach.
+      - **P7 — deploy, update & control plane.**
+        `modules/nixos/{auto-update,pull-deploy,push-deploy,
+        iso-autobuild,health-alerts}.nix` (~899 lines),
+        `modules/flake/deploy-guards.nix`, `scripts/bootstrap-host.sh`.
+        This is the "what can cause code to run as root across the
+        fleet" surface — arguably the highest-value target after P2.
+        Audit authn/authz on every trigger path, what is signed or
+        verified vs. merely reachable, and the blast radius of a
+        compromised trigger.
+      - **P8 — supply chain, flake infra, secrets plumbing, user env.**
+        `flake.nix`, `modules/flake/*`, `modules/home-manager/*`
+        (incl. `claude-code.nix`), `modules/nixos/{tooling,kde,
+        virtual-machines,wooting}.nix`, `tests/*`, `files/`. Input
+        pinning and `flake.lock` provenance, substituters/trusted
+        public keys, `nix.settings` across hosts, udev rules, and the
+        **sops wiring** — `secrets/.sops.yaml` key/recipient policy
+        and per-host `sops.secrets` declarations, ownership and mode.
+        Strictly the plumbing: per `docs/procedures/secrets.md`, no
+        agent decrypts or edits `secrets/*`, ever.
+
+      ### Contract every audit subagent follows
+      - **Read-only.** No edits, no rebuilds against live hosts, no
+        `switch`, no secret decryption. Findings only.
+      - **Verify against the pinned nixpkgs**, not recall — what a
+        module option actually does in *this* flake's nixpkgs, since
+        defaults differ by version and that is exactly where a
+        hardening assumption silently fails.
+      - **Apply the Phase 0 threat model** for severity, and state
+        explicitly *who* reaches the issue and *from where*.
+      - **Cover both axes** — a part's report must address
+        needed/used, not just hardening.
+      - **Separate CONFIRMED from PLAUSIBLE**: say which lines were
+        actually read and which claims are inference.
+      - **Fixed output schema** per finding: id, `file:line`,
+        severity, reachability/threat path, confidence, whether it
+        violates an existing `docs/hardening.md` rule or is a
+        *candidate for a new one*, proposed fix, and the risk/blast
+        radius of applying that fix.
+      - Report to `docs/audits/2026-08-26/P<n>-<part>.md`.
+
+      ### Phase 2 — consolidation
+      Dedupe across the eight reports, reconcile severity, and write
+      `docs/audits/2026-08-26/findings.md`: one ranked list, with
+      fleet-wide/systemic findings (a whole class of mistake repeated
+      across hosts) called out separately from one-off ones — those
+      are the ones that become new baseline rules.
+
+      ### Phase 3 — remediation, in waves
+      Sequenced, not one giant branch. Shared-baseline changes (P1)
+      land first since they move every host at once and need the most
+      testing; per-host changes follow. Every wave goes through the
+      repo's own gates — `nixos-rebuild build --flake .#<host>` for
+      each affected host, a VM test where behaviour (not just config)
+      changes, and no `switch` without being asked. Anything
+      requiring the user's own sign-off (accepting a risk, moving a
+      trust boundary) is surfaced as a decision, not decided by an
+      agent.
+
+      ### Phase 4 — documentation harvest
+      The audit's real output is not just fixes but *knowledge*, and
+      it goes back into the docs rather than dying in a report:
+      - New standing rules and newly-understood gotchas → the
+        relevant `docs/` file, primarily `docs/hardening.md`, which
+        is already the codified baseline and so is where "we now
+        always do X" belongs.
+      - The written threat model → kept as a durable doc, since every
+        future service decision needs it.
+      - `docs/audits/` is a new directory: add a row for it to
+        `AGENTS.md`'s "Where things live" table, per
+        `docs/procedures/updating-documentation.md`.
+      - Accepted-risk items (audited and deliberately *not* fixed)
+        get written down with their justification, so a future pass
+        does not re-litigate them from scratch.
+      - Plus whatever the user directs into `TODO.md` as follow-up:
+        remediation that is deferred rather than done stays tracked
+        here, not in a report file nobody reads.
+
+      **Phase 4 landed 2026-08-27.** All four parts done:
+      `docs/hardening.md` gained a **Standing rules** section with the
+      ten rules from `findings.md` §4 (the eleventh,
+      `AllowTcpForwarding`, was already applied in wave 2), including a
+      new OCI-container rule the doc had no equivalent of;
+      `docs/threat-model.md` is a new stable pointer at the model;
+      `docs/accepted-risks.md` is new; `AGENTS.md` gained rows for both.
+      Also corrected `docs/procedures/remote-access.md`, which asserted
+      the `vps-deploy` forced-command allowlist was "the actual security
+      boundary" when root arrives anyway via the polkit grant beside it,
+      and updated the audit skill's own Phase 4 guidance so the next run
+      inherits the layout rather than re-deciding it.
+
+      **Three judgement calls were decided by the agent, not the user**,
+      because Phase 4 is documentation-only and every one of them is
+      cheap to reverse. Flagged here so they can be overruled:
+      1. *How much reasoning goes inline.* Rules are short and
+         imperative; the `file:line` evidence stays in the audit and is
+         linked. `docs/hardening.md` went 138 → ~264 lines rather than
+         doubling on justification.
+      2. *Where the threat model lives.* It stays in
+         `docs/audits/2026-08-26/` — the eight part reports cite it by
+         section and a copy would drift — with `docs/threat-model.md` as
+         a stable path to link instead, carrying a supersession rule.
+      3. *Accepted risks could only be scaffolded.* §1 holds the six
+         risks whose acceptance is genuinely not in question (public
+         repo, homelab→vps root, zrepl-as-root, the two unlocked shell
+         paths, no-CI-on-purpose, NFS without `noexec`). §2 lists
+         D1–D14 as **explicitly not accepted** — the risk each one would
+         be accepting if answered that way. It cannot be finished until
+         those are decided.
+
+      **Progress.** Phase 0 done 2026-08-26:
+      `docs/audits/2026-08-26/00-threat-model.md` — exposure map,
+      principals, six trust-boundary analyses, nine adversaries, the
+      severity rubric P1–P8 must apply, six recurring failure modes to
+      probe for, and seven open questions. Every claim in it is cited
+      by `file:line` and the citations were verified against source.
+      P0's own cross-cutting findings are recorded in the standard
+      finding schema at `docs/audits/2026-08-26/P0-findings.md`
+      (F-P0-01..07) so Phase 2 consolidates them rather than losing
+      them in prose; that file is also the format reference P1-P8
+      write against. Phase 1 dispatched 2026-08-26: eight audit
+      subagents running against the parts below.
+      Two things it turned up that reframe the audit before it starts:
+      `origin/master` on GitHub is an unsigned, unattended root
+      credential for all four real hosts (§4.1), and there is no
+      meaningful security boundary between homelab and vps — the
+      vps-deploy ForceCommand allowlist bounds shells and accidents,
+      not root (§4.2).
+
+      **Status as of 2026-08-27.** Phases 0–2 done: 158 findings, **3
+      CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**, consolidated into
+      3 CRITICAL clusters, 10 HIGH clusters and 34 tail entries. Phase 3
+      **wave 1 is complete, and wave 2 is complete as far as an agent can
+      take it**: 2.3, 2.4, 2.5, 2.7 and 2.8 done, 2.6 two-thirds done,
+      and 2.1/2.2/2.9 blocked on user decisions (D9, D13, D14) rather
+      than on work. **Item 2.1 landed 2026-08-27** once D13 was answered
+      — `myDockerPublishGuard` filters the four published game ports in
+      FORWARD via DOCKER-USER, allowing only wg0 and tailscale0, VM-tested
+      with a real container and client. **Wave 4 / Phase 4 is done** (see
+      above); wave 3 is user-only by definition and not started. All work
+      is on
+      `worktree-worktree-security-audit-plan`, build-verified on
+      homelab, vps, torrent and thinkpad, and **never switched**.
+
+      Four changes are VM-tested rather than merely built: the
+      `zfs-emergency-prune` sandbox, the vps `ipset` fail-open fix
+      (including the parameter-drift scenario itself), both halves of
+      2.8 (including a simulated hostile sender), and 2.1's DOCKER-USER
+      guard. `tests/zrepl-replication.nix` and `tests/zfs-space-guard.nix`
+      both grew permanent subtests, and `tests/docker-publish-guard.nix`
+      is a new nine-subtest check that drives real packets at a real
+      container rather than asserting on rule text alone.
+
+      Read `docs/audits/2026-08-26/RESUME.md` first — it is written to
+      be picked up cold.
+
+      **Deferred out of wave 1, tracked so it does not get lost:**
+      - ~~Item **2.9** (interface-scoping the desktop profile's host-wide
+        firewall openings)~~ **DONE 2026-08-27**, and smaller than
+        scoped: the user's D9 answers *removed* two of the three port
+        groups (Steam remote play, avahi/mDNS) rather than narrowing
+        them, leaving only KDE Connect to scope to `tailscale0`. No
+        per-host LAN-interface option was needed and thinkpad did not
+        need to be online.
+      - ~~UDP 10400/10401 unattributable~~ **RESOLVED 2026-08-27.** They
+        were Steam Remote Play's, opened by
+        `programs.steam.remotePlay.openFirewall` alongside TCP
+        27036/27037 and UDP 27031-27035, and closed when 2.9 dropped that
+        option. Found by evaluating
+        `options.networking.firewall.allowedUDPPorts.definitionsWithLocations`
+        rather than grepping — the numbers appear nowhere as literals in
+        this repo, which is why the original search failed. Lesson worth
+        keeping: **attribute a port to the option that opens it, not to
+        the port number**; the audit's inventory listed 27036/27037 and
+        10400/10401 as separate items and never connected them.
+      - ~~The *skipped*-deploy half of `F-P7-09`~~ — **done 2026-08-27**,
+        build- and VM-verified, **not deployed**. Wave 1 item 1.9 made a
+        **failed** deploy visible on the laptops; a skipped one was still
+        silent, because every guard in `deploy-guards.nix` ends in
+        `exit 0`.
+
+        Closed by measuring the *outcome* rather than the attempt: all
+        four hosts now watch `/nix/var/nix/profiles/system` for staleness
+        via the existing `staleMarkerFiles`, so "this host has not
+        actually been activated in N weeks" is caught regardless of
+        cause — skip, failure, or a timer that stopped firing. A bespoke
+        per-unit marker was rejected because it would have alarmed on
+        hand-deployed hosts that were perfectly current. Separately,
+        homelab's `systemd.services.auto-switch.onSuccess` is replaced by
+        `myAutoUpdate.onDeployUnits`, gated on a real activation —
+        the old wiring was observed starting the vps closure build in the
+        same second the min-interval guard deferred the switch.
+
+        **Two corrections to what this entry used to say**, both from
+        homelab's journal. The units did **not** fail "every run since
+        2026-08-25": the 08-25T13:18 runs skipped cleanly and the
+        failures were the next scheduled runs at 08-27T03:00 and 03:15,
+        about ten overnight hours. And the gap was **not** notification —
+        both entered `systemctl --failed`, `myHealthAlerts` checks that
+        every 15 minutes and ran 246 times in the window without a
+        `curl` error, so the alert was sent. The real hole was that a
+        *skipped* deploy produces nothing to detect at all, which is what
+        the change above fixes.
+      - **`push-deploy-vps` is the one piece of 2.6 not done**, and it is
+        deferred on purpose. Its misleading comment is corrected; the
+        sandbox is not applied, because `nixos-rebuild --target-host`
+        shells out to `ssh`/`nix-copy-closure` and `PrivateTmp` +
+        `ProtectSystem = "strict"` can break the SSH control-master path
+        and nix's fetcher cache. It needs a VM test with a **real remote
+        target**, and a wrong guess means vps silently stops updating.
+      - A resumed `zfs recv` is not covered by 2.8's new test. `-o` on
+        resume has historically been fussy; noted in the test header.
+      - ~~**The containers have no resource ceilings.**~~ **Done
+        2026-08-27** for `--memory` and `--pids-limit`, build-verified
+        and confirmed in the rendered start scripts, **not deployed.**
+        D15 was answered "no container may exceed 50% of the host's
+        memory" → `--memory=7g` on both (MemTotal 15.54 GiB), with
+        `--pids-limit=512` on `factorio-main` and `1024` on
+        `minecraft-vanilla-plus`, both far above their measured peaks of
+        19 and 123 and far below the host default of 19038.
+
+        The memory figure is **an estimate, not a measurement** — the
+        user said so explicitly, since the servers are mostly idle
+        playerwise. It bounds the blast radius rather than tuning
+        anything. Caveat recorded at D15: both containers carry the same
+        50% cap, so simultaneous worst cases still exhaust the host;
+        that is inherent in a per-container percentage and accepted,
+        since it stops any *single* runaway. `--cpus` remains unset and
+        undecided. Original note follows.
+
+      - **The three containers have no resource ceilings.** Phase 4
+        wrote the rule (`docs/hardening.md` standing rule 10); it is not
+        yet applied. None of minecraft, `factorio-main` or
+        `factorio-new` sets `--pids-limit`, `--memory` or `--cpus`, so a
+        fork bomb or a memory leak in any of them is *host* OOM pressure
+        on the box holding `zbackup`, and the kernel picks its own
+        victim among jellyfin, smbd, nfsd and the restic job.
+        `--pids-limit` is safe at a generous few thousand; `--memory`
+        must come from measured RSS with headroom, **not** from
+        minecraft's `MEMORY = "4G"`, which is JVM heap only (off-heap,
+        DistantHorizons and the 1 GiB `/tmp` tmpfs sit on top of it). A
+        ceiling set too low becomes an OOM-kill loop that reads as a
+        game crash. *(F-P4-07)*
+
+        **First measurement taken 2026-08-27** (`factorio-new` is gone
+        since `7a047b7`, so this is two containers, not three). Read from
+        each container's cgroup on homelab — host has 15.54 GiB:
+
+        | | `memory.peak` | `pids.peak` | `memory.max` | `pids.max` |
+        |---|---|---|---|---|
+        | `factorio-main` | 1.06 GB | 19 | `max` | 19038 (host default) |
+        | `minecraft-vanilla-plus` | 4.90 GB | 123 | `max` | 19038 |
+
+        Confirms both halves of the finding: no ceiling is set on either,
+        and minecraft's real RSS (4.90 GB) is ~0.9 GB *above* its
+        `MEMORY = "4G"` JVM heap, so sizing from that setting would have
+        been wrong in the OOM-kill direction.
+
+        **These are not peaks.** Both containers had 37 minutes uptime
+        (restarted by the 13:15 switch) and were almost certainly idle —
+        `memory.peak` resets on restart, so there is no longer-run data.
+        Treat them as a floor. `--pids-limit` can be set from them now
+        with enormous margin (peaks of 19 and 123 against a 19038
+        default); `--memory` needs either a load-representative
+        observation window or a deliberately generous
+        bound-the-blast-radius value chosen by the user, since only they
+        know the real player load. **That choice is the open question.**
+      - **`userns-remap` is not set** in
+        `virtualisation.docker.daemon.settings`, so container uid 0 is
+        host uid 0 on every bind mount and an escape lands as real root
+        rather than a mapped subuid. Enabling it re-maps ownership of
+        existing volumes, so it is not a one-line change — it needs its
+        own VM test and a plan for the game-server data directories.
+        *(F-P4-07)*
+
+      **Everything requiring the user** — the ten credentials to rotate,
+      the `secrets/*` edits agents may not make, and decisions D1–D14 —
+      is a live checklist at
+      [`docs/audits/2026-08-26/user-actions.md`](docs/audits/2026-08-26/user-actions.md).
+      Two are free, reversible and should not wait: `chmod 600
+      ~/.config/sops/age/keys.txt` (currently 0644 on the daily driver)
+      and checking GitHub branch protection (there is no CI, so it is
+      the only remaining control on fleet root).
+
+      **Standing decision still open, carried over from the original
+      entry:** homelab has no intrusion detection at all (no
+      CrowdSec/fail2ban, unlike vps). Fine today *if* access really is
+      gated entirely by tailscale's own device authorization
+      (ACLs/key approval) rather than exposed ports — which is
+      precisely what Phase 0 and P3 must confirm rather than assume.
+      Needs an explicit decision on whether that trust boundary is
+      sufficient long-term or whether basic protections belong at the
+      homelab layer too.
+
+- [ ] **2026-08-27: re-evaluate and replan `flake-update-test` (D11) —
+      how it should execute, with a benefits/risk analysis.** Deferred
+      deliberately rather than answered during the audit; it should not
+      be inherited by default.
+
+      **What it does today.** Weekly (`Wed 03:00` on homelab) it runs
+      `git reset --hard origin/master`, `nix flake update`, and — if
+      `nixos-rebuild build` succeeds — `git merge --ff-only` and
+      `git push origin master`. So a green build is the *only* gate on
+      writing to `master`, and `master` is unattended fleet root.
+
+      **Why it needs a replan rather than a yes/no.** Commit `3f2c418`
+      repaired a mechanism that had never once completed (zero automated
+      `flake.lock` commits in 1371). Deploying it makes it live for the
+      first time, so there is no track record to judge it on. Points to
+      weigh:
+      - *Benefit*: upstream input updates get build-tested weekly instead
+        of accumulating into one large risky bump.
+      - *Risk*: a build-success gate does not test **behaviour**. A
+        change that builds and breaks at runtime merges anyway, and the
+        next `auto-switch` deploys it fleet-wide unattended.
+      - *Risk*: it is an unattended writer to fleet root, which is the
+        exact asset `F-P0-01`/H1 is about. Branch protection now blocks
+        force-pushes and deletions but not this.
+      - *Alternative*: push an `auto-update` branch on success and let a
+        human merge — keeps the testing, removes the unattended write.
+      - *Alternative*: keep auto-merge but gate on the VM test suite
+        (`nix flake check`) rather than a bare build.
+      - Note it does an unguarded `git checkout master && git reset
+        --hard`, so it will also move `/etc/nixos` off any other branch
+        it finds — relevant while a host is deliberately parked on one.
+
+      **Also decide the interaction with `auto-switch`**, which is the
+      other half: `flake-update-test` (Wed) writes master and
+      `auto-switch` (Thu) deploys it, so the two together are a fully
+      unattended upstream-to-production pipeline with no human in it.
+      *(D11, F-P7-10, H1)*
+
+- [ ] **2026-08-27: the three Minecraft/Factorio mod-supply tightenings
+      that survive auto-update.** D14 was answered "keep auto-updating"
+      and the risk is accepted in `docs/accepted-risks.md` AR-7 — but
+      three things can still be tightened *without* giving up
+      auto-update, and none was done yet. All three need a start-and-play
+      check, which is why they are here rather than done.
+
+      1. **Mark non-critical projects optional with a `?` suffix.**
+         Upstream supports `pl3xmap?`, and optional projects are
+         **excluded from the `VERSION_FROM_MODRINTH_PROJECTS`
+         calculation** — so one lagging mod stops holding the whole
+         server on an old Minecraft version, and merely warns instead of
+         aborting startup when it has no compatible build. This is the
+         highest-value one: it directly serves the "track the newest
+         stable automatically" goal, because today *any single* mod of
+         the sixteen can pin the server indefinitely. Needs a judgement
+         call per mod on what is actually load-bearing for the world
+         (e.g. geyser/floodgate almost certainly are; a mapper or a
+         client-perf mod may not be), which is the user's call, not an
+         agent's.
+      2. **Pin individual projects by version** where a specific mod
+         matters more than its freshness — syntax is `project:versionId`
+         or `project:2.21.2`, and it composes with `?`. Worth doing for
+         anything that has broken a world before.
+      3. **Reconsider `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"`.**
+         It pulls transitive artifacts that appear nowhere in this repo,
+         so the actual installed set is larger than the sixteen listed
+         projects and is not visible from the config. At minimum, record
+         what it actually resolves to once, so there is a baseline.
+
+      Related but separate, already tracked above: the containers still
+      have no `--pids-limit`/`--memory` ceilings, and `userns-remap` is
+      unset. *(F-P4-03, F-P4-13, AR-7)*
+
+- [ ] **2026-08-27: set up the new network printer/scanner (Brother
+      MFC-L2740DW).** The old USB Brother is gone. `modules/profiles/PC.nix`
+      is currently in a deliberate **placeholder state**: CUPS is enabled
+      with `drivers = [ ]` and no printer declared, and `services.avahi`
+      has been removed entirely (audit decision D9 option c — a static
+      printer address needs no discovery protocol, which is less surface
+      than firewalling UDP 5353 open on a roaming laptop). So nothing
+      prints today, by design, until this is worked through.
+
+      Steps, in order:
+      1. **Give the printer a static address** — a DHCP reservation on
+         the router is fine and is the least surprising option.
+      2. **Try driverless first.** The MFC-L2740DW supports IPP
+         Everywhere/AirPrint, so a queue of the form
+         `ipp://<static-ip>/ipp/print` with model `everywhere` should
+         need no vendor driver at all — keeping `drivers` empty.
+         **Use the IP, not the usual `._ipp._tcp.local` URI**: that form
+         resolves through avahi, and re-adding avahi to make printing
+         work would undo D9. Declare the queue declaratively
+         (`hardware.printers.ensurePrinters`) rather than clicking
+         through the CUPS web UI.
+      3. **Only if driverless fails**, add a driver — `brlaser` covers
+         many Brother lasers, but check it actually lists this model
+         before assuming, per the repo's check-the-source rule.
+      4. **Scanning is a separate problem from printing** and is not set
+         up at all right now. Prefer `sane-airscan` (driverless eSCL over
+         the same static IP) over Brother's `brscan4` blob for the same
+         reason as above; verify against the pinned nixpkgs rather than
+         from memory.
+      5. Note there is a known CUPS wrinkle where driverless queues added
+         through the web UI or autodetection can silently fail to print
+         while ones added via `lpadmin -m everywhere` work. If pages come
+         out blank or jobs vanish, that is the first thing to check —
+         it is a queue-creation problem, not a network one.
+
+      Build-verified as a placeholder on torrent and thinkpad; no
+      switch. *(D9, F-P1-04, F-P5-06)*
 
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
@@ -415,80 +1221,6 @@ them rot.
       reachable across the next one or two rotations (homelab's privacy
       addresses appear to rotate on the order of hours-to-a-day, based
       on prior observation).
-
-- [ ] **2026-08-20: deploy `new.factorio`** — merged to master
-      (`c7796c9`), not yet deployed. A second Factorio server
-      (`modules/services/factorio.nix`'s `factorio-new` container,
-      floating `stable` tag, fresh random world) alongside the
-      existing `old.factorio` (still pinned to the experimental
-      2.1.14 line). Needs: `nixos-rebuild switch` on homelab (brings
-      up the container) and vps (opens the 34198/udp DNAT/firewall/
-      ratelimit rules), then an `octodns-sync` run (or its hourly
-      timer) to push the new `old.factorio`/`new.factorio` A + SRV
-      records to Cloudflare. See `hosts/vps/README.md`'s Status
-      section. Once deployed, verify: `new.factorio` reachable by
-      hostname alone (SRV lookup, untested — first real use of SRV
-      records in this repo) and by `:34198`, `docker-factorio-new`'s
-      preStart actually rsyncs `old.factorio`'s mods on a real start,
-      and `old.factorio` (34197) still works unaffected.
-
-      **2026-08-21: reported unreachable from an actual game client —
-      needs investigation.** Everything checked so far looks healthy,
-      which makes this confusing:
-      - `factorio-new` container on homelab: up 7h, in-game
-        (`ServerMultiplayerManager` state `InGame`), authenticated with
-        Factorio's auth server, and registered on the public matching
-        server (`MatchingServer.cpp: Matching server game '1232520' has
-        been created`) at `97.206.73.106:34198` per its own logs.
-      - `new.factorio.skyseekerlabs.net` resolves correctly to the vps
-        (`137.184.45.18`), and a UDP probe (`nc -u -z -v`) to
-        `:34198` got no ICMP unreachable back.
-      - Despite both of the above, the user reports the client cannot
-        actually connect/join.
-      Not yet checked (as of 2026-08-21): whether the vps's DNAT/
-      firewall/ratelimit rules for 34198 were actually deployed — the
-      container could be up on homelab while the vps-side forwarding was
-      never switched; the SRV-record lookup was also unverified; and a
-      UDP `nc` probe getting no ICMP-unreachable isn't proof the DNAT
-      rule itself forwards traffic all the way through.
-
-      **2026-08-25 live triage: every infra layer now checks out.** On
-      vps, `iptables -t nat -L nixos-nat-pre -n -v` shows the DNAT rule
-      live and correct (`udp dpt:34198 to:10.100.0.2:34198`), alongside
-      the working 25565/19132/34197 rules. DNS resolves correctly both
-      ways: `dig SRV _factorio._udp.new.factorio.skyseekerlabs.net` →
-      `0 0 34198 new.factorio.skyseekerlabs.net.`, and the A record
-      resolves to vps's IPv4. The `factorio-new` container itself is
-      still up (21h) alongside `factorio-main`/`minecraft-vanilla-plus`.
-      vps's `current-system` was rebuilt today (2026-08-25 13:21, likely
-      via the auto-updater rearchitect's deploy), so the 34198 rule's
-      packet counters were freshly zeroed and can't confirm whether real
-      client traffic has hit it since — that's the one thing this
-      triage pass couldn't settle. Given everything on the infra side is
-      now confirmed correctly configured and deployed, the original
-      "vps-side forwarding was never switched" hypothesis no longer
-      holds as an explanation; what's still missing is a genuine
-      client-join retest to confirm the original Aug 21 report is
-      actually resolved.
-
-      **2026-08-26: still marked as needing an actual fix, not just more
-      diagnosis** — flagged explicitly by the user rather than left to
-      linger as an open investigation. Note this now also intersects with
-      this session's homelab firewall re-scoping (see the security-audit
-      item above): `modules/services/factorio.nix`'s 34197/34198 UDP
-      rules moved from host-wide to `tailscale0`/`wg0`-interface-scoped
-      only, which is exactly the DNAT'd-through-wg0 path `new.factorio`
-      traffic already takes — shouldn't regress anything, but the
-      pending client-join retest should happen *after* that firewall
-      change lands, not before, so a retest failure can't be
-      misattributed to the wrong change.
-
-      **2026-08-26: that firewall change has now landed and is
-      reboot-verified** (`deaf882`, `9134a47`, `0a774e5` — see
-      `docs/DONE.md`), so the client-join retest is unblocked. Still
-      needs a real game client to actually attempt joining
-      `new.factorio` — not something checkable from infra inspection
-      alone.
 
 - [ ] **2026-08-18: homelab backup/replication stack has several
       compounding risks if the box is powered off for an extended

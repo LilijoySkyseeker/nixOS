@@ -6,10 +6,10 @@ in
   flake.modules.nixos.factorio =
     { config, pkgs, ... }:
     let
-      # Common preStart body, parameterized by the server's own directory
-      # and display name (only `name` differs between the two — needed so
-      # players can tell them apart in the server browser — everything
-      # else, including the shared secrets below, is identical).
+      # preStart body, parameterized by the server's own directory and
+      # display name. Kept parameterized rather than inlined even though
+      # there is only one server again: it was written for two, and the
+      # parameters are what a second one would need.
       mkServerSettingsPatch =
         { directory, name }:
         ''
@@ -30,7 +30,7 @@ in
             mv "$settings.tmp" "$settings"
           fi
         '';
-      # container hardening shared by both servers — see
+      # container hardening — see
       # modules/services/minecraft.nix for the same general pattern, but
       # factoriotools/factorio's entrypoint isn't compatible with a
       # read-only rootfs like itzg/minecraft-server is: it runs
@@ -50,6 +50,40 @@ in
       # and setuid/setgid for usermod/groupmod/runuser) still meaningfully
       # restricts it.
       factorioExtraOptions = [
+        # Resource ceilings (docs/hardening.md standing rule 10). Without
+        # them, container OOM pressure is *host* OOM pressure on the box
+        # holding zbackup, and the kernel picks its own victim among
+        # jellyfin, smbd, nfsd and the restic job. Before this, both
+        # containers ran with memory.max = "max" and the host-default
+        # pids.max of 19038.
+        #
+        # --memory: user decision D15 — "no container may exceed 50% of
+        # host memory". homelab's MemTotal is 15.54 GiB, so half is
+        # 7.77 GiB; 7g is the round value comfortably under that. This is
+        # deliberately a *bound on the blast radius*, not a tuned figure:
+        # the server is mostly idle playerwise, so there is no real
+        # load data to size from, and the measured 1.06 GB peak
+        # (2026-08-27, 37 minutes uptime, idle) is a floor rather than a
+        # peak. Sizing down toward that measurement is the thing not to
+        # do — a ceiling below what the runtime needs becomes an OOM-kill
+        # loop that reads as a game crash.
+        #
+        # NB both containers carry the same 50% cap, so if both ever hit
+        # it at once the host is exhausted. That is inherent in a
+        # per-container percentage and is accepted: it still stops any
+        # *single* runaway from taking the whole machine, which is the
+        # failure this guards against. Revisit together with real load
+        # data (D16-style re-measure), not one container at a time.
+        #
+        # This figure is homelab-specific. If these game servers ever run
+        # on another host, recompute it there.
+        "--memory=7g"
+        # --pids-limit: measured peak was 19. 512 is ~27x that and still
+        # 37x below the host default, so it stops a fork bomb without any
+        # realistic chance of refusing a thread the server actually
+        # wanted. Erring generous is deliberate — too low fails as
+        # "cannot spawn thread", which looks nothing like its cause.
+        "--pids-limit=512"
         "--tmpfs=/tmp:rw,nosuid,nodev,size=512m"
         "--cap-drop=ALL"
         "--cap-add=CHOWN"
@@ -69,19 +103,22 @@ in
       # actually reach this host — see hosts/vps/configuration.nix's
       # networking.nat.forwardPorts) — scope to just those two
       # interfaces.
+      #
+      # These rules are NOT what enforces that for the published ports —
+      # a `-p` publish never traverses INPUT, so an INPUT rule cannot
+      # constrain it (F-P4-02). Enforcement lives in
+      # `myDockerPublishGuard` on homelab, which applies the same
+      # interface list in FORWARD via DOCKER-USER. Change both together.
       networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
-        34197 # old.factorio
-        34198 # new.factorio
+        34197 # factorio
       ];
       networking.firewall.interfaces.wg0.allowedUDPPorts = [
-        34197 # old.factorio
-        34198 # new.factorio
+        34197 # factorio
       ];
 
       # persistence
       environment.persistence.${vars.persistRoot}.directories = [
         { directory = "/srv/factorio/main"; }
-        { directory = "/srv/factorio/new"; }
       ];
 
       # server-settings.json was previously hand-edited directly on the
@@ -94,35 +131,16 @@ in
       # exactly as-is, so this can't clobber settings we don't know about.
       # `game_password`, `token` (a factorio.com account auth token,
       # equally sensitive), and `username` are secrets; `name`/
-      # `description`/`tags`/`non_blocking_saving` aren't. Shared by both
-      # servers — new.factorio is meant to have "the same settings" as
-      # old.factorio, including login credentials, per explicit decision.
+      # `description`/`tags`/`non_blocking_saving` aren't.
       sops.secrets.factorio_game_password = { };
       sops.secrets.factorio_token = { };
       sops.secrets.factorio_username = { };
       systemd.services.docker-factorio-main.preStart = mkServerSettingsPatch {
         directory = "/srv/factorio/main";
-        name = "GC Space Age!! (old)";
-      };
-      systemd.services.docker-factorio-new.preStart = ''
-        # Mirror old.factorio's mods into this server before every start,
-        # so "same mods as the old one" stays true declaratively instead
-        # of needing to hand-copy a mod list that'll drift the moment
-        # someone updates mods on the old server. install -d/rsync rather
-        # than a bind-mount: the new server needs to be able to add/update
-        # its own mods afterwards (UPDATE_MODS_ON_START) without writing
-        # back into old.factorio's volume.
-        ${pkgs.coreutils}/bin/install -d -m 0755 /srv/factorio/new/mods
-        if [ -d /srv/factorio/main/mods ]; then
-          ${pkgs.rsync}/bin/rsync -a --delete /srv/factorio/main/mods/ /srv/factorio/new/mods/
-        fi
-      ''
-      + mkServerSettingsPatch {
-        directory = "/srv/factorio/new";
-        name = "GC Space Age!! (new)";
+        name = "GC Space Age!!";
       };
 
-      # factorio servers
+      # factorio server
       virtualisation.oci-containers.containers = {
         factorio-main = {
           autoStart = true;
@@ -141,32 +159,6 @@ in
           ports = [ "34197:34197/udp" ];
           volumes = [ "/srv/factorio/main:/factorio" ];
           environment = {
-            UPDATE_MODS_ON_START = "true";
-          };
-          extraOptions = factorioExtraOptions;
-        };
-
-        # new.factorio — latest *stable* branch (not old.factorio's
-        # experimental 2.1.14 pin above), a fresh random world, same
-        # settings/mods as old.factorio (mirrored every start, see
-        # docker-factorio-new's preStart above). `stable` is a floating tag
-        # by design here (per explicit decision) — this server has no
-        # existing save to be version-locked against, so it's fine for it
-        # to track whatever Factorio currently calls stable and pick up
-        # engine updates automatically on restart.
-        factorio-new = {
-          autoStart = true;
-          image = "factoriotools/factorio:stable";
-          # PORT tells the entrypoint which port to actually bind inside
-          # the container (it isn't just a docker port-map relabeling —
-          # the factoriotools image reads this into server-settings.json's
-          # own port field), so old.factorio and new.factorio can run with
-          # distinct, non-conflicting ports on the same docker host. See
-          # factoriotools/factorio-docker's own multi-instance guidance.
-          ports = [ "34198:34198/udp" ];
-          volumes = [ "/srv/factorio/new:/factorio" ];
-          environment = {
-            PORT = "34198";
             UPDATE_MODS_ON_START = "true";
           };
           extraOptions = factorioExtraOptions;

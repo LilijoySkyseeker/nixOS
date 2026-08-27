@@ -82,7 +82,14 @@
         # "during every auto update": chain onto whichever units this host
         # already uses to pull/build/switch (e.g. pull-deploy.service).
         systemd.services = lib.mkMerge [
-          (lib.genAttrs cfg.triggeredBy (_: {
+          # `systemd.services.<name>` takes the unit name *without* the
+          # .service suffix -- NixOS appends it. Callers naturally write
+          # "pull-deploy.service" (the option's own example did too), which
+          # produced an attribute named "pull-deploy.service" and therefore a
+          # phantom `pull-deploy.service.service` unit: the OnSuccess= never
+          # attached to the real unit, and this ISO rebuild has consequently
+          # never once fired. Strip the suffix so both spellings work.
+          (lib.genAttrs (map (lib.removeSuffix ".service") cfg.triggeredBy) (_: {
             unitConfig.OnSuccess = [ "iso-build.service" ];
           }))
           {

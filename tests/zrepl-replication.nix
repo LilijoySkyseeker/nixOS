@@ -19,6 +19,16 @@
 #   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
 #     unguarded grid rule would condemn (see docs/backups.md "Gotchas")
 #   * a `snap` job snapshotting on its own, with no puller involved
+#   * `zrepl-protect-blank` making `@blank` genuinely undestroyable on the
+#     source, which `protectRegexes` cannot do -- that is the puller's
+#     pruning policy, and the source endpoint evaluates no keep rules
+#     (F-P6-04)
+#   * the receiver ignoring properties a *hostile sender* puts in the
+#     stream, simulated by poisoning the dataset and editing the source's
+#     own zrepl.yml the way an attacker with root there would (F-P6-03).
+#     Not covered: a resumed receive, which the finding also asks for --
+#     `-o` on resume has historically been fussy and orchestrating an
+#     interrupted send here is a separate piece of work
 #
 # This is kept as a regression test, not a one-off verification: the
 # module still has planned edits (turning off preserveLegacySnapshots,
@@ -208,5 +218,111 @@ pkgs.testers.runNixOSTest {
         # protect rule would have destroyed @blank by the assert below.
         sourcehost.succeed("sleep 20")
         sourcehost.succeed("zfs list -t snapshot -o name -H | grep -q 'tank/data@blank'")
+
+    with subtest("zrepl-protect-blank makes @blank undestroyable locally (F-P6-04)"):
+        # protectRegexes above is the puller's *pruning policy*, and a
+        # policy is not a control: Sender.DestroySnapshots evaluates no
+        # keep rules, and a source job has no Pruning field at all, so a
+        # compromised or merely misconfigured puller can destroy @blank
+        # here. A foreign `zfs hold` is the backstop, because zrepl only
+        # recognises and releases its own zrepl_STEP_/zrepl_last_received_
+        # tags and cannot release this one over any RPC.
+        #
+        # restart, not start: the unit is wantedBy multi-user.target and
+        # already ran once at boot, before the pool existed, where it
+        # correctly skipped and exited 0.
+        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
+        holds = sourcehost.succeed("zfs holds -H tank/data@blank")
+        assert "protect" in holds, f"@blank should carry a foreign hold: {holds!r}"
+
+        # The point of the hold: destroy now fails. This is the same call
+        # the puller's endpoint makes, so if it fails locally it fails
+        # over RPC too.
+        sourcehost.fail("zfs destroy tank/data@blank")
+
+        # Must be idempotent -- it runs on every boot and an existing hold
+        # would otherwise make `zfs hold` error and fail the unit.
+        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
+        status = sourcehost.succeed(
+            "systemctl show zrepl-protect-blank.service -p ExecMainStatus --value"
+        ).strip()
+        assert status == "0", f"second run should succeed, got {status}"
+
+    with subtest("the receiver ignores properties a hostile sender sends (F-P6-03)"):
+        # The sender alone decides whether properties travel, so a source
+        # whose root is compromised turns send.properties on in its own
+        # zrepl.yml and the puller has no say. Simulated faithfully: poison
+        # the dataset, then edit the source's config the way an attacker
+        # with root there would.
+        #
+        # mountpoint is deliberately /hostile rather than the /etc that
+        # makes this a real finding -- mounting a dataset over /etc on the
+        # source would wreck the node running the test. The receiver-side
+        # assertion is identical either way.
+        sourcehost.succeed("zfs set mountpoint=/hostile tank/data")
+        sourcehost.succeed("zfs set canmount=on tank/data")
+        sourcehost.succeed("zfs set setuid=on tank/data")
+        sourcehost.succeed("zfs set exec=on tank/data")
+        sourcehost.succeed("zfs set devices=on tank/data")
+
+        # /etc/zrepl/zrepl.yml is a store symlink. Replace it with a
+        # mutable copy: the forced command runs
+        # `zrepl --config /etc/zrepl/zrepl.yml stdinserver`, so this file
+        # is what the serving process actually reads.
+        sourcehost.succeed("cp -L /etc/zrepl/zrepl.yml /run/hostile.yml")
+        # The source job is rendered last, so `send:` can simply be
+        # appended as a sibling key. Guarded, because that ordering is the
+        # module's business and could change.
+        last = sourcehost.succeed("tail -1 /run/hostile.yml").strip()
+        assert last == "type: source", f"expected the source job last, got {last!r}"
+        # `send_properties`, not `properties`. F-P6-03 writes it as
+        # "send.properties: true"; the actual key in zrepl 0.7.0 is
+        # SendOptions.SendProperties `yaml:"send_properties"`
+        # (internal/config/config.go:95). The wrong spelling is not
+        # silently ignored -- zrepl unmarshals strictly and refuses to
+        # start with "field properties not found in type
+        # config.SendOptions" -- which is how this was caught.
+        sourcehost.succeed("echo '  send: {send_properties: true}' >> /run/hostile.yml")
+        sourcehost.succeed("rm -f /etc/zrepl/zrepl.yml")
+        sourcehost.succeed("cp /run/hostile.yml /etc/zrepl/zrepl.yml")
+        sourcehost.succeed("systemctl restart zrepl")
+        sourcehost.wait_for_unit("zrepl.service")
+
+        # Force a fresh receive and wait for it to actually land, so the
+        # assertions below describe a stream sent *after* the poisoning.
+        n_before = int(
+            puller.succeed(
+                "zfs list -t snapshot -H -o name "
+                "backup/backup/sourcehost/tank/data | wc -l"
+            ).strip()
+        )
+        puller.succeed("zrepl signal wakeup sourcehost")
+        puller.wait_until_succeeds(
+            "test $(zfs list -t snapshot -H -o name "
+            "backup/backup/sourcehost/tank/data | wc -l) -gt %d" % n_before,
+            timeout=180,
+        )
+
+        # recv.properties.override: pinned to a specific safe value.
+        for prop, want in [("mountpoint", "none"), ("canmount", "off")]:
+            got = puller.succeed(
+                f"zfs get -H -o value {prop} backup/backup/sourcehost/tank/data"
+            ).strip()
+            assert got == want, (
+                f"a hostile sender set {prop}; receiver should pin it to "
+                f"{want}, got {got!r}"
+            )
+
+        # recv.properties.inherit: must not arrive from the wire at all.
+        # `-x` makes the property inherited/default rather than received,
+        # so the source column is the assertion, not the value.
+        for prop in ["exec", "setuid", "devices"]:
+            src = puller.succeed(
+                f"zfs get -H -o source {prop} backup/backup/sourcehost/tank/data"
+            ).strip()
+            assert "received" not in src, (
+                f"{prop} arrived from the sender (source={src!r}); "
+                "recv.properties.inherit should have stripped it"
+            )
   '';
 }

@@ -21,6 +21,11 @@
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
+    # Disabled 2026-08-27 with the rest of the fleet's schedules — see
+    # hosts/homelab/configuration.nix's myAutoUpdate for the reasoning,
+    # and TODO.md's "rebuild the update/build/deploy pipeline properly".
+    # The service stays: `systemctl start pull-deploy` still works.
+    scheduleEnable = false;
     # root has no home-manager profile (and thus no SSH identity of its
     # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
     # already trusts and authenticates to the origin remote day-to-day.
@@ -123,10 +128,23 @@
   services.openssh = {
     enable = true;
     openFirewall = false;
+    # docs/hardening.md's full SSH baseline (F-P5-07). See
+    # hosts/torrent/configuration.nix for why these are `settings` rather
+    # than `extraConfig`, and for the OpenSSH 10.4p1 default each one
+    # replaces -- both hosts rendered the identical sshd.conf-final, down
+    # to the same store path, so the gap and the fix are identical too.
+    allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
+      AuthenticationMethods = "publickey";
+      AllowAgentForwarding = false;
+      AllowStreamLocalForwarding = false;
+      AllowTcpForwarding = false;
+      PermitTunnel = "no";
+      ClientAliveInterval = 60;
+      ClientAliveCountMax = 5;
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
@@ -138,5 +156,44 @@
       "zroot/local/home"
       "zroot/local/root"
     ];
+  };
+
+  # failed-unit / stuck-switch alerts to Discord (F-P7-09). See
+  # hosts/torrent/configuration.nix for the full reasoning: why homelab's
+  # webhook is reused rather than a per-host key minted, why checkSmart
+  # is off on a host that has a session, and why a *skipped* deploy is
+  # still not caught by this.
+  #
+  # It matters more here than on torrent. This host is a laptop that is
+  # legitimately offline for long stretches, so "no news" has always been
+  # indistinguishable from "deploying fine" -- and it is the host the
+  # audit could not verify live at all, precisely because it was dark.
+  sops.secrets.homelab_discord_webhook = {
+    owner = "health-check";
+    group = "health-check";
+  };
+  myHealthAlerts = {
+    enable = true;
+    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    checkSmart = false;
+    # A laptop that wakes after weeks off will fire one batch of alerts
+    # for anything that failed while it was down. That is the intended
+    # behaviour -- the timer is Persistent, so the catch-up run is what
+    # surfaces a deploy that broke a month ago -- and cooldownHours (6)
+    # keeps it to a single batch rather than a repeat every 15 minutes.
+    #
+    # Same reasoning as torrent: the failed-units check cannot see a
+    # pull-deploy that *skips*, because every guard exits 0. Watching the
+    # profile symlink's mtime catches the outcome regardless of cause.
+    #
+    # 720h = 30 days rather than torrent's 504. This host is a laptop that
+    # legitimately goes dark for long stretches, and it additionally sets
+    # requireACPower, so a Thursday spent on battery is a skip that is
+    # entirely correct. The threshold only has to be tight enough to catch
+    # "stopped deploying for good", and it clears itself on the next
+    # successful deploy after a wake-up.
+    staleMarkerFiles = {
+      "/nix/var/nix/profiles/system" = 720;
+    };
   };
 }

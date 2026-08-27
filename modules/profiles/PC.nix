@@ -11,6 +11,7 @@ in
       pkgs-stable,
       inputs,
       config,
+      lib,
       ...
     }:
     {
@@ -136,16 +137,17 @@ in
         pkgs-unstable.via
         pkgs-unstable.vial
       ];
-      services.udev.extraRules = ''
-        # 8bitdo pro 3
-        # 2.4GHz/Dongle
-        KERNEL=="hidraw*", ATTRS{idProduct}=="6012", ATTRS{idVendor}=="2dc8", MODE="0660", GROUP="input"
-        # Bluetooth
-        KERNEL=="hidraw*", KERNELS=="*2DC8:6012*", MODE="0660", GROUP="input"
-
-        # plover
-        KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
-      '';
+      # No services.udev.extraRules here any more. It held two 8bitdo Pro 3
+      # hidraw rules and plover's uinput rule; plover is gone, and the
+      # 8bitdo pair was dead config that never worked (confirmed by the
+      # user, and visible on-box): they ask for MODE="0660" GROUP="input",
+      # but live every /dev/hidraw* is 0666 root:plugdev with a uaccess
+      # ACL, because 50-qmk.rules (all hidraw, GROUP=plugdev,
+      # TAG+=uaccess) and 60-steam-input.rules (vendor 2dc8, TAG+=uaccess)
+      # both sort after 99-local.rules for those attributes. Controller
+      # access came from uaccess the whole time, never from the group --
+      # so the rules bought nothing and their only effect was to make the
+      # `input` grant above look load-bearing when it was not.
 
       # home-manager
       home-manager.users.lilijoy = {
@@ -154,7 +156,6 @@ in
           homeManagerModules."tooling-desktop"
           homeManagerModules."virt-manager"
           homeManagerModules."claude-code"
-          inputs.plover-flake.homeManagerModules.plover
         ];
         home = {
           stateVersion = "23.11";
@@ -170,17 +171,6 @@ in
 
         stylix.targets.firefox.profileNames = [ "default" ];
         stylix.targets.qt.platform = "qtct";
-
-        programs.plover = {
-          enable = true;
-          package = inputs.plover-flake.packages.${pkgs-unstable.system}.plover-full;
-          settings = {
-            "Machine Configuration" = {
-              machine_type = "Gemini PR";
-              auto_start = true;
-            };
-          };
-        };
       };
 
       # service for yubikey
@@ -265,6 +255,43 @@ in
         enable = true;
       };
 
+      # Scope KDE Connect to the tailnet (audit decision D9, 2026-08-27).
+      #
+      # `programs.kdeconnect` opens TCP+UDP 1714-1764 host-wide and gives
+      # you no say in it: the pinned nixpkgs module sets
+      # `networking.firewall.allowedTCPPortRanges` unconditionally inside
+      # its own `mkIf cfg.enable`, with no `openFirewall` option to turn
+      # off (checked against nixos/modules/programs/kdeconnect.nix at the
+      # pinned rev, not assumed). So the only way to narrow it is to
+      # mkForce the host-wide lists empty and re-add the range scoped to
+      # an interface.
+      #
+      # mkForce on the *whole list* is safe here only because kdeconnect
+      # is the only thing left contributing a port range on these hosts —
+      # Steam's remote play (27031-27035) is disabled just below, and
+      # avahi is gone entirely. If a future module adds a range and it
+      # silently disappears, this is why. The rendered firewall script is
+      # the place to check: `grep -oE 'dport [0-9]+:[0-9]+'` over it
+      # should list 1714:1764 and nothing else.
+      networking.firewall = {
+        allowedTCPPortRanges = lib.mkForce [ ];
+        allowedUDPPortRanges = lib.mkForce [ ];
+        interfaces.tailscale0 = {
+          allowedTCPPortRanges = [
+            {
+              from = 1714;
+              to = 1764;
+            }
+          ];
+          allowedUDPPortRanges = [
+            {
+              from = 1714;
+              to = 1764;
+            }
+          ];
+        };
+      };
+
       # LD fix
       programs.nix-ld.enable = true;
       programs.nix-ld.libraries = with pkgs-unstable; [
@@ -276,18 +303,33 @@ in
       hardware.bluetooth.powerOnBoot = true;
 
       # Enable CUPS to print documents.
+      #
+      # PLACEHOLDER STATE, 2026-08-27. The USB Brother this was built for
+      # is gone, so `drivers = [ brlaser ]` went with it — it was driving
+      # nothing. The replacement is a networked Brother MFC-L2740DW that
+      # does not have a static address yet, so there is deliberately no
+      # printer declared here: CUPS runs and prints to nothing until
+      # TODO.md's printer entry is worked through.
+      #
+      # When adding it, prefer a driverless IPP queue pointed at the
+      # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)
+      # over a vendor driver. That keeps `drivers` empty and, critically,
+      # does not reintroduce mDNS: the usual `._ipp._tcp.local` URI
+      # resolves via avahi, and avahi is intentionally gone (below).
       services.printing = {
         enable = true;
-        drivers = [
-          pkgs-unstable.brlaser
-        ];
+        drivers = [ ];
       };
-      # network printing
-      services.avahi = {
-        enable = true;
-        nssmdns4 = true;
-        openFirewall = true;
-      };
+
+      # No avahi/mDNS. It was here for exactly one thing — discovering the
+      # old network printer — and it opened UDP 5353 host-wide on both a
+      # desktop and a laptop that roams onto untrusted networks, where
+      # mDNS broadcasts the hostname and service list to whoever is
+      # listening. Removed rather than interface-scoped (audit decision
+      # D9, option c): a static printer address needs no discovery
+      # protocol at all, which is strictly less surface than firewalling
+      # one. Re-adding avahi is not the way to set up the new printer.
+      # (F-P1-04, F-P5-06)
 
       # Enable sound with pipewire.
       services.pulseaudio.enable = false;
@@ -303,21 +345,49 @@ in
       # Define a user account. Don't forget to set a password with ‘passwd’.
       users.users.lilijoy = {
         isNormalUser = true;
-        initialPassword = "123456";
+        # No initialPassword here. This repo is public, so any value set here
+        # is a published credential rather than a weak one -- it previously
+        # read "123456" (F-P1-03). Removing it does not change an already-set
+        # password: initialPassword only applies when the account is created,
+        # so this stops publishing the value but does not itself remediate a
+        # host where it was never changed. torrent is confirmed clear (its
+        # password was last changed after install); thinkpad was offline
+        # during the audit and still needs `passwd -S lilijoy` checked.
+        #
+        # If a declarative password is ever wanted here, use
+        # hashedPasswordFile pointing at a sops secret -- never a literal.
         description = "Lilijoy";
+        # `dialout` and `input` were both here "for plover", and plover is
+        # gone (declared unused, 2026-08-27). `input` in particular was the
+        # single worst grant on these hosts (F-P1-01): /dev/input/event* is
+        # root:input 0660 with no uaccess ACL -- systemd deliberately does
+        # not uaccess-tag keyboards -- so the membership was the *only*
+        # thing granting it, and it granted read of every input device on
+        # the machine. Under Wayland, which otherwise blocks X11-style input
+        # snooping, evdev read is the bypass. Anything running as lilijoy
+        # could capture, in plaintext, the run0/polkit password (typed on
+        # every elevation, since wheelNeedsPassword is true), the
+        # lock-screen password, the Bitwarden master password and the
+        # YubiKey PIN -- then register its own polkit agent and answer its
+        # own prompt for root, with no further vulnerability and no race.
         extraGroups = [
           "networkmanager"
           "wheel"
-          "dialout" # for plover
-          "input" # for plover
           "docker"
         ];
       };
 
       # steam
+      #
+      # `remotePlay.openFirewall` dropped 2026-08-27 (audit decision D9):
+      # it opened TCP 27036/27037 and UDP 27031-27036 host-wide, on a
+      # desktop and on a laptop that roams onto untrusted networks, for a
+      # feature that is not used. Steam itself is unaffected — this only
+      # ever controlled the in-home-streaming listener, not the client,
+      # not the store, not games. If remote play is ever wanted again,
+      # turn it back on scoped to an interface rather than host-wide.
       programs.steam = {
         enable = true;
-        remotePlay.openFirewall = true;
       };
       hardware.steam-hardware.enable = true;
 

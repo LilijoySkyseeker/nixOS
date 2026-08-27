@@ -33,6 +33,24 @@ in
           description = "systemd OnCalendar spec for the pull/build/switch job.";
         };
 
+        scheduleEnable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Whether the `pull-deploy` **timer** is installed. False keeps
+            the service defined and manually startable
+            (`systemctl start pull-deploy`) while stopping it happening
+            on a schedule.
+
+            The timer is removed rather than merely un-wanted, so a
+            `switch` actually stops a running timer instead of leaving it
+            armed until the next reboot.
+
+            Currently false fleet-wide — see TODO.md's "rebuild the
+            update/build/deploy pipeline properly".
+          '';
+        };
+
         autoReboot = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -144,7 +162,7 @@ in
           };
         };
 
-        systemd.timers.pull-deploy = {
+        systemd.timers.pull-deploy = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.dates;
