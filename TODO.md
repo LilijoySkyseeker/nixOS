@@ -372,6 +372,44 @@ them rot.
       sufficient long-term or whether basic protections belong at the
       homelab layer too.
 
+- [ ] **2026-08-27: re-evaluate and replan `flake-update-test` (D11) —
+      how it should execute, with a benefits/risk analysis.** Deferred
+      deliberately rather than answered during the audit; it should not
+      be inherited by default.
+
+      **What it does today.** Weekly (`Wed 03:00` on homelab) it runs
+      `git reset --hard origin/master`, `nix flake update`, and — if
+      `nixos-rebuild build` succeeds — `git merge --ff-only` and
+      `git push origin master`. So a green build is the *only* gate on
+      writing to `master`, and `master` is unattended fleet root.
+
+      **Why it needs a replan rather than a yes/no.** Commit `3f2c418`
+      repaired a mechanism that had never once completed (zero automated
+      `flake.lock` commits in 1371). Deploying it makes it live for the
+      first time, so there is no track record to judge it on. Points to
+      weigh:
+      - *Benefit*: upstream input updates get build-tested weekly instead
+        of accumulating into one large risky bump.
+      - *Risk*: a build-success gate does not test **behaviour**. A
+        change that builds and breaks at runtime merges anyway, and the
+        next `auto-switch` deploys it fleet-wide unattended.
+      - *Risk*: it is an unattended writer to fleet root, which is the
+        exact asset `F-P0-01`/H1 is about. Branch protection now blocks
+        force-pushes and deletions but not this.
+      - *Alternative*: push an `auto-update` branch on success and let a
+        human merge — keeps the testing, removes the unattended write.
+      - *Alternative*: keep auto-merge but gate on the VM test suite
+        (`nix flake check`) rather than a bare build.
+      - Note it does an unguarded `git checkout master && git reset
+        --hard`, so it will also move `/etc/nixos` off any other branch
+        it finds — relevant while a host is deliberately parked on one.
+
+      **Also decide the interaction with `auto-switch`**, which is the
+      other half: `flake-update-test` (Wed) writes master and
+      `auto-switch` (Thu) deploys it, so the two together are a fully
+      unattended upstream-to-production pipeline with no human in it.
+      *(D11, F-P7-10, H1)*
+
 - [ ] **2026-08-27: the three Minecraft/Factorio mod-supply tightenings
       that survive auto-update.** D14 was answered "keep auto-updating"
       and the risk is accepted in `docs/accepted-risks.md` AR-7 — but

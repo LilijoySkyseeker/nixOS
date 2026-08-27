@@ -238,6 +238,49 @@ untouched with no `config.lock` beside it. Built on all four hosts.
 **Not switched, so the fleet is still not deploying.** This lands only
 when the branch does.
 
+**Note on 2.1's egress bug, found by deploying it (2026-08-27).** The
+guard shipped matching on `--dport` alone. That also matches traffic a
+container *sends*, for any protocol using the same port at both ends —
+and Factorio is one: the server heartbeats to the public matching
+servers with `SPT=34197 DPT=34197`. So within half an hour of the first
+real deploy the guard was silently dropping factorio's own heartbeat.
+
+**The failure shape is the interesting part.** It is quiet and
+asymmetric: inbound play keeps working perfectly, while the server drops
+off the public server list. Nothing fails, nothing logs, and the symptom
+("nobody can find the server") looks like a DNS or port-forward problem
+several layers away from the actual cause.
+
+**How it was caught**: not by the tests, which all passed, but by reading
+the guard's own packet counters after deploying — the DROP rule for
+34197 was incrementing while the wg0 RETURN rule sat at zero, which is
+backwards. Logging inside the chain gave it away immediately:
+
+```
+IN=docker0 OUT=enp3s0 SRC=172.17.0.3 DST=139.162.87.206 SPT=34197 DPT=34197
+```
+
+**Fix**: every rule is pinned to the docker bridge with `-o`, via a new
+`bridgeInterface` option (default `docker0`). Direction is unambiguous
+once the interfaces are read rather than the ports:
+
+```
+inbound to a container    IN=wg0|tailscale0   OUT=docker0
+outbound from container   IN=docker0          OUT=enp3s0
+```
+
+Two subtests were added: one asserts every `--dport` rule carries
+`-o <bridge>`, the other sends a same-port packet *out* of a real
+container and asserts the DROP counter does not move. Verified live
+afterwards — the counter held at 0 across 75 seconds where it had been
+climbing, and factorio logged `Matching server game ... has been
+created` / `Matching server connection resumed`.
+
+**The lesson generalises past this module**: a port-matching firewall
+rule in a `FORWARD` chain is direction-agnostic unless you say
+otherwise, and "same port at both ends" is common in game and peer-to-peer
+protocols. Match the interface, not just the port.
+
 **Note on 2.9 — three of the four port groups were removed, not
 scoped, so the hard part evaporated.** The item was scoped as needing a
 new per-host LAN-interface option (thinkpad declares no interface names)

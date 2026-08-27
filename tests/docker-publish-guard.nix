@@ -128,13 +128,24 @@ pkgs.testers.runNixOSTest {
         rules = machine.succeed(f"iptables -S {chain}")
         for proto, port in [("tcp", 25565), ("udp", 19132),
                             ("udp", 34197)]:
+            # Matched on components rather than one exact string: the rule
+            # text legitimately grows (it gained `-o docker0`), and an
+            # exact-match assertion fails on a correct change while still
+            # not proving the parts that matter are present.
             for iface in ["wg0", "tailscale0"]:
-                expected = f"-A {chain} -i {iface} -p {proto} -m {proto} --dport {port} -j RETURN"
-                assert expected in rules, \
+                accept = [
+                    r for r in rules.splitlines()
+                    if f"-i {iface}" in r and f"--dport {port}" in r
+                    and f"-p {proto}" in r and "-j RETURN" in r
+                ]
+                assert accept, \
                     f"missing accept for {proto}/{port} on {iface}:\n{rules}"
-            expected_drop = f"-A {chain} -p {proto} -m {proto} --dport {port} -j DROP"
-            assert expected_drop in rules, \
-                f"missing drop for {proto}/{port}:\n{rules}"
+            drop = [
+                r for r in rules.splitlines()
+                if f"--dport {port}" in r and f"-p {proto}" in r
+                and "-j DROP" in r and "-i " not in r
+            ]
+            assert drop, f"missing drop for {proto}/{port}:\n{rules}"
 
     with subtest("the DROP comes after the RETURNs, or it would drop everything"):
         rules = machine.succeed(f"iptables -S {chain}").splitlines()
@@ -177,6 +188,38 @@ pkgs.testers.runNixOSTest {
     with subtest("restarting the guard closes it again"):
         machine.succeed("systemctl start docker-publish-guard.service")
         client.fail("nc -w 5 -z machine 8080")
+
+    with subtest("guard rules only apply to traffic entering the bridge"):
+        # Regression: the rules originally matched on --dport alone, which
+        # also matches traffic a container *sends* when the protocol uses
+        # the same port at both ends. Factorio's server heartbeat does
+        # (SPT=34197 DPT=34197), so the guard silently de-listed the live
+        # server from the public server list while inbound play still
+        # worked. Every rule must be pinned to the bridge with -o.
+        rules = machine.succeed(f"iptables -S {chain}").splitlines()
+        for r in rules:
+            if "--dport" not in r:
+                continue
+            assert "-o docker0" in r, \
+                f"rule not pinned to the bridge, will match outbound traffic too:\n{r}"
+
+    with subtest("a container's own outbound same-port traffic is not dropped"):
+        # Send from inside the container to an outside address using the
+        # guarded port as *source* and destination, the shape that broke.
+        before = machine.succeed(
+            f"iptables -vnL {chain} | grep 'dpt:34197' | tail -1"
+        ).split()[0]
+        machine.succeed(
+            "docker exec listener sh -c "
+            "'echo hi | nc -u -w 1 -p 34197 192.0.2.1 34197' || true"
+        )
+        after = machine.succeed(
+            f"iptables -vnL {chain} | grep 'dpt:34197' | tail -1"
+        ).split()[0]
+        assert before == after, (
+            f"the container's outbound packet hit the DROP rule "
+            f"({before} -> {after}); the guard is filtering egress"
+        )
 
     with subtest("the guard survives a docker restart"):
         # docker recreates the FORWARD -> DOCKER-USER jump on start. If

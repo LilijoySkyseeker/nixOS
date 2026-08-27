@@ -18,18 +18,28 @@
       # the chain and the jump to it, then leaves the contents alone.
       chain = "docker-publish-guard";
 
-      portRules = lib.concatMapStringsSep "\n" (
-        p:
-        let
-          match = "-p ${p.protocol} --dport ${toString p.port}";
-        in
-        ''
-          # ${p.comment}
-          ${lib.concatMapStringsSep "\n" (
-            iface: "iptables -A ${chain} -i ${iface} ${match} -j RETURN"
-          ) cfg.allowedInterfaces}
-          iptables -A ${chain} ${match} -j DROP''
-      ) cfg.ports;
+      # `-o <bridge>` is load-bearing, not tidiness. Without it the rules
+      # match on --dport alone and so also match traffic a container
+      # *sends*, whenever the protocol uses the same port at both ends.
+      # Factorio does exactly that: the server heartbeats to the public
+      # matching servers with SPT=34197 DPT=34197, so a dport-only DROP
+      # silently de-lists the server while inbound play still works.
+      # Observed live on homelab, 2026-08-27, within half an hour of
+      # first deploying this guard.
+      #
+      # Direction is unambiguous once you look at the interfaces:
+      #   inbound to a container   IN=wg0|tailscale0  OUT=docker0
+      #   outbound from container  IN=docker0         OUT=enp3s0
+      # so pinning OUT to the bridge keeps this to traffic entering the
+      # container network, which is the only thing it is meant to police.
+      match = p: "-o ${cfg.bridgeInterface} -p ${p.protocol} --dport ${toString p.port}";
+
+      portRules = lib.concatMapStringsSep "\n" (p: ''
+        # ${p.comment}
+        ${lib.concatMapStringsSep "\n" (
+          iface: "iptables -A ${chain} -i ${iface} ${match p} -j RETURN"
+        ) cfg.allowedInterfaces}
+        iptables -A ${chain} ${match p} -j DROP'') cfg.ports;
     in
     {
       options.myDockerPublishGuard = {
@@ -64,6 +74,23 @@
             would need a hardcoded 100.64.0.0/10 address that this repo
             otherwise never hardcodes, and that would break silently if
             the node were ever re-registered.
+          '';
+        };
+
+        bridgeInterface = lib.mkOption {
+          type = lib.types.str;
+          default = "docker0";
+          description = ''
+            The docker bridge published containers sit behind. Every rule
+            is pinned to it with `-o`, so the guard only ever sees traffic
+            being forwarded *into* the container network.
+
+            Without this the rules match on destination port alone, and a
+            protocol that uses the same port at both ends — Factorio's
+            server heartbeat is one — has its *outbound* packets matched
+            and dropped too. That failure is quiet and asymmetric:
+            inbound play keeps working while the server drops off the
+            public server list.
           '';
         };
 
