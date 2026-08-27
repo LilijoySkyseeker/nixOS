@@ -16,5 +16,10 @@
         pkgs = config.flake.pkgsUnstable;
         zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
       };
+
+      checks.docker-publish-guard = import ../../tests/docker-publish-guard.nix {
+        pkgs = config.flake.pkgsUnstable;
+        dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
+      };
     };
 }

@@ -171,7 +171,7 @@ Behaviour changes, not just config. Each needs
 
 | # | Fix | Finding | Why it needs more than a build |
 |---|---|---|---|
-| 2.1 | **Blocked on D13** — the load-bearing IPv6 dependency is now documented in `hosts/homelab/configuration.nix` (zero-risk half done); the packet-path change needs a user decision. See the note | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
+| 2.1 | **Done** (`myDockerPublishGuard`) — D13 answered "never from the LAN", so the publishes are filtered in FORWARD via DOCKER-USER, allowing only wg0 and tailscale0. **VM-tested with a real container and a real client, both directions.** See the note | H3 (`F-P4-02` `F-P3-04`) | changes the packet path for four live game servers; get it wrong and either they are unreachable or still exposed |
 | 2.2 | **Blocked on D14** — pinning changes what runs and the finding requires a start-and-play check, which is not an agent's to do | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
 | 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
 | 2.4 | **Done, and better than planned** — plover was declared unused by the user (2026-08-27), so the grant is *removed* rather than narrowed. No `hardware.uinput.enable` needed. See the note | C2 (`F-P1-01` `F-P8-09`), also `F-P8-21` | the functional dependency turned out not to exist |
@@ -180,6 +180,59 @@ Behaviour changes, not just config. Each needs
 | 2.7 | **Done** — all four parts of the proposed fix, VM-tested including the drift scenario itself | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | **Done** — both halves, and `tests/zrepl-replication.nix` extended to cover them (it now does). One correction to `F-P6-03`'s text; see the note | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.1 — the fix had to move chains, not just tighten a rule.**
+D13 was answered "never from the LAN — only tailnet or the public
+address", so there was no exception to carve out.
+
+The obvious fix, binding each publish to an address, was **rejected**.
+The public path is fine that way (vps DNATs all four ports to
+`10.100.0.2`, homelab's static wg0 address), but the tailnet path is
+not: tailscale assigns that address, this repo hardcodes a
+`100.64.0.0/10` address exactly nowhere, and a hardcoded one would break
+silently if the node were ever re-registered. So the guard filters on
+the **input interface** instead — `wg0` and `tailscale0` — which is also
+what `docs/hardening.md` standing rule 5 asks for.
+
+It lives in a new `modules/nixos/docker-publish-guard.nix` rather than
+inline in the host, for a specific reason: `modules/flake/checks.nix`
+takes a *module*, so making it a module is what makes it testable. It
+owns a private `docker-publish-guard` chain, rebuilt from scratch on
+every run, with `DOCKER-USER` jumping into it exactly once. Only the
+named ports are matched; everything else RETURNs, so inter-container
+traffic and every other container are untouched.
+
+**The old rules were left in place, with a correction.**
+`modules/services/{minecraft,factorio}.nix` still carry their
+`networking.firewall.interfaces.{tailscale0,wg0}` entries. They are
+correct for anything that reaches INPUT and they document the intent,
+but they never constrained the published ports and the comments now say
+so and point at the guard. Do not delete one without the other.
+
+**Verification — nine subtests, `tests/docker-publish-guard.nix`.** The
+rule-shape assertions are the weaker half and are deliberately not the
+whole test: rules existing is exactly the evidence that was already true
+of the INPUT rules this replaces, which existed and did nothing. So the
+test also builds a local busybox image (no network), runs it as a real
+container publishing 8080, and drives a real second node at it:
+
+- a client on an unlisted interface **cannot** reach the container;
+- with the guard stopped the *same* connection succeeds and returns the
+  expected payload — so the failure above is the guard, not a broken rig;
+- restarting the guard closes it again;
+- the guard survives `systemctl restart docker` (docker recreates the
+  FORWARD jump, and a guard that vanished there would reopen the ports
+  with nothing to report it);
+- re-running converges rather than duplicating rules.
+
+**Still IPv4-only, on purpose.** docker's ip6tables chains do not exist
+while container IPv6 is off, so an ip6tables rule would have nothing to
+attach to. `hosts/homelab/configuration.nix`'s comment now carries this
+as the one remaining live warning: enabling `ipv6 = true` or restoring
+`userland-proxy` without extending the guard converts a LAN exposure
+into an internet one.
+
+**Not switched.** The LAN path is closed only once this is deployed.
 
 **Note on 2.4 — the premise changed, so the fix got simpler and
 stronger.** The whole item was shaped around "plover must still work;

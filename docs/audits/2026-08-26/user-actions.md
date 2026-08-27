@@ -247,12 +247,21 @@ drafted.
       **ANSWERED 2026-08-27 — no.** The user never connects from a LAN
       machine: game access is over the tailnet, or over the public
       address through vps. So no LAN-scoped exception is needed and the
-      clean fix applies. The two paths that must keep working are
-      therefore exactly: **wg0 `10.100.0.2`** (public players, DNAT'd by
-      vps) and **`tailscale0`** (the user's own devices). Anything on
-      `192.168.1.0/24` should go from working to refused — that is the
-      intended, verifiable behaviour change.
-      **Unblocks wave 2 item 2.1.** *(F-P4-02, F-P3-04)*
+      clean fix applies.
+
+      **FIXED the same day — wave 2 item 2.1 is done.** A new
+      `myDockerPublishGuard` module filters the four ports in FORWARD via
+      DOCKER-USER, allowing only `wg0` (public players, DNAT'd in by vps)
+      and `tailscale0`. VM-tested with a real container and a real client
+      in both directions, nine subtests. **Not switched**, so the LAN
+      path is still open on the live host until this is deployed.
+
+      **After deploying, check from three positions**, per the finding:
+      a LAN host (should go from working to **refused**), a tailnet host
+      (unchanged), and the public path through vps (unchanged). If public
+      play breaks, the guard is the first thing to look at — but note it
+      fails *loudly*, since a wrong interface list refuses connections
+      rather than silently allowing them. *(F-P4-02, F-P3-04)*
 
       Already done and needing no decision: the load-bearing dependency
       is now written down in `hosts/homelab/configuration.nix` — the only

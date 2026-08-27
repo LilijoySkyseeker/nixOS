@@ -265,16 +265,23 @@ them rot.
       **wave 1 is complete, and wave 2 is complete as far as an agent can
       take it**: 2.3, 2.4, 2.5, 2.7 and 2.8 done, 2.6 two-thirds done,
       and 2.1/2.2/2.9 blocked on user decisions (D9, D13, D14) rather
-      than on work. **Wave 4 / Phase 4 is done** (see above); wave 3 is
-      user-only by definition and not started. All work is on
+      than on work. **Item 2.1 landed 2026-08-27** once D13 was answered
+      — `myDockerPublishGuard` filters the four published game ports in
+      FORWARD via DOCKER-USER, allowing only wg0 and tailscale0, VM-tested
+      with a real container and client. **Wave 4 / Phase 4 is done** (see
+      above); wave 3 is user-only by definition and not started. All work
+      is on
       `worktree-worktree-security-audit-plan`, build-verified on
       homelab, vps, torrent and thinkpad, and **never switched**.
 
-      Three changes are VM-tested rather than merely built: the
+      Four changes are VM-tested rather than merely built: the
       `zfs-emergency-prune` sandbox, the vps `ipset` fail-open fix
-      (including the parameter-drift scenario itself), and both halves of
-      2.8 (including a simulated hostile sender). `tests/zrepl-replication.nix`
-      and `tests/zfs-space-guard.nix` both grew permanent subtests.
+      (including the parameter-drift scenario itself), both halves of
+      2.8 (including a simulated hostile sender), and 2.1's DOCKER-USER
+      guard. `tests/zrepl-replication.nix` and `tests/zfs-space-guard.nix`
+      both grew permanent subtests, and `tests/docker-publish-guard.nix`
+      is a new nine-subtest check that drives real packets at a real
+      container rather than asserting on rule text alone.
 
       Read `docs/audits/2026-08-26/RESUME.md` first — it is written to
       be picked up cold.

@@ -178,8 +178,8 @@ reasoning and the verification for each one done so far.
 
 | # | Item | State |
 |---|---|---|
-| 2.1 | docker publishing past the firewall | **blocked** on D13; zero-risk half done (`bd6db07`) |
-| 2.2 | image/mod pinning | **blocked** on D14 (needs a start-and-play check) |
+| 2.1 | docker publishing past the firewall | **done** — D13 answered, `myDockerPublishGuard` added, VM-tested |
+| 2.2 | image/mod pinning | **answered, not pinned** — D14 accepts auto-update (`accepted-risks.md` AR-7); version now follows the mod set |
 | 2.3 | laptop sshd baseline + doc correction | **done** (`6b623c0`) |
 | 2.4 | `input` → `hardware.uinput` | **done** (`d6236cb`) — plover removed outright instead |
 | 2.5 | NFS mount options | **done** (`516ef31`) |

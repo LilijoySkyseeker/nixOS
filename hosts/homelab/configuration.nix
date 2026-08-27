@@ -64,13 +64,62 @@
   # 0.0.0.0 with none on ::. So the exposure today is LAN-wide, not
   # internet-wide.
   #
-  # Do not set `ipv6 = true` here, and do not restore userland-proxy,
-  # without first scoping these publishes to an address (or adding a
-  # DOCKER-USER allowlist). Either change silently converts a LAN
-  # exposure into an internet one, with no firewall rule in this repo
-  # capable of stopping it.
+  # RESOLVED 2026-08-27 by myDockerPublishGuard below, which adds the
+  # DOCKER-USER allowlist this comment asked for. The four ports are now
+  # filtered in FORWARD, where DNAT'd traffic actually goes, rather than
+  # in INPUT, where it never arrives. The LAN path described above is
+  # closed; the wg0 and tailscale0 paths are unchanged.
+  #
+  # The IPv6 warning below still stands and is now the only thing left
+  # in this comment that is load-bearing: the guard is IPv4-only, because
+  # docker's ip6tables chains do not exist while container IPv6 is off,
+  # so an ip6tables rule would have nothing to attach to. Do not set
+  # `ipv6 = true` here, and do not restore userland-proxy, without
+  # extending the guard to ip6tables first. Either change silently
+  # converts a LAN exposure into an internet one.
   virtualisation.docker.daemon.settings = {
     userland-proxy = false;
+  };
+
+  # Make the intent that modules/services/{minecraft,factorio}.nix
+  # already declare actually true. Those files scope the game ports to
+  # tailscale0 and wg0 via networking.firewall.interfaces, which reads
+  # correctly and constrains nothing for a published port (F-P4-02);
+  # this is the same policy expressed where it can take effect.
+  #
+  # D13, answered 2026-08-27: the user never reaches these servers from a
+  # LAN machine — only over the tailnet, or over the public address,
+  # which arrives here as wg0 traffic DNAT'd by vps. So there is no LAN
+  # exception to carve out, and anything on 192.168.1.0/24 should go from
+  # working to refused.
+  myDockerPublishGuard = {
+    enable = true;
+    allowedInterfaces = [
+      "wg0" # public players, DNAT'd in by vps (its networking.nat.forwardPorts)
+      "tailscale0" # our own devices
+    ];
+    ports = [
+      {
+        port = 25565;
+        protocol = "tcp";
+        comment = "minecraft: java edition";
+      }
+      {
+        port = 19132;
+        protocol = "udp";
+        comment = "minecraft: geyser bedrock listener";
+      }
+      {
+        port = 34197;
+        protocol = "udp";
+        comment = "old.factorio";
+      }
+      {
+        port = 34198;
+        protocol = "udp";
+        comment = "new.factorio";
+      }
+    ];
   };
 
   # oci containers

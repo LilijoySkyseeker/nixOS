@@ -69,6 +69,12 @@ in
       # actually reach this host — see hosts/vps/configuration.nix's
       # networking.nat.forwardPorts) — scope to just those two
       # interfaces.
+      #
+      # These rules are NOT what enforces that for the published ports —
+      # a `-p` publish never traverses INPUT, so an INPUT rule cannot
+      # constrain it (F-P4-02). Enforcement lives in
+      # `myDockerPublishGuard` on homelab, which applies the same
+      # interface list in FORWARD via DOCKER-USER. Change both together.
       networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
         34197 # old.factorio
         34198 # new.factorio

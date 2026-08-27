@@ -63,6 +63,7 @@ in
         nixosModules."health-alerts"
         nixosModules."push-deploy"
         nixosModules."zrepl"
+        nixosModules."docker-publish-guard"
         nixosModules.jellyfin
         nixosModules.minecraft
         nixosModules.factorio

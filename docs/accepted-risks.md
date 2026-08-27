@@ -236,7 +236,7 @@ it leaves this file entirely.
 | D10 | An open port (UDP 10400/10401) nobody can attribute | wave 2 §2.9 |
 | D11 | That `flake-update-test` auto-merges upstream updates to fleet root on build success alone | `F-P7-10` |
 | D12 | That the NFS shares stay executable — see AR-6 | `F-P6-05` |
-| ~~D13~~ | **Answered 2026-08-27 — not accepted, being fixed.** The user never reaches the game servers from the LAN, so the publishes get bound to wg0 and tailscale0 (wave 2 item 2.1). | `F-P4-02`, `F-P3-04` |
+| ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
 | ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |
 
 Two of these have a written home waiting for them: **D2** must land in

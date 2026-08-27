@@ -20,6 +20,16 @@ in
       # the wg0 tunnel from vps (which is how vps's DNAT'd public game
       # ports actually reach this host — see hosts/vps/configuration.nix's
       # networking.nat.forwardPorts) — scope to just those two interfaces.
+      #
+      # These rules are NOT what enforces that for the published ports.
+      # A `-p` publish DNATs in nat/PREROUTING before the routing
+      # decision, so the packet is forwarded and never traverses INPUT,
+      # which is the only place these rules exist (F-P4-02). They are
+      # kept because they are correct for any path that *does* reach
+      # INPUT and because they document the intent, but the enforcement
+      # lives in `myDockerPublishGuard` on homelab, which applies the
+      # same interface list in FORWARD via DOCKER-USER. Change both
+      # together or they will disagree.
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
         25565
       ];
