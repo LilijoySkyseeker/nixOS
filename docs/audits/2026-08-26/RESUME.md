@@ -87,6 +87,8 @@ All build-verified on all four hosts. **Not switched.**
 | `40255bd` | `github.com` host key pinned fleet-wide, verified against GitHub's published fingerprint | F-P7-04/P3-05/P0-07 |
 | `abdd049` | `myHealthAlerts` enabled on torrent and thinkpad, `checkSmart = false` on both; `sops.secrets.vps_caddy_env` deleted; `user-actions.md` added | F-P7-09, F-P2-13/P8-18, F-P8-11 |
 | `6b623c0` | **wave 2 starts.** Full sshd baseline on both laptops as `settings`, `allowSFTP = false`; `docs/hardening.md`'s false `AllowTcpForwarding` claim corrected | F-P5-07, F-P2-09/P3-18 |
+| `516ef31` | `nosuid` + `nodev` on both NFS client mounts; `noexec` considered and declined | F-P6-05 |
+| `3ce7d7a` | `zfs-emergency-prune` sandboxed (**VM-tested**); `crowdsec-allowlist-tailnet` sandboxed and moved off root to the `crowdsec` user; `push-deploy-vps`'s false `ReadOnlyPaths` claim corrected | F-P6-06, F-P2-08, F-P7-06 |
 
 ### Consequences to know before deploying any of it
 
@@ -101,6 +103,11 @@ All build-verified on all four hosts. **Not switched.**
 - **`40255bd` fails closed.** If GitHub rotates that key, unattended
   deploys stop until it is updated. That is the intended trade, but it
   is why F-P7-09 (nothing notices a failed deploy) matters.
+- **`3ce7d7a` changes who runs `crowdsec-allowlist-tailnet`.** It drops
+  from root to the `crowdsec` user. If the tailnet exemption ever stops
+  applying after deploying it, check that unit first — a CrowdSec that
+  bans the admin's own tailnet IP is the failure this unit exists to
+  prevent, and it was observed live on 2026-08-26.
 - **`6b623c0` changes what SSH to the laptops can do.** Nothing in the
   repo relies on any of it, and nothing can log in interactively there
   today, but if that ever changes: `scp`/`sftp` to torrent and thinkpad
@@ -138,12 +145,34 @@ session would otherwise re-derive or get wrong:
   `systemctl --failed`. Do not read "1.9 done" as "deploys are
   observable".
 
-**Wave 2** (nine items, each needs a VM test — see
-[`remediation.md`](remediation.md)): docker publishing past the firewall,
-image/mod pinning, laptop sshd baseline, `input` → `hardware.uinput`,
-NFS mount options, three under-sandboxed root units, the fail-open
-`ipset create`, `zfs hold` on `@blank` + `recv.properties.override`, and
-**2.9** the firewall interface-scoping moved out of wave 1.
+**Wave 2** — nine items, most needing a VM test. See
+[`remediation.md`](remediation.md), whose per-item notes carry the
+reasoning and the verification for each one done so far.
+
+| # | Item | State |
+|---|---|---|
+| 2.1 | docker publishing past the firewall | not started |
+| 2.2 | image/mod pinning | not started |
+| 2.3 | laptop sshd baseline + doc correction | **done** (`6b623c0`) |
+| 2.4 | `input` → `hardware.uinput` | not started |
+| 2.5 | NFS mount options | **done** (`516ef31`) |
+| 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
+| 2.7 | fail-open `ipset create` | not started |
+| 2.8 | `zfs hold` on `@blank` + `recv.properties.override` | not started |
+| 2.9 | firewall interface-scoping (moved out of wave 1) | **blocked** on a user decision |
+
+**Two things a next session should not re-derive.**
+
+- **Prefer the finding over the wave-plan row when they disagree** — it
+  has happened three times now (1.7, 2.5, and 2.6's `ReadWritePaths`).
+  The rows are summaries; the findings are the analysis written against
+  the file, with the `file:line` evidence.
+- **`push-deploy-vps` is the one piece of 2.6 left**, and it is deferred
+  on purpose, not forgotten. Its misleading comment is fixed; the
+  sandbox is not applied. It needs a VM test with a *real remote target*
+  because `PrivateTmp` and `ProtectSystem = "strict"` can break the SSH
+  control-master path and nix's fetcher cache, and a wrong guess means
+  vps silently stops updating with nothing to report it.
 
 **2.9 is blocked on a user decision** — should KDE Connect, Steam remote
 play and mDNS keep working on the LAN? It also needs a per-host
