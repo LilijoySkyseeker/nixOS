@@ -303,7 +303,17 @@ in
       # Define a user account. Don't forget to set a password with ‘passwd’.
       users.users.lilijoy = {
         isNormalUser = true;
-        initialPassword = "123456";
+        # No initialPassword here. This repo is public, so any value set here
+        # is a published credential rather than a weak one -- it previously
+        # read "123456" (F-P1-03). Removing it does not change an already-set
+        # password: initialPassword only applies when the account is created,
+        # so this stops publishing the value but does not itself remediate a
+        # host where it was never changed. torrent is confirmed clear (its
+        # password was last changed after install); thinkpad was offline
+        # during the audit and still needs `passwd -S lilijoy` checked.
+        #
+        # If a declarative password is ever wanted here, use
+        # hashedPasswordFile pointing at a sops secret -- never a literal.
         description = "Lilijoy";
         extraGroups = [
           "networkmanager"

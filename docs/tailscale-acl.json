@@ -61,31 +61,30 @@
         },
     ],
 
-    "ssh": [
-        // tag:vps is deliberately NOT a dst here (and never should be) —
-        // Tailscale's own SSH feature (services.tailscale.extraUpFlags
-        // = ["--ssh"]) intercepts and fully bypasses the real sshd on a
-        // matched host, including its authorized_keys ForceCommand
-        // restrictions. vps relies on that ForceCommand to lock its
-        // dedicated push-deploy user (vps-deploy) down to an allowlist
-        // of exactly three commands (see hosts/vps/configuration.nix) —
-        // confirmed live that Tailscale SSH matched and intercepted a
-        // connection to vps-deploy before this fix, entirely outside
-        // that restriction. Every user on vps, root included, must go
-        // through real OpenSSH only.
-        {
-            "action": "check",
-            "src":    ["autogroup:member"],
-            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
-            "users":  ["autogroup:nonroot", "root"],
-        },
-        // tagged devices have no user identity to run a "check" (WebAuthn
-        // re-auth) against, so device-to-device SSH must use "accept".
-        {
-            "action": "accept",
-            "src":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
-            "dst":    ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
-            "users":  ["autogroup:nonroot", "root"],
-        },
-    ],
+    // There is deliberately NO "ssh" block here any more.
+    //
+    // Removed 2026-08-26 by the security audit (F-P0-05 / F-P8-12). It had
+    // no effect, because Tailscale SSH is not enabled on any host — verified
+    // three independent ways: no --ssh in any host's evaluated
+    // extraUpFlags, no `tailscale set --ssh` anywhere in the repo, and
+    // `tailscale status --json` reporting sshHostKeys: null for every peer
+    // (which also rules out an imperative enable the config would not show).
+    //
+    // It was removed rather than left inert because it was a loaded footgun:
+    // a rule granting device-to-device SSH as **root** across tag:thinkpad,
+    // tag:torrent, tag:homelab and tag:isoimage, disarmed only by a setting
+    // in a different file. Two of those four hosts set PermitRootLogin =
+    // "forced-commands-only" as their entire root-login policy, and
+    // Tailscale SSH intercepts *all* SSH to a matched host, bypassing real
+    // sshd including authorized_keys ForceCommand restrictions — it already
+    // broke vps's push-deploy allowlist once, confirmed live. So anyone who
+    // ever enabled --ssh would have silently granted exactly what those
+    // hosts are configured to refuse.
+    //
+    // If Tailscale SSH is ever genuinely wanted, write the rules then, with
+    // that trade-off in front of you. Do not restore these.
+    //
+    // The prohibition itself is documented at length in
+    // modules/profiles/default.nix, which is the thing actually keeping
+    // --ssh off.
 }
