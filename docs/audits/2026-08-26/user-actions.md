@@ -29,7 +29,10 @@ broken neither could fire.
       **D11**, which is deliberately unanswered. Note the framing in D11
       below ("decide before deploying that commit") is now overtaken:
       homelab **is** deployed on this branch, so the behaviour has
-      already been inherited and the clock is running. *(F-P7-10)*
+      already been inherited and the clock is running. The requested
+      benefits/risk analysis is written:
+      [`D11-analysis.md`](D11-analysis.md) — read §6 for the four
+      options and §7 for the recommendation. *(F-P7-10)*
 
 - [ ] **Thu 2026-09-03 03:00 — `auto-switch` fires and reverts this
       branch off homelab.** It builds `master` and switches homelab to
@@ -493,6 +496,16 @@ neither has an acceptance write-up to draft. Leave §2 at D1–D14.
       to `master` on **build success alone**, where `master` is
       unattended fleet root. Decide before deploying that commit rather
       than inheriting the behaviour. *(F-P7-10)*
+
+      **The benefits/risk analysis you asked for is written:**
+      [`D11-analysis.md`](D11-analysis.md). Short version — the gate
+      builds **only homelab**, which is the one host on
+      `nixpkgs-stable`, while vps, torrent and thinkpad run
+      `nixpkgs-unstable`; `stylix` and `nvf` are never built at all; and
+      the repo's five VM tests are never run. Recommendation is **(c):
+      keep auto-merge but widen the gate** to build all four hosts and
+      run `nix flake check`, because the realistic alternative to
+      unattended updates is no updates. Read §6 for the four options.
 
       **Overtaken by events, 2026-08-27.** homelab was switched onto this
       branch, so the commit **is** deployed and the behaviour **has**

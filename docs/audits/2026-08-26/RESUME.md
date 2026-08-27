@@ -62,6 +62,7 @@ file.
 | [`remediation.md`](remediation.md) | The wave plan **and the per-item notes**, which carry the reasoning and verification for everything done. |
 | [`user-actions.md`](user-actions.md) | **Everything only the user can do**, as a live checklist, incl. decisions D1–D16. Its new **§0 is time-critical** — the two timers below. |
 | [`live-verification.md`](live-verification.md) | Live checks with commands and results. |
+| [`D11-analysis.md`](D11-analysis.md) | **The benefits/risk analysis for D11** (auto-merge), written in the fourth session. Time-critical — D11 fires Wed 2026-09-02. |
 
 Documentation harvested out of the audit into standing docs:
 `docs/hardening.md` (eleven standing rules — the eleventh added in the

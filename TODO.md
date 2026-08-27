@@ -13,6 +13,53 @@ them rot.
 
 ## Active
 
+- [ ] **Move `vps` from `nixpkgs-unstable` to `nixpkgs-stable`.** Raised
+      2026-08-27 while writing the D11 analysis, which surfaced the
+      split: `modules/flake/hosts.nix` builds **homelab** from
+      `nixpkgs-stable` (nixos-26.05) with `home-manager-stable`, but
+      **vps**, **torrent** and **thinkpad** from `nixpkgs-unstable`.
+
+      vps is the other *server*, and the only host with a public
+      interface — it should track the same conservative branch homelab
+      does, not the fast-moving one. Today it takes unstable's churn on
+      the box running Caddy, CrowdSec and the wireguard endpoint, and it
+      is deployed unattended (homelab builds its closure and pushes it).
+
+      Two reasons this is more than tidiness:
+
+      - **It shrinks D11's blast radius directly.** The auto-merge gate
+        builds only homelab, i.e. only `nixpkgs-stable`. Moving vps to
+        stable means two of the four hosts are covered by the input the
+        gate actually tests, instead of one.
+      - vps has ~2GB RAM and builds nothing itself; a stable branch
+        means fewer, smaller rebuilds pushed to it.
+
+      Not a one-liner: check what on vps needs unstable (`copyparty` is
+      isoimage-only, so probably nothing), whether the stable branch has
+      the CrowdSec/Caddy versions in use, and swap `home-manager` for
+      `home-manager-stable` in its `specialArgs` the way homelab does to
+      avoid a version mismatch. Build-verify before deploying, and diff
+      the closure with `nvd` — this changes essentially every package on
+      the host. See `docs/audits/2026-08-26/D11-analysis.md` §2.
+
+      **Write the rule down as part of this.** The intended convention
+      is **servers track `nixpkgs-stable`, PCs track
+      `nixpkgs-unstable`** — servers want boring and predictable, and
+      the desktops are where new packages are actually wanted. That
+      rule currently exists nowhere: it has to be inferred from
+      `modules/flake/hosts.nix`, and inferring it from today's code
+      gives the *wrong* answer, because vps contradicts it. That is
+      probably how vps drifted in the first place, and it is exactly
+      the "durable convention living only in someone's head" case
+      `docs/procedures/updating-documentation.md` exists for.
+
+      **The rule is now written** — `docs/architecture.md`, "Which
+      nixpkgs a host tracks", with vps named as a known deviation
+      pointing back here. Done ahead of the move itself, deliberately:
+      the undocumented convention is the part that keeps costing, and a
+      rule with a named exception beats no rule. What remains here is
+      the actual move, after which that deviation note comes out.
+
 - [ ] **2026-08-26: fleet-wide security hardening audit + "is this
       still needed?" config review, run as a multi-agent pass.**
       Originally scoped to homelab only (see trigger below); widened
