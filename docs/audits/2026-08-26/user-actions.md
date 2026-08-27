@@ -17,19 +17,18 @@ the evidence without re-deriving it.
 
 ## 0. Time-critical — two timers are running
 
-> **2026-08-27: the fleet's scheduled deploys are disabled *on this
-> branch*, and that is exactly the problem.** `scheduleEnable = false`
-> now removes the `flake-update-test`, `auto-switch`, `push-deploy-vps`
-> and both `pull-deploy` timers — verified absent from all four built
-> systems. **But nothing is deployed.** The live hosts are still running
-> the configuration that has those timers armed, so **both deadlines
-> below are still real** until someone switches homelab.
+> **RESOLVED 2026-08-27 — homelab deployed, both timers stopped.** Done
+> on your explicit instruction; homelab is on generation **346**.
+> `switch-to-configuration` reported stopping `auto-switch.timer`,
+> `flake-update-test.timer` and `push-deploy-vps.timer`, and
+> `systemctl list-timers` for all three now returns **0 timers listed**.
+> **Neither deadline below can fire.** Both boxes are ticked on that
+> basis; the rows stay as the record of why.
 >
-> Deploying homelab is the single action that defuses both: it removes
-> the `flake-update-test` timer (so D11 cannot fire Wed) and the
-> `auto-switch` timer (so the Thu revert cannot fire). That is a
-> `switch` on a live host and is **not** something to do unprompted —
-> it needs your go-ahead.
+> vps, torrent and thinkpad were **not** deployed and still have their
+> own timers armed — they stop when those hosts are next deployed.
+> Nothing on them can auto-merge to master or revert homelab, so this
+> is not urgent, but it is not finished either.
 
 
 Everything else in this file waits patiently. These two do not: they act
@@ -37,19 +36,22 @@ on their own, and both are live **because** the audit repaired the deploy
 path in `929efa3`, which homelab is now running. While that path was
 broken neither could fire.
 
-- [ ] **Wed 2026-09-02 03:00 — `flake-update-test` fires.** It does
+- [x] **Wed 2026-09-02 03:00 — `flake-update-test` fires.** *(defused 2026-08-27: timer removed, homelab gen 346.)* It does
       `git reset --hard origin/master` in `/etc/nixos`, runs
       `nix flake update`, and **if it builds, merges and pushes to
       `master`** — unattended, on a build-success gate alone. This is
-      **D11**, which is deliberately unanswered. Note the framing in D11
-      below ("decide before deploying that commit") is now overtaken:
-      homelab **is** deployed on this branch, so the behaviour has
-      already been inherited and the clock is running. The requested
+      **D11**, which is **still deliberately unanswered** — the timer
+      being gone stops it firing, it does not decide it. The framing in
+      D11 below ("decide before deploying that commit") was overtaken
+      twice: homelab was deployed on this branch, inheriting the
+      behaviour, and then deployed again with the timer removed. So the
+      decision is now unhurried rather than urgent, and belongs to the
+      pipeline project in `TODO.md`. The requested
       benefits/risk analysis is written:
       [`D11-analysis.md`](D11-analysis.md) — read §6 for the four
       options and §7 for the recommendation. *(F-P7-10)*
 
-- [ ] **Thu 2026-09-03 03:00 — `auto-switch` fires and reverts this
+- [x] **Thu 2026-09-03 03:00 — `auto-switch` fires and reverts this
       branch off homelab.** It builds `master` and switches homelab to
       it. homelab's `/etc/nixos` was deliberately left on `master`, so
       unless this branch is **merged to master before then**, or the
@@ -131,16 +133,27 @@ broken neither could fire.
       `factorio-main` still uses, so treat it as exposed until rotated at
       factorio.com — and rotating means updating sops too. *(F-P4-04)*
 
-- [ ] **After deploying, confirm the deploy path actually recovers.**
-      As of 2026-08-27 **the fleet is not deploying at all**: both
-      `auto-switch.service` and `push-deploy-vps.service` on homelab have
-      failed on every run since 2026-08-25 with `could not lock config
-      file /root/.config/git/config: Read-only file system`, because the
-      guards wrote to a path home-manager owns as a store symlink. Fixed
-      on this branch and covered by `tests/deploy-guards.nix`, but the
-      fix only takes effect once the branch is deployed — and it cannot
-      deploy itself, precisely because the deploy path is what is broken.
-      **The first switch has to be run by hand.**
+- [x] **After deploying, confirm the deploy path actually recovers.**
+      **Done 2026-08-27**, and then deliberately made moot.
+
+      Both `auto-switch.service` and `push-deploy-vps.service` failed
+      with `could not lock config file /root/.config/git/config:
+      Read-only file system`, because the guards wrote to a path
+      home-manager owns as a store symlink. Fixed on this branch and
+      covered by `tests/deploy-guards.nix`; homelab was deployed by hand
+      and the guards now run clean.
+
+      *(Correction: this entry originally said both units "failed on
+      every run since 2026-08-25" and that the fleet "is not deploying
+      at all". The journal says the 08-25T13:18 runs succeeded — they
+      skipped cleanly — and the failures were the next scheduled runs at
+      08-27T03:00 and 03:15, about ten overnight hours. See
+      `remediation.md`, "Note on 1.9's skipped half".)*
+
+      Moot because the scheduled deploy path is now **switched off**
+      fleet-wide (`scheduleEnable = false`) while the pipeline is
+      rebuilt. The guards still matter — they run on every manual
+      `auto-switch-now` — but nothing runs them on a timer any more.
 
       Afterwards, on homelab: `systemctl start auto-switch.service` and
       check it reaches its guards instead of dying on line one, and

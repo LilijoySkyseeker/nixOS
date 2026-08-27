@@ -10,13 +10,23 @@ session needs is here or linked from here.
 
 ## READ THIS FIRST — two clocks are running
 
-> **Update 2026-08-27:** the fix for both clocks is written but **not
-> deployed**. `scheduleEnable = false` removes every scheduled deploy
-> timer fleet-wide (verified absent from all four built systems), which
-> defuses both rows below. Until homelab is switched, **the live hosts
-> still have the timers armed and both deadlines stand.** Deploying
-> homelab is the one action that stops both; it is a `switch` on a live
-> host, so it needs the user's go-ahead.
+> **RESOLVED 2026-08-27 — both clocks are stopped.** homelab was
+> deployed on the user's explicit instruction (generation **346**), and
+> `switch-to-configuration` reported `stopping the following units:
+> auto-switch.timer, flake-update-test.timer, push-deploy-vps.timer`.
+> Verified live afterwards: `systemctl list-timers auto-switch
+> flake-update-test push-deploy-vps --all` returns **0 timers listed**.
+>
+> **Neither deadline below can now fire.** They are left in place as the
+> record of why the work happened, not as live warnings. The three
+> *services* remain (`linked`), so manual deploys still work — only the
+> clocks are gone. Re-arming is `scheduleEnable = true`, and should not
+> happen before the new pipeline exists (`TODO.md`).
+>
+> The rest of the fleet — vps, torrent, thinkpad — is **still on the old
+> configuration with its timers armed**, since only homelab was
+> deployed. Their `pull-deploy`/push timers stop when they are next
+> deployed.
 
 
 The audit branch is **deployed on homelab and nowhere else**, and
@@ -266,6 +276,33 @@ journal, neither actioned):
   the `stat` that `check_min_switch_interval` needs. Resolved by 13:22
   the same day, but it is a second, independent way that path has
   already broken.
+
+## Second homelab deploy — generation 346 (2026-08-27)
+
+The fourth session's work, deployed on explicit instruction. Verified on
+real hardware afterwards:
+
+| Change | Verified |
+|---|---|
+| Scheduled deploys off | `list-timers auto-switch flake-update-test push-deploy-vps --all` → **0 timers listed**; switch log shows all three being *stopped* |
+| Manual paths intact | `auto-switch`, `auto-switch-now`, `push-deploy-vps` all still present (`linked`) |
+| Container memory ceiling | `memory.max = 7516192768` (exactly 7 GiB) on **both**, was `max` |
+| Container pid ceiling | `pids.max` = **1024** minecraft / **512** factorio, was 19038 |
+| minecraft | `Resolved Minecraft version 26.2 from Modrinth projects`, `Done (1.382s)!`, Geyser up, healthy |
+| factorio | `Matching server game 1293844 has been created` + `connection resumed` — public listing survived the restart under the new cgroup caps |
+| health-check | runs clean, exit 0, no stderr; alert-state dir empty, so the new profile-staleness marker evaluated and found the profile fresh |
+| Tailscale | still `offers exit node`; `net.ipv4.conf.all.forwarding = 1` |
+| Reboot | not needed — kernel unchanged |
+| Overall | **zero failed units** |
+
+Two benign log lines seen and deliberately not chased: factorio's `Got
+EOF on stdin` (normal for a container with no TTY) and Carpet's
+`ctrlQCraftingFix is not a valid rule`, a pre-existing mod-config warning
+unrelated to this change.
+
+**The other three hosts were not deployed** and still have their own
+timers armed. Nothing on them can auto-merge or revert homelab, so it is
+not urgent — but the fleet is in a mixed state.
 
 ## What is verified live on homelab (2026-08-27)
 
