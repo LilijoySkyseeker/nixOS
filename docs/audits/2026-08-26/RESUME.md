@@ -68,9 +68,11 @@ file.
   than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
-- **homelab is deployed** (first switch of this audit, 2026-08-27).
-  `vps`, `torrent` and `thinkpad` are **build-verified only, never
-  switched**.
+- **homelab and vps are deployed** (2026-08-27). homelab was switched
+  twice — the audit's first switch, then again for the fourth session's
+  work (**generation 346**). vps followed (**generation 4**).
+  `torrent` and `thinkpad` remain **build-verified only, never
+  switched**, and still carry their own armed `pull-deploy` timers.
 
 | File | What |
 |---|---|
@@ -304,6 +306,44 @@ unrelated to this change.
 timers armed. Nothing on them can auto-merge or revert homelab, so it is
 not urgent — but the fleet is in a mixed state.
 
+## vps deploy — generation 4 (2026-08-27)
+
+**vps is no longer build-only.** Deployed on explicit instruction, from
+this worktree with `nixos-rebuild switch --flake .#vps --target-host
+root@vps`. Verified after:
+
+| Check | Result |
+|---|---|
+| Failed units | **zero** |
+| `crowdsec-ipset-precreate` (new unit) | active, exit **0** |
+| Both ipsets | exist, `hash:net`, `hashsize 1024 maxelem 131072 timeout 300` — unchanged params, refs 1 and 2 |
+| IPv4 `vps-ratelimit` | crowdsec match + 25565/19132/34197 limits; **34198 rules gone** |
+| IPv6 `vps-ratelimit` | **new chain present** — `crowdsec6-blacklists-0` match + `http-new6` |
+| DNAT | 34197 → `10.100.0.2` kept, **34198 removed** |
+| `vps_caddy_env` | activation logged `removing secret: vps_caddy_env`; 6 secrets remain |
+| CrowdSec | `crowdsec` + bouncer active; allowlist unit exit 0; `trusted-tailnet` intact |
+| Public site, IPv4 | `https://jellyfin.skyseekerlabs.net` → **302** via `137.184.45.18` |
+| Public site, IPv6 | → **302** via `2604:a880:…` — the new rate-limit path does not break real traffic |
+| Tailscale / Caddy | both up |
+
+**Two false alarms worth remembering**, both the same shape — a command
+that looks like it proves absence when it proves nothing:
+
+- `ipset list` returned **empty**. `ipset` is not on root's interactive
+  `PATH` on vps; via its store path both sets were there all along. Same
+  family as the `ip6tables`-looks-empty trap already in this file.
+- `curl https://skyseekerlabs.net` failed with a TLS internal error on
+  **both** families. That is the **apex**, which has no vhost — Caddy
+  serves only `jellyfin.skyseekerlabs.net`. Pre-existing and unrelated;
+  the identical failure on v4 and v6 is what ruled out the new v6 chain,
+  since that could only have affected one family.
+
+**Prerequisite that nearly went wrong:** `push-deploy-vps` must **not**
+be used to deploy this branch. homelab's `/etc/nixos` is on `master`,
+**diverged** (1 local commit, 31 behind), so its `git merge --ff-only`
+would fail — and if it succeeded it would push *master's* vps config,
+undoing the audit changes. See the `/etc/nixos` entry in `TODO.md`.
+
 ## What is verified live on homelab (2026-08-27)
 
 All checked after the deploy, on real hardware:
@@ -367,11 +407,12 @@ tailscale module sets the former.
    the user's.**
 4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
    mount. Re-maps existing volume ownership, so it needs its own VM test.
-5. **Deploy `vps`, `torrent`, `thinkpad`** if the user wants — all
-   build-verified, never switched. vps still carries a stale DNAT rule
-   for the deleted 34198. **homelab is now one deploy behind this
-   branch too**: the fourth session's changes are build- and VM-verified
-   but not switched anywhere.
+5. **Deploy `torrent` and `thinkpad`** if the user wants — still
+   build-verified only. ~~vps still carries a stale DNAT rule for the
+   deleted 34198~~ — **vps deployed 2026-08-27 (generation 4)**, and
+   that DNAT is gone; see the vps section below. homelab is deployed
+   (generation 346). The laptops still have armed `pull-deploy` timers,
+   which stop when they are next switched.
 
 ### User-only
 

@@ -228,20 +228,67 @@ them rot.
       them**. Cheap fix: stagger the `OnCalendar` values and add a
       reboot window. See `docs/audits/2026-08-26/D11-analysis.md` §7.
 
-- [ ] **Nothing rolls back automatically after a bad switch.** Also from
-      the D11 research. A `nixos-rebuild switch` that builds fine but
-      leaves a host unreachable — bad firewall rule, broken sshd,
-      broken network — is recovered only by hand, and on vps that means
-      the provider console. The ecosystem reference is `deploy-rs`'s
-      "magic rollback": after activation it writes a canary and
-      confirms the host is still reachable, and the *target* rolls
-      itself back if confirmation never arrives.
+- [ ] **Adopt a real deployment tool — `deploy-rs` or equivalent — so a
+      bad change rolls itself back.** Raised from the D11 research and
+      sharpened by the 2026-08-27 deploys, which made the gap concrete
+      rather than theoretical.
 
-      Worth scoping rather than adopting wholesale — `deploy-rs` is a
-      whole deployment tool and this repo has its own push/pull
-      modules. The borrowable idea is small: a confirm-or-revert timer
-      on the target around activation. Highest value on **vps**, which
-      is remote, public-facing and push-deployed. See
+      **The problem.** `nixos-rebuild switch --target-host` has no
+      safety net. A change that *builds perfectly* but leaves the host
+      unreachable — a bad firewall rule, a broken sshd, a network
+      change — is unrecoverable except by hand, and on **vps** that
+      means the provider's console. Nothing detects it, nothing
+      reverts it, and the deploying side cannot tell "activated fine"
+      from "activated and fell off the network", because both look like
+      a closed SSH connection.
+
+      **This is not hypothetical here.** vps was deployed on
+      2026-08-27 with changes that rewrote the raw-table firewall
+      chains on a public-facing remote host, including a *new* IPv6
+      PREROUTING chain. It went fine — but the only reason anyone knows
+      that is a human ran ~8 verification commands afterwards
+      (ipsets present, both `vps-ratelimit` chains correct, DNAT right,
+      CrowdSec allowlist intact, site serving over v4 **and** v6).
+      Had it not gone fine, the recovery path was a console login.
+      A deploy where correctness depends on someone remembering to
+      check is not a deploy process.
+
+      **What the tooling buys, in priority order:**
+
+      1. **Confirm-or-revert (the actual point).** `deploy-rs`'s "magic
+         rollback": after activation it writes a canary and reconnects
+         to confirm the host is still reachable; if confirmation never
+         arrives, *the target* rolls itself back on a timer. This is
+         the one feature that makes remote deploys safe, and it must
+         run on the target, since the deployer may be exactly what got
+         cut off.
+      2. **Health checks as a gate**, not as a human checklist — the
+         verification above expressed as code that runs every time.
+      3. **Multi-host orchestration** with per-host success/failure,
+         replacing the current split of `myPushDeploy` (vps) and
+         `myPullDeploy` (laptops) and their duplicated guard logic.
+      4. **A real dry-run/diff step** before activation.
+
+      **Evaluate, do not assume `deploy-rs`.** It is the best-known
+      option for magic rollback, but `colmena` is the other serious
+      contender (better multi-host ergonomics, no equivalent rollback
+      last time this was checked — verify rather than trust that).
+      Weigh adopting a tool wholesale against borrowing just the
+      confirm-or-revert timer into the existing modules: this repo's
+      push/pull modules already carry real logic (the deploy guards,
+      the arithmetic-injection fix, `onDeployUnits`) that should not be
+      thrown away casually.
+
+      **Sequencing.** This belongs to stage 3 ("adopt") of the pipeline
+      project above and should be decided with it, not separately —
+      the same decision about where deploys are driven from determines
+      what tool makes sense. **Highest value on `vps`**: remote,
+      public-facing, push-deployed, and the only host where a mistake
+      costs a console session rather than a walk to the machine.
+
+      References: [deploy-rs](https://github.com/serokell/deploy-rs),
+      [Serokell's write-up](https://serokell.io/blog/deploy-rs),
+      [colmena](https://colmena.cli.rs/), and
       `docs/audits/2026-08-26/D11-analysis.md` §7.
 
 - [ ] **Move `vps` from `nixpkgs-unstable` to `nixpkgs-stable`.** Raised
