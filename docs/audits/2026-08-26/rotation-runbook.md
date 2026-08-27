@@ -1,6 +1,7 @@
 # Credential rotation runbook — `F-P8-02`
 
-Step-by-step for the ten credentials proven exposed by `F-P8-02`. Written
+Step-by-step for the ten credentials proven exposed by `F-P8-02`, plus
+one more (item 11) added later from `F-P8-19`/`F-P8-11`. Written
 2026-08-27 to be worked through one at a time, in order.
 
 **Why these ten:** three *retired* vps age keys were recipients of public
@@ -17,6 +18,12 @@ not the same as impact, and the action follows from impact. See those
 items for the evidence. Worth checking each of the remaining eight the
 same way rather than rotating on reflex: the point is to retract
 something, not to complete a list.
+
+That cuts both ways, which is what **item 11** is doing at the end. A
+third Tailscale key — `tailscale_authkey_isoimage` — has *never been
+used*, so the "already spent" argument that retires 3 and 4 does not
+reach it. Same credential type, opposite conclusion, because impact is
+what decides.
 
 ## How to use this
 
@@ -47,6 +54,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 8 | `homelab_vps_deploy_key` | **high** | [ ] |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
+| 11 | `tailscale_authkey_isoimage` | med | [ ] — **revoke, do not replace**; added 2026-08-27, see item |
 
 **Access safety note.** My SSH to homelab and vps is over **Tailscale**,
 not over wg0, so items 5–7 cannot cut my access to either host. Item 8
@@ -334,7 +342,92 @@ the old password is still valid and you can put it back in sops.
 
 ---
 
-## After all ten
+## 11 — `tailscale_authkey_isoimage` — **revoke, do not replace**
+
+Added 2026-08-27 at the user's request. Not one of `F-P8-02`'s ten; it
+comes from `F-P8-19` and the orphan-key list in `F-P8-11`.
+
+**Why this one is the opposite case to items 3 and 4.** Those were
+dismissed because they are *spent* — single-use keys already consumed at
+enrollment, so the published plaintext is a credential Tailscale will
+refuse. This key has **never been used**. Nothing consumed it, so
+nothing spent it, so whatever power it had it still has. "Exposed but
+inert" and "exposed and never touched" look similar in a key list and
+are opposites in impact. The user caught this; the reasoning that
+retired 3 and 4 does not transfer here.
+
+**What it would grant.** A tailnet auth key enrolls a *new node*. §4.4 of
+the threat model treats enrolling into the tailnet as fleet access, and
+the ACL is generous to `tag:isoimage` — `docs/tailscale-acl.json` gives
+it `src` and `dst` in all four grants and both `ssh` rules
+(lines 23, 37, 38, 46, 52, 58, 79, 86, 87). So an unused key plus a live
+tag is adversary A5's "over-broad auth key" with the tag already
+provisioned to reach everything.
+
+**One thing that probably already limits it, and is not a substitute for
+acting.** Tailscale auth keys expire — 90 days maximum, and this key
+predates that window comfortably. An expired key is refused the same way
+a spent one is. But *probably expired* is an inference from a default;
+the console states it. Check there and act on what it says, rather than
+deciding from this paragraph.
+
+### Revoke rather than mint a replacement
+
+The instinct is to rotate — new key in, old key out. That is wrong here,
+and it is worth being explicit about why, because the same shape of
+mistake was already made once in this runbook (the item 3/4 draft that
+said to mint **reusable** replacements).
+
+**There is no consumer to keep working.** `isoimage`'s module list is
+`[ hosts/isoimage/configuration.nix, copyparty-iso ]` — no
+`profile-default`, so `services.tailscale.enable = false` and
+`config.sops` is not even an option on that system. Nothing reads this
+key; nothing ever did. Minting a replacement would create a *fresh,
+live, standing* enrollment credential with no consumer — strictly worse
+than the situation being fixed, since the current one is at least old
+enough to have expired.
+
+The design is right and deliberate: an ISO is a bootable artifact that
+may be copied anywhere, and it should not carry a tailnet identity. The
+defect is only that three places still describe a device the
+architecture refuses to create.
+
+- **You** — Tailscale console → Settings → Keys. Find the `isoimage`
+  key. Note what it says — used/unused, expired or not — and tell me;
+  that is the authoritative answer to the expiry question above and it
+  belongs in this document. Then **revoke** it.
+- **You** — same console → Access controls. Remove `tag:isoimage` from
+  `tagOwners`, from all four grants and from both `ssh` rules. **The
+  console is what enforces; the file is only a copy of it** — see
+  `F-P8-07`. Do the console first so the repo never claims a
+  restriction that is not live.
+- **You** — `sops secrets/secrets.yaml`, delete the
+  `tailscale_authkey_isoimage` key outright. No replacement value.
+- **Me** — remove the nine `tag:isoimage` occurrences from
+  `docs/tailscale-acl.json` so the file matches the console, and record
+  in `hosts/isoimage/README.md` that isoimage is deliberately
+  off-tailnet and must stay that way, with the reason.
+- **Me** — verify: `tailscale status` still lists exactly the four real
+  nodes plus the phone, and no host lost tailnet access. Since nothing
+  consumed the key and no live node carries `tag:isoimage`, there is
+  nothing that can break — the verification is confirming that claim,
+  not hoping it.
+
+**Order.** Revoke first, unusually. The standing **add-new → verify →
+remove-old** rule protects a credential something depends on; nothing
+depends on this one, and the whole point is retraction, so waiting only
+extends the window.
+
+Rollback: none needed, and none possible in the useful direction. If
+`isoimage` is ever genuinely meant to join the tailnet, that is a design
+change — give it `profile-default` and sops-nix and mint a key then,
+**non-reusable, pre-authorized and tagged**, rather than reviving this
+one.
+
+
+---
+
+## After the ten
 
 - Rotate the remaining live secrets too, for consistency — `F-P8-02`'s
   fix says "plus the rest of the live set", since ciphertext comparison
