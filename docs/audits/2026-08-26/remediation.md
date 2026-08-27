@@ -50,7 +50,7 @@ and is verifiable by a build. This is the wave to land first.
 | 1.6 | Delete the inert `ssh` block from the tailnet ACL reference copy, and from the console | H10 (`F-P0-05` `F-P8-12`) | `docs/tailscale-acl.json` | none — nothing uses it |
 | 1.7 | **Done** — but the row was wrong; see the note below. Repo-side: dropped `sops.secrets.vps_caddy_env`, the one declared-but-unconsumed declaration. The nine `F-P8-11` orphans are **user-only** and moved to [`user-actions.md`](user-actions.md) §3 | C1 (`F-P8-11`), `F-P2-13`/`F-P8-18` | `hosts/vps/configuration.nix` | low |
 | 1.8 | Add `programs.ssh.knownHosts` for `github.com` and `vps` so the deploy path stops re-TOFUing every boot | H1 (`F-P7-04` `F-P3-05` `F-P0-07`) | `modules/profiles/default.nix` | low — a stale pin blocks updates, so pair with 1.9 |
-| 1.9 | **Done** — enabled `myHealthAlerts` on both laptops, so a *failed* deploy is visible at all. A **skipped** deploy still is not; see the note below | H1 (`F-P7-09`) | `hosts/{torrent,thinkpad}/configuration.nix`, `modules/flake/hosts.nix` | low |
+| 1.9 | **Done, both halves.** Wave 1 enabled `myHealthAlerts` on both laptops, so a *failed* deploy is visible at all. The **skipped** half is now closed too — see "Note on 1.9's skipped half" below | H1 (`F-P7-09`) | `hosts/{torrent,thinkpad,homelab,vps}/configuration.nix`, `modules/flake/hosts.nix`, `modules/nixos/{auto-update,health-alerts}.nix` | low |
 
 **Note on 1.3.** Tailscale sets the forwarding sysctls at
 `mkOverride 97`, so a plain `boot.kernel.sysctl` assignment loses
@@ -96,7 +96,115 @@ enters `systemctl --failed`, which the unit already checks. It does
 **not** close the *skipped* half — every guard in `deploy-guards.nix`
 still ends in `exit 0`, so a skip is recorded as success and never
 enters `--failed`. That needs the deploy-marker work in `F-P7-09`'s
-proposed fix (a) and is not in wave 1.
+proposed fix (a) and is not in wave 1. **Closed in the fourth session —
+see the next note.**
+
+**Note on 1.9's skipped half — and a correction to the outage account.**
+
+Two independent things, both landed together.
+
+**1. Skips are now visible, by measuring the outcome instead of the
+attempt.** `F-P7-09`'s fix (a) proposed a bespoke "last successful
+deploy" marker per host. A marker is the right *mechanism* — the module
+already has `staleMarkerFiles` — but a bespoke one would have been
+wrong, because it records that *this unit* ran. A host deployed by hand
+all month would then look stale while being perfectly current, and the
+false alarms would train the reader to ignore it.
+
+`/nix/var/nix/profiles/system` is the marker that already exists. Its
+mtime is the last time the host was *actually activated*, by any route —
+scheduled, push-deployed or manual — which is the question worth asking.
+So all four hosts now carry a `staleMarkerFiles` entry for it and no new
+mechanism was added at all.
+
+Two things verified live on homelab rather than assumed:
+
+- The unprivileged `health-check` user can stat it (`/nix/var/nix/profiles`
+  is `0755`).
+- **`stat` must not dereference.** `stat -c %Y` returns the switch time
+  (`1787861700`, the 13:15 deploy). `stat -L -c %Y` returns **1** —
+  every store path has mtime 1 — so a dereferencing stat would report
+  every host as permanently stale, forever. The existing code is
+  non-dereferencing and now says why, because this is a one-character
+  change that fails in the "alert always on" direction.
+
+Thresholds are deliberately loose (504h/21d, 720h/30d on thinkpad):
+`switchDates` is weekly and `minSwitchInterval` is 7 days, so a 14-day
+gap is *normal*, and homelab's `protectedUnits` restic run can defer a
+third week. A loose threshold still converts "silently stopped
+deploying" from never-detected to detected-within-three-weeks; a tight
+one would only produce noise. Tighten once there is real cadence data.
+
+An eval-time assertion was added at the same time: the per-alert state
+key is derived from each marker's **basename**, so two markers whose
+paths differ only by directory would share one alert slot and one of the
+two failures would silently stop being reported. `last-success` is the
+obvious name for such a file and this fleet already has one. Verified by
+adding a deliberate collision and watching the build refuse it.
+
+**2. `OnSuccess=` fired on skips — fixed, and it was not theoretical.**
+`F-P7-09`'s consequence 1 argued that homelab's
+`systemd.services.auto-switch.onSuccess = [ "push-deploy-vps.service" ]`
+would fire on a skipped switch. homelab's journal shows it doing exactly
+that:
+
+```
+2026-08-25T13:18:15 auto-switch-start: Last switch activated 23 seconds ago
+                       (minimum 604800), skipping this scheduled run.
+2026-08-25T13:18:15 systemd: auto-switch.service: Deactivated successfully.
+2026-08-25T13:18:15 systemd: auto-switch.service: Triggering OnSuccess= dependencies.
+2026-08-25T13:18:15 systemd: Starting Build locally and push+activate vps ...
+```
+
+The min-interval guard deferred the switch and systemd started the vps
+closure build in the same second.
+
+`onSuccess` is replaced by a new `myAutoUpdate.onDeployUnits`, gated on a
+flag the switch script writes **only after `nixos-rebuild switch`
+returns**. The flag lives in a per-unit `RuntimeDirectory`, which systemd
+recreates on every start, so it cannot go stale and the two switch units
+cannot read each other's. Exit codes were considered and rejected:
+`SuccessExitStatus=` still counts as success, so `OnSuccess=` would keep
+firing, and the exit-code contract would have to be re-declared by every
+consumer of the shared guards fragment — the same "a later call site
+silently misses it" shape the `git()` wrapper exists to avoid.
+
+The trigger deliberately cannot fail its unit. It runs after the
+reboot-if-kernel-changed `ExecStartPost`, which may already have asked
+systemd to shut down, and queueing a job then legitimately fails —
+marking a wholly successful deploy as failed would page for a
+non-problem.
+
+Covered by `tests/deploy-chain.nix` (6 subtests), which drives the
+**rendered** `ExecStartPost` script out of the built system rather than a
+copy of the logic. Per the lesson that a passing VM test proves nothing
+until it has been seen to fail, the gate was temporarily reverted and the
+test caught it (`unexpected output: 'Activation completed; starting:
+chained.service'`).
+
+**3. The correction.** The write-up of the deploy outage said both units
+"had been failing on every run since 2026-08-25" and went unnoticed for
+two days because a failed deploy is not watched. homelab's journal
+contradicts both halves:
+
+- The 2026-08-25T13:18 runs **succeeded** (they skipped cleanly). The
+  failures were the next *scheduled* runs — 2026-08-27T03:00
+  (`auto-switch`) and 03:15 (`push-deploy-vps`), one cycle each, roughly
+  ten overnight hours before being found, not two days. `auto-switch`'s
+  timer is `Thu 03:00` and 08-25 was a Tuesday, so there was no
+  intervening scheduled run to fail.
+- They **were** watched. Both entered `systemctl --failed`, which
+  homelab's `myHealthAlerts` checks every 15 minutes; it ran 246 times
+  in that window with no `curl` errors on stderr, so the Discord post
+  went out. (That is strong evidence of delivery, not proof — the sink
+  itself was not inspected.)
+
+This matters because it changes what the finding is *for*. The failed
+path already works end to end. The remaining hole was never detection or
+notification — it was that a **skipped** deploy produces nothing to
+detect. That is precisely what the two changes above close, and it is
+the reason the fix measures the profile symlink rather than adding
+another alert to a path already proven to work.
 
 Two judgement calls, both deliberate:
 

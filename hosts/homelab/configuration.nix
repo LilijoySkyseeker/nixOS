@@ -369,6 +369,12 @@
     # switch-to-configuration restarts any unit whose definition changed, so
     # a same-cycle switch would kill it mid-run. Defer instead (see TODO.md).
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
+    # Replaces `systemd.services.auto-switch.onSuccess`, which fired this
+    # on a *skipped* switch too — observed live 2026-08-25T13:18:15, where
+    # the min-interval guard deferred the switch and systemd started the
+    # vps closure build 0 seconds later anyway. This only fires after a
+    # real activation (F-P7-09).
+    onDeployUnits = [ "push-deploy-vps.service" ];
   };
 
   # vps builds nothing itself anymore (myPullDeploy removed there — a
@@ -391,8 +397,6 @@
     # homelab's own myAutoUpdate switch, so this reuses the same
     # already-vetted master checkout instead of racing/duplicating it.
   };
-  systemd.services.auto-switch.onSuccess = [ "push-deploy-vps.service" ];
-
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
@@ -428,6 +432,22 @@
     # worst-case 1-week run before alerting on a missed/stuck run.
     staleMarkerFiles = {
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 336;
+      # F-P7-09's skipped-deploy half. A *failed* auto-switch already pages
+      # via the failed-units check (confirmed working: the 2026-08-27 03:00
+      # read-only-git-config failure did enter systemctl --failed). A
+      # *skipped* one does not — the guards exit 0 — so a host that defers
+      # every week, or whose timer stops firing, drifts silently forever.
+      # This watches the outcome instead: the profile symlink's mtime is the
+      # last real activation by any route, scheduled or manual.
+      #
+      # 504h = 21 days. The normal ceiling is 14: switchDates is weekly and
+      # minSwitchInterval is 7 days, so a deploy on day 0 defers the day-7
+      # run and lands on day 14. 21 allows one further deferral for the
+      # protectedUnits restic run (weekly, and able to run for days), which
+      # is the realistic third week. Tighten once there is real cadence data
+      # — a threshold this loose still turns "silently stopped deploying"
+      # from never-detected into detected-within-three-weeks.
+      "/nix/var/nix/profiles/system" = 504;
     };
   };
 

@@ -198,5 +198,20 @@
     # side of replication, and homelab's own myHealthAlerts already
     # watches zbackup/backup/torrent/* at a 336h threshold -- measuring
     # it again here would only report on the puller's behalf.
+    #
+    # The failed-units check above catches a pull-deploy that *fails*. It
+    # cannot catch one that *skips*: every guard exits 0, so a tree left
+    # dirty or parked on a branch (easy here -- flakeDir is this user's own
+    # ~/dotfiles, which is a working checkout, not a deploy-only clone)
+    # silently stops this host updating with no failed unit anywhere.
+    # Watching the profile symlink measures the outcome instead.
+    #
+    # 504h = 21 days: dates is weekly and minSwitchInterval is 7 days, so
+    # 14 days is the normal ceiling, plus a week of slack. This is a
+    # desktop that is usually powered on, so it needs no laptop-style
+    # allowance for long absences.
+    staleMarkerFiles = {
+      "/nix/var/nix/profiles/system" = 504;
+    };
   };
 }

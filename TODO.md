@@ -305,24 +305,34 @@ them rot.
         keeping: **attribute a port to the option that opens it, not to
         the port number**; the audit's inventory listed 27036/27037 and
         10400/10401 as separate items and never connected them.
-      - The *skipped*-deploy half of `F-P7-09` is still open. Wave 1
-        item 1.9 made a **failed** deploy visible on the laptops; a
-        skipped one is still silent, because every guard in
-        `deploy-guards.nix` ends in `exit 0`.
+      - ~~The *skipped*-deploy half of `F-P7-09`~~ — **done 2026-08-27**,
+        build- and VM-verified, **not deployed**. Wave 1 item 1.9 made a
+        **failed** deploy visible on the laptops; a skipped one was still
+        silent, because every guard in `deploy-guards.nix` ends in
+        `exit 0`.
 
-        **2026-08-27: this stopped being hypothetical.** Both
-        `auto-switch` and `push-deploy-vps` on homelab had been failing
-        every run since 2026-08-25 — `could not lock config file
-        /root/.config/git/config: Read-only file system`, because the
-        guards wrote `safe.directory` into a path home-manager owns as a
-        store symlink. Two days of no deploys on homelab and no pushes to
-        vps, noticed only by accident while clearing an unrelated failed
-        unit. The guard is fixed on the audit branch
-        (`tests/deploy-guards.nix`), but the episode sharpens what is
-        still missing: the failure *was* in `systemctl --failed` the
-        whole time, so the gap is **notification, not detection**.
-        Whatever closes the skipped-deploy half should also make a
-        failed one reach a human.
+        Closed by measuring the *outcome* rather than the attempt: all
+        four hosts now watch `/nix/var/nix/profiles/system` for staleness
+        via the existing `staleMarkerFiles`, so "this host has not
+        actually been activated in N weeks" is caught regardless of
+        cause — skip, failure, or a timer that stopped firing. A bespoke
+        per-unit marker was rejected because it would have alarmed on
+        hand-deployed hosts that were perfectly current. Separately,
+        homelab's `systemd.services.auto-switch.onSuccess` is replaced by
+        `myAutoUpdate.onDeployUnits`, gated on a real activation —
+        the old wiring was observed starting the vps closure build in the
+        same second the min-interval guard deferred the switch.
+
+        **Two corrections to what this entry used to say**, both from
+        homelab's journal. The units did **not** fail "every run since
+        2026-08-25": the 08-25T13:18 runs skipped cleanly and the
+        failures were the next scheduled runs at 08-27T03:00 and 03:15,
+        about ten overnight hours. And the gap was **not** notification —
+        both entered `systemctl --failed`, `myHealthAlerts` checks that
+        every 15 minutes and ran 246 times in the window without a
+        `curl` error, so the alert was sent. The real hole was that a
+        *skipped* deploy produces nothing to detect at all, which is what
+        the change above fixes.
       - **`push-deploy-vps` is the one piece of 2.6 not done**, and it is
         deferred on purpose. Its misleading comment is corrected; the
         sandbox is not applied, because `nixos-rebuild --target-host`

@@ -87,19 +87,60 @@
             "/var/lib/restic-backups-backblazeWeekly/last-success" = 192;
           };
           description = ''
-            Files to check for staleness by mtime, mapped to the maximum age in
-            hours before alerting. Intended for services (like an offsite restic
-            backup) that have no local ZFS dataset to measure via
-            `backupStaleness`: have the service touch the file only on success
-            (e.g. via ExecStartPost, which only runs after a successful
-            ExecStart), so its mtime is proof of the last completed run — this
-            catches the run silently never finishing (hung, retrying forever)
-            even when it never reaches a "failed" systemd state.
+            Paths whose mtime is checked for staleness, mapped to the maximum
+            age in hours before alerting. The mtime has to be proof that
+            something actually completed — for a service, have it touch the
+            file only on success (e.g. via ExecStartPost, which only runs
+            after a successful ExecStart).
+
+            Two distinct jobs, both catching failures that never reach
+            systemd's "failed" state:
+
+            - **A run that silently never finishes** (hung, retrying forever)
+              — e.g. the offsite restic backup, which has no local ZFS
+              dataset to measure via `backupStaleness`.
+            - **A run that never happens at all.** Every guard in
+              `deployGuardsScript` ends in `exit 0`, so a deploy that skips
+              (dirty tree, wrong branch, min-interval, protected unit) is
+              recorded as success and never enters `systemctl --failed`.
+              Pointing this at `/nix/var/nix/profiles/system` measures the
+              outcome instead of the attempt: that symlink's mtime is the
+              last time the host was *actually* activated, by any route —
+              scheduled, push-deployed or manual. That is F-P7-09's
+              skipped-deploy half.
+
+            Note the check below uses a non-dereferencing `stat`, which
+            matters for the profile symlink specifically: it points into the
+            nix store, and store paths all have mtime 1 (1970), so a
+            dereferencing `stat -L` here would report every host as
+            permanently stale. Verified live on homelab.
           '';
         };
       };
 
       config = lib.mkIf cfg.enable {
+        # The per-alert cooldown/clear state is keyed on each marker's
+        # *basename*, so two markers whose paths differ only in their
+        # directory would silently share one alert slot: the second would
+        # clear the first's stamp and one of the two failures would stop
+        # being reported. That is invisible at runtime, so catch it at eval.
+        # Not hypothetical — "last-success" is the obvious name for exactly
+        # this kind of file, and this host already has one.
+        assertions = [
+          {
+            assertion =
+              let
+                names = map baseNameOf (lib.attrNames cfg.staleMarkerFiles);
+              in
+              names == lib.unique names;
+            message = ''
+              myHealthAlerts.staleMarkerFiles has two entries with the same
+              file name, which would collide in the alert-state key:
+              ${lib.concatStringsSep ", " (lib.attrNames cfg.staleMarkerFiles)}
+            '';
+          }
+        ];
+
         # ZFS pool health, SMART health, failed systemd units, and stuck nixos-rebuild switches
         systemd.services.health-check = {
           description = "Check ZFS/SMART/systemd health and post to Discord on new problems";
@@ -192,8 +233,14 @@
             ''}
 
             ${lib.optionalString (cfg.staleMarkerFiles != { }) ''
-              # marker-file staleness (catches a service hanging/retrying
-              # forever without ever reaching systemd's "failed" state)
+              # marker-file staleness: catches both a run that hangs/retries
+              # forever and one that never happens at all (a skipped deploy),
+              # neither of which ever reaches systemd's "failed" state.
+              #
+              # `stat` without -L is load-bearing here, not incidental: the
+              # /nix/var/nix/profiles/system marker is a symlink into the
+              # store, every store path has mtime 1, so dereferencing would
+              # make every host permanently "stale". Keep it non-dereferencing.
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (path: maxHours: ''
                   stale_key="marker-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg path} | tr -c 'a-zA-Z0-9_-' '-')"
@@ -203,7 +250,7 @@
                     mtime=$(stat -c %Y ${lib.escapeShellArg path})
                     age_hours=$(( (now - mtime) / 3600 ))
                     if [ "$age_hours" -ge ${toString maxHours} ]; then
-                      notify "$stale_key" "Backup is stale" "${path}: last success was $age_hours hours ago (threshold: ${toString maxHours}h)"
+                      notify "$stale_key" "Marker is stale" "${path}: last success was $age_hours hours ago (threshold: ${toString maxHours}h)"
                     else
                       clear_alert "$stale_key"
                     fi

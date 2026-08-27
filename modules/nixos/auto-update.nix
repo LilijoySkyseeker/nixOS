@@ -25,8 +25,17 @@ in
       # and protected-unit guards: those exist to keep an *unattended* run
       # from disrupting work in progress, not to second-guess a human who
       # just explicitly asked for a deploy right now.
+      # `name` is the unit name, used for the per-unit RuntimeDirectory that
+      # carries the "did this run actually activate anything" flag below.
+      # `chainOnDeploy` decides whether this unit runs cfg.onDeployUnits
+      # afterwards — see the option's description for why that is gated on a
+      # real activation rather than on the unit merely succeeding.
       mkSwitchService =
-        { enforceScheduleGuards }:
+        {
+          name,
+          enforceScheduleGuards,
+          chainOnDeploy,
+        }:
         {
           description =
             "Fetch master, build-test, and switch if it builds"
@@ -41,6 +50,12 @@ in
             set -euo pipefail
             cd ${flakeDir}
 
+            # systemd recreates RuntimeDirectory on every start, so this flag
+            # cannot survive from a previous run; clear it anyway so the
+            # meaning does not depend on that (and so a manual `bash -x` of
+            # this script does the right thing).
+            rm -f "$RUNTIME_DIRECTORY/switched"
+
             ${deployGuardsScript}
 
             require_clean_master
@@ -54,6 +69,11 @@ in
 
             if nixos-rebuild build --flake .#${cfg.hostAttr}; then
               nixos-rebuild switch --flake .#${cfg.hostAttr}
+              # Reached only by a run that actually activated a new system.
+              # Every guard above exits 0 on a deliberate skip, so unit
+              # success alone does not mean a deploy happened -- this flag is
+              # the difference, and ExecStartPost below reads it.
+              touch "$RUNTIME_DIRECTORY/switched"
             else
               echo "Build failed, not switching." >&2
               exit 1
@@ -68,6 +88,11 @@ in
             # (build-only) can. NoNewPrivileges is the one flag safe to add
             # regardless (root already has every privilege it could gain).
             NoNewPrivileges = true;
+            # Carries the "we actually activated something" flag written by
+            # the script above. Per-unit (auto-switch vs auto-switch-now) so
+            # the two can never read each other's flag, and recreated by
+            # systemd on every start so it cannot go stale.
+            RuntimeDirectory = name;
             # Only reboot if the switch actually changed the running
             # kernel/initrd, instead of rebooting on every switch.
             ExecStartPost = [
@@ -77,7 +102,43 @@ in
                   systemctl reboot
                 fi
               '')
-            ];
+            ]
+            ++ lib.optional (chainOnDeploy && cfg.onDeployUnits != [ ]) (
+              pkgs.writeShellScript "start-on-deploy" ''
+                units="${lib.concatStringsSep " " cfg.onDeployUnits}"
+
+                # The whole point of this script. Under the OnSuccess= this
+                # replaces, systemd fired these units whenever auto-switch
+                # merely *succeeded* -- and a guard skip is a success. Caught
+                # live on homelab, 2026-08-25T13:18:15:
+                #
+                #   auto-switch-start: Last switch activated 23 seconds ago
+                #     (minimum 604800), skipping this scheduled run.
+                #   systemd: auto-switch.service: Deactivated successfully.
+                #   systemd: auto-switch.service: Triggering OnSuccess= dependencies.
+                #   systemd: Starting Build locally and push+activate vps ...
+                #
+                # i.e. the protected-unit/min-interval guards deferred the
+                # switch and systemd immediately started the closure build
+                # and push anyway -- exactly the load those guards exist to
+                # avoid (F-P7-09, consequence 1).
+                if [ ! -e "$RUNTIME_DIRECTORY/switched" ]; then
+                  echo "No activation this run (guard skipped it); not starting: $units"
+                  exit 0
+                fi
+
+                echo "Activation completed; starting: $units"
+                # Deliberately not allowed to fail this unit. The reboot
+                # check above runs first and may already have asked systemd
+                # to shut down, in which case queueing a new job legitimately
+                # fails -- and marking auto-switch failed for that would page
+                # on a completely successful deploy.
+                if ! systemctl start --no-block $units; then
+                  echo "Could not start $units (shutting down after a kernel change?)" >&2
+                fi
+                exit 0
+              ''
+            );
           };
         };
     in
@@ -121,6 +182,29 @@ in
             Systemd units that, if active, cause the scheduled switch job to
             skip (and retry next cycle) rather than build/switch and risk
             restarting them mid-run.
+          '';
+        };
+
+        onDeployUnits = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          example = [ "push-deploy-vps.service" ];
+          description = ''
+            Units to start after the scheduled `auto-switch` has *actually
+            activated a new system* — not merely after it succeeded.
+
+            Use this instead of `systemd.services.auto-switch.onSuccess`.
+            The distinction is the whole point: every guard in
+            `deployGuardsScript` ends in `exit 0`, so a run deferred by the
+            min-interval or protected-unit guard still terminates cleanly and
+            still fires `OnSuccess=`. On homelab that meant a switch deferred
+            to protect a multi-day restic run immediately kicked off a full
+            closure build and push to vps regardless — the exact contention
+            the guard exists to prevent (F-P7-09).
+
+            Only `auto-switch` chains. `auto-switch-now` is a human asking
+            for a deploy right now and can start the follow-on itself, so it
+            deliberately does not.
           '';
         };
       };
@@ -224,7 +308,11 @@ in
 
         # 2. The actual switch, scheduled — full guards (see mkSwitchService
         #    above), triggered by the timer below.
-        systemd.services.auto-switch = mkSwitchService { enforceScheduleGuards = true; };
+        systemd.services.auto-switch = mkSwitchService {
+          name = "auto-switch";
+          enforceScheduleGuards = true;
+          chainOnDeploy = true;
+        };
 
         # 2b. Same build/switch logic, manual-trigger only
         #    (`systemctl start --wait auto-switch-now.service`) — skips the
@@ -232,7 +320,11 @@ in
         #    protect an *unattended* run from disrupting work in progress,
         #    not to silently no-op when a human explicitly asks for a
         #    deploy right now. No timer.
-        systemd.services.auto-switch-now = mkSwitchService { enforceScheduleGuards = false; };
+        systemd.services.auto-switch-now = mkSwitchService {
+          name = "auto-switch-now";
+          enforceScheduleGuards = false;
+          chainOnDeploy = false;
+        };
 
         systemd.timers.auto-switch = {
           wantedBy = [ "timers.target" ];

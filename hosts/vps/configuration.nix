@@ -872,6 +872,24 @@ in
     webhookUrlFile = config.sops.secrets.vps_discord_webhook.path;
     checkZfs = false;
     checkSmart = false;
+    # This host does not deploy itself — homelab builds its closure and
+    # pushes it (myPushDeploy). So "homelab silently stopped updating me" is
+    # invisible from here *and* from homelab, whose push-deploy-vps exits 0
+    # when a guard defers it. The profile symlink's mtime is the one signal
+    # that lives on the right side of that link: it only advances when this
+    # host actually got activated.
+    #
+    # This is not hypothetical. push-deploy-vps failed on 2026-08-25 (the
+    # vps-deploy forced-command allowlist rejected its `stat`) and again on
+    # 2026-08-27 (read-only git config); the second entered systemctl
+    # --failed on homelab, but a run the *guards* skip never would.
+    #
+    # 504h = 21 days, matching homelab's own entry — dates is weekly and
+    # minSwitchInterval is 7 days, giving a 14-day normal ceiling plus one
+    # deferral of slack.
+    staleMarkerFiles = {
+      "/nix/var/nix/profiles/system" = 504;
+    };
   };
 
   # this box has no real block devices for smartd to monitor

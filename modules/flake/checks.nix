@@ -26,5 +26,10 @@
         pkgs = config.flake.pkgsUnstable;
         deployGuardsScript = config.flake.deployGuardsScript;
       };
+
+      checks.deploy-chain = import ../../tests/deploy-chain.nix {
+        pkgs = config.flake.pkgsUnstable;
+        autoUpdateModule = config.flake.modules.nixos."auto-update";
+      };
     };
 }

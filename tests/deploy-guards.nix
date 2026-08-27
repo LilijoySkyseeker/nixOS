@@ -9,8 +9,18 @@
 #   error: could not lock config file /root/.config/git/config:
 #   Read-only file system
 #
-# taking auto-switch and push-deploy-vps with it. Nothing noticed for two
-# days, because a failed scheduled deploy is not watched (F-P7-09).
+# taking auto-switch and push-deploy-vps with it.
+#
+# The original write-up here said this went unnoticed for two days because
+# a failed deploy is not watched. Re-reading homelab's journal shows both
+# halves of that were wrong, so it is corrected rather than repeated: the
+# last good run was 2026-08-25T13:18 and the failures were the next
+# scheduled runs, 2026-08-27T03:00 (auto-switch) and 03:15
+# (push-deploy-vps) — one cycle each, ~10 overnight hours, not two days.
+# And they *were* watched: both entered systemctl --failed, which
+# myHealthAlerts checks every 15 minutes. What is genuinely unwatched is a
+# deploy that SKIPS, since every guard below ends in exit 0 — see
+# tests/deploy-chain.nix.
 #
 # The first subtest deliberately proves the *environment* still
 # reproduces the original failure, so this test cannot quietly stop

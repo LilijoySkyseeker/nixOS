@@ -176,5 +176,19 @@
     # behaviour -- the timer is Persistent, so the catch-up run is what
     # surfaces a deploy that broke a month ago -- and cooldownHours (6)
     # keeps it to a single batch rather than a repeat every 15 minutes.
+    #
+    # Same reasoning as torrent: the failed-units check cannot see a
+    # pull-deploy that *skips*, because every guard exits 0. Watching the
+    # profile symlink's mtime catches the outcome regardless of cause.
+    #
+    # 720h = 30 days rather than torrent's 504. This host is a laptop that
+    # legitimately goes dark for long stretches, and it additionally sets
+    # requireACPower, so a Thursday spent on battery is a skip that is
+    # entirely correct. The threshold only has to be tight enough to catch
+    # "stopped deploying for good", and it clears itself on the next
+    # successful deploy after a wake-up.
+    staleMarkerFiles = {
+      "/nix/var/nix/profiles/system" = 720;
+    };
   };
 }

@@ -4,7 +4,7 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-27, end of the third session.**
+**Last updated: 2026-08-27, end of the fourth session.**
 
 ---
 
@@ -22,9 +22,10 @@ act on that without anyone doing anything:
 **Both of these are live *because* of this session's work**, which is the
 single most important thing to understand before touching anything:
 
-- `auto-switch` and `push-deploy-vps` had been **failing on every run
-  since 2026-08-25** (see "The deploy outage" below). While broken, they
-  could not have reverted anything.
+- `auto-switch` and `push-deploy-vps` were **both failing as of
+  2026-08-27 03:00** (see "The deploy outage" below — the fourth session
+  corrected the dates and duration originally recorded here). While
+  broken, they could not have reverted anything.
 - Commit `929efa3` fixed them, and homelab now runs it. **The revert
   mechanism is functional again.**
 
@@ -58,7 +59,8 @@ revert is a free rollback and nothing needs doing.
 | [`live-verification.md`](live-verification.md) | Live checks with commands and results. |
 
 Documentation harvested out of the audit into standing docs:
-`docs/hardening.md` (ten standing rules), `docs/threat-model.md`,
+`docs/hardening.md` (eleven standing rules — the eleventh added in the
+fourth session), `docs/threat-model.md`,
 `docs/accepted-risks.md`.
 
 ## Phase status
@@ -126,8 +128,19 @@ Nine commits. Six of the fourteen decisions were answered by the user.
 
 ### The deploy outage (`929efa3`) — the most important find
 
-**Both halves of the fleet's deploy path had been failing since
-2026-08-25 and nothing noticed.** Found by accident while clearing an
+> **Corrected in the fourth session.** This section originally said both
+> units had been failing "since 2026-08-25" and that "nothing noticed for
+> two days". homelab's journal says otherwise on both counts: the last
+> good runs were 2026-08-25T13:18 (they skipped cleanly), the failures
+> were the next *scheduled* runs at 2026-08-27T03:00 and 03:15 — one
+> cycle each, ~10 overnight hours — and both **did** enter `systemctl
+> --failed`, which `myHealthAlerts` checks every 15 minutes and reported.
+> The lesson below still holds; the timeline and the "nothing watches
+> this" claim do not. Detail in `remediation.md`, "Note on 1.9's skipped
+> half".
+
+**Both halves of the fleet's deploy path failed on their first scheduled
+run after the change landed.** Found by accident while clearing an
 unrelated failed unit.
 
 ```
@@ -150,10 +163,13 @@ scopes, so this genuinely applies where a repo-local value would be
 silently ignored. Verified against git's own docs.
 
 **Two things to carry forward.** The underlying mistake was mutating a
-dotfile another part of the system owns declaratively. And this is
-`F-P7-09` demonstrated rather than argued — the failure sat in
-`systemctl --failed` the whole time, so **the gap is notification, not
-detection**.
+dotfile another part of the system owns declaratively. And the failure
+sat in `systemctl --failed` the whole time — which, on the fourth
+session's re-reading, means the alerting worked and **the gap was
+neither detection nor notification but response time** on an overnight
+failure. The genuinely unwatched case is a deploy that *skips*, since
+every guard exits 0; that is `F-P7-09`'s remaining half and is now
+closed.
 
 Covered by `tests/deploy-guards.nix` (6 subtests), two of which assert
 the *premise* — that the config really is read-only and git really does
@@ -193,6 +209,49 @@ common in game and P2P protocols. Match the interface, not just the port.
 
 ---
 
+## What happened in the fourth session (2026-08-27)
+
+One commit, closing **`F-P7-09`'s skipped-deploy half** — the only
+agent-doable item that was both unblocked and not gated on a live
+measurement. Full reasoning in `remediation.md`, "Note on 1.9's skipped
+half".
+
+- **Skips are now visible.** The finding proposed a bespoke per-host
+  "last successful deploy" marker. Rejected in favour of the marker that
+  already exists: `/nix/var/nix/profiles/system`. Its mtime is the last
+  *actual* activation by any route — scheduled, push-deployed or manual —
+  so a hand-deployed host does not look stale while being current, which
+  a unit-scoped marker would have got wrong. All four hosts now watch it
+  via the existing `staleMarkerFiles`; **no new mechanism was added.**
+- **`OnSuccess=` firing on a skip is fixed, and it was real.** homelab's
+  journal has the min-interval guard deferring a switch at
+  `2026-08-25T13:18:15` and systemd starting the vps closure build in the
+  same second. Replaced with `myAutoUpdate.onDeployUnits`, gated on a
+  flag written only after `nixos-rebuild switch` returns, held in a
+  per-unit `RuntimeDirectory` so it cannot go stale.
+- **The outage account was wrong and is corrected** in place above.
+- New `tests/deploy-chain.nix` (6 subtests), driving the **rendered**
+  `ExecStartPost` out of the built system. Verified to fail when the gate
+  is reverted, per "a passing VM test is not proof".
+- New eval-time assertion: `staleMarkerFiles` keys its alert state on
+  each path's *basename*, so two same-named markers would silently share
+  one alert slot. Verified by adding a collision and watching it refuse.
+
+**Not deployed.** All four hosts build; `deploy-chain`, `deploy-guards`
+and `nix flake check --no-build` pass. Nothing was switched.
+
+**Two live findings worth carrying forward** (both from reading the
+journal, neither actioned):
+
+- `stat -L` on the profile symlink returns **1** (store paths all have
+  mtime 1), so a dereferencing stat in the staleness check would report
+  every host permanently stale. The code is correct and now says so.
+- `2026-08-25T13:18:17`: `vps-deploy: rejected command: stat -c %Y
+  /nix/var/nix/profiles/system` — the forced-command allowlist rejected
+  the `stat` that `check_min_switch_interval` needs. Resolved by 13:22
+  the same day, but it is a second, independent way that path has
+  already broken.
+
 ## What is verified live on homelab (2026-08-27)
 
 All checked after the deploy, on real hardware:
@@ -224,19 +283,23 @@ tailscale module sets the former.
    deferred on purpose. Needs a VM test with a **real remote target**,
    because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH
    control-master path and nix's fetcher cache. A wrong guess means vps
-   silently stops updating.
-2. **The skipped-deploy half of `F-P7-09`** — a *failed* deploy is
-   visible on the laptops now; a *skipped* one is not, because every
-   guard ends in `exit 0`. The outage above argues the real gap is
-   **notification**.
+   silently stops updating — though that is now *detectable*, since vps
+   watches its own profile mtime (see item 2).
+2. ~~**The skipped-deploy half of `F-P7-09`**~~ — **done in the fourth
+   session.** All four hosts watch `/nix/var/nix/profiles/system` for
+   staleness, and `onSuccess` is replaced by a gated
+   `myAutoUpdate.onDeployUnits`. See below.
 3. **Container resource ceilings** — no `--pids-limit`/`--memory`/`--cpus`
    on any container. Needs measured RSS off homelab, not a guess;
-   minecraft's `MEMORY = "4G"` is JVM heap only.
+   minecraft's `MEMORY = "4G"` is JVM heap only. **Now unblocked** — see
+   the SSH note under "Rules and traps".
 4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
    mount. Re-maps existing volume ownership, so it needs its own VM test.
 5. **Deploy `vps`, `torrent`, `thinkpad`** if the user wants — all
    build-verified, never switched. vps still carries a stale DNAT rule
-   for the deleted 34198.
+   for the deleted 34198. **homelab is now one deploy behind this
+   branch too**: the fourth session's changes are build- and VM-verified
+   but not switched anywhere.
 
 ### User-only
 
@@ -288,3 +351,15 @@ before `/srv/factorio/new` was deleted, and is the **same** credential
   eleven-subtest coverage and was caught only by deploying.
 - **Exact-string assertions on rendered rules are brittle** — they failed
   on a *correct* change while proving nothing extra. Match components.
+- **A failed bare `ssh homelab` is not evidence of no access.** It fails
+  as `lilijoy` with "Permission denied (publickey)"; `ssh root@homelab`
+  works. `AGENTS.md` says this explicitly and the fourth session still
+  briefly concluded the fleet was unreachable and marked a live
+  measurement blocked. **This machine is `torrent`** — run local commands
+  rather than SSHing to it. `vps` is Tailscale-only; `torrent` and
+  `thinkpad` set `PermitRootLogin = "forced-commands-only"` and accept no
+  interactive root SSH by design.
+- **`nix eval` is unavailable to a sandboxed agent session here** — the
+  harness refuses the command. `nixos-rebuild build` plus reading the
+  rendered unit out of `./result` gets the same answer, and is what the
+  "verify the fix, not the build" rule wanted anyway.

@@ -132,6 +132,35 @@ here; it is already applied in the SSH bullet below.
     `virtualisation.docker.daemon.settings`; it is not, today.
     (`F-P4-07`)
 
+### Observability
+
+11. **A guard that declines to act must be watched by something that
+    measures the outcome, not the attempt.** Every guard in
+    `deploy-guards.nix` ends in `exit 0` — correctly, since a deferred
+    deploy is not an error — so systemd records a skip as success and
+    it never enters `systemctl --failed`. A check that only watches
+    units therefore cannot distinguish "deployed weekly for a year"
+    from "skipped every week for a year". Two consequences, both of
+    which bit this fleet:
+
+    - **Watch the result the guard exists to produce.** For deploys
+      that is `/nix/var/nix/profiles/system`, whose mtime is the last
+      real activation by any route, so it stays honest when a host is
+      updated by hand. Prefer an existing artefact like this over a
+      bespoke marker the guarded unit writes about itself — the
+      bespoke one records that the *unit* ran, and will alarm on a host
+      that is perfectly current because a human deployed it.
+      (Non-obvious: `stat` that path **without** `-L`. Store paths all
+      have mtime 1, so dereferencing reports every host as permanently
+      stale.)
+    - **Never hang `OnSuccess=` off a unit that can skip.** systemd
+      cannot tell a skip from a real run, and `SuccessExitStatus=` does
+      not help — it makes the exit *count* as success, so `OnSuccess=`
+      still fires. Gate the follow-on on evidence the work actually
+      happened. homelab's `auto-switch` chained a full closure build and
+      push to vps off a switch its own guard had just deferred, in the
+      same second. (`F-P7-09`)
+
 ## Conventions in detail
 
 - **Shared server baseline lives in `modules/profiles/server.nix`**,
