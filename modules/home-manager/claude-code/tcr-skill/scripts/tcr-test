@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# tcr-test --step "<name>" [--fast]
+#
+# Step-scoped wrapper around FULL_CHECK. Only FULL_CHECK's result gates
+# pass/fail -- --fast, if a fast_check is configured, is run first purely
+# for quick feedback and is clearly labeled informational-only.
+#
+# Bumps the attempt counter for the named step (resetting it when the step
+# name changes) and prints a stuck-agent warning once max_attempts is hit,
+# but does not itself decide what to do next -- that decision belongs to
+# the skill (smaller step, different approach, or stop and ask).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+usage() { echo "usage: tcr-test --step \"<name>\" [--fast]" >&2; exit 1; }
+
+step="" fast=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --step) step="$2"; shift 2 ;;
+    --fast) fast=true; shift ;;
+    *) usage ;;
+  esac
+done
+[ -n "$step" ] || usage
+
+root="$(tcr_require_root)" || exit 1
+state="$root/$TCR_STATE_RELPATH"
+tcr_load_state "$state"
+
+[ "${TCR_ACTIVE:-false}" = "true" ] || tcr_die "no active TCR session (run tcr-status init first, or tcr-status show to see why)."
+[ "${TCR_CORRUPTED:-false}" = "true" ] && tcr_die "TCR session is marked corrupted -- a prior rollback could not be verified green. Resolve manually before continuing (see tcr-status show)."
+[ -n "${TCR_FULL_CHECK:-}" ] || tcr_die "no full_check recorded in state."
+
+if [ "$step" != "${TCR_CURRENT_STEP:-}" ]; then
+  TCR_CURRENT_STEP="$step"
+  TCR_ATTEMPT=0
+fi
+TCR_ATTEMPT=$((TCR_ATTEMPT + 1))
+
+work_root="$(tcr_work_root)"
+
+if [ "$fast" = true ] && [ -n "${TCR_FAST_CHECK:-}" ]; then
+  echo "--- FAST CHECK (informational only, does not gate commit) ---"
+  fastlog="$work_root/.tcr/last-fast-check.log"
+  if tcr_run_check "$work_root" "$TCR_FAST_CHECK" "$fastlog"; then
+    echo "fast check: pass"
+  else
+    echo "fast check: fail"
+    tcr_tail_log "$fastlog" 20
+  fi
+fi
+
+echo "--- FULL CHECK (gates this step): $TCR_FULL_CHECK ---"
+log="$work_root/.tcr/last-full-check.log"
+rc=0
+tcr_run_check "$work_root" "$TCR_FULL_CHECK" "$log" || rc=$?
+
+TCR_LAST_TEST_AT="$(tcr_now)"
+if [ "$rc" -eq 0 ]; then
+  TCR_LAST_RESULT=pass
+  tcr_save_state "$state"
+  echo "PASS  (step '$step', attempt $TCR_ATTEMPT/${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT})"
+  echo "Full suite is green. Next: tcr-commit --step \"$step\" -m \"<message>\"."
+else
+  TCR_LAST_RESULT=fail
+  tcr_save_state "$state"
+  echo "FAIL  (step '$step', attempt $TCR_ATTEMPT/${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT})"
+  tcr_tail_log "$log" 40
+  echo "Next: tcr-revert --step \"$step\" --reason \"<why>\"."
+  if [ "$TCR_ATTEMPT" -ge "${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT}" ]; then
+    cat >&2 <<EOF
+
+*** STUCK-AGENT PROTOCOL ***
+Step '$step' has failed $TCR_ATTEMPT times (max_attempts=${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT}).
+Do not retry the same approach again. After reverting:
+  - summarize what was tried and why each attempt failed
+  - re-read the relevant code/tests before guessing again
+  - reconsider the decomposition: pick a materially smaller or different
+    next step, not a variation on the same idea
+  - if no viable next step exists, stop, preserve the green state, and
+    report the blocker instead of continuing to retry
+EOF
+  fi
+fi
+exit "$rc"

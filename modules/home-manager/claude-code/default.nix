@@ -1,13 +1,19 @@
 { ... }:
 {
-  # Claude Code's own config lives in ~/.claude and the CLI writes to
-  # settings.json itself (that's how /model and /effort persist), so only the
-  # statusLine script is managed here - a store symlink over settings.json
-  # would make those writes fail.
+  # Claude Code's own config lives in ~/.claude. The CLI writes settings.json
+  # itself (that's how /model and /effort persist), so a store symlink over it
+  # would make those writes fail. Instead the keys this repo cares about are
+  # declared below and merged into the mutable file on activation: declarative
+  # keys win on every rebuild, CLI-owned keys survive untouched.
   #
   # The claude-code package itself comes from profile-pc's systemPackages.
   flake.modules.homeManager.claude-code =
-    { pkgs-unstable, ... }:
+    {
+      config,
+      lib,
+      pkgs-unstable,
+      ...
+    }:
     let
       # statusLine is invoked as a bare command, inheriting whatever PATH the
       # terminal happens to have - jq otherwise only exists in this repo's
@@ -121,8 +127,107 @@
           (IFS=' '; printf '%s\n' "''${segments[*]}")
         '';
       };
+
+      # The tcr skill is a plain file tree, but its scripts run from whatever
+      # PATH the invoking terminal has (same problem as statusline), so each
+      # entry point is wrapped with its own deps. lib.sh is deliberately left
+      # unwrapped: the scripts `source` it, and a wrapper is an exec shim that
+      # cannot be sourced.
+      tcrSkill =
+        pkgs-unstable.runCommandLocal "claude-tcr-skill"
+          {
+            nativeBuildInputs = [ pkgs-unstable.makeWrapper ];
+          }
+          ''
+            cp -r ${./tcr-skill} $out
+            chmod -R u+w $out
+            for script in $out/scripts/tcr-*; do
+              wrapProgram "$script" --prefix PATH : ${
+                lib.makeBinPath (
+                  with pkgs-unstable;
+                  [
+                    bash
+                    coreutils
+                    git
+                    jq
+                    gnused
+                    gnugrep
+                    gawk
+                  ]
+                )
+              }
+            done
+          '';
+
+      claudeDir = "${config.home.homeDirectory}/.claude";
+
+      # Keys this repo owns in ~/.claude/settings.json. Anything absent here
+      # (model, effortLevel, theme, enabledPlugins, ...) stays CLI-owned.
+      managedSettings = {
+        statusLine = {
+          type = "command";
+          command = "${claudeDir}/statusline.sh";
+          padding = 0;
+        };
+        # The tips shown next to the spinner.
+        spinnerTipsEnabled = false;
+        hooks.PreToolUse = [
+          {
+            matcher = "Bash";
+            hooks = [
+              {
+                type = "command";
+                command = "${claudeDir}/skills/tcr/scripts/tcr-guard-hook";
+                timeout = 10;
+              }
+            ];
+          }
+        ];
+      };
+
+      jsonFormat = pkgs-unstable.formats.json { };
+      managedSettingsFile = jsonFormat.generate "claude-settings-managed.json" managedSettings;
+      # Recorded so that dropping a key from managedSettings actually removes it
+      # from settings.json on the next activation, instead of stranding it there.
+      managedKeysFile = jsonFormat.generate "claude-settings-managed-keys.json" (
+        lib.attrNames managedSettings
+      );
     in
     {
-      home.file.".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
+      home = {
+        file.".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
+        file.".claude/skills/tcr".source = tcrSkill;
+
+        # Reads happen unconditionally, but every write goes through `run` so
+        # that `home-manager build`/dry-run stays side-effect free - a bare
+        # `run echo > file` would still truncate the file via the redirect.
+        activation.claudeCodeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          settings="${claudeDir}/settings.json"
+          keyrecord="${claudeDir}/.hm-managed-setting-keys.json"
+
+          current='{}'
+          [ -e "$settings" ] && current=$(cat "$settings")
+          prevKeys='[]'
+          [ -e "$keyrecord" ] && prevKeys=$(cat "$keyrecord")
+
+          # Deep-merge (jq `*`) so unmanaged keys survive, with the declared
+          # side winning. Keys we managed on a previous generation but no
+          # longer declare are dropped, so deleting one here removes it.
+          merged=$(${pkgs-unstable.jq}/bin/jq -n \
+            --argjson current "$current" \
+            --argjson prevKeys "$prevKeys" \
+            --slurpfile managed ${managedSettingsFile} \
+            --slurpfile curKeys ${managedKeysFile} \
+            '($current | delpaths([ ($prevKeys - $curKeys[0])[] | [.] ])) * $managed[0]')
+
+          merged_tmp=$(mktemp)
+          printf '%s\n' "$merged" > "$merged_tmp"
+
+          run mkdir -p ${claudeDir}
+          run install -m 644 "$merged_tmp" "$settings"
+          run install -m 644 ${managedKeysFile} "$keyrecord"
+          rm -f "$merged_tmp"
+        '';
+      };
     };
 }

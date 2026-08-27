@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# tcr-commit --step "<name>" -m "<message>"
+#
+# Only commits when tcr-test just reported PASS for this exact step name --
+# refuses an untested, differently-scoped, or already-failed change. This
+# gating applies in both normal and strict mode; strict mode additionally
+# blocks a raw `git commit` from bypassing this script entirely (see
+# tcr-guard-hook).
+#
+# The message you pass is used verbatim as the commit subject/body -- this
+# script does not prefix or rewrite it, so it stays compatible with any
+# commit-msg conventions (Conventional Commits, a commit-msg hook, etc.)
+# already in force for the repo. It only appends a `TCR-Step:` trailer for
+# traceability. No authorship/attribution trailers are added.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+usage() { echo "usage: tcr-commit --step \"<name>\" -m \"<message>\"" >&2; exit 1; }
+
+step="" message=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --step) step="$2"; shift 2 ;;
+    -m|--message) message="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -n "$step" ] && [ -n "$message" ] || usage
+
+root="$(tcr_require_root)" || exit 1
+state="$root/$TCR_STATE_RELPATH"
+tcr_load_state "$state"
+
+[ "${TCR_ACTIVE:-false}" = "true" ] || tcr_die "no active TCR session."
+[ "${TCR_CORRUPTED:-false}" = "true" ] && tcr_die "TCR session is marked corrupted -- cannot commit until resolved manually."
+[ "$step" = "${TCR_CURRENT_STEP:-}" ] || tcr_die "current_step is '${TCR_CURRENT_STEP:-<none>}', not '$step'. Run tcr-test --step \"$step\" first."
+[ "${TCR_LAST_RESULT:-}" = "pass" ] || tcr_die "last_result is '${TCR_LAST_RESULT:-none}', not 'pass'. FULL_CHECK must pass for this exact step before committing -- run tcr-test --step \"$step\" first."
+
+work_root="$(tcr_work_root)"
+
+if [ -z "$(git -C "$work_root" status --porcelain -- . ':!.tcr' 2>/dev/null)" ]; then
+  tcr_die "nothing to commit in $work_root (working tree matches HEAD outside of .tcr/)."
+fi
+
+tcr_git_identity_ensure "$work_root"
+git -C "$work_root" add -A -- . ':!.tcr'
+
+commit_body="$message
+TCR-Step: $step"
+
+if ! git -C "$work_root" commit -q -m "$commit_body"; then
+  tcr_die "git commit failed (see output above) -- e.g. a pre-commit/commit-msg hook rejected it. The change remains uncommitted; fix the issue or run tcr-revert."
+fi
+
+new_head="$(git -C "$work_root" rev-parse HEAD)"
+TCR_BASELINE_COMMIT="$new_head"
+TCR_CURRENT_STEP=""
+TCR_ATTEMPT=0
+TCR_LAST_RESULT=pass
+TCR_LAST_VERIFIED_RESULT=pass
+TCR_LAST_VERIFIED_AT="$(tcr_now)"
+tcr_save_state "$state"
+
+echo "COMMITTED  $new_head  (step '$step')"
+[ "$TCR_WORKTREE_MODE" = "true" ] && echo "  branch: $TCR_WORKTREE_BRANCH"
+echo "Repository is green."

@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# PreToolUse hook (matcher: Bash). Installed once, user-wide, in
+# ~/.claude/settings.json -- it is a no-op for every Bash call unless the
+# call's cwd is inside a directory tree with an ACTIVE, STRICT TCR session
+# (.tcr/state.json with active:true, mode:"strict"), so it never affects
+# ordinary git usage outside a strict TCR session.
+#
+# Scope and honest limitations (see reference.md "Strict mode" section):
+#   - This is a best-effort deterministic guard against the *obvious* forms
+#     of the commands it lists, matched as an anchored regex on the literal
+#     command string. It is not a sandbox: a sufficiently indirect command
+#     (piped through another interpreter, base64-decoded, etc.) can evade
+#     it. Real safety comes from the isolated worktree/stash design in
+#     tcr-status and from git's own reflog, not from this hook.
+#   - It parses the hook's JSON payload with `jq` when available, and with
+#     a small awk-based extractor when it isn't (this sandbox and some
+#     minimal systems don't ship jq) -- see extract_top/extract_obj below.
+#     It does NOT fail open just because jq is missing: that would silently
+#     defeat strict mode on exactly the systems most likely to need it.
+#   - It only recognizes literal `git ...` invocations at the start of the
+#     command or immediately after a `;`, `&&`, `|`, or `(` -- so it does not
+#     false-positive on a tcr-commit call whose own -m message happens to
+#     contain words like "git commit" inside a quoted argument.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+# ---- minimal JSON field extraction (no jq required) -----------------------
+
+# extract_top <json> <key> -- string value of a top-level "key": "...".
+extract_top() {
+  awk -v key="$2" '
+  BEGIN { needle = "\"" key "\""; ORS=""; }
+  { text = text $0 "\n" }
+  END {
+    n = length(text); idx = index(text, needle)
+    if (idx == 0) { exit 1 }
+    i = idx + length(needle)
+    while (i <= n) {
+      c = substr(text, i, 1)
+      if (c == " " || c == "\t" || c == "\n" || c == ":") { i++ } else break
+    }
+    if (substr(text, i, 1) != "\"") { exit 1 }
+    i++; out = ""
+    while (i <= n) {
+      c = substr(text, i, 1)
+      if (c == "\\") {
+        nc = substr(text, i + 1, 1)
+        if (nc == "n") out = out "\n"
+        else if (nc == "t") out = out "\t"
+        else out = out nc
+        i += 2; continue
+      }
+      if (c == "\"") break
+      out = out c; i++
+    }
+    printf "%s", out
+  }' <<<"$1"
+}
+
+# extract_obj <json> <key> -- raw substring of a top-level "key": { ... }.
+extract_obj() {
+  awk -v key="$2" '
+  BEGIN { needle = "\"" key "\""; ORS=""; }
+  { text = text $0 "\n" }
+  END {
+    n = length(text); idx = index(text, needle)
+    if (idx == 0) { exit 1 }
+    i = idx + length(needle)
+    while (i <= n) {
+      c = substr(text, i, 1)
+      if (c == " " || c == "\t" || c == "\n" || c == ":") { i++ } else break
+    }
+    if (substr(text, i, 1) != "{") { exit 1 }
+    depth = 0; start = i; instr = 0
+    while (i <= n) {
+      c = substr(text, i, 1)
+      if (instr) {
+        if (c == "\\") { i += 2; continue }
+        if (c == "\"") instr = 0
+        i++; continue
+      }
+      if (c == "\"") { instr = 1; i++; continue }
+      if (c == "{") { depth++; i++; continue }
+      if (c == "}") { depth--; i++; if (depth == 0) break; continue }
+      i++
+    }
+    printf "%s", substr(text, start, i - start)
+  }' <<<"$1"
+}
+
+json_str() { # json_str <json> <top-level-key>
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r --arg k "$2" '.[$k] // empty' 2>/dev/null
+  else
+    extract_top "$1" "$2" 2>/dev/null
+  fi
+}
+
+json_command() { # json_command <json> -- .tool_input.command
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r '.tool_input.command // empty' 2>/dev/null
+  else
+    local obj
+    obj="$(extract_obj "$1" tool_input 2>/dev/null)" || return 0
+    [ -n "$obj" ] && extract_top "$obj" command
+  fi
+}
+
+# ---------------------------------------------------------------------------
+
+input="$(cat)"
+tool_name="$(json_str "$input" tool_name)"
+[ "$tool_name" = "Bash" ] || exit 0
+
+cwd="$(json_str "$input" cwd)"
+command="$(json_command "$input")"
+[ -n "$cwd" ] && [ -n "$command" ] || exit 0
+
+state=""
+dir="$cwd"
+while :; do
+  if [ -f "$dir/.tcr/state.json" ]; then state="$dir/.tcr/state.json"; break; fi
+  [ "$dir" = "/" ] && break
+  dir="$(dirname "$dir")"
+done
+[ -n "$state" ] || exit 0
+
+active="$(tcr_get "$state" active)"
+mode="$(tcr_get "$state" mode)"
+[ "$active" = "true" ] && [ "$mode" = "strict" ] || exit 0
+
+deny() {
+  local reason; reason="$(tcr_json_escape "$1")"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+  exit 0
+}
+
+# Anchored so a match must start the command or follow ;/&&/|/( -- not just
+# appear anywhere as a substring (e.g. inside a commit message argument).
+anchored() {
+  printf '%s' "$command" | grep -Eq "(^|[;&|(][[:space:]]*)$1"
+}
+
+if anchored 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+commit([[:space:]]|$)'; then
+  deny "Active strict TCR session: commits must go through tcr-commit, which only commits after FULL_CHECK has passed for the current step. Direct 'git commit' is blocked. Use: tcr-commit --step \"<name>\" -m \"<message>\""
+fi
+if anchored 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+reset[[:space:]]+--hard'; then
+  deny "Active strict TCR session: use tcr-revert to roll back safely (it logs the failure and verifies green afterward). Direct 'git reset --hard' is blocked."
+fi
+if anchored 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+clean[[:space:]]+[^;&|]*-[a-zA-Z]*f'; then
+  deny "Active strict TCR session: use tcr-revert for cleanup instead of 'git clean' directly."
+fi
+if anchored 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+push[[:space:]]+[^;&|]*(--force|-f([[:space:]]|$))'; then
+  deny "Active strict TCR session: force-push is blocked while a TCR session is active."
+fi
+if anchored 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+branch[[:space:]]+[^;&|]*(-D([[:space:]]|$)|--delete[[:space:]]+--force)'; then
+  deny "Active strict TCR session: force branch deletion is blocked while a TCR session is active."
+fi
+
+exit 0
