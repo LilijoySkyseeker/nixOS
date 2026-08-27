@@ -355,6 +355,30 @@ them rot.
         DistantHorizons and the 1 GiB `/tmp` tmpfs sit on top of it). A
         ceiling set too low becomes an OOM-kill loop that reads as a
         game crash. *(F-P4-07)*
+
+        **First measurement taken 2026-08-27** (`factorio-new` is gone
+        since `7a047b7`, so this is two containers, not three). Read from
+        each container's cgroup on homelab — host has 15.54 GiB:
+
+        | | `memory.peak` | `pids.peak` | `memory.max` | `pids.max` |
+        |---|---|---|---|---|
+        | `factorio-main` | 1.06 GB | 19 | `max` | 19038 (host default) |
+        | `minecraft-vanilla-plus` | 4.90 GB | 123 | `max` | 19038 |
+
+        Confirms both halves of the finding: no ceiling is set on either,
+        and minecraft's real RSS (4.90 GB) is ~0.9 GB *above* its
+        `MEMORY = "4G"` JVM heap, so sizing from that setting would have
+        been wrong in the OOM-kill direction.
+
+        **These are not peaks.** Both containers had 37 minutes uptime
+        (restarted by the 13:15 switch) and were almost certainly idle —
+        `memory.peak` resets on restart, so there is no longer-run data.
+        Treat them as a floor. `--pids-limit` can be set from them now
+        with enormous margin (peaks of 19 and 123 against a 19038
+        default); `--memory` needs either a load-representative
+        observation window or a deliberately generous
+        bound-the-blast-radius value chosen by the user, since only they
+        know the real player load. **That choice is the open question.**
       - **`userns-remap` is not set** in
         `virtualisation.docker.daemon.settings`, so container uid 0 is
         host uid 0 on every bind mount and an escape lands as real root

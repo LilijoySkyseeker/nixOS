@@ -290,9 +290,19 @@ tailscale module sets the former.
    staleness, and `onSuccess` is replaced by a gated
    `myAutoUpdate.onDeployUnits`. See below.
 3. **Container resource ceilings** — no `--pids-limit`/`--memory`/`--cpus`
-   on any container. Needs measured RSS off homelab, not a guess;
-   minecraft's `MEMORY = "4G"` is JVM heap only. **Now unblocked** — see
-   the SSH note under "Rules and traps".
+   on any container. **First measurement taken 2026-08-27** and recorded
+   in `TODO.md`: `factorio-main` peaked at 1.06 GB / 19 pids,
+   `minecraft-vanilla-plus` at 4.90 GB / 123 pids, both with
+   `memory.max = max` and the host-default `pids.max = 19038`. Minecraft's
+   real RSS is ~0.9 GB above its `MEMORY = "4G"` JVM heap, confirming why
+   that setting must not be used to size the ceiling.
+
+   `--pids-limit` can be set from this now with huge margin. `--memory`
+   **cannot** — the containers had 37 minutes uptime and were idle, and
+   `memory.peak` resets on restart, so this is a floor, not a peak.
+   Needs either a load-representative window or a user decision on a
+   generous blast-radius bound. **That is the open question, and it is
+   the user's.**
 4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
    mount. Re-maps existing volume ownership, so it needs its own VM test.
 5. **Deploy `vps`, `torrent`, `thinkpad`** if the user wants — all
