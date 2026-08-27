@@ -58,21 +58,31 @@ the evidence without re-deriving it.
       **Signed commits deliberately not enabled** — that is D2, and it
       needs a signing key set up first. *(D3, H1)*
 
-- [ ] **Delete `/srv/factorio/new` on homelab after deploying.** The
-      second Factorio server was removed 2026-08-27, but only from the
-      config — its data directory still exists on the host and is no
-      longer in the impermanence persistence list, so nothing manages it
-      any more. It matters because of what is in it: `server-settings.json`
-      holds a **factorio.com account token and the game password**, which
-      `F-P4-04` already flagged as secrets that left sops into a
-      container-visible volume, and therefore into every ZFS snapshot and
-      every restic backup derived from that dataset.
+- [x] **Delete `/srv/factorio/new` on homelab.** **Done 2026-08-27**, on
+      the user's explicit authorisation — the one live-host mutation this
+      audit has made. Sequence: stopped `docker-factorio-new.service`
+      (container removed, `factorio-main` untouched and still up),
+      deleted the contents, stopped `srv-factorio-new.mount`, then
+      `rmdir`'d both `/srv/factorio/new` and its persist source
+      `/nix/state/srv/factorio/new`. Verified after: only `main` remains
+      in both paths, `docker-factorio-main.service` and
+      `srv-factorio-main.mount` still active. `systemctl reset-failed`
+      cleared the stopped unit so it does not sit in `systemctl --failed`
+      masking real failures.
 
-      Deleting the directory does not retract it from the snapshots that
-      already contain it — those age out on zrepl's normal retention.
-      Treat the token as exposed for as long as those snapshots exist,
-      and note it is the *same* credential the surviving server still
-      uses, so rotating it means updating sops too. *(F-P4-04)*
+      **The world was provably unused**, which is what made this safe:
+      the only save was a single `_autosave1.zip` dated 2026-08-21 11:39
+      — deployment day — with `player-data.json` from the same minute and
+      nothing since. Factorio autosaves continuously while a player is
+      connected, so one autosave means nobody ever joined.
+
+      **The credential exposure is not retracted by this.**
+      `config/server-settings.json` held the factorio.com account token
+      and game password, and those are still in every ZFS snapshot and
+      restic backup taken while the directory existed; they age out on
+      normal retention. It is the *same* credential
+      `factorio-main` still uses, so treat it as exposed until rotated at
+      factorio.com — and rotating means updating sops too. *(F-P4-04)*
 
 - [ ] **Delete the `ssh` block in the Tailscale console.** `ba8cd4e`
       removed it from `docs/tailscale-acl.json`, but that file is only a
