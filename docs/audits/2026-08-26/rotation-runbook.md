@@ -29,7 +29,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 
 | # | sops key | Risk | Status |
 |---|---|---|---|
-| 1 | `cloudflare_octodns_token` | low | [ ] |
+| 1 | `cloudflare_octodns_token` | low | **[x] 2026-08-27** — new token verified live; old token pending deletion by user |
 | 2 | `homelab_discord_webhook` | low | [ ] |
 | 3 | `tailscale_authkey_homelab` | low | [ ] |
 | 4 | `tailscale_authkey_torrent` | low | [ ] |
@@ -62,6 +62,22 @@ exposure means someone else can repoint your domain.
 
 Rollback: put the old token back in sops and redeploy; the old token
 still works until you delete it.
+
+**Done 2026-08-27.** Deployed as homelab generation **347**; activation
+logged `modifying secret: cloudflare_octodns_token` and `modifying
+rendered secret: octodns-env`. `octodns-sync` then ran clean with the new
+token:
+
+```
+CloudflareProvider[cloudflare] populate:   found 6 records, exists=True
+CloudflareProvider[cloudflare] plan:   No changes
+Manager sync:   0 total changes
+```
+
+`populate` succeeding is the proof — it reads the zone through the API,
+so an invalid or under-scoped token fails there. `No changes` separately
+confirms declared state still matches Cloudflare. Zero failed units after.
+**Remaining: delete the old token in the Cloudflare dashboard.**
 
 ## 2 — `homelab_discord_webhook`
 
