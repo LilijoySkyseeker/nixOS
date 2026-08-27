@@ -557,10 +557,20 @@
   # wireguard: dial out to the vps (hosts/vps) so it can act as a public
   # tunnel endpoint for us despite being behind CGNAT — homelab always
   # initiates, nothing needs to be reachable inbound at home.
-  sops.secrets.homelab_wireguard_private_key = { };
+  # restartUnits is load-bearing, not tidiness. wireguard-wg0.service is
+  # Type=oneshot + RemainAfterExit=true: it reads privateKeyFile once when
+  # the link is created and never re-runs, so rotating the key in sops
+  # leaves the interface running the OLD key indefinitely. Hit for real
+  # during the 2026-08-27 rotation (items 5-7): activation logged
+  # "modifying secrets: homelab_wireguard_private_key", the peer unit
+  # restarted because its name is derived from the peer's public key, and
+  # `wg show` still reported the previous interface key — the interface
+  # unit had last started the day before. The peer units carry the PSK and
+  # are Requires=/WantedBy= this unit, so cycling it cycles them too.
+  sops.secrets.homelab_wireguard_private_key.restartUnits = [ "wireguard-wg0.service" ];
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
   # hosts/vps/configuration.nix's peer entry.
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "wireguard-wg0.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;

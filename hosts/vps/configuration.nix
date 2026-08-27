@@ -345,8 +345,15 @@ in
   networking.firewall.logRefusedConnections = true;
 
   # wireguard tunnel
-  sops.secrets.vps_wireguard_private_key = { };
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  # Same latent bug as homelab's, reached by a different route: wg0 here is
+  # a systemd-networkd .netdev, which embeds the peer's public key but
+  # reads PrivateKeyFile at link setup. The 2026-08-27 rotation restarted
+  # networkd only because the *peer* key changed, rewriting 40-wg0.netdev.
+  # Rotating this host's own private key alone would have changed no unit
+  # file and left the interface on the old key, exactly as happened on
+  # homelab. Make the dependency explicit rather than incidental.
+  sops.secrets.vps_wireguard_private_key.restartUnits = [ "systemd-networkd.service" ];
+  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "systemd-networkd.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;
