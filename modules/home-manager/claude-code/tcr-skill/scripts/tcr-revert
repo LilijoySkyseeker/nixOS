@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# tcr-revert --step "<name>" --reason "<short reason>" [--lesson "<text>"]
+#
+# Safe rollback for a failed TCR step. This is only safe to implement as a
+# hard reset because of how the work root got here: it's either an isolated
+# worktree branched from the last known-good commit (nothing of value can be
+# sitting there uncommitted except the current failed attempt), or, in
+# --in-place mode, the main repo with any pre-existing changes already
+# removed from the working tree via `git stash push -u` before TCR started.
+# Either way, HEAD is guaranteed to already be the last accepted green
+# state, so `reset --hard HEAD` cannot destroy anything TCR doesn't own.
+#
+# Order of operations matters: the failure is logged to .tcr/failures.md
+# BEFORE the destructive reset, and .tcr/ is excluded from both the reset's
+# scope and `git clean`, so the log survives the rollback it describes.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+usage() { echo "usage: tcr-revert --step \"<name>\" --reason \"<why it failed>\" [--lesson \"<what to do differently>\"]" >&2; exit 1; }
+
+step="" reason="" lesson=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --step) step="$2"; shift 2 ;;
+    --reason) reason="$2"; shift 2 ;;
+    --lesson) lesson="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+[ -n "$step" ] && [ -n "$reason" ] || usage
+
+root="$(tcr_require_root)" || exit 1
+state="$root/$TCR_STATE_RELPATH"
+tcr_load_state "$state"
+
+[ "${TCR_ACTIVE:-false}" = "true" ] || tcr_die "no active TCR session."
+[ "${TCR_CORRUPTED:-false}" = "true" ] && tcr_die "TCR session is already marked corrupted from a previous failed rollback -- resolve manually (see tcr-status show) instead of reverting again."
+
+work_root="$(tcr_work_root)"
+head_before="$(git -C "$work_root" rev-parse HEAD)"
+log="$work_root/.tcr/last-full-check.log"
+failure_log="$work_root/${TCR_FAILURE_LOG_PATH:-$TCR_FAILURES_RELPATH}"
+
+mkdir -p "$(dirname "$failure_log")"
+if [ ! -f "$failure_log" ]; then
+  printf '# TCR failure log\n\nEach entry is a reverted attempt. Survives rollback -- it lives outside\ngit-tracked content and is never touched by tcr-revert'"'"'s reset/clean.\n\n' > "$failure_log"
+fi
+
+diffstat="$(git -C "$work_root" diff --stat HEAD -- . ':!.tcr' 2>/dev/null | tail -n 20)"
+tail_of_log=""
+[ -f "$log" ] && tail_of_log="$(tail -n 15 "$log")"
+
+{
+  printf -- '---\n'
+  printf -- '- timestamp: %s\n' "$(tcr_now)"
+  printf -- '- step: %s\n' "$step"
+  printf -- '- attempt: %s/%s\n' "${TCR_ATTEMPT:-?}" "${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT}"
+  printf -- '- reason: %s\n' "$reason"
+  printf -- '- full_check: %s\n' "${TCR_FULL_CHECK:-<unset>}"
+  if [ -n "$diffstat" ]; then
+    printf -- '- diffstat:\n```\n%s\n```\n' "$diffstat"
+  fi
+  if [ -n "$tail_of_log" ]; then
+    printf -- '- diagnostic (last 15 lines of full check output):\n```\n%s\n```\n' "$tail_of_log"
+  fi
+  printf -- '- rollback target: %s\n' "$head_before"
+  if [ -n "$lesson" ]; then
+    printf -- '- lesson: %s\n' "$lesson"
+  fi
+  printf '\n'
+} >> "$failure_log"
+
+git -C "$work_root" reset --hard HEAD >/dev/null
+git -C "$work_root" clean -fd -- . ':!.tcr' >/dev/null
+
+verify_log="$work_root/.tcr/last-full-check.log"
+if [ -z "${TCR_FULL_CHECK:-}" ]; then
+  tcr_die "no full_check recorded; cannot verify post-rollback state."
+fi
+if tcr_run_check "$work_root" "$TCR_FULL_CHECK" "$verify_log"; then
+  TCR_LAST_RESULT=pass
+  TCR_LAST_VERIFIED_RESULT=pass
+  TCR_LAST_VERIFIED_AT="$(tcr_now)"
+  tcr_save_state "$state"
+  echo "REVERTED to $head_before. Repository verified GREEN."
+  echo "Failure logged: $failure_log"
+  echo "Attempt $TCR_ATTEMPT/${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT} for step '$step'."
+  exit 0
+else
+  TCR_CORRUPTED=true
+  TCR_LAST_VERIFIED_RESULT=fail
+  TCR_LAST_VERIFIED_AT="$(tcr_now)"
+  tcr_save_state "$state"
+  {
+    echo
+    echo "*** TCR SAFETY STOP ***"
+    echo "Rolled back to $head_before but FULL_CHECK still fails there."
+    echo "That commit was previously green, so this indicates environment"
+    echo "flakiness, a non-hermetic test, or an out-of-band change to"
+    echo "$work_root -- not something TCR caused just now."
+    echo "Do NOT continue automated TCR steps. Investigate manually."
+  } >&2
+  tcr_tail_log "$verify_log" 40
+  exit 9
+fi

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# tcr-verify -- run FULL_CHECK once and report GREEN/RED. Does not touch
+# step/attempt bookkeeping (that's tcr-test's job); only updates
+# last_verified_result/last_verified_at. Safe to call at any time, including
+# outside a TCR step, e.g. to sanity-check the baseline or double-check
+# green after a manual git operation.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+root="$(tcr_require_root)" || exit 1
+state="$root/$TCR_STATE_RELPATH"
+tcr_load_state "$state"
+
+if [ -z "${TCR_FULL_CHECK:-}" ]; then
+  tcr_die "no full_check command recorded in state; run tcr-status init first."
+fi
+
+work_root="$(tcr_work_root)"
+log="$work_root/.tcr/last-full-check.log"
+
+echo "Running FULL_CHECK: $TCR_FULL_CHECK"
+if tcr_run_check "$work_root" "$TCR_FULL_CHECK" "$log"; then
+  TCR_LAST_VERIFIED_RESULT=pass
+  TCR_LAST_VERIFIED_AT="$(tcr_now)"
+  tcr_save_state "$state"
+  echo "GREEN"
+  exit 0
+else
+  rc=$?
+  TCR_LAST_VERIFIED_RESULT=fail
+  TCR_LAST_VERIFIED_AT="$(tcr_now)"
+  tcr_save_state "$state"
+  echo "RED"
+  tcr_tail_log "$log" 40
+  exit "$rc"
+fi
