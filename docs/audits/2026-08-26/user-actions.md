@@ -176,6 +176,16 @@ repeated here so this file is the single place to work through.
       a port set that contains one nobody can account for. *(wave 2
       §2.9 port inventory)*
 
+- [ ] **D12 — should the NFS shares be `noexec` too?** Low stakes, and
+      only worth answering if the answer is easy. Wave 2 item 2.5 added
+      `nosuid` and `nodev` to `/home/lilijoy/storage{,-bulk}` and
+      declined `noexec` on `F-P6-05`'s reasoning that a media share will
+      eventually have something run off it. A scan found nothing that is
+      actually a program there today, so if you never intend to run
+      anything from those shares, `noexec` is one word and closes the
+      last execution path from a homelab-controlled filesystem onto both
+      laptops. *(F-P6-05)*
+
 - [ ] **D11 — should `flake-update-test` be allowed to auto-merge?**
       Commit `3f2c418` repaired a mechanism that had never once
       completed. It now can — and it auto-merges upstream input updates

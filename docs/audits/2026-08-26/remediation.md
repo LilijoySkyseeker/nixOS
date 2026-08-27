@@ -175,11 +175,45 @@ Behaviour changes, not just config. Each needs
 | 2.2 | Pin the container images by digest and pin the Modrinth mod set | H3 (`F-P4-03`) | changes what actually runs; needs a start-and-play check |
 | 2.3 | **Done** — both laptops brought up to the baseline as structured `settings`, `allowSFTP = false`, and the `AllowTcpForwarding` claim in `docs/hardening.md` corrected. The homelab/vps `extraConfig`→`settings` move is **not** included; see the note | MEDIUM cluster (`F-P5-07` `F-P2-09` `F-P3-18` `F-P6-10`) | verified with `sshd -T`, before *and* after — see the note |
 | 2.4 | Replace the `input` group grant with `hardware.uinput.enable` | C2 (`F-P1-01` `F-P8-09`) | plover must still work; this is a real functional dependency, not dead config |
-| 2.5 | Add `nosuid`/`nodev`/`noexec` to the NFS client mounts | MEDIUM (`F-P6-05`) | could break execution from `/storage` if anything relies on it |
+| 2.5 | **Done** — added `nosuid` and `nodev` to the NFS client mounts. `noexec` **declined**, per the finding rather than this row; see the note | MEDIUM (`F-P6-05`) | verified live on torrent and through `systemd-fstab-generator` — see the note |
 | 2.6 | Sandbox the three under-hardened root units | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | Guard the `ipset create` calls so a parameter drift cannot take the whole packet filter down fail-open | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
 | 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**Note on 2.5 — the row said three options; the finding says two.** This
+row read "add `nosuid`/`nodev`/`noexec`", but `F-P6-05`'s proposed fix
+explicitly *declines* `noexec` — "this is a media/file share and someone
+will eventually want to run something off it" — and asks for it to be
+recorded as considered and declined, in the same comment. The finding
+wins: it is the analysis written against the file, where the table row
+is a summary. This is the second time in this wave plan a row has
+disagreed with the finding it cites (see 1.7); prefer the finding.
+
+Checked live on torrent rather than reasoned about, since the mounts are
+real there:
+
+- The mount is `vers=4.2 … sec=sys` with **no** `nosuid`, `nodev` or
+  `noexec` — `suid` and `dev` were in force, exactly as `F-P6-05` says.
+- A scan of both shares found **no setuid/setgid regular files and no
+  device nodes**, so `nosuid` and `nodev` cost nothing today. The
+  setgid *directories* the scan turns up (`drwxrws---`) are the
+  multimedia group-inheritance pattern and are unaffected by `nosuid`,
+  which only suppresses setuid/setgid on execution.
+- The `+x` bit is set indiscriminately across the media files, a
+  permissive-umask artifact, so "executables present" carries no signal
+  either way on the `noexec` question. Nothing that is actually a
+  program lives there today, so `noexec` remains a cheap tightening if
+  the share is ever declared data-only — logged as **D12**.
+
+`F-P6-05` warns that a bad option surfaces at first access, not at
+build, and verifying the automount properly needs a switch. Short of
+that: the rendered `/etc/fstab` carries `nosuid,nodev` on both mounts on
+both laptops, and feeding that fstab to the pinned
+`systemd-fstab-generator` produces both the `.mount` and the
+`.automount` unit for each share with the new options in `Options=`.
+Both are generic kernel mount flags rather than NFS-specific spellings,
+so there is no filesystem-specific typo risk in these two.
 
 **Note on 2.3 — verified by `sshd -T`, and the doc error is confirmed
 empirically.** The rendered `sshd_config` was extracted from each host's
