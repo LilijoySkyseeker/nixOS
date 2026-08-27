@@ -213,6 +213,7 @@ remains published and decryptable by any key that was ever a recipient.
   | 8 | `homelab_vps_deploy_key` | SSH key → `vps-deploy@vps`, i.e. **root on vps** | add new pubkey to vps `authorized_keys`, verify a deploy, then remove old | **high** |
   | 9 | `homelab_zrepl_key` | SSH key → **root on torrent and thinkpad** | see the separate item below — ordering matters, and the public half is `vars.zreplPullerKey` in this repo | **high** |
   | 10 | `homelab_backblaze_restic_password` | the restic **repository password** | **not a console action** — see the warning below | **highest** |
+  | 11 | `tailscale_authkey_isoimage` | node enrollment key that was **never used** | **REVOKED 2026-08-27** — revoke, do **not** replace; nothing consumes it. Console confirmed unused. Remaining: delete the sops key | med |
 
   **#10 is the one that can lose data, and the old row got it wrong.**
   `homelab_backblaze_restic_password` is restic's `passwordFile`
@@ -283,7 +284,7 @@ rather than done in a branch.
   | `winapps_password` | password | no winapps anywhere |
   | `open_weather_key` | API key | no consumer |
   | `restic` | unclear | `homelab_backblaze_restic_password` is the live one; this looks like its predecessor |
-  | `tailscale_authkey_isoimage` | tailnet auth key | isoimage has `services.tailscale.enable = false` and no sops |
+  | `tailscale_authkey_isoimage` | tailnet auth key | isoimage has `services.tailscale.enable = false` and no sops. **Key revoked at Tailscale 2026-08-27** (console confirmed it had never been used) and `tag:isoimage` is out of `docs/tailscale-acl.json` — see runbook item 11. Deleting the sops key is all that is left, and it retracts nothing on its own |
 
   Rotate-or-revoke each at its provider as well as deleting it. A
   Cloudflare Tunnel token and a Nextcloud admin password do not expire

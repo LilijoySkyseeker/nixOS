@@ -54,7 +54,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 8 | `homelab_vps_deploy_key` | **high** | [ ] |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
-| 11 | `tailscale_authkey_isoimage` | med | [ ] — **revoke, do not replace**; added 2026-08-27, see item |
+| 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
 
 **Access safety note.** My SSH to homelab and vps is over **Tailscale**,
 not over wg0, so items 5–7 cannot cut my access to either host. Item 8
@@ -359,17 +359,24 @@ retired 3 and 4 does not transfer here.
 **What it would grant.** A tailnet auth key enrolls a *new node*. §4.4 of
 the threat model treats enrolling into the tailnet as fleet access, and
 the ACL is generous to `tag:isoimage` — `docs/tailscale-acl.json` gives
-it `src` and `dst` in all four grants and both `ssh` rules
-(lines 23, 37, 38, 46, 52, 58, 79, 86, 87). So an unused key plus a live
-tag is adversary A5's "over-broad auth key" with the tag already
-provisioned to reach everything.
+it `src` in all four grants and `dst` in the first. So an unused key plus
+a live tag is adversary A5's "over-broad auth key" with the tag already
+provisioned to reach everything. (`F-P8-19` counted nine occurrences; the
+other three were in the two `ssh` rules, deleted on 2026-08-26 under
+`F-P0-05`/`F-P8-12`. Six were live when this item was worked.)
 
-**One thing that probably already limits it, and is not a substitute for
-acting.** Tailscale auth keys expire — 90 days maximum, and this key
-predates that window comfortably. An expired key is refused the same way
-a spent one is. But *probably expired* is an inference from a default;
-the console states it. Check there and act on what it says, rather than
-deciding from this paragraph.
+**Confirmed at the console, 2026-08-27.** The user checked the Tailscale
+key list before revoking: the key had **not been used**. That settles it
+from the authoritative source rather than from this repo's own comments —
+worth doing precisely because two other comments in this repo turned out
+to be wrong during this audit.
+
+Note what the console did *not* say, and do not fill the gap by
+inference: it reported unused, not expired. Tailscale auth keys do expire
+(90 days maximum) and this one predates that window comfortably, so it
+was very likely refused on age alone — but "very likely" is a default
+being assumed, not a fact observed. The key is revoked either way, which
+is what makes the question academic rather than load-bearing.
 
 ### Revoke rather than mint a replacement
 
@@ -384,34 +391,39 @@ said to mint **reusable** replacements).
 `config.sops` is not even an option on that system. Nothing reads this
 key; nothing ever did. Minting a replacement would create a *fresh,
 live, standing* enrollment credential with no consumer — strictly worse
-than the situation being fixed, since the current one is at least old
-enough to have expired.
+than the situation being fixed. The old key at least had age working
+against it; a new one would have nothing working against it at all.
 
 The design is right and deliberate: an ISO is a bootable artifact that
 may be copied anywhere, and it should not carry a tailnet identity. The
 defect is only that three places still describe a device the
 architecture refuses to create.
 
-- **You** — Tailscale console → Settings → Keys. Find the `isoimage`
-  key. Note what it says — used/unused, expired or not — and tell me;
-  that is the authoritative answer to the expiry question above and it
-  belongs in this document. Then **revoke** it.
-- **You** — same console → Access controls. Remove `tag:isoimage` from
-  `tagOwners`, from all four grants and from both `ssh` rules. **The
-  console is what enforces; the file is only a copy of it** — see
-  `F-P8-07`. Do the console first so the repo never claims a
-  restriction that is not live.
-- **You** — `sops secrets/secrets.yaml`, delete the
-  `tailscale_authkey_isoimage` key outright. No replacement value.
-- **Me** — remove the nine `tag:isoimage` occurrences from
-  `docs/tailscale-acl.json` so the file matches the console, and record
-  in `hosts/isoimage/README.md` that isoimage is deliberately
-  off-tailnet and must stay that way, with the reason.
-- **Me** — verify: `tailscale status` still lists exactly the four real
-  nodes plus the phone, and no host lost tailnet access. Since nothing
-  consumed the key and no live node carries `tag:isoimage`, there is
-  nothing that can break — the verification is confirming that claim,
-  not hoping it.
+- **[x] You** — Tailscale console → Settings → Keys. Checked the
+  `isoimage` key: **not used**. **Revoked** 2026-08-27.
+- **[ ] You** — same console → Access controls: paste the updated
+  `docs/tailscale-acl.json` over the console policy. **The console is
+  what enforces; the file is only a copy of it** (see `F-P8-07`), so
+  until this paste happens the repo claims a restriction that is not
+  live. The window is narrow and harmless here — the tag now grants
+  access to a device that cannot exist and whose only enrollment key is
+  revoked — but it is the wrong direction, and the fix is one paste.
+- **[ ] You** — `sops secrets/secrets.yaml`, delete the
+  `tailscale_authkey_isoimage` key outright. No replacement value. This
+  is cleanup, not retraction: the ciphertext is permanently published in
+  the repo's history and deleting it now removes nothing. The revocation
+  above is the step that actually took the power away.
+- **[x] Me** — removed the six live `tag:isoimage` occurrences from
+  `docs/tailscale-acl.json` and added a header note saying why the tag is
+  absent, so it does not get re-added; recorded in
+  `hosts/isoimage/README.md` that isoimage is deliberately off-tailnet,
+  with the reason and what it would take to change that deliberately.
+- **[x] Me** — verified: `tailscale status` lists exactly the four real
+  nodes (`homelab`, `vps`, `torrent`, `thinkpad`) plus `pixel-6a`, none
+  carrying `tag:isoimage`, and my SSH to homelab and vps still works
+  after the revocation. Since nothing consumed the key and no live node
+  carries the tag, there was nothing that could break — this confirms
+  that claim rather than hoping it.
 
 **Order.** Revoke first, unusually. The standing **add-new → verify →
 remove-old** rule protects a credential something depends on; nothing
