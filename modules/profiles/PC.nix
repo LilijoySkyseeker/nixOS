@@ -136,23 +136,17 @@ in
         pkgs-unstable.via
         pkgs-unstable.vial
       ];
-      services.udev.extraRules = ''
-        # 8bitdo pro 3
-        # 2.4GHz/Dongle
-        KERNEL=="hidraw*", ATTRS{idProduct}=="6012", ATTRS{idVendor}=="2dc8", MODE="0660", GROUP="input"
-        # Bluetooth
-        KERNEL=="hidraw*", KERNELS=="*2DC8:6012*", MODE="0660", GROUP="input"
-      '';
-      # Note on the two rules above: their MODE/GROUP do not actually take
-      # effect. Checked live on torrent -- every /dev/hidraw* is 0666
-      # root:plugdev with a uaccess ACL, because 50-qmk.rules (GROUP=plugdev,
-      # TAG+=uaccess, matching *all* hidraw) and 60-steam-input.rules
-      # (TAG+=uaccess for vendor 2dc8) both sort after 99-local.rules for
-      # these attributes. So controller access comes from uaccess, not from
-      # group membership, and these rules no longer grant lilijoy anything
-      # now that the `input` membership below is gone. Left in place rather
-      # than removed as part of a plover change; worth revisiting as dead
-      # config on its own terms.
+      # No services.udev.extraRules here any more. It held two 8bitdo Pro 3
+      # hidraw rules and plover's uinput rule; plover is gone, and the
+      # 8bitdo pair was dead config that never worked (confirmed by the
+      # user, and visible on-box): they ask for MODE="0660" GROUP="input",
+      # but live every /dev/hidraw* is 0666 root:plugdev with a uaccess
+      # ACL, because 50-qmk.rules (all hidraw, GROUP=plugdev,
+      # TAG+=uaccess) and 60-steam-input.rules (vendor 2dc8, TAG+=uaccess)
+      # both sort after 99-local.rules for those attributes. Controller
+      # access came from uaccess the whole time, never from the group --
+      # so the rules bought nothing and their only effect was to make the
+      # `input` grant above look load-bearing when it was not.
 
       # home-manager
       home-manager.users.lilijoy = {

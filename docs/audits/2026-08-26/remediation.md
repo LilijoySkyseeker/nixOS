@@ -217,14 +217,19 @@ the `input` group now has **zero members**, `dialout` likewise, the
 
 Two things noticed while doing it, neither fixed here:
 
-- **The 8bitdo hidraw rules never took effect.** They set `MODE="0660"
-  GROUP="input"`, but live on torrent every `/dev/hidraw*` is `0666
-  root:plugdev` with a uaccess ACL, because `50-qmk.rules` (all hidraw,
-  `GROUP=plugdev`, `TAG+=uaccess`) and `60-steam-input.rules` (vendor
-  `2dc8`, `TAG+=uaccess`) sort after `99-local.rules`. Controller access
-  comes from uaccess, not the group, so those rules grant `lilijoy`
-  nothing now. Left in place with a comment; dead config worth revisiting
-  on its own terms rather than inside a plover change.
+- **The 8bitdo hidraw rules never took effect — and are now removed
+  too.** They set `MODE="0660" GROUP="input"`, but live on torrent every
+  `/dev/hidraw*` is `0666 root:plugdev` with a uaccess ACL, because
+  `50-qmk.rules` (all hidraw, `GROUP=plugdev`, `TAG+=uaccess`) and
+  `60-steam-input.rules` (vendor `2dc8`, `TAG+=uaccess`) sort after
+  `99-local.rules`. Controller access came from uaccess the whole time,
+  never from the group. The user confirmed the config was unused and had
+  never worked, which matches exactly what the live device modes show, so
+  it is deleted rather than annotated. That empties
+  `services.udev.extraRules` on these hosts entirely — the rendered
+  `99-local.rules` is now nothing but NixOS's own defaults, with no
+  `GROUP="input"` anywhere in it. Their only real effect had been to make
+  the `input` grant look load-bearing when it was not.
 - **`/dev/uinput` already carried `user:lilijoy:rw-`** from a logind
   uaccess ACL, independent of the group — so even the narrowing fix would
   have been partly redundant.

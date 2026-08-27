@@ -61,7 +61,9 @@ of eight parts found this independently.
 `origin/master` push) and has no passphrase. Reading one file is the
 whole attack. Plus root via the pull-deploy checkout four ways, the
 `input` group as a keylogger, and `libvirtd` arriving invisibly via
-`PC.nix:18` → `virtual-machines.nix:11`.
+`PC.nix:18` → `virtual-machines.nix:11`. **The `input` half is fixed**
+in `d6236cb` — plover was declared unused, so the grant is gone rather
+than narrowed. The rest of C2 stands.
 
 **C3 — no backup copy is out of reach of a single root.** Live `zdata`,
 `zbackup` and the offsite Backblaze copy all answer to the same uid 0 on
@@ -90,6 +92,7 @@ All build-verified on all four hosts. **Not switched.**
 | `516ef31` | `nosuid` + `nodev` on both NFS client mounts; `noexec` considered and declined | F-P6-05 |
 | `3ce7d7a` | `zfs-emergency-prune` sandboxed (**VM-tested**); `crowdsec-allowlist-tailnet` sandboxed and moved off root to the `crowdsec` user; `push-deploy-vps`'s false `ReadOnlyPaths` claim corrected | F-P6-06, F-P2-08, F-P7-06 |
 | `e5744f5` | vps firewall no longer fails open: `ipset create` moved to its own unit, match-set rules guarded, raw chain torn down on stop (**VM-tested, including the drift scenario**) | F-P2-02 |
+| `d6236cb` | **plover removed entirely** (user declared it unused), taking the `input` and `dialout` grants, the `uinput` udev rule, wooting.nix's duplicate grant and the `plover-flake` input with it — nine lock nodes gone | F-P1-01/P8-09, F-P8-21, F-P1-15 |
 
 ### Consequences to know before deploying any of it
 
@@ -161,7 +164,7 @@ reasoning and the verification for each one done so far.
 | 2.1 | docker publishing past the firewall | not started |
 | 2.2 | image/mod pinning | not started |
 | 2.3 | laptop sshd baseline + doc correction | **done** (`6b623c0`) |
-| 2.4 | `input` → `hardware.uinput` | not started |
+| 2.4 | `input` → `hardware.uinput` | **done** (`d6236cb`) — plover removed outright instead |
 | 2.5 | NFS mount options | **done** (`516ef31`) |
 | 2.6 | three under-sandboxed root units | **2 of 3 done** (`3ce7d7a`); `push-deploy-vps` deferred |
 | 2.7 | fail-open `ipset create` | **done** (`e5744f5`) |
