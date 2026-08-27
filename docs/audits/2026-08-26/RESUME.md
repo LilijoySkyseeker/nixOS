@@ -34,6 +34,11 @@ master** before then, or the timers stopped. That is a user decision and
 has not been made. If the deploy was only ever meant as a test, the
 revert is a free rollback and nothing needs doing.
 
+Both are tracked as checkboxes in
+[`user-actions.md`](user-actions.md) **§0**, which is where the user
+works through them — keep the two in sync rather than only updating this
+file.
+
 ---
 
 ## Where things are
@@ -55,7 +60,7 @@ revert is a free rollback and nothing needs doing.
 | [`findings-tail.md`](findings-tail.md) | LOW/INFO + the needed/used rollup. |
 | `P0..P8-*.md` | The nine part reports, ~13,700 lines. |
 | [`remediation.md`](remediation.md) | The wave plan **and the per-item notes**, which carry the reasoning and verification for everything done. |
-| [`user-actions.md`](user-actions.md) | **Everything only the user can do**, as a live checklist, incl. decisions D1–D14. |
+| [`user-actions.md`](user-actions.md) | **Everything only the user can do**, as a live checklist, incl. decisions D1–D16. Its new **§0 is time-critical** — the two timers below. |
 | [`live-verification.md`](live-verification.md) | Live checks with commands and results. |
 
 Documentation harvested out of the audit into standing docs:
@@ -313,17 +318,71 @@ tailscale module sets the former.
 
 ### User-only
 
-`user-actions.md` is the live checklist. Unchanged headline: **rotate the
+`user-actions.md` is the live checklist, and its **§0 is time-critical**
+— the two timers above. Unchanged headline: **rotate the
 ten credentials from `F-P8-02`** — the largest unmitigated risk in the
 audit, and nothing an agent does moves it. The repo is public, so only
 rotation at each provider retracts anything.
 
-Still open: **D1, D2, D4, D5, D6, D7, D8, D11, D12**. Also the factorio
+Still open: **D1, D2, D4, D5, D6, D7, D8, D11, D12**, plus **D15**
+(container `--memory` ceiling — blocks half of the resource-ceilings
+item) and **D16** (confirm the new deploy-staleness thresholds; not
+blocking), both added in the fourth session. **D11 is time-critical.**
+Also the factorio
 account token is still exposed in ZFS snapshots and restic backups taken
 before `/srv/factorio/new` was deleted, and is the **same** credential
 `factorio-main` uses.
 
 ---
+
+## Obligations for every session — do these, not just the fix
+
+Each of these was rediscovered the hard way by a later session, usually
+because the instruction lived somewhere you only find *after* you needed
+it. They are cheap; skipping them is what makes the next pick-up
+expensive.
+
+- **Read [`AGENTS.md`](../../../AGENTS.md) first, before the audit
+  docs.** It is the map to `docs/`, and it carries two things nothing
+  here repeats: **you have real SSH** (`ssh root@homelab` — a bare
+  `ssh homelab` fails as `lilijoy` and is *not* evidence of no access),
+  and **this machine is `torrent`**, so run local commands rather than
+  SSHing to it. The fourth session skipped this, concluded the fleet was
+  unreachable, and wrongly marked a live measurement blocked.
+
+- **Record every new user-only decision in
+  [`user-actions.md`](user-actions.md)** — that file is the single
+  checklist the user works through, and a decision recorded only in a
+  commit message or in this file's prose will be missed. Its own header
+  says so, but you only read that header if you happened to open it, so
+  it is repeated here. The fourth session produced two new decisions
+  (D15, D16) and only filed them when asked. Give each one a `D<n>`,
+  say what it blocks, and say **why it is the user's** rather than an
+  agent's. Note D15/D16 deliberately do *not* go in
+  `accepted-risks.md` §2 — that section is for risks that could be
+  accepted, not for sizing and threshold choices.
+
+- **Log the plan and its state in [`TODO.md`](../../../TODO.md)**, not
+  only in this file. It is the repo-root entry point a session reaches
+  for before assuming a described feature is deployed.
+
+- **Correct the record when evidence contradicts it, in place.** Three
+  claims in these docs turned out to be wrong when someone finally read
+  homelab's journal (the outage duration, "nothing watches this", and
+  "nothing anywhere would have told you"). An audit doc that is trusted
+  and wrong is worse than one that is obviously stale, and the wrong
+  claims here were load-bearing — they changed what the remaining work
+  was *for*. Strike through or annotate rather than silently rewriting,
+  so a reader can see the correction happened.
+
+- **Harvest anything generalisable into `docs/hardening.md`.** Findings
+  that become standing rules move there; risks knowingly left in place
+  move to `docs/accepted-risks.md`. Update the rule count in `AGENTS.md`
+  when you add one, and **do not renumber existing rules** — several are
+  cited by number from `TODO.md` and `remediation.md`.
+
+- **Finish with what only the user can do.** Say plainly what is
+  undeployed, what is undecided, and what is on a clock.
 
 ## Rules and traps
 

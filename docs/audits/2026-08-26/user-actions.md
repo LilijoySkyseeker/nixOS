@@ -15,6 +15,35 @@ the evidence without re-deriving it.
 
 ---
 
+## 0. Time-critical — two timers are running
+
+Everything else in this file waits patiently. These two do not: they act
+on their own, and both are live **because** the audit repaired the deploy
+path in `929efa3`, which homelab is now running. While that path was
+broken neither could fire.
+
+- [ ] **Wed 2026-09-02 03:00 — `flake-update-test` fires.** It does
+      `git reset --hard origin/master` in `/etc/nixos`, runs
+      `nix flake update`, and **if it builds, merges and pushes to
+      `master`** — unattended, on a build-success gate alone. This is
+      **D11**, which is deliberately unanswered. Note the framing in D11
+      below ("decide before deploying that commit") is now overtaken:
+      homelab **is** deployed on this branch, so the behaviour has
+      already been inherited and the clock is running. *(F-P7-10)*
+
+- [ ] **Thu 2026-09-03 03:00 — `auto-switch` fires and reverts this
+      branch off homelab.** It builds `master` and switches homelab to
+      it. homelab's `/etc/nixos` was deliberately left on `master`, so
+      unless this branch is **merged to master before then**, or the
+      timer stopped, the audit's entire deploy is rolled back.
+
+      This is a genuine either/or, not a problem: if the homelab deploy
+      was only ever a test, the revert is a free rollback and the right
+      action is to do nothing. If the work should stay, it has to be
+      merged. **Only you can decide which.**
+
+---
+
 ## 1. Do these first — free, reversible, no decision needed
 
 - [x] **`chmod 600 ~/.config/sops/age/keys.txt`** on the daily driver.
@@ -223,9 +252,15 @@ work — `TODO.md` or a branch. Deciding *toward acceptance* means writing
 it into [`docs/accepted-risks.md`](../../accepted-risks.md) §1 with its
 reasoning, and striking it from that file's §2 pending table; an
 acceptance that only exists in a commit message will be re-litigated by
-the next audit. Phase 4 pre-listed all fourteen in §2 with the exact
-risk each one would be accepting, so the write-up is mostly already
+the next audit. Phase 4 pre-listed all fourteen of D1–D14 in §2 with the
+exact risk each one would be accepting, so the write-up is mostly already
 drafted.
+
+**D15 and D16 are deliberately *not* in `accepted-risks.md` §2, and that
+is not an oversight.** That section lists risks that could be knowingly
+accepted. D15 is a sizing choice and D16 a threshold confirmation —
+answering either produces a config value, not an accepted risk, so
+neither has an acceptance write-up to draft. Leave §2 at D1–D14.
 
 | # | Decision | Bears on | Done? |
 |---|---|---|---|
@@ -385,12 +420,63 @@ drafted.
       last execution path from a homelab-controlled filesystem onto both
       laptops. *(F-P6-05)*
 
+- [ ] **D15 — what `--memory` ceiling should the game containers get?**
+      Blocks the `--memory` half of the container-resource-ceilings item
+      (`docs/hardening.md` standing rule 10, still unapplied). The
+      `--pids-limit` half needs no decision and can land whenever.
+
+      Measured on homelab 2026-08-27, straight off each container's
+      cgroup — host has 15.54 GiB:
+
+      | | `memory.peak` | `pids.peak` | ceiling today |
+      |---|---|---|---|
+      | `factorio-main` | 1.06 GB | 19 | none (`memory.max = max`) |
+      | `minecraft-vanilla-plus` | 4.90 GB | 123 | none |
+
+      Minecraft's real RSS is ~0.9 GB **above** its `MEMORY = "4G"` JVM
+      heap, which is the concrete confirmation that the ceiling must not
+      be sized from that setting.
+
+      **Why this is yours and not an agent's.** Both containers had 37
+      minutes uptime (restarted by the 13:15 switch) and were idle, and
+      `memory.peak` resets on restart, so those numbers are a **floor,
+      not a peak**. Only you know the real player load. A ceiling set
+      below what the runtime actually needs becomes an OOM-kill loop
+      that reads as a game crash — the exact failure rule 10 warns
+      about — so guessing from an idle sample would be worse than
+      leaving it unset.
+
+      Two ways to answer: let the containers run a representative period
+      and re-measure, or pick a deliberately generous
+      bound-the-blast-radius value now (any finite ceiling beats none,
+      since container OOM pressure is *host* OOM pressure on the box
+      holding `zbackup`). *(F-P4-07)*
+
+- [ ] **D16 — confirm the deploy-staleness thresholds once there is real
+      cadence data.** Not urgent and not blocking; noted so it is not
+      silently inherited. The new
+      `staleMarkerFiles."/nix/var/nix/profiles/system"` entries alert
+      after **504h (21 days)** on homelab, vps and torrent, and **720h
+      (30 days)** on thinkpad. Those were chosen deliberately loose: a
+      14-day gap is *normal* given weekly timers and a 7-day
+      `minSwitchInterval`, and homelab's `protectedUnits` restic run can
+      defer a third week. Loose still converts "silently stopped
+      deploying" from never-detected to caught-within-three-weeks;
+      tighten once a few real cycles have been observed. *(F-P7-09)*
+
 - [ ] **D11 — should `flake-update-test` be allowed to auto-merge?**
       Commit `3f2c418` repaired a mechanism that had never once
       completed. It now can — and it auto-merges upstream input updates
       to `master` on **build success alone**, where `master` is
       unattended fleet root. Decide before deploying that commit rather
       than inheriting the behaviour. *(F-P7-10)*
+
+      **Overtaken by events, 2026-08-27.** homelab was switched onto this
+      branch, so the commit **is** deployed and the behaviour **has**
+      been inherited. This is no longer "decide before deploying" but
+      "decide before **Wed 2026-09-02 03:00**", when it next fires. See
+      §0. The user asked for a re-evaluation with a benefits/risk
+      analysis rather than a yes/no; that is an open `TODO.md` entry.
 
 ---
 
@@ -411,5 +497,12 @@ deploying any of it" in full first. The three that bite silently:
 - [ ] Know that `40255bd` **fails closed**: if GitHub rotates the pinned
       host key, unattended deploys stop until it is updated. That is the
       intended trade, and it is why enabling health alerts on the
-      laptops (wave 1 item 1.9) mattered — until that landed, nothing
-      anywhere would have told you deploys had stopped.
+      laptops (wave 1 item 1.9) mattered — until that landed, nothing on
+      **torrent or thinkpad** would have told you deploys had stopped.
+
+      Corrected 2026-08-27: this used to read "nothing anywhere", which
+      was too strong. homelab and vps had `myHealthAlerts` all along and
+      it works — the 2026-08-27 03:00 deploy failure did enter
+      `systemctl --failed` and was reported. The real gap, on every host,
+      was a deploy that **skips**, which produces nothing to detect at
+      all; closed since (`68bd751`). *(F-P7-09)*
