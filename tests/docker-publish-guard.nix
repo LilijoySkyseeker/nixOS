@@ -98,12 +98,7 @@ pkgs.testers.runNixOSTest {
           {
             port = 34197;
             protocol = "udp";
-            comment = "old.factorio";
-          }
-          {
-            port = 34198;
-            protocol = "udp";
-            comment = "new.factorio";
+            comment = "factorio";
           }
           {
             port = 8080;
@@ -132,7 +127,7 @@ pkgs.testers.runNixOSTest {
     with subtest("every guarded port allows both interfaces and drops the rest"):
         rules = machine.succeed(f"iptables -S {chain}")
         for proto, port in [("tcp", 25565), ("udp", 19132),
-                            ("udp", 34197), ("udp", 34198)]:
+                            ("udp", 34197)]:
             for iface in ["wg0", "tailscale0"]:
                 expected = f"-A {chain} -i {iface} -p {proto} -m {proto} --dport {port} -j RETURN"
                 assert expected in rules, \
@@ -144,7 +139,7 @@ pkgs.testers.runNixOSTest {
     with subtest("the DROP comes after the RETURNs, or it would drop everything"):
         rules = machine.succeed(f"iptables -S {chain}").splitlines()
         for proto, port in [("tcp", 25565), ("udp", 19132),
-                            ("udp", 34197), ("udp", 34198)]:
+                            ("udp", 34197)]:
             idx = [i for i, r in enumerate(rules)
                    if f"--dport {port} " in r and f"-p {proto}" in r]
             returns = [i for i in idx if "-j RETURN" in rules[i]]

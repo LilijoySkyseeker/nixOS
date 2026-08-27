@@ -379,12 +379,7 @@ in
       {
         destination = "10.100.0.2:34197";
         proto = "udp";
-        sourcePort = 34197; # old.factorio
-      }
-      {
-        destination = "10.100.0.2:34198";
-        proto = "udp";
-        sourcePort = 34198; # new.factorio
+        sourcePort = 34197; # factorio
       }
     ];
   };
@@ -428,11 +423,6 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
-
-    # new.factorio: same as old.factorio
-    iptables -t raw -A vps-ratelimit -p udp --dport 34198 \
-      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
-      --hashlimit-mode srcip --hashlimit-name factorio-new-flood -j DROP
 
     # base rate limit for caddy's public HTTP(S) entry (80/443)
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \

@@ -58,6 +58,22 @@ the evidence without re-deriving it.
       **Signed commits deliberately not enabled** — that is D2, and it
       needs a signing key set up first. *(D3, H1)*
 
+- [ ] **Delete `/srv/factorio/new` on homelab after deploying.** The
+      second Factorio server was removed 2026-08-27, but only from the
+      config — its data directory still exists on the host and is no
+      longer in the impermanence persistence list, so nothing manages it
+      any more. It matters because of what is in it: `server-settings.json`
+      holds a **factorio.com account token and the game password**, which
+      `F-P4-04` already flagged as secrets that left sops into a
+      container-visible volume, and therefore into every ZFS snapshot and
+      every restic backup derived from that dataset.
+
+      Deleting the directory does not retract it from the snapshots that
+      already contain it — those age out on zrepl's normal retention.
+      Treat the token as exposed for as long as those snapshots exist,
+      and note it is the *same* credential the surviving server still
+      uses, so rotating it means updating sops too. *(F-P4-04)*
+
 - [ ] **Delete the `ssh` block in the Tailscale console.** `ba8cd4e`
       removed it from `docs/tailscale-acl.json`, but that file is only a
       reference copy — the live policy is console state and must be
