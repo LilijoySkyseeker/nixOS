@@ -13,6 +13,41 @@ them rot.
 
 ## Active
 
+- [ ] **The whole fleet deploys at once, with no randomisation and no
+      reboot window.** Surfaced 2026-08-27 while researching D11.
+      `auto-switch` (homelab), `pull-deploy` (torrent, thinkpad) and
+      `push-deploy-vps` all fire at **`Thu 03:00`**-ish, and homelab
+      reboots unconditionally on a kernel change
+      (`reboot-if-kernel-changed`) with no window.
+
+      homelab is the NFS/Samba server the laptops mount, so the
+      worst case is homelab rebooting into a broken generation at the
+      same moment both laptops are mid-deploy against it.
+
+      Upstream's `system.autoUpgrade` has `randomizedDelaySec`,
+      `fixedRandomDelay`, `rebootWindow` and `persistent` for exactly
+      this (verified in the pinned nixpkgs,
+      `nixos/modules/tasks/auto-upgrade.nix`). This repo replaced that
+      module with `modules/nixos/auto-update.nix` and **dropped all of
+      them**. Cheap fix: stagger the `OnCalendar` values and add a
+      reboot window. See `docs/audits/2026-08-26/D11-analysis.md` §7.
+
+- [ ] **Nothing rolls back automatically after a bad switch.** Also from
+      the D11 research. A `nixos-rebuild switch` that builds fine but
+      leaves a host unreachable — bad firewall rule, broken sshd,
+      broken network — is recovered only by hand, and on vps that means
+      the provider console. The ecosystem reference is `deploy-rs`'s
+      "magic rollback": after activation it writes a canary and
+      confirms the host is still reachable, and the *target* rolls
+      itself back if confirmation never arrives.
+
+      Worth scoping rather than adopting wholesale — `deploy-rs` is a
+      whole deployment tool and this repo has its own push/pull
+      modules. The borrowable idea is small: a confirm-or-revert timer
+      on the target around activation. Highest value on **vps**, which
+      is remote, public-facing and push-deployed. See
+      `docs/audits/2026-08-26/D11-analysis.md` §7.
+
 - [ ] **Move `vps` from `nixpkgs-unstable` to `nixpkgs-stable`.** Raised
       2026-08-27 while writing the D11 analysis, which surfaced the
       split: `modules/flake/hosts.nix` builds **homelab** from

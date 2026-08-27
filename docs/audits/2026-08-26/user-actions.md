@@ -502,10 +502,23 @@ neither has an acceptance write-up to draft. Leave §2 at D1–D14.
       builds **only homelab**, which is the one host on
       `nixpkgs-stable`, while vps, torrent and thinkpad run
       `nixpkgs-unstable`; `stylix` and `nvf` are never built at all; and
-      the repo's five VM tests are never run. Recommendation is **(c):
-      keep auto-merge but widen the gate** to build all four hosts and
-      run `nix flake check`, because the realistic alternative to
-      unattended updates is no updates. Read §6 for the four options.
+      the repo's five VM tests are never run.
+
+      Recommendation is **(c) plus a PR step**: widen the gate to build
+      all four hosts and run `nix flake check`, and open a PR that
+      automerges on green instead of pushing straight to `master`.
+
+      §7 was added after checking what upstream and larger environments
+      actually do, and it **corrected the first draft's
+      recommendation** — that draft defended the direct push on the
+      grounds that the alternative was no updates, which is a false
+      dichotomy. The standard shape is a PR that automerges once CI is
+      green: still fully unattended, but with a diff, a CI record and a
+      revert point. Upstream nixpkgs is the precedent that unattended
+      advancement is fine *when the gate matches the blast radius* —
+      `nixos-unstable` advances with no human approval, but only behind
+      Hydra's full `tested` job. Read §6 for the options, §7 for the
+      comparison table, §8 for the recommendation.
 
       **Overtaken by events, 2026-08-27.** homelab was switched onto this
       branch, so the commit **is** deployed and the behaviour **has**
