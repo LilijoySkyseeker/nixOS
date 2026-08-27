@@ -33,21 +33,31 @@ Live evidence gathered along the way is in
 | `3f2c418` | `iso-autobuild`'s phantom `pull-deploy.service.service` unit — the `.service` suffix is now stripped, so the ISO rebuild can actually fire | tail |
 | `3f2c418` | `flake-update-test` given `openssh` on PATH and `/root` in `ReadWritePaths`; it had never completed a single run | tail |
 | `5682087` | Tailscale routing default inverted to `"client"`; homelab `mkForce "both"`; vps's redundant override deleted; homelab's redundant explicit sysctls removed in the same commit | F-P0-06, F-P1-06, F-P5-08, F-P3-20 |
-| *this commit* | `initialPassword = "123456"` removed from `PC.nix` | F-P1-03 |
-| *this commit* | Inert `ssh` block deleted from the tailnet ACL reference copy | F-P0-05, F-P8-12 |
+| `ba8cd4e` | `initialPassword = "123456"` removed from `PC.nix` | F-P1-03 |
+| `ba8cd4e` | Inert `ssh` block deleted from the tailnet ACL reference copy | F-P0-05, F-P8-12 |
+| *this commit* | `github.com` host key pinned fleet-wide in `programs.ssh.knownHosts`, verified against GitHub's published fingerprint rather than TOFU-scanned | F-P7-04, F-P3-05, F-P0-07 |
 
 ### Still to do in wave 1
 
-- **1.4** — interface-scope `PC.nix`'s host-wide openings: avahi, Steam
-  remote play, and KDE Connect's 1714–1764 range (106 ports). The
-  mechanism is already proven on these hosts, since port 22 is
-  interface-qualified on torrent and nothing else is.
 - **1.7** — drop the nine declared-but-unconsumed `sops.secrets`
   declarations (`F-P8-11`); verify no consumer first.
-- **1.8** — pin `github.com` and `vps` in `programs.ssh.knownHosts` so
-  the deploy path stops re-TOFUing every boot (`F-P7-04`, `F-P3-05`).
 - **1.9** — enable `myHealthAlerts` on both laptops (`F-P7-09`): today
-  nothing anywhere reports a failed or skipped deploy.
+  nothing anywhere reports a failed or skipped deploy. Note this needs a
+  webhook secret reachable from each laptop, so check what is declared
+  before assuming it is a two-line change.
+
+**1.4 was moved to wave 2** (now 2.9) after investigation showed it is
+not a zero-decision fix: KDE Connect's range is opened unconditionally
+by the nixpkgs module with no toggle, the interface names must come from
+the hosts and thinkpad declares none, and thinkpad is offline so it
+cannot be tested. It also needs a user decision on whether LAN discovery
+should keep working at all. Reasoning and the full port inventory are in
+[`remediation.md`](remediation.md).
+
+**vps was deliberately not pinned** in 1.8: its host key churned three
+times during the 2026-08-25 reinstall, so a pin is a standing breakage
+risk, and homelab already holds root on vps by design (F-P0-02) so
+host-key TOFU is not the weak link there.
 
 Waves 2–4 unstarted; see [`remediation.md`](remediation.md).
 

@@ -111,6 +111,38 @@
       };
       sops.secrets."tailscale_authkey_${config.networking.hostName}" = { };
 
+      # Pin github.com's host key fleet-wide.
+      #
+      # Every host that deploys itself fetches origin/master as root --
+      # myAutoUpdate on homelab, myPullDeploy on the laptops -- and
+      # deploy-guards.nix does that with StrictHostKeyChecking=accept-new.
+      # That is TOFU, and on homelab it is TOFU *on every boot*, because
+      # impermanence does not persist /root so root's known_hosts is empty
+      # again each time (F-P7-04, F-P3-05, F-P0-07). Since a commit fetched
+      # from that remote becomes root on four hosts, the remote's identity is
+      # worth pinning rather than accepting.
+      #
+      # This key was verified against the fingerprint GitHub publishes
+      # (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU) rather than
+      # simply ssh-keyscan'ed and trusted, which would have reproduced the
+      # TOFU it is meant to remove. Public key, not a secret.
+      #
+      # If GitHub ever rotates this, unattended deploys fail closed until it
+      # is updated here -- which is the intended trade, but it is why it
+      # matters that a failed deploy is actually noticed (see F-P7-09).
+      #
+      # vps is deliberately NOT pinned here: its host key churned three times
+      # during the 2026-08-25 reinstall, so a pin would be a standing
+      # breakage risk, and homelab already has root on vps by design
+      # (F-P0-02) so host-key TOFU is not the weak link on that path.
+      programs.ssh.knownHosts."github.com" = {
+        hostNames = [
+          "github.com"
+          "ssh.github.com"
+        ];
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+      };
+
       # firmware updates
       services.fwupd.enable = true;
 

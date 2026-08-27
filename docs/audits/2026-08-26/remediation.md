@@ -45,7 +45,7 @@ and is verifiable by a build. This is the wave to land first.
 | 1.1 | Move the `disk` grant from the `health-check` *user* to the one unit that needs it, via `serviceConfig.SupplementaryGroups` | H2 (`F-P3-02` `F-P2-05` `F-P7-05`) | `modules/nixos/health-alerts.nix` | low — narrows only |
 | 1.2 | Fix the arithmetic injection: quote and validate the remote-supplied timestamp before arithmetic | H5 (`F-P7-03`) | `modules/flake/deploy-guards.nix:61` | low |
 | 1.3 | Invert the routing default: `"client"` in the shared profile, `mkForce "both"` on homelab only, drop vps's now-redundant override, and remove homelab's redundant explicit sysctls **in the same change** | H4 (`F-P0-06` `F-P1-06` `F-P5-08` `F-P3-20`) | `modules/profiles/default.nix`, `hosts/{homelab,vps}/configuration.nix` | medium — see note |
-| 1.4 | Interface-scope the desktop profile's host-wide openings (avahi, Steam remote play, KDE Connect) to the LAN interface or tailscale0 | H4 (`F-P1-04` `F-P5-06`) | `modules/profiles/PC.nix` | medium — breaks discovery if scoped wrong |
+| ~~1.4~~ | **Moved to wave 2** — interface-scoping the desktop profile's host-wide openings. See the note below; this is not a zero-decision fix. | H4 (`F-P1-04` `F-P5-06`) | `modules/profiles/PC.nix` | — |
 | 1.5 | Remove `initialPassword = "123456"` | H9 (`F-P1-03`) | `modules/profiles/PC.nix:306` | low — but confirm 0.3 first for thinkpad |
 | 1.6 | Delete the inert `ssh` block from the tailnet ACL reference copy, and from the console | H10 (`F-P0-05` `F-P8-12`) | `docs/tailscale-acl.json` | none — nothing uses it |
 | 1.7 | Drop the nine declared-but-unconsumed secret declarations | C1 (`F-P8-11`) | per-host `sops.secrets` | low — verify no consumer first |
@@ -60,11 +60,39 @@ and its `192.168.1.0/24` subnet route, which is connectivity-visible
 but **not** build-visible. Verify with `tailscale status` after any
 eventual deploy.
 
-**Note on 1.4.** The mechanism is already proven on these hosts — port
-22 is interface-qualified on torrent while everything else is not, so
-this is applying an existing pattern rather than inventing one. KDE
-Connect has no upstream `openFirewall` toggle, so the range is written
-by hand and must be rewritten by hand.
+**Note on 1.4 — why it moved to wave 2.** Investigating it turned up
+three things that disqualify it from a wave whose defining property is
+"needs no judgement call":
+
+- **KDE Connect's range is opened by the nixpkgs module itself,
+  unconditionally.** There is no `openFirewall` toggle to flip:
+  `programs/kdeconnect.nix` adds 1714-1764 to
+  `networking.firewall.allowedTCPPortRanges`/`allowedUDPPortRanges`
+  directly. Scoping it means `lib.mkForce`-ing the host-wide lists empty
+  and re-declaring *everything* per interface — which silently drops any
+  future contributor to those lists too. That is a real trade-off, not a
+  mechanical edit.
+- **The interface names have to come from the hosts, and thinkpad has
+  none.** `hosts/thinkpad/` declares no interface names at all; it is
+  NetworkManager-managed with dynamic interfaces. `docs/hardening.md`
+  already warns that host-specific interface names must not live in a
+  shared profile because they silently break on hosts without that
+  interface — so this needs a new per-host option, not a hardcoded NIC.
+- **thinkpad is offline and cannot be verified.** Getting this wrong
+  breaks LAN discovery, printing and device pairing on a machine that
+  cannot currently be tested. The live probe (see
+  `live-verification.md`) showed these ports are not presently reachable
+  from the internet, so there is no urgency that justifies guessing.
+
+It also needs an actual decision the user has to make: should KDE
+Connect, Steam remote play and mDNS keep working on the LAN at all? If
+yes, they get scoped to a host-declared LAN interface; if no, they can
+go to `tailscale0` only, or be dropped. The full port inventory is in
+the wave 2 entry.
+
+The rest of the wave-1 note still holds: the mechanism is proven on
+these hosts, since port 22 *is* interface-qualified on torrent while
+nothing else is.
 
 ---
 
@@ -83,6 +111,14 @@ Behaviour changes, not just config. Each needs
 | 2.6 | Sandbox the three under-hardened root units | MEDIUM (`F-P2-08` `F-P6-06` `F-P7-06`) | `push-deploy-vps` does no local activation, so the carve-out does not apply to it |
 | 2.7 | Guard the `ipset create` calls so a parameter drift cannot take the whole packet filter down fail-open | MEDIUM (`F-P2-02`) | touches vps's firewall start path — the one host where a mistake is internet-facing |
 | 2.8 | `zfs hold` on `@blank`, and `recv.properties.override` on the pull jobs | C3/H8 (`F-P6-04` `F-P6-03`) | changes replication behaviour; the existing VM tests do not cover it (`F-P6-14`) |
+| 2.9 | Interface-scope the desktop profile's host-wide openings (moved from 1.4) | H4 (`F-P1-04` `F-P5-06`) | needs a new per-host LAN-interface option, a `mkForce` of the host-wide lists, and a user decision on whether LAN discovery keeps working — plus thinkpad online to test |
+
+**2.9 port inventory**, as evaluated on torrent, so it does not have to
+be re-derived: TCP ranges 1714-1764; UDP ranges 27031-27035 and
+1714-1764; TCP ports 27036, 27037; UDP ports 5353, 10400, 10401, 27036.
+Note 10400/10401 are opened by something outside this repo and were not
+attributed during the audit — identify them before scoping, since an
+unexplained open port is its own finding.
 
 ---
 
