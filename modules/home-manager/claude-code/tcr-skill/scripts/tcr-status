@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+# tcr-status init|show|end
+#
+# init: establishes the TCR baseline (BASELINE_GREEN) for a new session:
+#   - verifies we're in a git repo with at least one commit
+#   - never touches pre-existing uncommitted changes: by default it creates
+#     an isolated git worktree branched from HEAD, so the original working
+#     tree (and whatever the user was mid-editing) is left completely alone;
+#     with --in-place it instead stashes pre-existing changes (git stash
+#     push -u, fully restorable) so the current tree becomes a clean base.
+#   - discovers FULL_CHECK from the repo unless --full-check is given
+#   - runs FULL_CHECK once as the baseline check before anything is touched
+#   - writes .tcr/state.json
+#
+# show: prints the current session state (or "no session") for this dir tree.
+# end:  deactivates the session (does not delete history); reminds about the
+#       worktree / stash left behind so the caller can merge or clean it up
+#       explicitly (TCR never merges or deletes branches on your behalf).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+usage() {
+  cat >&2 <<'EOF'
+usage:
+  tcr-status show
+  tcr-status init --task "<description>" [--strict] [--in-place]
+                   [--full-check "<cmd>"] [--fast-check "<cmd>"]
+                   [--max-attempts N] [--allow-red-baseline]
+  tcr-status end
+EOF
+  exit 1
+}
+
+cmd="${1:-show}"; [ $# -gt 0 ] && shift
+
+# ---------------------------------------------------------------- show ----
+cmd_show() {
+  local root
+  if ! root="$(tcr_find_root)"; then
+    echo "no active TCR session in this directory tree."
+    return 0
+  fi
+  tcr_load_state "$root/$TCR_STATE_RELPATH"
+  echo "TCR session at: $root"
+  echo "  active:            ${TCR_ACTIVE:-false}"
+  echo "  mode:              ${TCR_MODE:-normal}"
+  echo "  task:              ${TCR_TASK:-}"
+  echo "  isolation:         $([ "$TCR_WORKTREE_MODE" = "true" ] && echo "worktree ($TCR_WORKTREE_PATH, branch $TCR_WORKTREE_BRANCH)" || echo "in-place (main repo: $TCR_MAIN_REPO_ROOT)")"
+  echo "  full_check:        ${TCR_FULL_CHECK:-<unset>}"
+  echo "  fast_check:        ${TCR_FAST_CHECK:-<none>}"
+  echo "  baseline_commit:   ${TCR_BASELINE_COMMIT:-}"
+  echo "  current_step:      ${TCR_CURRENT_STEP:-<none>}"
+  echo "  attempt:           ${TCR_ATTEMPT:-0} / ${TCR_MAX_ATTEMPTS:-$TCR_MAX_ATTEMPTS_DEFAULT}"
+  echo "  last_result:       ${TCR_LAST_RESULT:-none}"
+  echo "  last_verified:     ${TCR_LAST_VERIFIED_RESULT:-none} at ${TCR_LAST_VERIFIED_AT:-never}"
+  echo "  corrupted:         ${TCR_CORRUPTED:-false}"
+  if [ -n "${TCR_PREEXISTING_STASH_REF:-}" ]; then
+    echo "  preexisting stash: ${TCR_PREEXISTING_STASH_REF} (restore with: git -C \"$TCR_MAIN_REPO_ROOT\" stash pop)"
+  fi
+}
+
+# ---------------------------------------------------------------- end -----
+cmd_end() {
+  local root
+  root="$(tcr_require_root)" || exit 1
+  tcr_load_state "$root/$TCR_STATE_RELPATH"
+  TCR_ACTIVE=false
+  tcr_save_state "$root/$TCR_STATE_RELPATH"
+  echo "TCR session deactivated."
+  if [ "$TCR_WORKTREE_MODE" = "true" ]; then
+    cat <<EOF
+This session worked in an isolated worktree that is left in place for you
+to inspect, merge, or discard:
+  worktree: $TCR_WORKTREE_PATH
+  branch:   $TCR_WORKTREE_BRANCH
+Nothing there is deleted automatically. If the session entered this worktree
+with EnterWorktree, leave it with ExitWorktree({action: "keep"}) (never
+"remove") so this cleanup stays a deliberate, separate step. To bring the
+accepted commits back into your main branch:
+  git -C "$TCR_MAIN_REPO_ROOT" merge --ff-only $TCR_WORKTREE_BRANCH
+To discard the worktree once merged (or if you don't want its commits):
+  git -C "$TCR_MAIN_REPO_ROOT" worktree remove "$TCR_WORKTREE_PATH"
+  git -C "$TCR_MAIN_REPO_ROOT" branch -d $TCR_WORKTREE_BRANCH
+EOF
+  fi
+  if [ -n "${TCR_PREEXISTING_STASH_REF:-}" ]; then
+    cat <<EOF
+Pre-existing uncommitted changes from before this session are still saved
+in the stash and were NOT restored automatically:
+  git -C "$TCR_MAIN_REPO_ROOT" stash list
+  git -C "$TCR_MAIN_REPO_ROOT" stash pop   # restores them
+EOF
+  fi
+}
+
+# --------------------------------------------------------------- init -----
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]\+/-/g' -e 's/^-\+//' -e 's/-\+$//' | cut -c1-24
+}
+
+discover_full_check() {
+  local root="$1"
+  if [ -f "$root/Makefile" ] && grep -qE '^test:' "$root/Makefile"; then
+    echo "make test"; return 0
+  fi
+  if [ -f "$root/Makefile" ] && grep -qE '^check:' "$root/Makefile"; then
+    echo "make check"; return 0
+  fi
+  if [ -f "$root/package.json" ] && grep -q '"test"[[:space:]]*:' "$root/package.json"; then
+    echo "npm test"; return 0
+  fi
+  if [ -f "$root/Cargo.toml" ]; then
+    echo "cargo test"; return 0
+  fi
+  if [ -f "$root/go.mod" ]; then
+    echo "go test ./..."; return 0
+  fi
+  if [ -f "$root/pyproject.toml" ] || [ -f "$root/pytest.ini" ] || [ -f "$root/setup.cfg" ]; then
+    if command -v pytest >/dev/null 2>&1; then echo "pytest"; else echo "python3 -m pytest"; fi
+    return 0
+  fi
+  if [ -f "$root/Gemfile" ] && [ -d "$root/spec" ]; then
+    echo "bundle exec rspec"; return 0
+  fi
+  return 1
+}
+
+cmd_init() {
+  local task="" strict=false in_place=false full_check="" fast_check=""
+  local max_attempts="$TCR_MAX_ATTEMPTS_DEFAULT" allow_red_baseline=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --task) task="$2"; shift 2 ;;
+      --strict) strict=true; shift ;;
+      --in-place) in_place=true; shift ;;
+      --full-check) full_check="$2"; shift 2 ;;
+      --fast-check) fast_check="$2"; shift 2 ;;
+      --max-attempts) max_attempts="$2"; shift 2 ;;
+      --allow-red-baseline) allow_red_baseline=true; shift ;;
+      *) usage ;;
+    esac
+  done
+  [ -n "$task" ] || tcr_die "init requires --task \"<description>\""
+
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || \
+    tcr_die "not inside a git repository. Run 'git init' (and make an initial commit) before starting TCR."
+  local repo_root head branch
+  repo_root="$(git rev-parse --show-toplevel)"
+  if ! head="$(git rev-parse HEAD 2>/dev/null)"; then
+    tcr_die "this repository has no commits yet. TCR needs a baseline commit to branch from and roll back to -- make an initial commit first."
+  fi
+  branch="$(git branch --show-current)"
+
+  local existing_root
+  if existing_root="$(tcr_find_root 2>/dev/null)"; then
+    tcr_load_state "$existing_root/$TCR_STATE_RELPATH"
+    if [ "$TCR_ACTIVE" = "true" ]; then
+      tcr_die "a TCR session is already active at $existing_root (step: '${TCR_CURRENT_STEP:-none}'). Run 'tcr-status end' first, or 'tcr-status show' to inspect it."
+    fi
+  fi
+
+  local dirty
+  dirty="$(git status --porcelain)"
+
+  local worktree_mode=true worktree_path="" worktree_branch="" preexisting_stash_ref=""
+  local work_root="$repo_root"
+
+  cleanup_on_abort() {
+    if [ "$worktree_mode" = true ] && [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
+      git -C "$repo_root" worktree remove --force "$worktree_path" >/dev/null 2>&1
+      git -C "$repo_root" branch -D "$worktree_branch" >/dev/null 2>&1
+    fi
+    if [ -n "$preexisting_stash_ref" ]; then
+      git -C "$repo_root" stash pop >/dev/null 2>&1
+    fi
+  }
+
+  if [ "$in_place" = true ]; then
+    worktree_mode=false
+    work_root="$repo_root"
+    if [ -n "$dirty" ]; then
+      local ts; ts="$(date +%s)"
+      if git -C "$repo_root" stash push -u -m "tcr-preexisting-$ts" >/dev/null 2>&1; then
+        preexisting_stash_ref="$(git -C "$repo_root" rev-parse -q --verify refs/stash 2>/dev/null)"
+        tcr_note "Stashed pre-existing uncommitted changes as $preexisting_stash_ref (restore later with 'git stash pop')."
+      else
+        tcr_die "failed to stash pre-existing changes; refusing to proceed in --in-place mode."
+      fi
+    fi
+  else
+    local slug ts
+    slug="$(slugify "$task")"
+    [ -n "$slug" ] || slug="task"
+    ts="$(date +%s)"
+    worktree_branch="tcr/${slug}-${ts}"
+    # Placed under .claude/worktrees/, matching Claude Code's own EnterWorktree
+    # convention, so the skill can hand the session into this same worktree
+    # with EnterWorktree({path: ...}) instead of a bare cd.
+    worktree_path="$repo_root/.claude/worktrees/${slug}-${ts}"
+    mkdir -p "$repo_root/.claude/worktrees"
+    local werr; werr="$(mktemp)"
+    if ! git -C "$repo_root" worktree add -q -b "$worktree_branch" "$worktree_path" "$head" 2>"$werr"; then
+      tcr_note "$(cat "$werr" 2>/dev/null)"; rm -f "$werr"
+      tcr_die "could not create an isolated worktree at $worktree_path. Re-run with --in-place to work directly in $repo_root instead (pre-existing changes will be stashed, not lost)."
+    fi
+    rm -f "$werr"
+    work_root="$worktree_path"
+    # Best-effort: keep the worktrees directory out of the parent repo's own
+    # untracked-file view (Claude Code does the same for its own worktrees).
+    local parent_exclude
+    parent_exclude="$(git -C "$repo_root" rev-parse --git-path info/exclude 2>/dev/null)"
+    if [ -n "$parent_exclude" ]; then
+      mkdir -p "$(dirname "$parent_exclude")" 2>/dev/null
+      grep -qxF '.claude/worktrees/' "$parent_exclude" 2>/dev/null || echo '.claude/worktrees/' >> "$parent_exclude"
+    fi
+    if [ -n "$dirty" ]; then
+      tcr_note "Note: $repo_root has pre-existing uncommitted changes. They are left completely untouched there; TCR is working from a clean copy of HEAD in an isolated worktree and will not include them unless you copy them over yourself."
+    fi
+  fi
+
+  if [ -z "$full_check" ]; then
+    if ! full_check="$(discover_full_check "$work_root")"; then
+      cleanup_on_abort
+      tcr_die "could not auto-discover a FULL_CHECK command for this repo. Re-run with --full-check \"<command>\" (e.g. \"pytest\", \"npm test\", \"make test && npm run typecheck\")."
+    fi
+    tcr_note "Discovered FULL_CHECK: $full_check"
+  fi
+
+  local log="$work_root/.tcr/last-full-check.log"
+  tcr_note "Running baseline FULL_CHECK in $work_root ..."
+  local baseline_result="pass"
+  if ! tcr_run_check "$work_root" "$full_check" "$log"; then
+    baseline_result="fail"
+    tcr_tail_log "$log" 60
+    if [ "$allow_red_baseline" != true ]; then
+      cleanup_on_abort
+      tcr_die "BASELINE IS RED. The full check fails before any TCR change was made. Do not begin implementation -- fix or explicitly accept this first. Re-run with --allow-red-baseline if the user has explicitly chosen to proceed with a known-red baseline."
+    fi
+    tcr_note "Proceeding with a known-red baseline (--allow-red-baseline). The first accepted TCR step still requires a fully passing FULL_CHECK before it can be committed."
+  fi
+
+  # Best-effort: keep .tcr/ out of git's view of this worktree.
+  local exclude_file
+  exclude_file="$(git -C "$work_root" rev-parse --git-path info/exclude 2>/dev/null)"
+  if [ -n "$exclude_file" ]; then
+    mkdir -p "$(dirname "$exclude_file")" 2>/dev/null
+    grep -qxF '.tcr/' "$exclude_file" 2>/dev/null || echo '.tcr/' >> "$exclude_file"
+  fi
+
+  TCR_ACTIVE=true
+  TCR_MODE=$([ "$strict" = true ] && echo strict || echo normal)
+  TCR_BASELINE_COMMIT="$head"
+  TCR_FULL_CHECK="$full_check"
+  TCR_FAST_CHECK="$fast_check"
+  TCR_WORKTREE_MODE=$([ "$worktree_mode" = true ] && echo true || echo false)
+  TCR_WORKTREE_PATH="$worktree_path"
+  TCR_WORKTREE_BRANCH="$worktree_branch"
+  TCR_MAIN_REPO_ROOT="$repo_root"
+  TCR_TASK="$task"
+  TCR_CURRENT_STEP=""
+  TCR_ATTEMPT=0
+  TCR_MAX_ATTEMPTS="$max_attempts"
+  TCR_LAST_RESULT="$baseline_result"
+  TCR_LAST_TEST_AT="$(tcr_now)"
+  TCR_LAST_VERIFIED_RESULT="$baseline_result"
+  TCR_LAST_VERIFIED_AT="$TCR_LAST_TEST_AT"
+  TCR_PREEXISTING_STASH_REF="$preexisting_stash_ref"
+  TCR_CORRUPTED=false
+  TCR_STARTED_AT="$TCR_LAST_TEST_AT"
+  TCR_FAILURE_LOG_PATH="$TCR_FAILURES_RELPATH"
+  tcr_save_state "$work_root/$TCR_STATE_RELPATH"
+
+  echo "TCR session established."
+  echo "  mode:         $TCR_MODE"
+  echo "  work root:    $work_root"
+  [ "$worktree_mode" = true ] && echo "  branch:       $worktree_branch (from $branch @ $head)"
+  echo "  full_check:   $full_check"
+  echo "  baseline:     $baseline_result"
+  echo "Original working tree ($repo_root) is untouched by this session."
+  if [ "$worktree_mode" = true ]; then
+    echo "This worktree already exists on disk; enter it with the EnterWorktree tool"
+    echo "(path: \"$work_root\") rather than 'cd', so the session's file tools and"
+    echo "worktree lifecycle stay in sync with it."
+  fi
+}
+
+case "$cmd" in
+  show) cmd_show "$@" ;;
+  init) cmd_init "$@" ;;
+  end)  cmd_end "$@" ;;
+  *) usage ;;
+esac
