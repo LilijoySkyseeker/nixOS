@@ -12,8 +12,10 @@ session needs is here or linked from here.
   than making a new one. If it is gone, make one from the branch
   (`git fetch && EnterWorktree`, then check the branch out) or work on
   the branch directly.
-- **Last session ended 2026-08-27** having finished wave 1 and taken
-  wave 2 as far as an agent can. Phase 4 is next and is already scoped.
+- **Last session ended 2026-08-27** having finished wave 1, taken wave 2
+  as far as an agent can, and completed **Phase 4**. What is left is
+  wave 3, which is user-only by definition, plus the three wave-2 items
+  blocked on decisions.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
 - **Nothing has ever been switched.** Every change is build-verified
@@ -38,7 +40,7 @@ session needs is here or linked from here.
 | 1 — eight part audits | **done** — 158 findings |
 | 2 — consolidation | **done** |
 | 3 — remediation | **waves 1–2 done as far as an agent can take them.** 2.1/2.2/2.9 are blocked on user decisions, not work; `push-deploy-vps`'s sandbox is deliberately deferred. Wave 3 is user-only by definition |
-| 4 — docs harvest | **not started — and it is the next thing to do.** Scoped and rule-by-rule triaged in [`remediation.md`](remediation.md)'s Wave 4 section: nine of the eleven rules are new, two need finishing, three judgement calls are open. Documentation only — no build, no VM test |
+| 4 — docs harvest | **done 2026-08-27.** Ten rules folded into `docs/hardening.md`; `docs/threat-model.md` and `docs/accepted-risks.md` created; `TODO.md` and `AGENTS.md` updated. The three judgement calls were decided by the agent and are flagged as reversible — see [`remediation.md`](remediation.md)'s Wave 4 section |
 
 Headline counts: **3 CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**,
 consolidated into 3 CRITICAL clusters, 10 HIGH clusters, and 34 tail
@@ -206,27 +208,40 @@ online to test. Evaluated port inventory is in `remediation.md`,
 including that **UDP 10400/10401 are opened by something outside this
 repo and were never attributed**.
 
-**Wave 4 / Phase 4 — this is the next thing to do.** Fold
-`findings.md` §4's eleven rules into `docs/hardening.md`, promote the
-threat model to a standing doc, write down accepted risks, and log
-deferred items to `TODO.md`. The `AGENTS.md` row is already done.
+**Wave 4 / Phase 4 is done** (2026-08-27), documentation only — no host
+configuration was touched, so nothing in it needs a build or a VM test.
+Four new or changed places to know about:
 
-**It is already scoped — read [`remediation.md`](remediation.md)'s Wave
-4 section before starting, and do not re-derive the triage there.** In
-short: rule 10 is **done** (`6b623c0`); rule 9 exists but is scoped to
-SSH only; rule 4 is written into `hosts/homelab/configuration.nix`
-(`bd6db07`) but not stated fleet-wide; the other **nine are new**.
+- **`docs/hardening.md` now opens with a `## Standing rules` section** —
+  ten rules from `findings.md` §4, short and imperative, evidence linked
+  back into this directory rather than inlined. The pre-existing content
+  is byte-identical, under a new `## Conventions in detail` heading.
+  Rule 10 of §4 (`AllowTcpForwarding`) is not repeated; wave 2 already
+  applied it in the SSH bullet.
+- **`docs/threat-model.md` is new and is a *pointer*, not a copy.** The
+  model itself stays at `00-threat-model.md` in this directory, because
+  eight part reports cite it by section. Link the stable path; repoint
+  it when a later audit supersedes the model.
+- **`docs/accepted-risks.md` is new and is deliberately half-finished.**
+  §1 carries six risks whose acceptance is not in question. §2 is
+  D1–D14 stated as "what you would be accepting", and is **explicitly
+  not acceptance**. Answering a decision toward acceptance means moving
+  a row from §2 to §1 with reasoning — `user-actions.md` §4 now says so.
+- **`docs/procedures/remote-access.md` was corrected**: it claimed the
+  `vps-deploy` forced-command allowlist was "the actual security
+  boundary". Root arrives anyway via the polkit grant beside it, so
+  homelab and vps are one blast radius (`F-P0-02`, `F-P8-13`).
 
-Three judgement calls are open and were deliberately not decided:
-how much reasoning goes inline (`docs/hardening.md` is a tight 138-line
-checklist and doubling it may make it go unread — the proposal was short
-imperative rules with evidence linked, not inlined); where the threat
-model should live; and that the accepted-risks file cannot be *finished*
-until decisions D1–D14 are answered, only scaffolded.
+**The three judgement calls were decided by the agent, not the user, and
+are cheap to reverse** — recorded in `remediation.md`'s Wave 4 section
+and in `TODO.md` so they can be overruled: rules kept short with linked
+evidence; threat model left in place behind a stable pointer; accepted
+risks scaffolded rather than completed.
 
-Phase 4 touches **no host configuration** — documentation only, so no
-build and no VM test are needed. That is a real difference from waves
-1–3.
+Two items the rule-writing surfaced are now tracked in `TODO.md` rather
+than done: the three containers have **no `--pids-limit` / `--memory`
+ceilings**, and **`userns-remap` is unset**, so container uid 0 is host
+uid 0 on every bind mount.
 
 ---
 

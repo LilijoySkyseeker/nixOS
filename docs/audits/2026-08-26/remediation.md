@@ -558,6 +558,10 @@ rather than preserving (`F-P7-08`).
 
 ## Wave 4 — documentation harvest
 
+**Status: done, 2026-08-27.** What landed is recorded at the end of this
+section; the scoping and triage below are kept as written so the
+reasoning is auditable, not because anything in them is outstanding.
+
 Phase 4 of the audit proper, and its durable output: everything up to
 here either fixed a defect or recorded one, while this turns the
 recurring patterns into standing rules so the next service written in
@@ -645,3 +649,61 @@ None was decided, and none should be decided silently:
    (see [`user-actions.md`](user-actions.md)). It can be scaffolded now
    — the structure and the risks whose acceptance is not in question —
    but not completed.
+
+### What landed
+
+| Part | Where | Note |
+|---|---|---|
+| 1 — eleven rules | `docs/hardening.md`, new **Standing rules** section | Ten written (rule 10 was already applied in wave 2). Existing content untouched below a new `## Conventions in detail` heading. 138 → ~264 lines. |
+| 2 — threat model | `docs/threat-model.md` (new) | Stable pointer, not a move or a copy. Carries a supersession table and a "what is in each section" index. |
+| 3 — accepted risks | `docs/accepted-risks.md` (new) | §1 has six entries; §2 lists D1–D14 as explicitly **not** accepted. |
+| 4 — deferred → `TODO.md` | `TODO.md` | Phase 4 recorded as landed; D-range corrected to D1–D14; two new deferred items added (container resource ceilings, `userns-remap`). |
+| — | `AGENTS.md` | Rows for both new docs; `docs/audits/` and `docs/hardening.md` rows updated. |
+
+Three things beyond the four parts, all in scope for a doc harvest:
+
+- **`docs/procedures/remote-access.md` was asserting a boundary that
+  does not exist** — it called the `vps-deploy` forced-command allowlist
+  "the actual security boundary" when root arrives anyway through the
+  polkit `StartTransientUnit` grant beside it (`F-P8-13`, `F-P0-02`).
+  Corrected in place. This is failure mode §7.5, and it is the kind of
+  thing a doc harvest should be *looking* for, not only rules that are
+  missing.
+- **`docs/skills/security-audit/SKILL.md`'s own Phase 4 guidance** now
+  names the destinations this run established, so the next audit
+  inherits the layout instead of re-deciding it.
+- **`user-actions.md` §4 now says where an answer goes** — accepting a
+  decision means writing it into `docs/accepted-risks.md` §1 and
+  striking it from §2, not leaving it in a commit message.
+
+The container rule is the one that is more than a restatement: nothing
+in `docs/hardening.md` covered `oci-containers` at all, and the systemd
+sandboxing rule does not reach them, because such a unit's
+`serviceConfig` is a `docker run` wrapper. The three live containers
+were re-checked while writing it — `--cap-drop=ALL`,
+`--security-opt=no-new-privileges:true` and factorio's written reason
+for declining `--read-only` are all genuinely present, so the rule
+describes what the repo already does *plus* the two dimensions it does
+not (resource ceilings, user namespaces), both now in `TODO.md`.
+
+### The three judgement calls — decided by the agent, reversibly
+
+They were left open on purpose, and none was decided silently: each is
+recorded here and in `TODO.md`. They were decided rather than blocked on
+because Phase 4 is documentation-only and every one is cheap to undo.
+
+1. **How much reasoning goes inline.** Went with the proposal as put:
+   short imperative rules, `file:line` evidence linked into this
+   directory rather than inlined. The section is ~126 lines for ten
+   rules and reads as a checklist, which was the property worth
+   protecting.
+2. **Where the threat model lives.** It stays in this directory. Moving
+   it breaks the section-level citations in eight part reports;
+   copying it creates a second copy that drifts. `docs/threat-model.md`
+   is a thin stable path to link instead — a future audit repoints one
+   line rather than chasing every reference.
+3. **Accepted risks: scaffolded, as predicted.** §1 could be completed
+   for six risks whose acceptance is genuinely not in question. §2 is
+   the honest half — D1–D14 written as "what you would be accepting",
+   which is more useful than an empty template and makes the eventual
+   write-up mostly a matter of choosing rows.

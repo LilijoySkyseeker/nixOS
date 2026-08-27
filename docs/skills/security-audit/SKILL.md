@@ -197,11 +197,28 @@ The audit's durable output is not the fixes, it is the knowledge.
   A wrong default in the standing rulebook propagates into every future
   service.
 - The threat model becomes a durable doc — every future "should I
-  expose this?" decision is a question about it.
+  expose this?" decision is a question about it. The 2026-08-26 run
+  settled *how*: the model stays in its dated audit directory, because
+  the part reports cite it by section and a second copy would drift,
+  and `docs/threat-model.md` is a thin **stable pointer** at the
+  current one. Repoint that file rather than moving or copying the
+  model.
 - **Accepted risks get written down with their reasoning**, so a future
-  pass doesn't re-litigate them.
+  pass doesn't re-litigate them → `docs/accepted-risks.md`. Note what
+  that file is *not* for: deferred work (`TODO.md`), undecided
+  questions (the audit's own `user-actions.md`), or rules everyone
+  should follow (`docs/hardening.md`). A risk blocked on a user
+  decision is not accepted — list it separately as pending.
 - Deferred remediation → `TODO.md`.
 - Add a row to `AGENTS.md`'s "Where things live" table for anything new.
+- **Fix docs that assert a boundary the config doesn't implement**
+  (failure mode §7.5), not just docs that are missing a rule. Last run
+  found `docs/procedures/remote-access.md` calling the `vps-deploy`
+  forced-command allowlist "the actual security boundary" when root
+  arrives anyway via the polkit grant beside it.
+- **Phase 4 touches no host configuration.** No build, no VM test — a
+  real difference from the remediation waves, and it should make this
+  the fastest phase, not the one that gets dropped.
 
 ---
 

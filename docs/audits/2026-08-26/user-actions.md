@@ -168,10 +168,19 @@ rather than done in a branch.
 None of these should be made by an agent. Recorded in `findings.md` §5;
 repeated here so this file is the single place to work through.
 
+**Where an answer goes.** Deciding *toward a fix* turns the row into
+work — `TODO.md` or a branch. Deciding *toward acceptance* means writing
+it into [`docs/accepted-risks.md`](../../accepted-risks.md) §1 with its
+reasoning, and striking it from that file's §2 pending table; an
+acceptance that only exists in a commit message will be re-litigated by
+the next audit. Phase 4 pre-listed all fourteen in §2 with the exact
+risk each one would be accepting, so the write-up is mostly already
+drafted.
+
 | # | Decision | Bears on | Done? |
 |---|---|---|---|
 | D1 | Rotate which credentials, and how far back? | C1 / N2 — the answer is probably "all ten in `F-P8-02`" | [ ] |
-| D2 | Accept unsigned unattended `origin/master`, or add signature verification? | H1; if accepting, write it into `docs/hardening.md` as an explicit accepted risk | [ ] |
+| D2 | Accept unsigned unattended `origin/master`, or add signature verification? | H1; if accepting, write it into [`docs/accepted-risks.md`](../../accepted-risks.md) §1 as AR-7 | [ ] |
 | D3 | Check GitHub branch protection | H1; with no CI, the only remaining control on fleet root | [ ] |
 | D4 | Buy immutability: append-only B2 key + Object Lock? | C3 — the single highest-value change for asset #1 | [ ] |
 | D5 | FDE on the laptops? The plan exists on an unmerged branch | H7 | [ ] |

@@ -208,6 +208,38 @@ them rot.
         remediation that is deferred rather than done stays tracked
         here, not in a report file nobody reads.
 
+      **Phase 4 landed 2026-08-27.** All four parts done:
+      `docs/hardening.md` gained a **Standing rules** section with the
+      ten rules from `findings.md` §4 (the eleventh,
+      `AllowTcpForwarding`, was already applied in wave 2), including a
+      new OCI-container rule the doc had no equivalent of;
+      `docs/threat-model.md` is a new stable pointer at the model;
+      `docs/accepted-risks.md` is new; `AGENTS.md` gained rows for both.
+      Also corrected `docs/procedures/remote-access.md`, which asserted
+      the `vps-deploy` forced-command allowlist was "the actual security
+      boundary" when root arrives anyway via the polkit grant beside it,
+      and updated the audit skill's own Phase 4 guidance so the next run
+      inherits the layout rather than re-deciding it.
+
+      **Three judgement calls were decided by the agent, not the user**,
+      because Phase 4 is documentation-only and every one of them is
+      cheap to reverse. Flagged here so they can be overruled:
+      1. *How much reasoning goes inline.* Rules are short and
+         imperative; the `file:line` evidence stays in the audit and is
+         linked. `docs/hardening.md` went 138 → ~264 lines rather than
+         doubling on justification.
+      2. *Where the threat model lives.* It stays in
+         `docs/audits/2026-08-26/` — the eight part reports cite it by
+         section and a copy would drift — with `docs/threat-model.md` as
+         a stable path to link instead, carrying a supersession rule.
+      3. *Accepted risks could only be scaffolded.* §1 holds the six
+         risks whose acceptance is genuinely not in question (public
+         repo, homelab→vps root, zrepl-as-root, the two unlocked shell
+         paths, no-CI-on-purpose, NFS without `noexec`). §2 lists
+         D1–D14 as **explicitly not accepted** — the risk each one would
+         be accepting if answered that way. It cannot be finished until
+         those are decided.
+
       **Progress.** Phase 0 done 2026-08-26:
       `docs/audits/2026-08-26/00-threat-model.md` — exposure map,
       principals, six trust-boundary analyses, nine adversaries, the
@@ -233,7 +265,8 @@ them rot.
       **wave 1 is complete, and wave 2 is complete as far as an agent can
       take it**: 2.3, 2.4, 2.5, 2.7 and 2.8 done, 2.6 two-thirds done,
       and 2.1/2.2/2.9 blocked on user decisions (D9, D13, D14) rather
-      than on work. Waves 3–4 not started. All work is on
+      than on work. **Wave 4 / Phase 4 is done** (see above); wave 3 is
+      user-only by definition and not started. All work is on
       `worktree-worktree-security-audit-plan`, build-verified on
       homelab, vps, torrent and thinkpad, and **never switched**.
 
@@ -269,9 +302,29 @@ them rot.
         target**, and a wrong guess means vps silently stops updating.
       - A resumed `zfs recv` is not covered by 2.8's new test. `-o` on
         resume has historically been fussy; noted in the test header.
+      - **The three containers have no resource ceilings.** Phase 4
+        wrote the rule (`docs/hardening.md` standing rule 10); it is not
+        yet applied. None of minecraft, `factorio-main` or
+        `factorio-new` sets `--pids-limit`, `--memory` or `--cpus`, so a
+        fork bomb or a memory leak in any of them is *host* OOM pressure
+        on the box holding `zbackup`, and the kernel picks its own
+        victim among jellyfin, smbd, nfsd and the restic job.
+        `--pids-limit` is safe at a generous few thousand; `--memory`
+        must come from measured RSS with headroom, **not** from
+        minecraft's `MEMORY = "4G"`, which is JVM heap only (off-heap,
+        DistantHorizons and the 1 GiB `/tmp` tmpfs sit on top of it). A
+        ceiling set too low becomes an OOM-kill loop that reads as a
+        game crash. *(F-P4-07)*
+      - **`userns-remap` is not set** in
+        `virtualisation.docker.daemon.settings`, so container uid 0 is
+        host uid 0 on every bind mount and an escape lands as real root
+        rather than a mapped subuid. Enabling it re-maps ownership of
+        existing volumes, so it is not a one-line change — it needs its
+        own VM test and a plan for the game-server data directories.
+        *(F-P4-07)*
 
       **Everything requiring the user** — the ten credentials to rotate,
-      the `secrets/*` edits agents may not make, and decisions D1–D11 —
+      the `secrets/*` edits agents may not make, and decisions D1–D14 —
       is a live checklist at
       [`docs/audits/2026-08-26/user-actions.md`](docs/audits/2026-08-26/user-actions.md).
       Two are free, reversible and should not wait: `chmod 600
