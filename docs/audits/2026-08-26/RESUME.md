@@ -4,7 +4,36 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-27, end of the fourth session.**
+**Last updated: 2026-08-27, end of the fifth session.**
+
+> ## START HERE — state as of the fifth session
+>
+> **The audit branch is merged.** PR #24 landed; `master` is `9f39873`
+> plus everything since. The branch
+> `worktree-worktree-security-audit-plan` is still the working branch and
+> is **ahead of master again** with the fifth session's commits — open a
+> new PR when it is time to land them. Worktree:
+> `.claude/worktrees/worktree-security-audit-plan`.
+>
+> **Deployed:** homelab **gen 350**, vps **gen 7**, both with zero failed
+> units. `torrent` and `thinkpad` have **never been switched** and still
+> run pre-audit configs with their `pull-deploy` timers armed.
+>
+> **All scheduled deploys are OFF fleet-wide** (`scheduleEnable = false`
+> on `myAutoUpdate`/`myPullDeploy`/`myPushDeploy`). Deliberate and
+> temporary — see the pipeline project in `TODO.md`. Nothing auto-updates
+> or auto-reverts any more; the safety net is the profile-staleness alert.
+> Both audit "clocks" are dead.
+>
+> **The active workstream is credential rotation**
+> ([`rotation-runbook.md`](rotation-runbook.md)), worked item by item
+> *with* the user. Items **1 and 2 are done and verified**; **3 and 4 are
+> not required**; **5–10 remain**. Next up is the WireGuard set (5–7).
+>
+> **The user works these interactively.** Do not batch them. Each item is
+> "user does the provider + sops half, agent does the repo + deploy +
+> verify half", and the verification is the point — it has caught two
+> real problems already.
 
 ---
 
@@ -68,7 +97,9 @@ file.
   than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
-- **homelab and vps are deployed** (2026-08-27). homelab was switched
+- **homelab is on gen 350 and vps on gen 7** as of the fifth session;
+  the line below records the fourth session's state and is kept for the
+  sequence. homelab and vps are deployed (2026-08-27). homelab was switched
   twice — the audit's first switch, then again for the fourth session's
   work (**generation 346**). vps followed (**generation 4**).
   `torrent` and `thinkpad` remain **build-verified only, never
@@ -367,7 +398,82 @@ tailscale module sets the former.
 
 ---
 
+## What happened in the fifth session (2026-08-27)
+
+**The branch was merged** (PR #24) after syncing `origin/master` in; the
+only conflict was `TODO.md`, resolved by keeping both sides' new entries
+and dropping master's older copy of the audit entry, which this branch
+had already superseded. homelab and vps built to byte-identical store
+paths across the merge, proving it changed nothing deployed.
+
+**Scheduled deploys were turned off fleet-wide**, on instruction, while
+the pipeline is rebuilt. New `scheduleEnable` option on all three deploy
+modules; **not** `enable = false`, because that would also delete
+`auto-switch-now`, `pull-deploy` and `push-deploy-vps` as *units*, and
+those are the manual deploy paths. Timers are *removed* rather than
+un-wanted, so a switch actually stops a running one — confirmed in the
+switch log (`stopping the following units: auto-switch.timer, …`).
+
+**Credential rotation started.** Items 1 (`cloudflare_octodns_token`) and
+2 (`discord_webhook`) are done and verified live. Item 2 also
+**consolidated two sops keys into one**: `homelab_discord_webhook` (read
+by homelab, torrent *and* thinkpad) and `vps_discord_webhook` held the
+same URL, so the host prefix described nothing. All four hosts now read
+one unprefixed `discord_webhook`.
+
+**Debug tooling is now shared.** `modules/flake/debug-tools.nix` is a
+single list consumed by both the devshell and every host (via
+`profiles/default.nix`), always resolved against **unstable** so tools
+behave identically fleet-wide. Currently `jq` and `ipset`. Add a tool
+there once and it lands everywhere.
+
+### Things this session got wrong, and what corrected them
+
+Worth reading — the pattern is that the *verification step* caught all of
+them, not the reasoning:
+
+- **The rotated Discord webhook was pasted as a bare URL**, but
+  `myHealthAlerts` uses `curl -K`, which is config-file mode and needs
+  `url = "https://…"`. It fails **silently**, because `notify` only runs
+  when something is already wrong and discards curl's output and exit
+  status. Filed in `TODO.md`: nothing ever verifies the alert sink works.
+- **"Keep the old sops keys until the laptops are deployed" was wrong.**
+  The user challenged it. `secrets/secrets.yaml` is version-controlled
+  and a built system pins an **immutable store copy**, so removing a key
+  cannot affect a host that has not rebuilt, and every commit is a
+  self-consistent snapshot. Also moot: neither laptop reads it, since
+  `myHealthAlerts` was never deployed there.
+- **A missing key fails the *build*, not activation** —
+  `sops-install-secrets` validates the manifest at build time. Better
+  than documented; `remediation.md` corrected.
+- **Rotating the two Tailscale auth keys was unnecessary**, and the
+  advice given for it was actively harmful — it said to mint *reusable*
+  replacements, which would have turned a spent single-use credential
+  into a standing one. See items 3/4 in the runbook.
+
 ## What is left
+
+### Active: credential rotation (do this with the user, item by item)
+
+[`rotation-runbook.md`](rotation-runbook.md) is the script. **1 and 2
+done; 3 and 4 not required; 5–10 open.** Next is the WireGuard set
+(5–7), which is one commit: the PSK is shared and each private key needs
+the *other* host's peer `publicKey` updated
+(`hosts/vps/configuration.nix:357`, `hosts/homelab/configuration.nix:570`).
+
+Two later items have prerequisites:
+
+- **9 (`homelab_zrepl_key`) is blocked.** `clients.homelab.publicKey` on
+  the laptops is a single value, not a list, so there is no
+  both-keys-valid window — torrent and thinkpad must take the new public
+  key at the same moment homelab takes the new private one, and neither
+  laptop has ever been deployed. Do 10 before 9.
+- **10 (restic) can lose data.** It is the repository password, not the
+  Backblaze application key. Replacing the sops value alone locks the
+  repo; use `restic key add` → verify → `key remove`.
+
+Still owed by the user from items already done: delete the **old
+Cloudflare token** and the **old Discord webhook**.
 
 ### Agent-doable, unblocked
 
@@ -530,6 +636,25 @@ expensive.
   harness refuses the command. `nixos-rebuild build` plus reading the
   rendered unit out of `./result` gets the same answer, and is what the
   "verify the fix, not the build" rule wanted anyway.
+- **A command that prints nothing may not be on `PATH`.** `ipset list`
+  returned empty on vps and read as "the sets are gone"; they were fine,
+  `ipset` just was not on root's interactive `PATH`. `jq` likewise.
+  **Both are now installed fleet-wide** via
+  `modules/flake/debug-tools.nix` — if something else is missing, add it
+  there rather than reaching for a `/nix/store` path (see `AGENTS.md`).
+  `iptables`, `ip6tables` and `ss` were on `PATH` all along.
+- **Do not put backticks inside `git commit -m "…"`.** Bash runs them as
+  command substitution and silently eats the word — it removed `inputs`
+  from one commit message this session. Use a message file, or no
+  backticks.
+- **`nix eval` and heredocs to paths outside the worktree are refused**
+  by the harness in this session type. `nixos-rebuild build` plus reading
+  `./result`, and `python3 - <<EOF` writing *inside* the worktree, both
+  work.
+- **The user pushes back, and is usually right.** Three corrections this
+  session (the sops-key ordering, the Tailscale keys, unstable for debug
+  tooling) came from being challenged, and each time the challenge was
+  correct. Check the claim against the repo before defending it.
 - **When verifying a rendered unit, grep the payload, not the wrapper.**
   A `.service` file usually only holds
   `ExecStart=/nix/store/…-unit-script-<name>-start/bin/<name>-start`, and
