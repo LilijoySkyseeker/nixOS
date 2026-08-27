@@ -354,7 +354,7 @@ in
     peers = [
       {
         # homelab
-        publicKey = "GH5vw+bR1d28xPPTlB4cn9VLp529QAyyNAJhnhmzVXE=";
+        publicKey = "d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         allowedIPs = [ "10.100.0.2/32" ];
       }

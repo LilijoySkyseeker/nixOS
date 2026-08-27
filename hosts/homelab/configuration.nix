@@ -567,7 +567,7 @@
     peers = [
       {
         # vps
-        publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
+        publicKey = "ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         # IPv4 literal, not vps's IPv6 address — confirmed live this
         # tunnel silently died for hours despite persistentKeepalive:
