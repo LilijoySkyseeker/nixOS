@@ -230,10 +230,18 @@ them rot.
       **Status as of 2026-08-27.** Phases 0–2 done: 158 findings, **3
       CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**, consolidated into
       3 CRITICAL clusters, 10 HIGH clusters and 34 tail entries. Phase 3
-      **wave 1 is complete**; wave 2 (nine items, each needing a VM
-      test) is in progress; waves 3–4 not started. All work is on
+      **wave 1 is complete, and wave 2 is complete as far as an agent can
+      take it**: 2.3, 2.4, 2.5, 2.7 and 2.8 done, 2.6 two-thirds done,
+      and 2.1/2.2/2.9 blocked on user decisions (D9, D13, D14) rather
+      than on work. Waves 3–4 not started. All work is on
       `worktree-worktree-security-audit-plan`, build-verified on
       homelab, vps, torrent and thinkpad, and **never switched**.
+
+      Three changes are VM-tested rather than merely built: the
+      `zfs-emergency-prune` sandbox, the vps `ipset` fail-open fix
+      (including the parameter-drift scenario itself), and both halves of
+      2.8 (including a simulated hostile sender). `tests/zrepl-replication.nix`
+      and `tests/zfs-space-guard.nix` both grew permanent subtests.
 
       Read `docs/audits/2026-08-26/RESUME.md` first — it is written to
       be picked up cold.
@@ -252,6 +260,15 @@ them rot.
         item 1.9 made a **failed** deploy visible on the laptops; a
         skipped one is still silent, because every guard in
         `deploy-guards.nix` ends in `exit 0`.
+      - **`push-deploy-vps` is the one piece of 2.6 not done**, and it is
+        deferred on purpose. Its misleading comment is corrected; the
+        sandbox is not applied, because `nixos-rebuild --target-host`
+        shells out to `ssh`/`nix-copy-closure` and `PrivateTmp` +
+        `ProtectSystem = "strict"` can break the SSH control-master path
+        and nix's fetcher cache. It needs a VM test with a **real remote
+        target**, and a wrong guess means vps silently stops updating.
+      - A resumed `zfs recv` is not covered by 2.8's new test. `-o` on
+        resume has historically been fussy; noted in the test header.
 
       **Everything requiring the user** — the ten credentials to rotate,
       the `secrets/*` edits agents may not make, and decisions D1–D11 —
