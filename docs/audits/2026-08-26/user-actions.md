@@ -247,12 +247,25 @@ remains published and decryptable by any key that was ever a recipient.
   one where a mistake is not recoverable by redeploying.
 
 - [ ] **Rotate the zrepl key, and only then delete
-      `/tmp/homelab_zrepl_key`.** It is the live private half of
-      `vars.zreplPullerKey`, mode 0600, dated 2026-08-23, sitting on the
-      ZFS root — so **40 snapshots** plus the offsite copy already
-      contain it. Deleting the file does not retract it; rotation is
-      what retracts it. Delete second, not first, or replication breaks
-      before the new key is in place. *(F-P8-06)*
+      `/tmp/homelab_zrepl_key` — which is on `torrent`, not homelab.**
+      It is the live private half of `vars.zreplPullerKey`, mode 0600,
+      dated 2026-08-23, sitting on `zroot/local/root` because `/tmp` is
+      not a separate mount there. **61 snapshots** on torrent contain it
+      as of 2026-08-27, plus **69** in homelab's `zbackup` replica.
+      Deleting the file does not retract it; rotation is what retracts
+      it. Delete second, not first, or replication breaks before the new
+      key is in place. *(F-P7-02)*
+
+      Three corrections to an earlier version of this item, all found on
+      2026-08-27 while checking it: it cited **F-P8-06**, which is the
+      flat-tailnet-ACL finding and unrelated; it said **40 snapshots**,
+      which was the count at audit time and keeps growing at one per five
+      minutes; and it said "plus the offsite copy", which is **wrong** —
+      restic backs up only `zroot/local/state` and
+      `zdata/storage/storage`, never `zbackup/*`, so no laptop replica
+      reaches Backblaze. It also did not name the host, and the rotation
+      runbook's item 9 said "on homelab", so following either would have
+      shredded nothing.
 
 ---
 

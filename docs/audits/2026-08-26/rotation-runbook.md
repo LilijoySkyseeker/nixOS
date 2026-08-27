@@ -301,10 +301,24 @@ fire.
 - Then: **You** generate the keypair, put the private half in sops, give
   me the public half; **Me** update `vars.zreplPullerKey`, deploy both
   laptops **then** homelab, and verify a replication run completes.
-- **You** — afterwards, delete `/tmp/homelab_zrepl_key` on homelab
-  (`F-P8-06`). **Delete second, never first** — and note that deleting it
-  does not retract it, since 40 ZFS snapshots plus the offsite copy
-  already contain it. Rotation is what retracts it.
+- **You** — afterwards, delete `/tmp/homelab_zrepl_key` **on torrent**
+  (`F-P7-02`), along with its `.pub`. **Delete second, never first** —
+  and note that deleting it does not retract it: 61 snapshots on torrent
+  hold it as of 2026-08-27, plus 69 in homelab's `zbackup` replica, and
+  the count grows every five minutes. Rotation is what retracts it.
+
+  > **Corrected 2026-08-27.** This step previously said "on homelab" and
+  > cited `F-P8-06`. Both wrong: the file is on **torrent** (verified
+  > live — still present, and readable inside
+  > `/.zfs/snapshot/zrepl_20260827_231641_000/tmp/`), and `F-P8-06` is
+  > the flat-ACL finding. It also said "plus the offsite copy"; restic
+  > never backs up `zbackup/*`, so the replicas are not offsite. Anyone
+  > following the old text would have shredded nothing and believed the
+  > step done.
+
+  The structural fix — so a key written to a normal temp path stops
+  being unretractable — is the ZFS restructure logged in `TODO.md`
+  (2026-08-27). It is **not** a prerequisite for this rotation.
 
 ## 10 — `homelab_backblaze_restic_password` — **the one that can lose data**
 

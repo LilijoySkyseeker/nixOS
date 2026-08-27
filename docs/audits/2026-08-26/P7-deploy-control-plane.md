@@ -313,8 +313,11 @@ the ids are not sequential in reading order.
 - **Reachability:** A7 — any code running as `lilijoy` reads it
   directly (mode 0600, owner `lilijoy`). Also A9/backup-holder: `/tmp`
   is on `zroot/local/root`, which `myZrepl` snapshots every 5 minutes
-  and replicates to `zbackup` on homelab, which restic pushes to
-  Backblaze.
+  and replicates to `zbackup` on homelab. **Corrected 2026-08-27:** this
+  line previously ended "which restic pushes to Backblaze". It does not.
+  restic mounts only `zroot/local/state` and `zdata/storage/storage`
+  under `/tmp/restic` and backs up that path alone, so `zbackup/*` — and
+  therefore every laptop replica — is outside the offsite copy.
 - **Rule:** violates `docs/procedures/secrets.md`'s "secrets live in
   sops, never on disk in the clear"; new-rule candidate for key-generation
   hygiene.

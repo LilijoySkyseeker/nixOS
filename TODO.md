@@ -14,6 +14,80 @@ them rot.
 ## Active
 
 
+- [ ] **2026-08-27: restructure ZFS so ordinary temp/cache data in
+      ordinary locations is not snapshotted or replicated.** Today the
+      laptops snapshot `/tmp`, `/var/tmp` and `~/.cache` every 5 minutes
+      and ship them to homelab, because those paths sit inside datasets
+      that are snapshotted wholesale. That is what forced the awkward
+      "generate keys in `/dev/shm`" workaround in the credential rotation
+      runbook, and it is the mechanism behind `F-P7-02`.
+
+      **The constraint that decides the shape of the fix: ZFS snapshots
+      whole datasets.** There is no exclude list. You cannot keep
+      `~/.cache` out of a `zroot/local/home` snapshot by configuring
+      zrepl — the only way to exclude a path is to make it *its own
+      dataset* and leave that dataset out of the snapshot set. So this is
+      genuinely a restructure (disko layout + zrepl dataset lists), not a
+      settings change.
+
+      **homelab already has the right shape; the laptops do not.**
+      Measured live 2026-08-27:
+
+      | host | `/tmp` lives on | snapshots on it | replicated? |
+      |---|---|---|---|
+      | homelab | `zroot/local/root` | **1** — `@blank` only | no |
+      | torrent | `zroot/local/root` | **61** zrepl snapshots | yes → `zbackup` |
+      | thinkpad | `zroot/local/root` | same shape | yes → `zbackup` |
+
+      homelab gets this for free from impermanence: its root is rolled
+      back to `@blank` on boot and only `zroot/local/state` +
+      `zdata/storage/*` are in `myZrepl.local.datasets`. The laptops
+      serve `zroot/local/root` and `zroot/local/home` whole
+      (`hosts/torrent/configuration.nix:92-95`), so everything transient
+      on them is versioned and replicated. The goal is to give the
+      laptops the property homelab already has, by whichever route suits
+      them — they are daily drivers, so wipe-on-boot is not obviously the
+      right answer for them the way it is for a server.
+
+      **Two separate costs, worth keeping distinct:**
+
+      - *Security.* A secret written to a normal temp location becomes
+        unretractable. `F-P7-02` is the live proof: the **live** zrepl
+        puller private key (`vars.zreplPullerKey`'s private half, mode
+        0600, dated 2026-08-23) is still at `/tmp/homelab_zrepl_key` on
+        torrent, and confirmed present inside
+        `/.zfs/snapshot/zrepl_20260827_231641_000/tmp/` — one of 61
+        snapshots, plus homelab's replica. Deleting the file retracts
+        nothing. This is also why rotation item 9 cannot be closed by
+        tidying.
+      - *Volume.* On torrent, `~/.cache` is **22 GB** of regenerable
+        churn being snapshotted hourly and replicated (7.5G spotify,
+        3.6G appimage-run, 2.3G nix, 1.1G chromium…), plus 791M of
+        `~/.local/share/Trash` and 162M in `/tmp`. `~/Downloads` is
+        **957 GB** and is also where `iso-autobuild` drops built ISOs —
+        rebuildable artefacts in an hourly-snapshotted, replicated
+        dataset. torrent's replica on homelab is 3.16T.
+
+      **Candidate moves, none decided:**
+
+      - `boot.tmp.cleanOnBoot = true` or `useTmpfs = true` — **no
+        `boot.tmp.*` is set anywhere in this repo today**, so `/tmp`
+        is on-disk and never cleaned on all four hosts. Cheapest single
+        improvement; `useTmpfs` also makes `/dev/shm`-style hygiene the
+        default rather than something to remember.
+      - Split `~/.cache`, `~/.local/share/Trash` and `~/Downloads` into
+        their own datasets, excluded from `serve.datasets`. Note
+        `~/Downloads` is a judgement call — 957 GB of it is not obviously
+        disposable, and "not backed up" is a promise to the user as much
+        as a storage decision.
+      - Decide deliberately whether `zroot/local/root` needs replicating
+        on a laptop at all, given `/nix` is excluded already and the
+        config is in this repo.
+
+      **Do not treat this as a prerequisite for rotation item 9.**
+      Rotating the zrepl key is what retracts it; this entry stops the
+      *next* one happening.
+
 - [ ] **2026-08-27: decide what to do with the 9 branches left after the
       merged-worktree prune — 6 of them exist only on this machine and
       are one `rm -rf` away from being lost.** A cleanup pass removed 34
