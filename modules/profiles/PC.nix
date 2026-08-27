@@ -265,18 +265,33 @@ in
       hardware.bluetooth.powerOnBoot = true;
 
       # Enable CUPS to print documents.
+      #
+      # PLACEHOLDER STATE, 2026-08-27. The USB Brother this was built for
+      # is gone, so `drivers = [ brlaser ]` went with it — it was driving
+      # nothing. The replacement is a networked Brother MFC-L2740DW that
+      # does not have a static address yet, so there is deliberately no
+      # printer declared here: CUPS runs and prints to nothing until
+      # TODO.md's printer entry is worked through.
+      #
+      # When adding it, prefer a driverless IPP queue pointed at the
+      # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)
+      # over a vendor driver. That keeps `drivers` empty and, critically,
+      # does not reintroduce mDNS: the usual `._ipp._tcp.local` URI
+      # resolves via avahi, and avahi is intentionally gone (below).
       services.printing = {
         enable = true;
-        drivers = [
-          pkgs-unstable.brlaser
-        ];
+        drivers = [ ];
       };
-      # network printing
-      services.avahi = {
-        enable = true;
-        nssmdns4 = true;
-        openFirewall = true;
-      };
+
+      # No avahi/mDNS. It was here for exactly one thing — discovering the
+      # old network printer — and it opened UDP 5353 host-wide on both a
+      # desktop and a laptop that roams onto untrusted networks, where
+      # mDNS broadcasts the hostname and service list to whoever is
+      # listening. Removed rather than interface-scoped (audit decision
+      # D9, option c): a static printer address needs no discovery
+      # protocol at all, which is strictly less surface than firewalling
+      # one. Re-adding avahi is not the way to set up the new printer.
+      # (F-P1-04, F-P5-06)
 
       # Enable sound with pipewire.
       services.pulseaudio.enable = false;

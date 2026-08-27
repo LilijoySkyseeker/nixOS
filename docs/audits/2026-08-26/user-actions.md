@@ -48,11 +48,15 @@ the evidence without re-deriving it.
       the uaccess ACL is present; the fix would be a `uaccess`-scoped
       grant, not putting `input` back. *(F-P1-01, F-P8-09)*
 
-- [ ] **Check GitHub branch protection** on the public repo. There is no
-      CI anywhere and never has been — confirmed by a full-history scan
-      — so branch protection is the *only* remaining control on a commit
-      that becomes unattended root on four hosts. Not visible from
-      inside the repo. *(D3, H1)*
+- [x] **Check GitHub branch protection** on the public repo. **Done
+      2026-08-27.** Checked: `master` had **no branch protection and no
+      rulesets at all**. There are no deploy keys and the user is the
+      sole collaborator, and repo-level auto-merge is off. A ruleset
+      named `master` now targets the default branch with **restrict
+      deletions** + **block force pushes**, enforcement `active`, and an
+      empty bypass list (`current_user_can_bypass: never`).
+      **Signed commits deliberately not enabled** — that is D2, and it
+      needs a signing key set up first. *(D3, H1)*
 
 - [ ] **Delete the `ssh` block in the Tailscale console.** `ba8cd4e`
       removed it from `docs/tailscale-acl.json`, but that file is only a
@@ -204,11 +208,20 @@ drafted.
         `remotePlay.openFirewall = true` (`PC.nix:330`) outright, which
         closes TCP 27036/27037 and UDP 27031-27036. `programs.steam`
         itself stays enabled; only the in-home-streaming listener goes.
-      - **mDNS → still open.** It is `services.avahi.openFirewall`
-        (`PC.nix:275-279`), and it is there for **network printing** —
-        the Brother printer via `services.printing` + `brlaser` directly
-        above it. Scoping UDP 5353 to the LAN interface keeps printing
-        working; `tailscale0`-only would break it. Pending.
+      - **mDNS → REMOVED (option c), 2026-08-27.** It was
+        `services.avahi.openFirewall` (`PC.nix:275-279`), there for one
+        thing: discovering the network printer. The user chose to drop
+        avahi entirely and give the printer a static address instead — a
+        static address needs no discovery protocol at all, which is
+        strictly less surface than firewalling UDP 5353. Verified in the
+        built closure: no avahi units, and **no occurrence of `5353`
+        anywhere in torrent's system closure**.
+
+        This is bound up with a hardware change: the USB Brother is gone
+        and its replacement is a networked **MFC-L2740DW** with no static
+        address yet, so `brlaser` was dead config too. `services.printing`
+        is now a deliberate placeholder (`drivers = [ ]`, no printer
+        declared) and the setup is tracked as its own `TODO.md` entry.
 
       Still needs a per-host LAN-interface option (thinkpad declares no
       interface names at all) and thinkpad online to test.
@@ -246,14 +259,32 @@ drafted.
       thing keeping these ports off homelab's real public IPv6 is
       docker's IPv6-off default, and nothing had recorded that.
 
-- [ ] **D14 — pin the game container images by digest?** Wave 2 item
-      **2.2**. `factorio-new` tracks a floating `stable` tag and
-      `factorio-main` a mutable `2.1.14`; the Modrinth mod set is
-      unpinned too. Pinning is the right call in principle, but it
-      changes what actually runs and the finding asks for a
-      start-and-play check afterwards — which needs you, not an agent.
-      Worth pairing with D13 since both touch the same four servers.
-      *(F-P4-03, F-P4-13)*
+- [x] **D14 — pin the game container images by digest?** **ANSWERED
+      2026-08-27 — no, auto-update is kept deliberately, and the risk is
+      written up as an accepted risk** in
+      [`docs/accepted-risks.md`](../../accepted-risks.md) AR-7.
+
+      The user's goal is that the server tracks the newest *stable*
+      Minecraft release automatically and that mods stay current, with
+      `alpha` retained because mod development lags game releases. That
+      is availability over supply-chain tightness, chosen knowingly.
+
+      What changed while accepting it: the game version no longer leads
+      the mod set. `VERSION = "LATEST"` is replaced by upstream's
+      `VERSION_FROM_MODRINTH_PROJECTS = "true"`, which resolves the
+      newest Minecraft version **every** listed project supports and
+      **fails closed** if it cannot. The version-type variable also moved
+      off the legacy `MODRINTH_ALLOWED_VERSION_TYPE` name to
+      `MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE` — the mod downloader
+      accepts both, but the version resolver reads only the new name, so
+      the legacy spelling would have had mods resolving at `alpha` while
+      the game version resolved at `release`.
+
+      Verified in the evaluated unit on homelab, not just by build.
+      Still available if wanted later, without giving up auto-update:
+      the `?` optional-project suffix (excludes a lagging mod from the
+      version calculation instead of letting it hold the server back),
+      and per-project version pins. *(F-P4-03, F-P4-13)*
 
 - [ ] **D12 — should the NFS shares be `noexec` too?** Low stakes, and
       only worth answering if the answer is easy. Wave 2 item 2.5 added

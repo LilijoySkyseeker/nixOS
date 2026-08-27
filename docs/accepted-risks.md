@@ -155,6 +155,62 @@ the present.
 ever be run from those shares", `noexec` is one word and closes the last
 execution path from a homelab-controlled filesystem onto both laptops.
 
+### AR-7 — The game servers auto-update their mods, and the mod set decides the game version
+
+**Sits on:** [threat model](threat-model.md) §4.7, adversary A6 ·
+**Evidence:** `findings.md` H3, `F-P4-03`, `F-P4-13` · **Decides D14**
+
+Sixteen third-party Modrinth projects are resolved **by slug at every
+container start** — every reboot, and every switch touching the unit —
+at the `alpha` release channel, with
+`MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further transitive
+artifacts nobody has listed. Both Factorio servers do the same through
+`UPDATE_MODS_ON_START`. There is no version constraint and no integrity
+check on any of it.
+
+**Why accepted:** the servers exist to be played on and current. A
+pinned mod set is only as good as the discipline that updates it, and a
+stale mod set is the failure that actually happens. `alpha` is
+load-bearing rather than lazy: mod releases lag game releases, so
+restricting to `release` would hold the server on an old Minecraft
+version for as long as any single mod had only a pre-release build out.
+This is a deliberate availability-over-supply-chain trade, made with the
+exposure understood.
+
+**What was tightened while accepting it (2026-08-27):** the game version
+no longer *leads* the mod set. `VERSION = "LATEST"` is gone, replaced by
+`VERSION_FROM_MODRINTH_PROJECTS = "true"`, so the server tracks the
+newest Minecraft version **every** project already supports. It fails
+closed — an unresolvable set aborts startup rather than falling back to
+a version the mods do not support. That removes the "game moved, mods
+broke" class of outage without changing the trust decision. The variable
+was also moved off the legacy `MODRINTH_ALLOWED_VERSION_TYPE` name,
+which the version resolver does not read — under the old name the mod
+downloader would have used `alpha` while the version resolver silently
+used `release`.
+
+**What is being accepted, stated plainly:** any one of sixteen upstreams
+is a sufficient entry point into a process that handles untrusted
+internet traffic through vps's DNAT and holds a writable bind mount. And
+because the repo is public, an attacker can read the exact mod list,
+derive the parsing surface, and match it against published advisories
+before sending a packet — this is why `F-P4-03` is HIGH rather than
+MEDIUM.
+
+**What bounds it today:** `--cap-drop=ALL` with a minimal add-back list,
+`--security-opt=no-new-privileges:true`, `--read-only` on minecraft, a
+`nosuid,nodev` tmpfs, and docker's default seccomp profile. The
+capability dimension is genuinely well handled; the resource dimension
+is not, and is tracked in `TODO.md`.
+
+**What would change the answer:** a compromise anywhere in the chain, or
+the host coming to hold anything of value beyond game state. Three
+tightenings remain available without giving up auto-update — mark
+non-critical projects optional with a `?` suffix so they are excluded
+from version calculation, pin individual projects by version where a mod
+matters more than its freshness, and apply the container resource
+ceilings.
+
 ---
 
 ## 2. Not yet acceptable — blocked on a decision
@@ -170,18 +226,18 @@ it leaves this file entirely.
 |---|---|---|
 | D1 | That ten credentials exposed in public history stay live | C1, `F-P8-02` |
 | D2 | That `origin/master` is unsigned and unattended fleet root | H1 |
-| D3 | Whatever GitHub branch protection turns out to be, incl. none | H1, AR-5 |
+| ~~D3~~ | **Answered 2026-08-27.** `master` had no protection and no rulesets at all; a ruleset now blocks force pushes and deletions with no bypass actors. Signed commits deliberately not enabled yet — that is D2. | H1, AR-5 |
 | D4 | That no backup copy is out of reach of a single root | C3 |
 | D5 | That neither laptop has FDE, and thinkpad hibernates RAM to unencrypted swap | H7 |
 | D6 | That any tailnet device reaches nearly everything | ACL cluster |
 | D7 | That homelab has no intrusion detection at all | H8 |
 | D8 | That the recovery ISO serves the whole filesystem unauthenticated | H6 |
-| D9 | That the desktop profile's firewall openings stay host-wide | `F-P1-04`, `F-P5-06` |
+| D9 | That the desktop profile's firewall openings stay host-wide. **Partly answered:** KDE Connect → tailnet-only, Steam remote play → disabled, mDNS → **removed outright**, so nothing is accepted for it. The remaining host-wide openings are still pending. | `F-P1-04`, `F-P5-06` |
 | D10 | An open port (UDP 10400/10401) nobody can attribute | wave 2 §2.9 |
 | D11 | That `flake-update-test` auto-merges upstream updates to fleet root on build success alone | `F-P7-10` |
 | D12 | That the NFS shares stay executable — see AR-6 | `F-P6-05` |
-| D13 | That anything on the LAN reaches the game servers directly, past vps's rate limiter | `F-P4-02`, `F-P3-04` |
-| D14 | That the game container images track mutable tags | `F-P4-03`, `F-P4-13` |
+| ~~D13~~ | **Answered 2026-08-27 — not accepted, being fixed.** The user never reaches the game servers from the LAN, so the publishes get bound to wg0 and tailscale0 (wave 2 item 2.1). | `F-P4-02`, `F-P3-04` |
+| ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |
 
 Two of these have a written home waiting for them: **D2** must land in
 this file as an explicit accepted risk if accepted (`findings.md` §5),

@@ -107,7 +107,10 @@ here; it is already applied in the SSH bullet below.
     - **Publish to an address, never `0.0.0.0`** — see rule 4.
     - **Pin the image by digest**, not by a floating tag. A `stable` or
       `2.1.14` tag is mutable and can be re-pointed upstream.
-      (`F-P4-03`, `F-P4-13`)
+      (`F-P4-03`, `F-P4-13`) The game servers are a **deliberate,
+      documented exception** — they auto-update on purpose; see
+      [`accepted-risks.md`](accepted-risks.md) AR-7. Departing from this
+      rule is allowed; departing from it silently is not.
     - **`--cap-drop=ALL`** with an explicit, justified add-back list.
     - **`--security-opt=no-new-privileges:true`**, unless a specific
       documented feature needs otherwise — record the reason at the

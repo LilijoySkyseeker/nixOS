@@ -53,7 +53,10 @@ in
         ];
         environment = {
           TYPE = "FABRIC";
-          VERSION = "LATEST";
+          # No `VERSION` here on purpose — VERSION_FROM_MODRINTH_PROJECTS
+          # below computes it. Setting both would pin the game version and
+          # defeat the point; the image exports its resolved value over
+          # whatever VERSION held.
           EULA = "TRUE";
           # the entrypoint writes /etc/nsswitch.conf on every start unless told
           # not to; --read-only below makes that write fail, so skip it — the
@@ -81,7 +84,30 @@ in
           # the added complexity/attack surface (knockd needs NET_RAW,
           # which in turn needs no-new-privileges dropped — see git history
           # on this file if reconsidering autopause later).
-          MODRINTH_ALLOWED_VERSION_TYPE = "alpha";
+          # Track the newest Minecraft version that *every* project in
+          # MODRINTH_PROJECTS already supports, rather than the newest
+          # Minecraft version full stop. This is the upstream feature for
+          # "don't move the game ahead of the mods"; before this, VERSION
+          # = "LATEST" moved first and the mod set had to catch up, which
+          # is the wrong way round. Resolved at each container start by
+          # `mc-image-helper version-from-modrinth-projects`
+          # (scripts/start-configuration:196-207), and it **fails closed**
+          # — an unresolvable set aborts startup rather than falling back
+          # to a version the mods do not support.
+          VERSION_FROM_MODRINTH_PROJECTS = "true";
+          # `alpha` is load-bearing, not laziness: mod releases lag game
+          # releases, so restricting to `release` would hold the server on
+          # an old Minecraft version for as long as any one mod had only a
+          # pre-release build out.
+          #
+          # Must be spelled MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE, not
+          # the legacy MODRINTH_ALLOWED_VERSION_TYPE. Both still work for
+          # *downloading* mods (start-setupModpack:286 keeps the old name
+          # as an alias), but the version resolver above reads only the
+          # new name (start-configuration:198-200). Under the legacy name
+          # the two halves silently disagree: mods resolve at `alpha`
+          # while the game version resolves at the default `release`.
+          MODRINTH_PROJECTS_DEFAULT_VERSION_TYPE = "alpha";
           MODRINTH_DOWNLOAD_DEPENDENCIES = "required";
           MODRINTH_PROJECTS = ''
             c2me-fabric

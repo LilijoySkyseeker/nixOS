@@ -342,6 +342,78 @@ them rot.
       sufficient long-term or whether basic protections belong at the
       homelab layer too.
 
+- [ ] **2026-08-27: the three Minecraft/Factorio mod-supply tightenings
+      that survive auto-update.** D14 was answered "keep auto-updating"
+      and the risk is accepted in `docs/accepted-risks.md` AR-7 — but
+      three things can still be tightened *without* giving up
+      auto-update, and none was done yet. All three need a start-and-play
+      check, which is why they are here rather than done.
+
+      1. **Mark non-critical projects optional with a `?` suffix.**
+         Upstream supports `pl3xmap?`, and optional projects are
+         **excluded from the `VERSION_FROM_MODRINTH_PROJECTS`
+         calculation** — so one lagging mod stops holding the whole
+         server on an old Minecraft version, and merely warns instead of
+         aborting startup when it has no compatible build. This is the
+         highest-value one: it directly serves the "track the newest
+         stable automatically" goal, because today *any single* mod of
+         the sixteen can pin the server indefinitely. Needs a judgement
+         call per mod on what is actually load-bearing for the world
+         (e.g. geyser/floodgate almost certainly are; a mapper or a
+         client-perf mod may not be), which is the user's call, not an
+         agent's.
+      2. **Pin individual projects by version** where a specific mod
+         matters more than its freshness — syntax is `project:versionId`
+         or `project:2.21.2`, and it composes with `?`. Worth doing for
+         anything that has broken a world before.
+      3. **Reconsider `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"`.**
+         It pulls transitive artifacts that appear nowhere in this repo,
+         so the actual installed set is larger than the sixteen listed
+         projects and is not visible from the config. At minimum, record
+         what it actually resolves to once, so there is a baseline.
+
+      Related but separate, already tracked above: the containers still
+      have no `--pids-limit`/`--memory` ceilings, and `userns-remap` is
+      unset. *(F-P4-03, F-P4-13, AR-7)*
+
+- [ ] **2026-08-27: set up the new network printer/scanner (Brother
+      MFC-L2740DW).** The old USB Brother is gone. `modules/profiles/PC.nix`
+      is currently in a deliberate **placeholder state**: CUPS is enabled
+      with `drivers = [ ]` and no printer declared, and `services.avahi`
+      has been removed entirely (audit decision D9 option c — a static
+      printer address needs no discovery protocol, which is less surface
+      than firewalling UDP 5353 open on a roaming laptop). So nothing
+      prints today, by design, until this is worked through.
+
+      Steps, in order:
+      1. **Give the printer a static address** — a DHCP reservation on
+         the router is fine and is the least surprising option.
+      2. **Try driverless first.** The MFC-L2740DW supports IPP
+         Everywhere/AirPrint, so a queue of the form
+         `ipp://<static-ip>/ipp/print` with model `everywhere` should
+         need no vendor driver at all — keeping `drivers` empty.
+         **Use the IP, not the usual `._ipp._tcp.local` URI**: that form
+         resolves through avahi, and re-adding avahi to make printing
+         work would undo D9. Declare the queue declaratively
+         (`hardware.printers.ensurePrinters`) rather than clicking
+         through the CUPS web UI.
+      3. **Only if driverless fails**, add a driver — `brlaser` covers
+         many Brother lasers, but check it actually lists this model
+         before assuming, per the repo's check-the-source rule.
+      4. **Scanning is a separate problem from printing** and is not set
+         up at all right now. Prefer `sane-airscan` (driverless eSCL over
+         the same static IP) over Brother's `brscan4` blob for the same
+         reason as above; verify against the pinned nixpkgs rather than
+         from memory.
+      5. Note there is a known CUPS wrinkle where driverless queues added
+         through the web UI or autodetection can silently fail to print
+         while ones added via `lpadmin -m everywhere` work. If pages come
+         out blank or jobs vanish, that is the first thing to check —
+         it is a queue-creation problem, not a network one.
+
+      Build-verified as a placeholder on torrent and thinkpad; no
+      switch. *(D9, F-P1-04, F-P5-06)*
+
 - [ ] **2026-08-25: two branches with substantial unmerged progress have
       been idle for 5-6 days and aren't reflected anywhere in this file —
       reviewed, not yet touched, needs a decision on whether to revive
