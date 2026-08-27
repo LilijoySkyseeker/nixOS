@@ -478,7 +478,6 @@ in
   };
 
   # caddy: public HTTPS entry point, jellyfin routes through anubis
-  sops.secrets.vps_caddy_env = { }; # TODO: populate with DNS provider API token if using DNS-01 challenges
   # caddy needs group membership to reverse_proxy into anubis's unix socket
   users.users.caddy.extraGroups = [ "anubis" ];
   # anubis's "anubis" group is transient (DynamicUser = true): it only exists

@@ -23,6 +23,7 @@ in
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."health-alerts"
       ];
     };
     #==================================================
@@ -42,6 +43,7 @@ in
         nixosModules."iso-autobuild"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."health-alerts"
       ];
     };
     #==================================================

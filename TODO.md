@@ -225,7 +225,42 @@ them rot.
       credential for all four real hosts (§4.1), and there is no
       meaningful security boundary between homelab and vps — the
       vps-deploy ForceCommand allowlist bounds shells and accidents,
-      not root (§4.2). Phase 1 not started.
+      not root (§4.2).
+
+      **Status as of 2026-08-27.** Phases 0–2 done: 158 findings, **3
+      CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**, consolidated into
+      3 CRITICAL clusters, 10 HIGH clusters and 34 tail entries. Phase 3
+      **wave 1 is complete**; wave 2 (nine items, each needing a VM
+      test) is in progress; waves 3–4 not started. All work is on
+      `worktree-worktree-security-audit-plan`, build-verified on
+      homelab, vps, torrent and thinkpad, and **never switched**.
+
+      Read `docs/audits/2026-08-26/RESUME.md` first — it is written to
+      be picked up cold.
+
+      **Deferred out of wave 1, tracked so it does not get lost:**
+      - Item **2.9** (interface-scoping the desktop profile's host-wide
+        firewall openings) was moved from wave 1 to wave 2. It is not a
+        mechanical edit: KDE Connect's 1714-1764 range is opened by the
+        nixpkgs module itself with no `openFirewall` toggle, thinkpad
+        declares no interface names at all, and it needs a decision on
+        whether LAN discovery keeps working.
+      - **UDP 10400/10401 are open on torrent and are not attributable
+        to anything in this repo.** An unexplained open port is its own
+        finding; identify it before 2.9 scopes a port set containing it.
+      - The *skipped*-deploy half of `F-P7-09` is still open. Wave 1
+        item 1.9 made a **failed** deploy visible on the laptops; a
+        skipped one is still silent, because every guard in
+        `deploy-guards.nix` ends in `exit 0`.
+
+      **Everything requiring the user** — the ten credentials to rotate,
+      the `secrets/*` edits agents may not make, and decisions D1–D11 —
+      is a live checklist at
+      [`docs/audits/2026-08-26/user-actions.md`](docs/audits/2026-08-26/user-actions.md).
+      Two are free, reversible and should not wait: `chmod 600
+      ~/.config/sops/age/keys.txt` (currently 0644 on the daily driver)
+      and checking GitHub branch protection (there is no CI, so it is
+      the only remaining control on fleet root).
 
       **Standing decision still open, carried over from the original
       entry:** homelab has no intrusion detection at all (no

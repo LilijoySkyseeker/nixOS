@@ -117,4 +117,51 @@
       "zroot/local/root"
     ];
   };
+
+  # failed-unit / stuck-switch alerts to Discord (F-P7-09)
+  #
+  # myPullDeploy runs unattended every Thursday, and until now a build
+  # error, a fetch failure or a failed switch on this host was visible
+  # only in the local journal: health-alerts was imported for homelab and
+  # vps only, so nothing anywhere reported that a laptop had quietly
+  # stopped deploying. The failed-units check is the whole point of
+  # enabling it here -- pull-deploy.service entering "failed" is exactly
+  # what it catches.
+  #
+  # It does NOT yet catch a *skipped* deploy. Every guard in
+  # deploy-guards.nix ends in `exit 0`, so a skip is recorded as success
+  # and never enters `systemctl --failed`; closing that needs the
+  # deploy-marker half of F-P7-09, which is not this change.
+  #
+  # Reusing homelab's webhook rather than minting a per-host one: adding
+  # a key is a user-only sops edit, and under .sops.yaml's single
+  # creation_rules entry every host already decrypts all 31 secrets, so
+  # this grants no access this host did not already have. Re-point it at
+  # a per-host key when .sops.yaml is split per path (F-P8-01, F-P8-05).
+  sops.secrets.homelab_discord_webhook = {
+    owner = "health-check";
+    group = "health-check";
+  };
+  myHealthAlerts = {
+    enable = true;
+    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    # checkSmart is the one option here that costs something: the module
+    # grants the unit the "disk" group plus CAP_SYS_RAWIO so smartctl can
+    # issue its SG_IO ioctls, and /dev/sd* is root:disk 0660 -- read *and
+    # write* on every raw block device, i.e. root-equivalent. homelab
+    # pays that because it is headless, where smartd's wall/x11 sinks
+    # reach nobody. This host has a graphical session, so the fleet-wide
+    # services.smartd (profiles/default.nix) already reaches a human --
+    # paying a root-equivalent grant for a duplicate alert is a bad
+    # trade.
+    checkSmart = false;
+    # checkZfs stays on and needs no privilege: /dev/zfs is 0666, and
+    # `zpool status -x` was verified to succeed as the unprivileged
+    # health-check user on homelab.
+    #
+    # backupStaleness is deliberately absent. This host is the passive
+    # side of replication, and homelab's own myHealthAlerts already
+    # watches zbackup/backup/torrent/* at a 336h threshold -- measuring
+    # it again here would only report on the puller's behalf.
+  };
 }

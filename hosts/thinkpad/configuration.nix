@@ -139,4 +139,29 @@
       "zroot/local/root"
     ];
   };
+
+  # failed-unit / stuck-switch alerts to Discord (F-P7-09). See
+  # hosts/torrent/configuration.nix for the full reasoning: why homelab's
+  # webhook is reused rather than a per-host key minted, why checkSmart
+  # is off on a host that has a session, and why a *skipped* deploy is
+  # still not caught by this.
+  #
+  # It matters more here than on torrent. This host is a laptop that is
+  # legitimately offline for long stretches, so "no news" has always been
+  # indistinguishable from "deploying fine" -- and it is the host the
+  # audit could not verify live at all, precisely because it was dark.
+  sops.secrets.homelab_discord_webhook = {
+    owner = "health-check";
+    group = "health-check";
+  };
+  myHealthAlerts = {
+    enable = true;
+    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    checkSmart = false;
+    # A laptop that wakes after weeks off will fire one batch of alerts
+    # for anything that failed while it was down. That is the intended
+    # behaviour -- the timer is Persistent, so the catch-up run is what
+    # surfaces a deploy that broke a month ago -- and cooldownHours (6)
+    # keeps it to a single batch rather than a repeat every 15 minutes.
+  };
 }

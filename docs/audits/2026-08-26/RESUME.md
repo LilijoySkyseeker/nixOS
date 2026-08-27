@@ -23,6 +23,7 @@ session needs is here or linked from here.
 | [`P0-findings.md`](P0-findings.md) | Cross-cutting findings + the finding schema. |
 | `P1..P8-*.md` | The eight part reports, ~13,700 lines total. |
 | [`remediation.md`](remediation.md) | The wave plan. |
+| [`user-actions.md`](user-actions.md) | **Everything only the user can do**, as a live checklist: the free-and-reversible items, the ten credentials to rotate, the `secrets/*` edits agents may not make, and decisions D1–D11. Keep it current as remediation turns up more. |
 | [`live-verification.md`](live-verification.md) | Every live check run, with commands and results. |
 
 ## Phase status
@@ -32,7 +33,7 @@ session needs is here or linked from here.
 | 0 — threat model | **done** |
 | 1 — eight part audits | **done** — 158 findings |
 | 2 — consolidation | **done** |
-| 3 — remediation | **wave 1 nearly done**; waves 2–4 not started |
+| 3 — remediation | **wave 1 done**; wave 2 in progress; waves 3–4 not started |
 | 4 — docs harvest | **not started** — `findings.md` §4 has the eleven rules to fold into `docs/hardening.md` |
 
 Headline counts: **3 CRITICAL, 31 HIGH, 38 MEDIUM, 53 LOW, 35 INFO**,
@@ -105,12 +106,20 @@ All build-verified on all four hosts. **Not switched.**
 
 ## Phase 3 — what is left
 
-**Wave 1 remainder**
-- **1.7** drop the nine declared-but-unconsumed `sops.secrets`
-  declarations (`F-P8-11`); verify no consumer first.
-- **1.9** enable `myHealthAlerts` on both laptops (`F-P7-09`) — today
-  nothing anywhere reports a failed or skipped deploy. Needs a webhook
-  secret reachable from each laptop; check what is declared first.
+**Wave 1 is complete.** 1.7 and 1.9 landed; see the notes on both in
+[`remediation.md`](remediation.md), which record two things a later
+session would otherwise re-derive or get wrong:
+
+- **1.7's plan row was wrong.** The nine `F-P8-11` items are *not*
+  `sops.secrets` declarations — they are unreferenced keys inside
+  `secrets/secrets.yaml`, so there is no repo-side fix and they are now
+  tracked in [`user-actions.md`](user-actions.md) §3. The one genuine
+  declared-but-unconsumed declaration, `vps_caddy_env`, is deleted.
+- **1.9 closes only half of `F-P7-09`.** A *failed* deploy on a laptop
+  is now visible; a *skipped* one still is not, because every guard in
+  `deploy-guards.nix` ends in `exit 0` and so never enters
+  `systemctl --failed`. Do not read "1.9 done" as "deploys are
+  observable".
 
 **Wave 2** (nine items, each needs a VM test — see
 [`remediation.md`](remediation.md)): docker publishing past the firewall,
@@ -135,25 +144,27 @@ and log deferred items to `TODO.md`.
 
 ## Actions only the user can take
 
+**Moved to [`user-actions.md`](user-actions.md)** — a live checklist, so
+there is one place to work through rather than a summary here that
+drifts from the findings. It carries the four free-and-reversible items,
+the ten credentials to rotate, the `secrets/*` edits agents may not
+make, and decisions D1–D11.
+
+The four with the best ratio of value to effort, unchanged:
+
 1. **`chmod 600 ~/.config/sops/age/keys.txt`** — currently 0644 on the
    daily driver, verified live. Free, reversible, should not wait.
-2. **Rotate the ten credentials** from `F-P8-02` at each provider:
-   Backblaze, Cloudflare, tailscale, both WireGuard keypairs + PSK, the
-   Discord webhook, the vps-deploy and zrepl keypairs. Re-keying
-   `.sops.yaml` does nothing retroactively.
-3. **Rotate the zrepl key, then** remove `/tmp/homelab_zrepl_key` — it is
-   the live private half of `vars.zreplPullerKey`, mode 0600, dated
-   2026-08-23, and sits on the ZFS root so **40 snapshots** plus the
-   offsite copy already contain it. Deleting does not retract it.
-4. **Restructure `.sops.yaml`** into per-path `creation_rules`; attribute
-   or retire the five unattributable recipients (`F-P8-05`).
-5. **`passwd -S lilijoy` on thinkpad** when it is next online — the one
+2. **Rotate the ten credentials** from `F-P8-02` at each provider.
+   Re-keying `.sops.yaml` does nothing retroactively; the repo is
+   public, so only rotation at the provider retracts anything.
+3. **`passwd -S lilijoy` on thinkpad** when it is next online — the one
    verification this audit still owes (`F-P1-03`).
-6. **Check GitHub branch protection.** There is no CI anywhere and never
+4. **Check GitHub branch protection.** There is no CI anywhere and never
    has been (confirmed by full-history scan), so this is the only
    remaining control on fleet root.
-7. **Delete the `ssh` block in the Tailscale console** to match the repo.
-8. Decisions **D1–D8** in [`findings.md`](findings.md) §5.
+
+**Agents: when remediation turns up a new user-only action, add a row to
+`user-actions.md`.** Do not leave it in a finding or in prose here.
 
 ---
 

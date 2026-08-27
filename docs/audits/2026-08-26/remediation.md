@@ -48,9 +48,9 @@ and is verifiable by a build. This is the wave to land first.
 | ~~1.4~~ | **Moved to wave 2** — interface-scoping the desktop profile's host-wide openings. See the note below; this is not a zero-decision fix. | H4 (`F-P1-04` `F-P5-06`) | `modules/profiles/PC.nix` | — |
 | 1.5 | Remove `initialPassword = "123456"` | H9 (`F-P1-03`) | `modules/profiles/PC.nix:306` | low — but confirm 0.3 first for thinkpad |
 | 1.6 | Delete the inert `ssh` block from the tailnet ACL reference copy, and from the console | H10 (`F-P0-05` `F-P8-12`) | `docs/tailscale-acl.json` | none — nothing uses it |
-| 1.7 | Drop the nine declared-but-unconsumed secret declarations | C1 (`F-P8-11`) | per-host `sops.secrets` | low — verify no consumer first |
+| 1.7 | **Done** — but the row was wrong; see the note below. Repo-side: dropped `sops.secrets.vps_caddy_env`, the one declared-but-unconsumed declaration. The nine `F-P8-11` orphans are **user-only** and moved to [`user-actions.md`](user-actions.md) §3 | C1 (`F-P8-11`), `F-P2-13`/`F-P8-18` | `hosts/vps/configuration.nix` | low |
 | 1.8 | Add `programs.ssh.knownHosts` for `github.com` and `vps` so the deploy path stops re-TOFUing every boot | H1 (`F-P7-04` `F-P3-05` `F-P0-07`) | `modules/profiles/default.nix` | low — a stale pin blocks updates, so pair with 1.9 |
-| 1.9 | Enable `myHealthAlerts` on both laptops so a failed or skipped deploy is visible at all | H1 (`F-P7-09`) | `hosts/{torrent,thinkpad}/configuration.nix` | low |
+| 1.9 | **Done** — enabled `myHealthAlerts` on both laptops, so a *failed* deploy is visible at all. A **skipped** deploy still is not; see the note below | H1 (`F-P7-09`) | `hosts/{torrent,thinkpad}/configuration.nix`, `modules/flake/hosts.nix` | low |
 
 **Note on 1.3.** Tailscale sets the forwarding sysctls at
 `mkOverride 97`, so a plain `boot.kernel.sysctl` assignment loses
@@ -59,6 +59,74 @@ silently — only `mkForce` or changing `useRoutingFeatures` works
 and its `192.168.1.0/24` subnet route, which is connectivity-visible
 but **not** build-visible. Verify with `tailscale status` after any
 eventual deploy.
+
+**Note on 1.7 — the row above was wrong, and the correction matters.**
+It read "drop the nine declared-but-unconsumed secret *declarations*"
+and pointed at `F-P8-11`. But `F-P8-11` says in terms that **none of the
+nine is a `sops.secrets` declaration** — they are keys in
+`secrets/secrets.yaml` that no `.nix` file references. Nothing decrypts
+them to `/run/secrets` on any host, so there is no repo-side edit that
+removes them; removing them means editing the encrypted file, which
+`docs/procedures/secrets.md` reserves to the user. They are now tracked
+in [`user-actions.md`](user-actions.md) §3, together with the
+rotate-or-revoke-at-the-provider step that actually retracts them.
+
+Re-verified independently rather than taken on trust: `secrets.yaml`
+holds 31 keys plus the `sops` metadata block; 18 are declared statically
+as `sops.secrets.<name>`; four more come from the dynamic
+`sops.secrets."tailscale_authkey_${config.networking.hostName}"` at
+`modules/profiles/default.nix:112` (homelab, vps, thinkpad, torrent —
+**not** isoimage, which has tailscale disabled). 18 + 4 = 22 consumed,
+31 − 22 = **nine orphans**, matching `F-P8-11` exactly.
+
+Checking the *other* direction — declared but unconsumed — turned up
+exactly one: `sops.secrets.vps_caddy_env` (`F-P2-13`, `F-P8-18`), which
+sops decrypted into `/run/secrets` on every vps activation for no
+reader. That declaration is deleted. Removing the declaration *before*
+the `secrets.yaml` key is the safe order: an undeclared key is inert,
+whereas a declaration whose key is missing fails activation. Verified in
+the rendered manifest, not just the build — vps's sops manifest now
+lists **six** secrets where it listed seven.
+
+**Note on 1.9 — what it does and does not buy.** `myHealthAlerts` is now
+enabled on torrent and thinkpad, and `health-alerts` added to both
+hosts' module lists in `modules/flake/hosts.nix`. This closes the
+*failed* half of `F-P7-09`: `pull-deploy.service` entering `failed`
+enters `systemctl --failed`, which the unit already checks. It does
+**not** close the *skipped* half — every guard in `deploy-guards.nix`
+still ends in `exit 0`, so a skip is recorded as success and never
+enters `--failed`. That needs the deploy-marker work in `F-P7-09`'s
+proposed fix (a) and is not in wave 1.
+
+Two judgement calls, both deliberate:
+
+- **`checkSmart = false` on both laptops.** It is the one option that
+  costs something: the module grants the unit the `disk` group *and*
+  `CAP_SYS_RAWIO`, and `/dev/sd*` is `root:disk 0660` — read **and
+  write** on every raw block device, i.e. root-equivalent, by the
+  module's own comment. homelab pays that because it is headless, where
+  smartd's `wall`/`x11` sinks reach nobody. The laptops have graphical
+  sessions and `services.smartd` is already enabled fleet-wide in
+  `profiles/default.nix` with those sinks, so `checkSmart` would buy a
+  duplicate alert at the price of a new root-equivalent grant on two
+  more hosts — a bad trade during an audit whose C2 is "the desktop user
+  is already fleet root". Verified in the rendered unit on both hosts:
+  no `SupplementaryGroups`, no `AmbientCapabilities`, no
+  `CapabilityBoundingSet`, and no `smartctl` block in the script.
+- **`checkZfs` stays on**, and costs nothing. `/dev/zfs` is `0666` and
+  `runuser -u health-check -- zpool status -x` was confirmed live on
+  homelab to return "all pools are healthy" with exit 0. Worth recording
+  because the unit exiting 0 proves nothing here — the script runs under
+  `set -uo pipefail` with no `-e`, so a broken `zpool status` would fire
+  a `zfs-error` alert and *still* exit 0.
+
+The webhook is the existing `homelab_discord_webhook` rather than a new
+per-host key, because minting a key is a user-only sops edit and, under
+`.sops.yaml`'s single `creation_rules` entry, both laptops already
+decrypt that value — so it grants no access they did not already have.
+It does add a coupling the `.sops.yaml` restructure must account for;
+logged as a user decision in [`user-actions.md`](user-actions.md) §3,
+and re-pointing is one line per host.
 
 **Note on 1.4 — why it moved to wave 2.** Investigating it turned up
 three things that disqualify it from a wave whose defining property is
