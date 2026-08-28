@@ -265,6 +265,9 @@ in
       };
       boot.loader.efi.canTouchEfiVariables = true;
 
+      # plan: 2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md#D1
+      boot.tmp.useTmpfs = true;
+
       # Enable networking
       networking.networkmanager.enable = true;
       networking.nameservers = [
