@@ -92,7 +92,7 @@ be the wrong shape for this — it might need to be several subagents (split
 by boot-check vs. `runNixOSTest`), or folded into a broader verification
 agent. This needs its own research/design pass before building it — see
 `docs/procedures/vm-testing.md` for the manual procedure in the meantime,
-and `design-the-vm-testing-subagent-s-2026-08-27.md` for the tracked plan.
+and `2026-08-27-design-the-vm-testing-subagent-s.md` for the tracked plan.
 
 **A dedicated linting/lint-scoping skill or subagent may also be worth
 building.** `verify-ladder`'s diff-scoped statix/deadnix logic (only
@@ -102,4 +102,4 @@ construction — the same diff-scoping problem could recur anywhere lint
 tooling gets added to a gate, and a dedicated skill encoding "how to scope
 a linter to a diff, not a whole file" might be worth generalizing beyond
 this one script. Not built now — see
-`design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md`.
+`2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`.

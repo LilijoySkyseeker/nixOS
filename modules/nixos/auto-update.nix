@@ -21,7 +21,7 @@ in
       # unlike the stock system.autoUpgrade this used to be; that's what
       # fixed the 2026-08-21 incident where a stale/dirty local checkout
       # getting switched silently reverted a manual `--target-host` deploy
-      # (see verify-android-smb-share-end-to-end-2026-08-18.md). Only the
+      # (see 2026-08-18-verify-android-smb-share-end-to-end.md). Only the
       # scheduled one also applies the min-interval
       # and protected-unit guards: those exist to keep an *unattended* run
       # from disrupting work in progress, not to second-guess a human who
@@ -206,7 +206,7 @@ in
             it armed until the next reboot.
 
             Fleet-wide this is currently **false** — see
-            rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md. The
+            2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md. The
             profile-staleness check in `myHealthAlerts` is what makes
             that survivable: if the fleet stops deploying, it says so.
           '';
@@ -327,7 +327,7 @@ in
             # this and auto-switch's timer would otherwise both fire their
             # missed run immediately at boot, piling I/O/CPU load on top of
             # zrepl's own post-boot catch-up replication (see
-            # homelab-backup-replication-stack-has-several-compo-2026-08-18.md). A
+            # 2026-08-18-homelab-backup-replication-stack-has-several-compo.md). A
             # week's delay on picking up flake updates is a non-issue —
             # missing this window just means the next one runs on schedule.
             Persistent = false;

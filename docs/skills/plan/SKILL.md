@@ -10,9 +10,9 @@ file stays short on purpose (progressive disclosure).
 
 ## The rule
 
-Every plan file lives at `docs/plans/<status>/<slug>-<created-date>.md` and
+Every plan file lives at `docs/plans/<status>/<created-date>-<slug>.md` and
 is cited **everywhere else in the repo by its bare filename + anchor**,
-never by folder path: `<slug>-<date>.md#D3`. This is deliberate (see
+never by folder path: `<date>-<slug>.md#D3`. This is deliberate (see
 `reference.md`, "Why bare-filename citations") -- it's what makes a
 citation survive the file moving between folders. Never write
 `docs/plans/...` into a citation.

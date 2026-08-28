@@ -19,7 +19,7 @@ entry, neither one build- or runtime-verified:
    *required*: "`/var/lib/samba` is persisted, without which the whole
    mechanism would silently reset each boot."
 2. The `security` subagent's live test run (see finding F1 in
-   `establish-the-workflow-and-plan-file-system-2026-08-27.md`, a real
+   `2026-08-27-establish-the-workflow-and-plan-file-system.md`, a real
    invocation, not synthetic) asserts the opposite: `samba-user-
    provision`'s script (`modules/services/samba.nix:127-140`) checks
    `pdbedit -L` for the existing user and branches to `smbpasswd -s -a`

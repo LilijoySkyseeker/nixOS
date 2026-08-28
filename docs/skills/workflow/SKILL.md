@@ -37,7 +37,7 @@ this file stays short on purpose (progressive disclosure).
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.
 8. **Commit** per `docs/GIT_WORKFLOW.md` -- short, human, Conventional
-   Commits. A `Plan: <slug>-<date>.md` trailer is fine for traceability;
+   Commits. A `Plan: <date>-<slug>.md` trailer is fine for traceability;
    never inline the plan's reasoning into the commit body. A
    `PreToolUse` hook blocks the commit unless step 1 or step 2 actually
    happened this session (`plan-touch-guard`); another blocks any

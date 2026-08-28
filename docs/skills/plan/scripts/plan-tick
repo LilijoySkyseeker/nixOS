@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # plan-tick <path> <D|G|F><N> -- flip that ID's Progress checklist line to [x].
+# Matches the ID anywhere in the bullet's full block -- the "- [ ]" line plus
+# any lazy-continuation lines up to the next bullet/blank line/heading -- not
+# just the checkbox's own physical line, so a wrapped multi-line bullet whose
+# ID citation lands on a continuation line still matches.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
@@ -11,15 +15,28 @@ case "$id" in [DGF][0-9]*) ;; *) plan_die "second argument must look like D1/G2/
 
 root="$(plan_repo_root)"
 rel="$(plan_locate "$arg" "$root")"
-plan_require_not_frozen "$root/$rel"
+file="$root/$rel"
+plan_require_not_frozen "$file"
 
-line="$(grep -nE -- "- \[ \].*\b${id}\b" "$root/$rel" || true)"
-n="$(printf '%s\n' "$line" | grep -c .)"
+ranges="$(awk '
+  /^- \[ \]/    { if (start) print start":"(NR-1); start=NR; next }
+  /^- \[[xX]\]/ { if (start) print start":"(NR-1); start=0; next }
+  /^[[:space:]]*$/ || /^#/ { if (start) print start":"(NR-1); start=0; next }
+  END { if (start) print start":"NR }
+' "$file")"
+
+matches=()
+while IFS=: read -r s e; do
+  [ -n "$s" ] || continue
+  sed -n "${s},${e}p" "$file" | grep -qE "\b${id}\b" && matches+=("$s")
+done <<< "$ranges"
+
+n="${#matches[@]}"
 [ "$n" -eq 0 ] && plan_die "no unchecked Progress line referencing '$id' found in $rel."
 [ "$n" -gt 1 ] && plan_die "multiple unchecked Progress lines reference '$id' in $rel -- ambiguous, edit manually."
 
-lineno="${line%%:*}"
-sed -i "${lineno}s/- \[ \]/- [x]/" "$root/$rel"
+lineno="${matches[0]}"
+sed -i "${lineno}s/- \[ \]/- [x]/" "$file"
 git -C "$root" add "$rel"
 plan_mark_touched "$root" "$rel"
 echo "$rel: $id ticked (line $lineno)."

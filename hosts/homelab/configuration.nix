@@ -31,7 +31,7 @@
     # of silently corrupting in-flight data under I/O load -- the bridge is
     # powered off the USB port while only the drives get power from the
     # enclosure's own supply, so bus-side power sag glitches transfers without
-    # ever dropping the link. Ref: homelab-zdata-pool-usb-uas-checksum-errors-2026-08-28.md
+    # ever dropping the link. Ref: 2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md
     # Force plain USB Mass Storage (BOT) instead of UAS to avoid this.
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
   };
@@ -224,7 +224,7 @@
         # Persistent=false (default) is deliberate: after a long outage this
         # would otherwise fire its missed run immediately at boot, piling
         # ~2.9TiB of I/O on top of zrepl's own post-boot catch-up
-        # replication (see homelab-backup-replication-stack-has-several-compo-2026-08-18.md).
+        # replication (see 2026-08-18-homelab-backup-replication-stack-has-several-compo.md).
         # Skipping straight to next Friday
         # instead isn't silent — myHealthAlerts pages if
         # last-success goes over 336h/14 days stale (see below).
@@ -381,7 +381,7 @@
     # the weekly restic->Backblaze run can take multiple days (~2.9TiB) —
     # switch-to-configuration restarts any unit whose definition changed, so
     # a same-cycle switch would kill it mid-run. Defer instead (see
-    # homelab-s-weekly-restic-to-backblaze-backup-has-no-2026-08-18.md).
+    # 2026-08-18-homelab-s-weekly-restic-to-backblaze-backup-has-no.md).
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
     # DISABLED 2026-08-27, deliberately and temporarily. Removes both the
     # flake-update-test and auto-switch timers; the services stay, so
@@ -391,7 +391,7 @@
     # deployed by hand anyway — the scheduled path buys nothing right now
     # while carrying every risk in the D11 analysis. And the pipeline is
     # being rebuilt rather than patched (see
-    # rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md),
+    # 2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md),
     # so leaving the old shape
     # armed would mean maintaining something already known to be wrong.
     #

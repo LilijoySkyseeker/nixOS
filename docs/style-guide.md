@@ -89,7 +89,7 @@ Non-obvious rationale — a workaround, a surprising constraint, a
 tradeoff, an incident the config is defending against — belongs in the
 task's plan file (`docs/skills/plan/SKILL.md`), not an inline comment. A
 one-line citation pointing at it is fine inline (`// plan:
-<slug>-<date>.md#D2`) — that's a citation, not the rationale itself, and
+<date>-<slug>.md#D2`) — that's a citation, not the rationale itself, and
 is exempt from the "mechanics/labeling only" rule below. For a trivial
 change that never got a plan file, a short note in the commit message is
 still fine; see `docs/agents.md` for why the plan file is the primary home

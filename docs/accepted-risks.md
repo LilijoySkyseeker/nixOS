@@ -201,7 +201,7 @@ MEDIUM.
 `--security-opt=no-new-privileges:true`, `--read-only` on minecraft, a
 `nosuid,nodev` tmpfs, and docker's default seccomp profile. The
 capability dimension is genuinely well handled; the resource dimension
-is not, and is tracked in `do-a-full-security-audit-hardening-pass-on-homelab-2026-08-26.md` (F-P4-07).
+is not, and is tracked in `2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md` (F-P4-07).
 
 **What would change the answer:** a compromise anywhere in the chain, or
 the host coming to hold anything of value beyond game state. Three

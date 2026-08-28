@@ -438,7 +438,7 @@ in
     # ipset the bouncer maintains automatically), this just closes the gap for
     # the pre-CrowdSec burst/flood layer. Game ports are deliberately not
     # mirrored here — they're still IPv4-only (see
-    # add-ipv6-support-for-the-vps-s-forwarded-game-port-2026-08-18.md).
+    # 2026-08-18-add-ipv6-support-for-the-vps-s-forwarded-game-port.md).
     # (crowdsec6-blacklists-0 is pre-created by the same unit as its v4 twin)
     ip6tables -t raw -N vps-ratelimit 2>/dev/null || ip6tables -t raw -F vps-ratelimit
     ip6tables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
@@ -659,7 +659,7 @@ in
     # NOTE: only applies to CrowdSec's own alert->profile pipeline; `cscli decisions
     # add` (fail2ban's cscli.conf action, below) bypasses profile evaluation
     # entirely — verified against crowdsec's own apiserver source, see
-    # add-fail2ban-to-vps-defaulting-to-an-immediate-ban-2026-08-25.md.
+    # 2026-08-25-add-fail2ban-to-vps-defaulting-to-an-immediate-ban.md.
     localConfig.profiles = [
       {
         name = "default_ip_remediation";

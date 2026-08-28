@@ -48,7 +48,7 @@ from multiple places, and isn't grouped with the gotchas/findings that
 came out of the same task. The plan file supersedes the commit message for
 anything that went through the `workflow` gate: the reasoning lives there,
 a comment/doc cites it with a one-line pointer
-(`// plan: <slug>-<date>.md#D2`), and the commit stays short and human,
+(`// plan: <date>-<slug>.md#D2`), and the commit stays short and human,
 optionally with a `Plan:` trailer for traceability. A trivial change that
 skipped the gate entirely can still put its one-line "why" in the commit
 message — there's no plan file to cite for those.
