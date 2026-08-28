@@ -41,16 +41,17 @@ errors: No known data errors
 - [x] Checked dmesg/journalctl for ATA/USB link errors
 - [x] Identified physical transport (USB, not SATA) as the likely differentiator
 - [x] Decide on remediation (D1)
-- [x] Apply fix (PR #26, not yet merged): deployed to homelab directly via
-      `nixos-rebuild switch --flake .#homelab --target-host root@homelab`
-      (built locally, activated remotely per G11/G38) and rebooted
-      2026-08-28 11:49. Confirmed via dmesg: all four enclosure ports now
-      report `UAS is ignored for this device, using usb-storage instead`.
-      `zpool clear` turned out unnecessary -- CKSUM reset to 0/0 on its own
-      across the reboot/re-import (see G6 correction).
+- [x] Apply fix: deployed to homelab directly via `nixos-rebuild switch
+      --flake .#homelab --target-host root@homelab` (built locally,
+      activated remotely per G11/G38) and rebooted 2026-08-28 11:49.
+      Confirmed via dmesg: all four enclosure ports now report `UAS is
+      ignored for this device, using usb-storage instead`. `zpool clear`
+      turned out unnecessary -- CKSUM reset to 0/0 on its own across the
+      reboot/re-import (see G6 correction).
+- [x] Merge PR #26 now that the fix is confirmed working live -- merged
+      2026-08-28 (`d2f357d`)
 - [ ] Confirm no error recurrence after a full scrub cycle (fresh 0/0
       baseline as of 2026-08-28 11:49 boot)
-- [ ] Merge PR #26 now that the fix is confirmed working live
 
 ## Decisions (D)
 ### D1 -- how to remediate: apply USB UAS quirk, just clear errors, or investigate further first?
