@@ -485,12 +485,35 @@
       "zbackup/backup/thinkpad/zroot/local/home" = 336;
       "zbackup/backup/thinkpad/zroot/local/root" = 336;
     };
-    # offsite restic backup runs weekly (Fri 03:00) and can now take up to
-    # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give
-    # zero slack; 336h = 14 days gives a full week of slack past a
-    # worst-case 1-week run before alerting on a missed/stuck run.
+    # Offsite restic backup runs weekly (Fri 03:00).
+    #
+    # 312h = 13 days, lowered from 336h on 2026-08-28. 336h was sized
+    # against TimeoutStartSec=1w, reasoning that a worst-case 1-week run
+    # needed a full week of slack on top of the 1-week schedule. That is
+    # exactly the problem: 168h schedule + 168h worst-case run = 336h, so
+    # the threshold landed on the same instant as the next scheduled run.
+    # A run that succeeded then refreshed this marker at almost precisely
+    # the moment the alarm came due, and a fortnight with no offsite
+    # backup could pass without ever paging. Nearly happened for real --
+    # the 2026-08-21 run was the last success, the 2026-08-28 run was
+    # killed mid-flight, and the alarm was due 2026-09-04, the same day as
+    # the next attempt.
+    #
+    # Dropping a single day breaks that coincidence: the alarm now fires
+    # 24h *before* the run that would otherwise mask it, so a missed run
+    # is reported rather than papered over.
+    #
+    # The 1-week worst case it was protecting against is theoretical --
+    # it comes from the timeout, not from behaviour. Measured runs:
+    # 2d16h for the initial 522.8 GB full upload (2026-08-18 -> 08-21),
+    # and 8h28m for an incremental before a deploy killed it. At 312h a
+    # run may take 144h (6 days) before false-alarming, still more than
+    # double the longest real run.
+    #
+    # If a run ever legitimately approaches a week, raise this again --
+    # but raise the *schedule* too, or the coincidence comes back.
     staleMarkerFiles = {
-      "/var/lib/restic-backups-backblazeWeekly/last-success" = 336;
+      "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
       # F-P7-09's skipped-deploy half. A *failed* auto-switch already pages
       # via the failed-units check (confirmed working: the 2026-08-27 03:00
       # read-only-git-config failure did enter systemctl --failed). A
