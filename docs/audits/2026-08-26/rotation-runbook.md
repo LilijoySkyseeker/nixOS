@@ -52,7 +52,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 6 | `homelab_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 8 | `homelab_vps_deploy_key` | **high** | **[x] 2026-08-28** — verified by authenticating with it; old key removed |
-| 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
+| 9 | `homelab_zrepl_key` | **high** | [ ] — **deferred 2026-08-28**; needs the laptops' first audit-branch deploy *and* a reboot each, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
 | 12 | `factorio_token`, `factorio_game_password` | **high** | **[x] 2026-08-28** — rotated; container re-authenticated to factorio.com with the new token |
@@ -409,6 +409,48 @@ fire.
 - **Decision needed from you:** deploy the laptops first, or defer this
   item. I recommend deferring 9 until the laptops are deployed, and doing
   10 before it.
+
+> ### DEFERRED 2026-08-28, on the user's decision — and the block is worse than described above
+>
+> Item 10 was done first. Item 9 waits for the laptops' first
+> audit-branch deploy, which is its own piece of work with its own risk,
+> not a step inside this rotation.
+>
+> Four concrete obstacles, all verified live rather than assumed:
+>
+> - **thinkpad has no remote shell.** `ssh root@thinkpad` →
+>   `Permission denied (publickey)`. It is
+>   `PermitRootLogin = "forced-commands-only"` with only zrepl's forced
+>   command authorised, which is correct hardening and also means an
+>   agent cannot deploy it remotely at all. Someone has to be at the
+>   machine.
+> - **There is no automatic path either.** `scheduleEnable = false` on
+>   both laptops (`torrent:26`, `thinkpad:28`) and torrent's
+>   `pull-deploy.timer` reports `not-found`. Nothing will deploy them on
+>   its own.
+> - **`operation = "boot"` on both** (`torrent:21`, `thinkpad:22`). Even
+>   a pull-deploy run sets the *boot* generation rather than switching,
+>   so a rotated `zreplPullerKey` would not take effect until the laptop
+>   reboots. This is not mentioned anywhere else in this runbook and it
+>   changes the shape of the item: the rotation is not complete when the
+>   deploy finishes, it is complete when both laptops have rebooted.
+> - **torrent must not be rebooted** (`docs/procedures/workflow.md`) and
+>   has never run the audit-branch config, so this would be its first,
+>   carrying all of wave 1.
+>
+> **Current state is healthy, which is why deferring is safe.** torrent's
+> `zrepl.service` is active and the newest snapshot at the time of
+> writing was `zroot/local/home@zrepl_20260828_204817_000`, so the
+> existing key works. The failure mode if it ever does break is a pull
+> that pauses and retries — nothing is lost until the 336h staleness
+> alarm fires.
+>
+> **Order when it is unblocked:** laptops first, then homelab. Because
+> zrepl pulls, a window where the laptops trust the new public key and
+> homelab still holds the old private key means replication simply
+> pauses; the reverse order would too, but laptops-first keeps the
+> not-yet-working state on the side that fails safe and is easiest to
+> re-deploy.
 - Then: **You** generate the keypair, put the private half in sops, give
   me the public half; **Me** update `vars.zreplPullerKey`, deploy both
   laptops **then** homelab, and verify a replication run completes.
