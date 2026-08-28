@@ -65,6 +65,7 @@ every line below is currently unstarted.
 - [ ] G34 — see `design-the-vm-testing-subagent-s-2026-08-27.md` (tabled separately)
 - [ ] G35 — see `design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md` (tabled separately)
 - [ ] G36 — see `resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md` (tabled separately)
+- [ ] G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
 
 ## Decisions (D)
 
@@ -308,6 +309,35 @@ Copied from `tcr-guard-hook`'s proven pattern, but this session's actual
 environment always had `jq` present — the awk-only JSON extraction
 fallback (`hook_extract_top`/`hook_extract_obj`) has never been run for
 real here, only inherited on faith from the tcr precedent.
+
+### G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
+Hit for real in a background-job session (`kde-connect-bluetooth-crash-
+loop-troubleshooting-2026-08-27.md`'s own troubleshooting work, chatting
+about it here): the session ran `plan-new` and `plan-move ... in-progress`
+*before* calling `EnterWorktree`, per the `plan` skill's own documented
+sequencing not being cross-checked against the background-job worktree-
+isolation requirement. Both scripts succeeded and wrote real files into
+the shared checkout — `plan-new`/`plan-move` have no worktree-awareness
+and no guard equivalent to the `Edit`/`Write`-tool-level isolation
+enforcement that later blocked a plain `Edit` call on the same path. Only
+that *separate* `Edit`-tool guard caught the problem, and only on the next
+write attempt, not at the point the scripts themselves ran.
+
+Consequence: `EnterWorktree` (correctly) only carries over the git-tracked
+working tree, not untracked files, so the freshly created `todo/`-then-
+`in-progress/`-status plan file was invisible inside the new worktree.
+The plan had to be recreated from scratch there (`plan-new` again, same
+title, re-typing all content), and the original untracked copy was left
+behind in the shared checkout with no cleanup path — `plan-new`/`plan-move`
+have no "undo" or "move this untracked file into a worktree" operation,
+and nothing currently detects or flags the leftover file as orphaned
+(closest existing report is asking the user to `rm` it by hand after the
+fact). A `plan`-skill instruction (or a hook, mirroring the `Edit`/`Write`
+guard's mechanism) that checks for worktree isolation *before* `plan-new`/
+`plan-move` write anything would close this — either by refusing early
+with the same guidance the `Edit` guard gives, or by rejecting until
+`EnterWorktree` has run, whichever the isolation guard's authors intended
+scripts (not just the `Edit`/`Write` tools) to respect.
 
 ### G34, G35, G36 — already tracked as their own separate plans
 Listed here only as an index pointer, not duplicated: VM-testing's
