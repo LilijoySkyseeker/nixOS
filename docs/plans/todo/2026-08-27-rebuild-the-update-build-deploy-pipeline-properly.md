@@ -364,7 +364,7 @@ If the fleet auto-adopts a ref, verifying who signed it is the control that make
 ## Gotchas (G)
 
 ### G1 -- one already-live consequence: homelab's /etc/nixos diverged with an unpushed auto-update commit
-Tracked as its own plan (homelab-s-etc-nixos-has-diverged-from-origin-with--2026-08-27.md) since it's a live-host state question needing the user's own judgement call, not blocked on this redesign.
+Tracked as its own plan (2026-08-27-homelab-s-etc-nixos-has-diverged-from-origin-with-.md) since it's a live-host state question needing the user's own judgement call, not blocked on this redesign.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

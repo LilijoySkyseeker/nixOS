@@ -50,7 +50,7 @@ Same for PR descriptions: no "🤖 Generated with Claude Code" footer or
 content line (e.g. the test plan).
 
 A commit for work tracked in a plan file (`docs/skills/plan/SKILL.md`) may
-add a `Plan: <slug>-<date>.md` trailer for traceability — but never inline
+add a `Plan: <date>-<slug>.md` trailer for traceability — but never inline
 the plan's decisions/findings into the commit body; the body stays short
 and human, the reasoning stays in the plan.
 

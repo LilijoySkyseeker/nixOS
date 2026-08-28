@@ -10,17 +10,17 @@ frozen: false
 ## Original plan
 
 User's explicit request after this session built and landed the plan-file/
-workflow system (`establish-the-workflow-and-plan-file-system-2026-08-27.md`)
+workflow system (`2026-08-27-establish-the-workflow-and-plan-file-system.md`)
 and then rebased it against 57 commits of drift
-(`hardcode-pull-before-branching-as-a-hook-2026-08-27.md`): a single
+(`2026-08-27-hardcode-pull-before-branching-as-a-hook.md`): a single
 running catalog of every weak point, gap, or improvement opportunity
 noticed in the system itself so far — deliberately over-inclusive ("list
 more than you think, I can always veto them later"), not a queue to work
 through now. Nothing here is prioritized or scheduled; each item is just
 recorded so it isn't lost. Cross-references three already-tracked plans
-(`design-the-vm-testing-subagent-s-2026-08-27.md`,
-`design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md`,
-`resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md`)
+(`2026-08-27-design-the-vm-testing-subagent-s.md`,
+`2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`,
+`2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md`)
 rather than duplicating them.
 
 ## Progress
@@ -31,7 +31,7 @@ every line below is currently unstarted.
 
 - [ ] G1 — no `plan-find`/citation-resolver helper
 - [ ] G2 — no index/dashboard view across all plans
-- [ ] G3 — `plan-tick`'s ID matching is line-bound and fragile
+- [x] G3 — `plan-tick`'s ID matching is line-bound and fragile
 - [ ] G4 — heading-regex mismatches fail silently with no linter
 - [ ] G5 — no structural validator ("plan-lint") for a plan file
 - [ ] G6 — near-duplicate plan detection is judgment-only, not hardcoded
@@ -39,13 +39,13 @@ every line below is currently unstarted.
 - [ ] G8 — host-build detection logic is duplicated between `pre-push` and `verify-ladder`
 - [ ] G9 — no reverse index from a plan file to the commit(s) that landed it
 - [ ] G10 — `docs/plans/.checksums` is a single shared file with no locking
-- [ ] G11 — `plan-carry`/`plan-reject` default titles can collide after 50-char slug truncation
+- [x] G11 — `plan-carry`/`plan-reject` default titles can collide after 50-char slug truncation
 - [ ] G12 — no automated test suite for the plan/workflow scripts
 - [ ] G13 — `plan-touch-guard` can't verify the *right* plan was touched, only *a* plan
 - [ ] G14 — `footer-guard`'s pattern list isn't exhaustive
 - [ ] G15 — `verify-ladder`'s diff-scoped lint precision silently degrades without `jq`
 - [ ] G16 — diff-scoped line-range logic untested against renamed files
-- [ ] G17 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
+- [x] G17 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
 - [ ] G18 — `plan-reject`'s mandatory reason has no substance check
 - [ ] G19 — no retention/archival story for `done/`/`rejected/` at scale
 - [ ] G20 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
@@ -62,10 +62,10 @@ every line below is currently unstarted.
 - [ ] G31 — no repo-wide citation-integrity checker confirming every bare-filename citation actually resolves
 - [ ] G32 — no chain-of-custody view for multi-hop `plan-carry`/supersession chains
 - [ ] G33 — `hook-lib.sh`'s no-`jq` awk fallback path has never actually been exercised
-- [ ] G34 — see `design-the-vm-testing-subagent-s-2026-08-27.md` (tabled separately)
-- [ ] G35 — see `design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md` (tabled separately)
-- [ ] G36 — see `resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md` (tabled separately)
-- [ ] G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
+- [ ] G34 — see `2026-08-27-design-the-vm-testing-subagent-s.md` (tabled separately)
+- [ ] G35 — see `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md` (tabled separately)
+- [ ] G36 — see `2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md` (tabled separately)
+- [x] G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 - [ ] G38 — no priority signal on a plan file or in any index
 
 ## Decisions (D)
@@ -108,6 +108,8 @@ continuation line fails to match with no clear hint why, until the wording
 is manually reflowed — hit twice for real in this session's own meta plan
 (`G7`/`D14` references). No `--line <N>` fallback exists despite being
 considered during design.
+
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan-tick` now matches the ID anywhere in the bullet's full block (checkbox line plus lazy-continuation lines up to the next bullet/blank/heading), not just the checkbox's own physical line. No `--line` override was added; block-aware matching alone was judged sufficient.
 
 ### G4 — heading-regex mismatches fail silently with no linter
 `plan-decide`/`plan-carry`/`plan-tick` all match `### D<N>`/`### G<N>`
@@ -163,6 +165,8 @@ but a real latent bug, not a hypothetical one.
 truncate into an unexpected or colliding slug for a sufficiently long
 original name — untested against this edge case.
 
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` (same underlying `plan_slugify` change as `G17`) — cap raised to 70 chars, doesn't eliminate collisions in principle but meaningfully widens the room before they'd occur.
+
 ### G12 — no automated test suite for the plan/workflow scripts
 Every script (`plan-*`, the four hooks, `verify-ladder`) was verified this
 session via extensive, careful, but entirely manual/ad hoc Bash testing —
@@ -197,11 +201,13 @@ hunk headers. Never exercised this session against a renamed `.nix` file
 case wasn't specifically verified to behave as expected.
 
 ### G17 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
-Visible in this session's own output: `resolve-whether-samba-s-var-lib-
-samba-persistence--2026-08-27.md` is visibly cut off mid-word. Not
+Visible in this session's own output: `2026-08-27-resolve-whether-samba-s-var-lib-
+samba-persistence-.md` is visibly cut off mid-word. Not
 currently a collision risk (the date suffix still disambiguates in
 practice), but the truncation point is arbitrary and can make a filename
 citation less self-descriptive than intended.
+
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan_slugify`'s cap raised from 50 to 70 chars and truncation now backs up to the last word boundary instead of cutting mid-word. The filename above is left as historical evidence of the bug (this plan is append-only) and was not re-slugified — only reordered to date-first by the same fix's migration (see `G37` below).
 
 ### G18 — `plan-reject`'s mandatory reason has no substance check
 The gate is "non-empty string." A one-word reason ("no", "abandoned")
@@ -325,11 +331,11 @@ real here, only inherited on faith from the tcr precedent.
 
 ### G34, G35, G36 — already tracked as their own separate plans
 Listed here only as an index pointer, not duplicated: VM-testing's
-subagent shape (`design-the-vm-testing-subagent-s-2026-08-27.md`), a
+subagent shape (`2026-08-27-design-the-vm-testing-subagent-s.md`), a
 generalized diff-scoped-linting skill
-(`design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md`), and the
+(`2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`), and the
 unresolved samba persistence conflict
-(`resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md`).
+(`2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md`).
 
 ### G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 `plan-new` names files `<slug>-<created-date>.md` (slug first, date as a
@@ -347,6 +353,8 @@ renaming to stay consistent — a one-time bulk migration of every plan
 file already created under the old ordering, exactly the "rename target
 outside the normal scripts" risk `G31` already flags for citation
 integrity).
+
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan-new` now emits `<date>-<slug>.md`, and the user opted for the full migration: all 44 pre-existing plan files were renamed, `docs/plans/.checksums` updated for the frozen ones (two frozen files needed a citation-text edit too, recorded there as its own gotcha), and every citation repo-wide (not just under `docs/plans/`) swept to the new filenames. This file's own name is now the literal example given above.
 
 ### G38 — no priority signal on a plan file or in any index
 Every plan in `todo/`/`in-progress/` currently carries equal visual

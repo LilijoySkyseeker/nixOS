@@ -10,10 +10,10 @@ frozen: true
 ## Original plan
 
 Discovered while committing the work tracked in the (now frozen)
-`establish-the-workflow-and-plan-file-system-2026-08-27.md`: the
+`2026-08-27-establish-the-workflow-and-plan-file-system.md`: the
 `.githooks/pre-commit` frozen-file check correctly blocked a real
-corruption in `docs/plans/done/add-fail2ban-to-vps-defaulting-to-an-
-immediate-ban-2026-08-25.md` -- 5 leftover "tampered content" lines from
+corruption in `docs/plans/done/2026-08-25-add-fail2ban-to-vps-defaulting-to-an-
+immediate-ban.md` -- 5 leftover "tampered content" lines from
 earlier hook testing that this session's own cleanup steps claimed to
 have reverted, repeatedly, and were wrong every time.
 

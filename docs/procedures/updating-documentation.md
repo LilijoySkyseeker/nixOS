@@ -99,7 +99,7 @@ per-commit updates insufficient, because the *structure* the docs describe
 has changed, not just its contents. Examples: splitting `modules/profiles/`
 into more/fewer roles, changing how hosts are pinned across nixpkgs
 channels, restructuring the secrets layout, or (already happened once, see
-`build-switch-thinkpad-and-torrent-after-the-dendri-2026-08-20.md`)
+`2026-08-20-build-switch-thinkpad-and-torrent-after-the-dendri.md`)
 migrating the whole composition mechanism, as the dendritic flake-parts +
 import-tree migration did.
 

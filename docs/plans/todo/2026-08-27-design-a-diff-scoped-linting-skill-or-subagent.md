@@ -10,7 +10,7 @@ frozen: false
 ## Original plan
 
 User's own observation while reviewing `verify-ladder`'s design (see
-`establish-the-workflow-and-plan-file-system-2026-08-27.md`'s G3): the
+`2026-08-27-establish-the-workflow-and-plan-file-system.md`'s G3): the
 diff-scoped statix/deadnix logic (only fail on warnings whose line falls
 inside the actual changed lines, never pre-existing debt elsewhere in a
 touched file) is a real, non-obvious pattern that had to be built from

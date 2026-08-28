@@ -29,7 +29,7 @@ the repo, not against what the main agent believes it did.
   considered prose, or a doc paragraph explaining an agent's reasoning
   process, does not belong there.
 - **Citation form**: if a comment or doc already cites a plan file, is it
-  the correct bare-filename+anchor form (`<slug>-<date>.md#D3`), not a
+  the correct bare-filename+anchor form (`<date>-<slug>.md#D3`), not a
   folder path?
 
 ## What to do about a violation
@@ -42,7 +42,7 @@ or doc:
    file:line the reasoning came from.
 2. Replace the original comment/doc prose with a short, technical
    one-liner plus a citation pointer to the `F<N>` entry you just added:
-   `// plan: <slug>-<date>.md#F<N>` (or the doc-appropriate equivalent).
+   `// plan: <date>-<slug>.md#F<N>` (or the doc-appropriate equivalent).
 3. Do not invent a citation to a plan file or anchor that doesn't exist.
 
 If you find a doc that's simply stale (describes removed/renamed

@@ -64,7 +64,7 @@ when something breaks.
 **Known deviation: `vps` is on unstable and should be on stable.** It is
 a server and the only host with a public interface, so it belongs on
 the stable branch with `homelab`. It is not there, and moving it is an
-open item, tracked in `rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md` — check it before assuming the table above reflects
+open item, tracked in `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` — check it before assuming the table above reflects
 the intent.
 
 This rule was written down on 2026-08-27 because it existed nowhere:
@@ -299,7 +299,7 @@ Two hosts are still structurally unusual, same as before the migration:
   trusting the name. Fixed 2026-08-26 by splitting the desktop-only
   pieces into `modules/home-manager/tooling-desktop.nix`, imported only
   by `modules/profiles/PC.nix` — see
-  `reorganize-modules-home-manager-tooling-nix-it-s-w-2026-08-25.md`.
+  `2026-08-25-reorganize-modules-home-manager-tooling-nix-it-s-w.md`.
 
 ## Backups
 
@@ -358,7 +358,7 @@ build/switch:
   checked out. This is what a 2026-08-21 incident was missing: a
   scheduled switch built from a stale/dirty local checkout and silently
   reverted a manual deploy (see
-  `verify-android-smb-share-end-to-end-2026-08-18.md`).
+  `2026-08-18-verify-android-smb-share-end-to-end.md`).
 - **`minSwitchInterval`** (default 7 days) — skips if
   `/nix/var/nix/profiles/system`'s own mtime (not dereferenced — the
   symlink itself is recreated fresh on every switch/boot, so its mtime

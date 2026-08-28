@@ -200,7 +200,7 @@ in
       # env var or ~/.config/sops/age/keys.txt on whatever machine runs the
       # command), independent of this module. So it was pure downside with
       # no upside -- confirmed as the fix in
-      # sops-nix-age-keyfile-fallback-doesn-t-actually-fir-2026-08-18.md
+      # 2026-08-18-sops-nix-age-keyfile-fallback-doesn-t-actually-fir.md
       # (it was never a fallback that could fire in the first place).
       sops.age.keyFile = "/var/lib/sops-nix/key.txt";
       sops.age.generateKey = true;
@@ -309,7 +309,7 @@ in
       # nothing. The replacement is a networked Brother MFC-L2740DW that
       # does not have a static address yet, so there is deliberately no
       # printer declared here: CUPS runs and prints to nothing until
-      # set-up-the-new-network-printer-scanner-brother-mfc-2026-08-27.md is worked through.
+      # 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md is worked through.
       #
       # When adding it, prefer a driverless IPP queue pointed at the
       # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)

@@ -49,5 +49,5 @@ in place — replication runs on a 15m interval separate from the 5m snapshot
 cadence, and the archive retention grid is tiered rather than a flat year of
 dailies. Those are no longer forced by the hardware and could be revisited,
 but they have not been re-tuned; see
-`replace-sanoid-syncoid-with-zrepl-repo-wide-2026-08-23.md`.
+`2026-08-23-replace-sanoid-syncoid-with-zrepl-repo-wide.md`.
 
