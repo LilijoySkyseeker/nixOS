@@ -16,6 +16,17 @@ Neither is required for a purely mechanical change (a version bump, a
 rename with no behavior change) — use judgment, and if genuinely unsure,
 invoke the one in question rather than skip it silently.
 
+- **`/simplify`** — required for every non-trivial change (see the
+  triviality bar above), no judgment call. Reviews for reuse,
+  simplification, efficiency, and condensing into shared modules, then
+  applies its own fixes. This is a deliberately cheap stand-in for a
+  dedicated repo-aware cleanliness subagent (matching `security`/
+  `docs-updater`'s shape — auto-invoked, appending findings into the plan)
+  that may be worth building later; see
+  `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`. Unlike
+  `security`/`docs-updater`, `/simplify` doesn't yet append anything into
+  the plan file itself — it just edits the working tree directly.
+
 ## Trivial vs. not: worked examples
 
 Line count is not the test. A textually tiny change can still be
@@ -103,3 +114,12 @@ tooling gets added to a gate, and a dedicated skill encoding "how to scope
 a linter to a diff, not a whole file" might be worth generalizing beyond
 this one script. Not built now — see
 `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`.
+
+**A dedicated code-cleanliness subagent (reuse/simplification/module
+condensation), matching `security`/`docs-updater`'s auto-invoked,
+plan-appending shape, was considered and deliberately deferred** —
+`workflow` mandates the existing `/simplify` skill instead for now (see
+the subagent-selection table above). Revisit if `/simplify` proves
+insufficient for this repo's own module conventions (it isn't repo-aware
+the way `security`/`docs-updater` are), or fold it into the diff-scoped
+linting skill above if that gets built first.

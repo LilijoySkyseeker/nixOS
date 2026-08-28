@@ -76,6 +76,19 @@ plan_require_not_frozen() {
 # docs/plans/*/, printed relative to repo root. Dies on zero or >1 matches.
 plan_locate() {
   local arg="$1" root="$2" base cand n
+  # Reject any '..' segment before anything else. A bash `case` pattern's
+  # `*` matches '/' (this is not pathname-expansion globbing), so
+  # `docs/plans/*/*.md` below matches strings like
+  # `docs/plans/../../../etc/passwd.md` -- without this check that arm's
+  # `[ -f "$root/$arg" ]` would happily resolve outside docs/plans/
+  # entirely. Every legitimate plan filename is `<date>-<slug>.md` with a
+  # slug from plan_slugify (alnum/hyphen only), so '..' can never appear
+  # in a real citation -- this can't reject anything legitimate. Matters
+  # now that plan-gate feeds this function attacker-influenced input (a
+  # PR's own commit-trailer text), not just agent-supplied CLI arguments.
+  case "$arg" in
+    *..*) plan_die "'$arg' contains '..' -- not a valid plan path or filename." ;;
+  esac
   case "$arg" in
     docs/plans/*/*.md)
       [ -f "$root/$arg" ] || plan_die "$arg: no such file."
@@ -136,6 +149,33 @@ plan_unresolved_decisions() {
     /\*\*CARRIED/  { carried=1 }
     END { report() }
   ' "$1"
+}
+
+# plan_unresolved_findings <file> -- one line per F<N> heading that is
+# none of FIXED, ACCEPTED, or MOOT. Empty output = all resolved.
+plan_unresolved_findings() {
+  awk '
+    function report() {
+      if (id != "" && !resolved) print id
+    }
+    /^### F[0-9]+/ { report(); id=$0; resolved=0; next }
+    /\*\*FIXED/    { resolved=1 }
+    /\*\*ACCEPTED/ { resolved=1 }
+    /\*\*MOOT/     { resolved=1 }
+    END { report() }
+  ' "$1"
+}
+
+# plan_state_problem <file> -- prints a reason if the ## State section is
+# missing or empty; empty output = present and non-empty. State is the one
+# section rewritten in place rather than appended to (see plan/SKILL.md),
+# so its presence can't be inferred from Progress/Decisions/Gotchas/Findings
+# ever having had content.
+plan_state_problem() {
+  local file="$1" body
+  grep -q '^## State$' "$file" || { echo "no '## State' heading found."; return; }
+  body="$(awk '/^## State$/{f=1;next} /^## /{f=0} f' "$file" | tr -d '[:space:]')"
+  [ -n "$body" ] || echo "'## State' section is empty -- summarize the current status before freezing."
 }
 
 plan_checksum() { sha256sum "$1" | awk '{print $1}'; }

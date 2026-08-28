@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# plan-lint <path> -- structural validator, read-only. Checks frontmatter
+# completeness, that status matches folder, that every required section is
+# present, that D/G/F headings are sequential from 1 with no gaps or
+# duplicates, and that every id a Progress checkbox cites actually exists
+# as a heading. Prints every problem found; exits non-zero if any exist.
+# Resolves G5 in 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
+# -- nothing previously checked this mechanically; every existing plan file
+# was correct by construction or careful hand-authorship only.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 1 ] || { printf 'usage: plan-lint <path-or-filename>\n' >&2; exit 1; }
+root="$(plan_repo_root)"
+rel="$(plan_locate "$1" "$root")"
+file="$root/$rel"
+problems=0
+report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
+
+for key in slug created status frozen; do
+  [ -n "$(plan_get_field "$file" "$key")" ] || report "frontmatter missing '$key:'"
+done
+
+folder="$(basename "$(dirname "$rel")")"
+status="$(plan_get_field "$file" status)"
+[ "$status" = "$folder" ] || report "frontmatter status '$status' does not match folder '$folder'"
+
+for section in "## Original plan" "## State" "## Progress" "## Decisions (D)" "## Gotchas (G)" "## Findings (F)"; do
+  grep -qF "$section" "$file" || report "missing required section '$section'"
+done
+
+for type in D G F; do
+  raw="$(grep -oE "^### ${type}[0-9]+" "$file" | grep -oE '[0-9]+')"
+  [ -z "$raw" ] && continue
+  dupes="$(printf '%s\n' "$raw" | sort -n | uniq -d)"
+  [ -n "$dupes" ] && report "duplicate ${type} id(s): $(printf '%s' "$dupes" | tr '\n' ' ')"
+  ids="$(printf '%s\n' "$raw" | sort -nu)"
+  expected=1
+  while IFS= read -r n; do
+    [ "$n" -eq "$expected" ] || report "${type} headings not sequential from 1: expected ${type}${expected}, found ${type}${n}"
+    expected=$((expected + 1))
+  done <<<"$ids"
+done
+
+# Only the ID immediately following the checkbox counts as a local
+# citation to validate -- a bare "- [ ] D1 ..." / "- [ ] G2 ..." is this
+# file's own convention for a locally-tracked item (see reference.md's
+# worked example). An ID appearing later in a bullet's prose is routinely
+# a cross-reference to a *different* plan file's id (e.g. "resolve
+# G5/G20 in <other-file>") and isn't meant to resolve locally -- treating
+# it as a citation produced false positives on this very file's own
+# Progress section during development.
+while IFS= read -r cited; do
+  [ -n "$cited" ] || continue
+  grep -qE "^### ${cited}([[:space:]]|\$)" "$file" || report "Progress cites '${cited}' but no '### ${cited}' heading exists"
+done < <(grep -oE '^- \[[ xX]\] [DGF][0-9]+\b' "$file" | grep -oE '[DGF][0-9]+' | sort -u)
+
+if [ "$problems" -gt 0 ]; then
+  plan_note "$rel: $problems problem(s) found."
+  exit 1
+fi
+echo "$rel: OK"

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# plan-gate <base-ref> [<head-ref>]
+# Refuses (non-zero exit) if any commit in <base-ref>..<head-ref> cites a
+# plan file via a "Plan: <file>.md" trailer that still has an unresolved
+# Finding. Used both pre-merge and pre-deploy -- same underlying question,
+# "is the security review this range depended on actually closed out",
+# just a different commit range each time. Read-only; never edits
+# anything. A commit with no Plan: trailer (e.g. mark-trivial'd) is simply
+# not gated here -- plan-touch-guard already covers "did this session
+# touch a plan at all" at commit time.
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root="$(git rev-parse --show-toplevel)" || { echo "not inside a git repository." >&2; exit 1; }
+cd "$root"
+# Sourced relative to this script's own location, not $root -- CI pins a
+# copy of this script (and this sibling lib.sh) fetched from the base
+# branch before running it, specifically so a PR can't neuter its own
+# gate by editing plan-gate/lib.sh in the same commit range it's supposed
+# to be gated by (see .github/workflows/plan-gate.yml). Sourcing via
+# $root here would silently defeat that pinning by pulling the PR's own
+# (possibly tampered) copy back in regardless of which plan-gate ran.
+# shellcheck source=../../plan/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
+
+[ $# -ge 1 ] || { printf 'usage: plan-gate <base-ref> [<head-ref>]\n' >&2; exit 1; }
+base="$1" head="${2:-HEAD}"
+
+plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head}" 2>/dev/null | sed '/^$/d' | sort -u)"
+
+if [ -z "$plans" ]; then
+  echo "no 'Plan:' trailers found in ${base}..${head} -- nothing to gate."
+  exit 0
+fi
+
+fail=0
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  rel="$(plan_locate "$p" "$root" 2>/dev/null)" || {
+    echo "BLOCKED: commit range cites plan '$p', which cannot be uniquely located under docs/plans/." >&2
+    fail=1
+    continue
+  }
+  unresolved="$(plan_unresolved_findings "$root/$rel")"
+  if [ -n "$unresolved" ]; then
+    echo "BLOCKED: $rel has unresolved finding(s) -- resolve with plan-resolve before merging/deploying:" >&2
+    echo "$unresolved" >&2
+    fail=1
+  fi
+done <<<"$plans"
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "plan-gate: one or more cited plans have unresolved findings. See above." >&2
+  exit 1
+fi
+echo "plan-gate: all cited plans ($(printf '%s\n' "$plans" | grep -c .)) have their findings resolved."
+exit 0

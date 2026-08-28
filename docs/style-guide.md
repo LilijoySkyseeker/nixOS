@@ -88,12 +88,15 @@ for how this is used in practice.
 Non-obvious rationale — a workaround, a surprising constraint, a
 tradeoff, an incident the config is defending against — belongs in the
 task's plan file (`docs/skills/plan/SKILL.md`), not an inline comment. A
-one-line citation pointing at it is fine inline (`// plan:
+one-line citation pointing at it is fine inline (`# plan:
 <date>-<slug>.md#D2`) — that's a citation, not the rationale itself, and
-is exempt from the "mechanics/labeling only" rule below. For a trivial
-change that never got a plan file, a short note in the commit message is
-still fine; see `docs/agents.md` for why the plan file is the primary home
-for anything that went through the `workflow` gate.
+is exempt from the "mechanics/labeling only" rule below. Anchor the
+citation to the specific `D`/`G`/`F` id it's about, not just the bare
+filename — a reader shouldn't have to search the whole plan to find the
+one section that explains this line. For a trivial change that never got
+a plan file, a short note in the commit message is still fine; see
+`docs/agents.md` for why the plan file is the primary home for anything
+that went through the `workflow` gate.
 
 Inline comments (beyond a citation pointer) are for mechanics/labeling
 only — see below.

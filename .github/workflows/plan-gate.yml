@@ -1,0 +1,44 @@
+name: plan-gate
+
+# This repo's first CI check. Server-side backstop for the fix-or-accept
+# discipline docs/skills/plan/scripts/plan-resolve enforces locally --
+# every local hook in this system is bypassable by design (skip hooks,
+# craft tool calls outside their matchers), so this exists so an
+# unresolved security Finding can't reach master purely by skipping local
+# hooks. Runs the same docs/skills/workflow/scripts/plan-gate script the
+# local pre-merge/pre-deploy path uses -- one source of truth, no
+# duplicated logic.
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  plan-gate:
+    name: plan-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A pull_request checkout is the PR's own tree, which can include
+      # edits to plan-gate/lib.sh themselves -- run the base branch's
+      # copy instead, so a PR can't pass this check by neutering the
+      # script that's supposed to gate it. This still reads the PR's own
+      # *data* (its commits' Plan: trailers, the plan files' content) --
+      # only the enforcement logic itself is pinned.
+      - name: Pin the gate script to the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          mkdir -p /tmp/plan-gate-trusted/skills/workflow/scripts /tmp/plan-gate-trusted/skills/plan/scripts
+          git show "origin/$BASE_REF:docs/skills/workflow/scripts/plan-gate" > /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
+          git show "origin/$BASE_REF:docs/skills/plan/scripts/lib.sh" > /tmp/plan-gate-trusted/skills/plan/scripts/lib.sh
+          chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
+
+      - name: Check every plan cited in this PR has its findings resolved
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate "origin/$BASE_REF" "$HEAD_SHA"
