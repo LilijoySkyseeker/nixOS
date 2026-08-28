@@ -66,6 +66,13 @@ itself is documented as unreliable. So this system does not rely on the
 - `footer-guard` (`PreToolUse`) hard-blocks AI-attribution footers in
   commit messages and PR bodies, rather than relying on this file being
   remembered.
+- `fresh-branch-guard` (`PreToolUse`) blocks creating a new branch
+  (`git checkout -b`/`git switch -c`/`git branch <name>`) when local
+  `master` is behind `origin/master` — added after a real incident where
+  an entire session's work was branched off stale local `master`, causing
+  a large, avoidable rebase against 57 commits of drift once it was time
+  to land. `docs/procedures/workflow.md` already said to pull first; this
+  is that rule, hardcoded, not just documented.
 - The git-level `pre-commit` extensions (frozen-file check, symlink-drift
   check) apply the same logic outside Claude Code entirely — a human
   editing a frozen plan by hand, or forgetting to symlink a new skill, is

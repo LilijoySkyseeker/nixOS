@@ -8,6 +8,7 @@ f41cc29f5492d37f66483729b25966575b8a93af5209b9e0d1dca84c1842ca57  docs/plans/don
 fbd7270425ca20f64af128f64c10ae168a0ec008f420403259e37d870b547cbc  docs/plans/done/flake-update-test-service-failing-on-homelab-root--2026-08-19.md
 fb27dce5461bfa323ba04cdacfc656aad99e288efa58308171063c125f5e6fee  docs/plans/done/full-vps-reinstall-via-nixos-anywhere-automated-an-2026-08-25.md
 ec59b858228e67244a7dea6d0017f1127615de4bd80c202ac372859d6ece94f4  docs/plans/done/git-reset-checkout-do-not-revert-a-path-with-no-he-2026-08-27.md
+7c68949e33dc6a7faae223d364d44912ef62c962d18c437511e89c230bfbe254  docs/plans/done/hardcode-pull-before-branching-as-a-hook-2026-08-27.md
 f9768a80b0ae9ea792c67ffe34c6446aeac7c642d09e6c2eeb48dff08ff65f10  docs/plans/done/homelab-s-host-firewall-has-no-real-protection-aga-2026-08-26.md
 336a1c785555c4d7d99680a1d2889600885cb5bedc129dcdebab2e201e162379  docs/plans/done/homelab-s-weekly-restic-to-backblaze-backup-has-no-2026-08-18.md
 0702281c29c9c8b563e7d71f1852ca67850aee8004d73a1700eb8945987ebed7  docs/plans/done/octodns-sync-service-failing-on-homelab-transient--2026-08-19.md
