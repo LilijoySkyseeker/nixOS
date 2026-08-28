@@ -293,20 +293,13 @@ in
     # needed for sshd
     shell = "${pkgs.bash}/bin/bash";
     openssh.authorizedKeys.keys = [
-      # homelab -> vps push-deploy key.
-      #
-      # TWO KEYS ON PURPOSE, 2026-08-27 — mid-rotation (item 8 of
-      # docs/audits/2026-08-26/rotation-runbook.md). authorizedKeys.keys
-      # is a list, so both halves are valid at once and there is no window
-      # where neither works. The old entry comes out in a follow-up commit,
-      # only after the new one is proven by an actual push-deploy-vps run.
-      # If you are reading this and both are still here, that last step
-      # did not happen — see the runbook before deleting either.
-      #
-      # new (rotated) key
+      # homelab -> vps push-deploy key. Rotated 2026-08-28, item 8 of
+      # docs/audits/2026-08-26/rotation-runbook.md. The superseded key
+      # (SHA256:HKcWtV9Oloo2z4XXma5P9jLJ7i7GyHwDmA6uTFu1+1c) was removed
+      # here only after the replacement was proven by authenticating with
+      # it -- see the runbook item for what "proven" meant, since the
+      # obvious test did not work.
       "command=\"${vpsDeployDispatcher}\",restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlJbrWrcdGkWtpXnBZgAJ0gHHR1G36SSmdeoLHzqPGn homelab-vps-deploy"
-      # old key, still authorised until the new one is verified
-      "command=\"${vpsDeployDispatcher}\",restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINDGczUoWFSHuf+96aLLrGd+Eqkz5KTFY1gYbSaqJJFp homelab-vps-deploy"
     ];
   };
   users.groups.vps-deploy = { };

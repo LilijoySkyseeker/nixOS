@@ -51,11 +51,11 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 5 | `wireguard_vps_homelab_psk` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 6 | `homelab_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
-| 8 | `homelab_vps_deploy_key` | **high** | [ ] — new key authorised on vps + in sops; **unverified** |
+| 8 | `homelab_vps_deploy_key` | **high** | **[x] 2026-08-28** — verified by authenticating with it; old key removed |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
-| 12 | `factorio_token`, `factorio_game_password` | **high** | [ ] — **proven disclosed**, promoted 2026-08-28, see item |
+| 12 | `factorio_token`, `factorio_game_password` | **high** | **[x] 2026-08-28** — rotated; container re-authenticated to factorio.com with the new token |
 
 **Access safety note.** My SSH to homelab and vps is over **Tailscale**,
 not over wg0, so items 5–7 cannot cut my access to either host. Item 8
@@ -336,6 +336,56 @@ This one is genuinely safe to do incrementally, because
 
 Rollback at any point: the old key is still authorized until the last
 step.
+
+**Done 2026-08-28 — but not the way this item says.**
+
+> ### The prescribed verification does not work, and fails *green*
+>
+> `systemctl start push-deploy-vps` on homelab did not test anything. The
+> unit has a branch guard, and `/etc/nixos` was on
+> `worktree-worktree-security-audit-plan` at the time:
+>
+> ```
+> push-deploy-vps-start[30560]: Not on master (on worktree-worktree-security-audit-plan), skipping this scheduled run.
+> systemd[1]: push-deploy-vps.service: Deactivated successfully.
+> ```
+>
+> `ActiveState=inactive Result=success ExecMainStatus=0`. The guard is
+> correct and worth keeping — it exists so a half-finished branch on
+> homelab cannot be pushed to vps, which is exactly the accident that
+> reverted vps earlier in this audit. But it means the credential was
+> never exercised, while systemd reported success. **This is `F-P7-09`'s
+> skipped-deploy-looks-like-success shape, observed live**, and it is
+> worth noting that the step designed to avoid trusting an activation log
+> was itself trusting an exit code.
+>
+> ### What actually verified it
+>
+> Authenticating to the account directly, with only the rotated key
+> offered:
+>
+> ```
+> ssh -i /run/secrets/homelab_vps_deploy_key -o IdentitiesOnly=yes vps-deploy@vps "stat -c %Y /run/current-system"
+> vps-deploy: rejected command: stat -c %Y /run/current-system
+> ```
+>
+> That rejection **is** the proof. The message comes from the forced
+> command dispatcher, so producing it required sshd to accept the key,
+> start the dispatcher, and only then have the dispatcher refuse an
+> argument outside its allowlist. A bad key fails earlier, at
+> authentication, and never reaches the dispatcher.
+>
+> Fingerprints confirmed on both ends first: homelab's
+> `/run/secrets/homelab_vps_deploy_key` is
+> `SHA256:2CmD7PN6wnrrXfvGULoLNxiHw8pyb6Ty+Nj9ogaGoXo`, matching the first
+> of the two entries then authorised on vps.
+>
+> **For items 9 and 10, prefer this shape**: use the credential against
+> the thing that consumes it and read what comes back. An exit code from a
+> wrapper unit can be success-because-skipped.
+
+Old key `SHA256:HKcWtV9Oloo2z4XXma5P9jLJ7i7GyHwDmA6uTFu1+1c` removed from
+`hosts/vps/configuration.nix` once the above passed.
 
 ## 9 — `homelab_zrepl_key` — **blocked, read first**
 
