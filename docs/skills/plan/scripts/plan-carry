@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# plan-carry <path> D<N> ["<new plan title>"]
+# Requires D<N> already have a DEFERRED marker with no CARRIED marker yet.
+# Creates a new docs/plans/todo/ plan holding the deferred item's text, and
+# appends a CARRIED marker to the original (never rewriting the DEFERRED
+# line itself) -- so a deferred decision always resurfaces as live backlog.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -ge 2 ] || { printf 'usage: plan-carry <path> D<N> ["<new plan title>"]\n' >&2; exit 1; }
+arg="$1" id="$2" title="${3:-}"
+case "$id" in D[0-9]*) ;; *) plan_die "second argument must look like D<N>, got '$id'." ;; esac
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+
+section="$(awk -v id="$id" '
+  $0 ~ "^### " id "([[:space:]]|$)" { grab=1; print; next }
+  grab && /^#/ { exit }
+  grab { print }
+' "$root/$rel")"
+
+printf '%s\n' "$section" | grep -q '\*\*DEFERRED' || plan_die "$id in $rel has no DEFERRED marker yet -- run plan-decide ... deferred first."
+printf '%s\n' "$section" | grep -q '\*\*CARRIED' && plan_die "$id in $rel already has a CARRIED marker."
+
+[ -n "$title" ] || title="follow-up: $(basename "$rel" .md) $id"
+new_rel="$("$SCRIPT_DIR/plan-new" "$title")"
+
+{
+  echo ""
+  echo "Carried from \`$(basename "$rel")#${id}\`:"
+  echo ""
+  printf '%s\n' "$section" | tail -n +2
+} >> "$root/$new_rel"
+git -C "$root" add "$new_rel"
+
+today="$(plan_today)"
+heading_re="^### ${id}([[:space:]]|\$)"
+plan_append_under_heading "$root/$rel" "$heading_re" "**CARRIED ${today}:** see \`$(basename "$new_rel")\`"
+git -C "$root" add "$rel"
+plan_mark_touched "$root" "$new_rel"
+
+echo "$new_rel"

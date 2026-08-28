@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# plan-decide <path> D<N> <answered|discussed|deferred> "<note>"
+# Appends a dated resolution marker under a decision heading. Never rewrites
+# existing text. Exactly three states exist -- no informal alternative.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 4 ] || { printf 'usage: plan-decide <path> D<N> <answered|discussed|deferred> "<note>"\n' >&2; exit 1; }
+arg="$1" id="$2" state="$3" note="$4"
+
+case "$id" in D[0-9]*) ;; *) plan_die "second argument must look like D<N>, got '$id'." ;; esac
+case "$state" in
+  answered) label="ANSWERED" ;;
+  discussed) label="DISCUSSED" ;;
+  deferred) label="DEFERRED" ;;
+  *) plan_die "state must be exactly one of: answered, discussed, deferred (got '$state')." ;;
+esac
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+plan_require_not_frozen "$root/$rel"
+
+heading_re="^### ${id}([[:space:]]|\$)"
+today="$(plan_today)"
+plan_append_under_heading "$root/$rel" "$heading_re" "**${label} ${today}:** ${note}"
+git -C "$root" add "$rel"
+plan_mark_touched "$root" "$rel"
+echo "$rel: $id -> $label"

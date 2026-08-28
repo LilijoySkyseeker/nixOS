@@ -19,10 +19,22 @@
     btop
   ];
 
-  # disable staggered hdd spin up
-  boot.extraModprobeConfig = ''
-    options libahci ignore_sss=1
-  '';
+  boot = {
+    # disable staggered hdd spin up
+    extraModprobeConfig = ''
+      options libahci ignore_sss=1
+    '';
+
+    # The 4 zdata/zbackup HDDs sit in a TerraMaster USB enclosure (ASMedia
+    # bridge, USB id 174c:55aa) bound to the kernel's uas driver. That bridge
+    # chip has a well-documented history (see TerraMaster/kernel bug threads)
+    # of silently corrupting in-flight data under I/O load -- the bridge is
+    # powered off the USB port while only the drives get power from the
+    # enclosure's own supply, so bus-side power sag glitches transfers without
+    # ever dropping the link. Ref: homelab-zdata-pool-usb-uas-checksum-errors-2026-08-28.md
+    # Force plain USB Mass Storage (BOT) instead of UAS to avoid this.
+    kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
+  };
 
   # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC,
   services.networkd-dispatcher = {
@@ -212,7 +224,8 @@
         # Persistent=false (default) is deliberate: after a long outage this
         # would otherwise fire its missed run immediately at boot, piling
         # ~2.9TiB of I/O on top of zrepl's own post-boot catch-up
-        # replication (see TODO.md). Skipping straight to next Friday
+        # replication (see homelab-backup-replication-stack-has-several-compo-2026-08-18.md).
+        # Skipping straight to next Friday
         # instead isn't silent — myHealthAlerts pages if
         # last-success goes over 336h/14 days stale (see below).
         Persistent = false;
@@ -367,7 +380,8 @@
     switchDates = "Thu 03:00";
     # the weekly restic->Backblaze run can take multiple days (~2.9TiB) —
     # switch-to-configuration restarts any unit whose definition changed, so
-    # a same-cycle switch would kill it mid-run. Defer instead (see TODO.md).
+    # a same-cycle switch would kill it mid-run. Defer instead (see
+    # homelab-s-weekly-restic-to-backblaze-backup-has-no-2026-08-18.md).
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
     # DISABLED 2026-08-27, deliberately and temporarily. Removes both the
     # flake-update-test and auto-switch timers; the services stay, so
@@ -376,8 +390,9 @@
     # Two reasons. There is active development, so these hosts are being
     # deployed by hand anyway — the scheduled path buys nothing right now
     # while carrying every risk in the D11 analysis. And the pipeline is
-    # being rebuilt rather than patched (TODO.md, "rebuild the
-    # update/build/deploy pipeline properly"), so leaving the old shape
+    # being rebuilt rather than patched (see
+    # rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md),
+    # so leaving the old shape
     # armed would mean maintaining something already known to be wrong.
     #
     # This also stops D11 firing on its own: flake-update-test can no

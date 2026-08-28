@@ -3,6 +3,10 @@ result-*
 .direnv/
 .claude/worktrees/
 .nelson/
+# ephemeral per-session markers written by the plan/workflow skills --
+# never repo content, see docs/skills/plan/scripts/lib.sh
+.claude/.active-plan
+.claude/.trivial-ack
 
 # never track pre-generated host SSH keys (see hosts/vps/README.md,
 # step 1) — these belong outside the repo entirely, this is a backstop

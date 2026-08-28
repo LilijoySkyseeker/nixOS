@@ -3,7 +3,7 @@
 How snapshots are taken and replicated across `homelab`, `torrent`, and
 `thinkpad`, and the zrepl behaviours that are easy to get wrong. For the
 offsite restic path see the last section; for deployment status see
-`TODO.md`.
+`docs/plans/` (`in-progress/` for what's still being verified).
 
 ## Three independent paths
 
@@ -273,8 +273,9 @@ These each cost real investigation; none are obvious from the config.
   three to directly exercise the failure path at the time — it looked
   intermittent rather than reliably reproducible. **2026-08-26: the
   underlying race itself is now fixed too**, not just this consequence
-  of it — see `docs/DONE.md`'s "`/storage`/`/storage-bulk` failed their
-  first mount attempt on boot" entry: `storage/storage` and
+  of it — see
+  `storage-storage-bulk-failed-their-first-mount-atte-2026-08-26.md`:
+  `storage/storage` and
   `storage/storage-bulk` now use `options.mountpoint = "legacy"` in
   `hosts/homelab/disko.nix` (disko's own `zfs-over-legacy` pattern), so
   `zfs-mount.service`'s `zfs mount -a` skips both entirely and only the
@@ -292,7 +293,9 @@ These each cost real investigation; none are obvious from the config.
   container per source host under `zbackup/backup/<host>` for exactly
   this reason — but disko only acts at pool *format* time, so if one gets
   destroyed later (as `backup/torrent` was, by mistake, in the
-  capacity-cleanup incident in `TODO.md`), deploying that host's pull job
+  capacity-cleanup incident described in
+  `replace-sanoid-syncoid-with-zrepl-repo-wide-2026-08-23.md`), deploying
+  that host's pull job
   fails until someone `zfs create`s it back by hand, matching disko's
   declared properties. `canmount` doesn't inherit in ZFS — it's
   dataset-local and defaults to `on` regardless of a parent's `off` — so
@@ -387,4 +390,4 @@ See `docs/procedures/backup-restore.md` for the restore paths out of both
 `zbackup` and Backblaze. It is written from the mechanics and has not yet
 been exercised as a real restore — verify each step's output as you go,
 and correct that doc once a real restore has been done (tracked in
-`TODO.md`).
+`build-and-test-a-full-restore-suite-scripts-proced-2026-08-25.md`).

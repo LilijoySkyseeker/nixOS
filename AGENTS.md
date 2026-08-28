@@ -34,10 +34,10 @@ encrypted with sops-nix.
 | `docs/procedures/new-host.md` / `new-service.md` | Runbooks for adding a host or a service. |
 | `docs/procedures/secrets.md` | Secret rotation and the manual-secret-management policy — agents never edit or decrypt `secrets/*` themselves. |
 | `docs/procedures/remote-access.md` | SSH/Tailscale key model, which hosts are Tailscale-only, the `vps-deploy` account. |
-| `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (`TODO.md`). |
+| `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (`plan-new`, see below). |
 | `docs/GIT_WORKFLOW.md` | Commit conventions, git hooks, day-to-day branching. |
-| `TODO.md` | Live plans/goals and known in-flight issues — check before assuming a described feature is fully deployed. |
-| `docs/DONE.md` | Completed `TODO.md` items, moved here once landed rather than checked off in place — historical record of what was fixed and when. |
+| `docs/plans/{todo,in-progress,done,rejected}/` | Per-task plan files — decisions, gotchas, findings, citeable by bare filename. Check before assuming a described feature is fully deployed. Mechanics: `docs/skills/plan/SKILL.md`. |
+| `docs/skills/`, `docs/agents/` | Project skills/subagents (`plan`, `workflow`, `security`, `docs-updater`) — canonical source, symlinked into `.claude/skills/`/`.claude/agents/`. |
 
 ## Commands
 
@@ -105,4 +105,4 @@ This repo's documentation is expected to be updated as work happens: log new
 patterns, mistakes to avoid, and insights to the right `docs/` file (not
 here — this file should stay a short map). See
 `docs/procedures/updating-documentation.md` for when to do a routine update
-vs. flag something to `TODO.md` vs. do a full rewrite.
+vs. flag something with `plan-new` vs. do a full rewrite.

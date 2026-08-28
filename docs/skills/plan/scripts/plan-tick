@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# plan-tick <path> <D|G|F><N> -- flip that ID's Progress checklist line to [x].
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 2 ] || { printf 'usage: plan-tick <path> <D|G|F><N>\n' >&2; exit 1; }
+arg="$1" id="$2"
+case "$id" in [DGF][0-9]*) ;; *) plan_die "second argument must look like D1/G2/F3, got '$id'." ;; esac
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+plan_require_not_frozen "$root/$rel"
+
+line="$(grep -nE -- "- \[ \].*\b${id}\b" "$root/$rel" || true)"
+n="$(printf '%s\n' "$line" | grep -c .)"
+[ "$n" -eq 0 ] && plan_die "no unchecked Progress line referencing '$id' found in $rel."
+[ "$n" -gt 1 ] && plan_die "multiple unchecked Progress lines reference '$id' in $rel -- ambiguous, edit manually."
+
+lineno="${line%%:*}"
+sed -i "${lineno}s/- \[ \]/- [x]/" "$root/$rel"
+git -C "$root" add "$rel"
+plan_mark_touched "$root" "$rel"
+echo "$rel: $id ticked (line $lineno)."

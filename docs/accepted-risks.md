@@ -9,7 +9,7 @@ settled trade-off from scratch.
 place on purpose. Each entry names what the exposure actually is, why it
 is accepted, what would change the answer, and where the evidence lives.
 
-**What does not.** Work that is merely *deferred* (that is `TODO.md`),
+**What does not.** Work that is merely *deferred* (that is a plan file via `plan-new`),
 a decision nobody has made yet (that is
 [`audits/2026-08-26/user-actions.md`](audits/2026-08-26/user-actions.md)
 §4), or a rule everyone should follow (that is
@@ -201,7 +201,7 @@ MEDIUM.
 `--security-opt=no-new-privileges:true`, `--read-only` on minecraft, a
 `nosuid,nodev` tmpfs, and docker's default seccomp profile. The
 capability dimension is genuinely well handled; the resource dimension
-is not, and is tracked in `TODO.md`.
+is not, and is tracked in `do-a-full-security-audit-hardening-pass-on-homelab-2026-08-26.md` (F-P4-07).
 
 **What would change the answer:** a compromise anywhere in the chain, or
 the host coming to hold anything of value beyond game state. Three
