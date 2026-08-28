@@ -19,10 +19,22 @@
     btop
   ];
 
-  # disable staggered hdd spin up
-  boot.extraModprobeConfig = ''
-    options libahci ignore_sss=1
-  '';
+  boot = {
+    # disable staggered hdd spin up
+    extraModprobeConfig = ''
+      options libahci ignore_sss=1
+    '';
+
+    # The 4 zdata/zbackup HDDs sit in a TerraMaster USB enclosure (ASMedia
+    # bridge, USB id 174c:55aa) bound to the kernel's uas driver. That bridge
+    # chip has a well-documented history (see TerraMaster/kernel bug threads)
+    # of silently corrupting in-flight data under I/O load -- the bridge is
+    # powered off the USB port while only the drives get power from the
+    # enclosure's own supply, so bus-side power sag glitches transfers without
+    # ever dropping the link. Ref: homelab-zdata-pool-usb-uas-checksum-errors-2026-08-28.md
+    # Force plain USB Mass Storage (BOT) instead of UAS to avoid this.
+    kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
+  };
 
   # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC,
   services.networkd-dispatcher = {
