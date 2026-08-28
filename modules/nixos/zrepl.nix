@@ -1087,7 +1087,7 @@
         # for a dependency reason -- zrepl sat inactive (dead) until
         # someone ran `systemctl start zrepl` by hand. That is a silent
         # backup outage, the exact class of bug this migration exists to
-        # fix (see zbackup-was-never-imported-at-boot-backups-had-bee-2026-08-24.md
+        # fix (see 2026-08-24-zbackup-was-never-imported-at-boot-backups-had-bee.md
         # for the first instance).
         #
         # `mkForce [ ]` drops that Requires; Wants+After keeps the
@@ -1106,7 +1106,7 @@
         # options.mountpoint = "legacy" in disko.nix, so zfs-mount.service
         # no longer races the fstab-generated mount units for them --
         # reboot-verified, see
-        # storage-storage-bulk-failed-their-first-mount-atte-2026-08-26.md),
+        # 2026-08-26-storage-storage-bulk-failed-their-first-mount-atte.md),
         # but this Wants=/After=
         # override is kept regardless as defense in depth against any
         # other local mount having a bad boot.

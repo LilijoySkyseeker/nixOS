@@ -198,11 +198,11 @@ not blocking this plan's commit.
 ~~### G11 -- workflow gap: don't build on the target host itself for a manual pre-merge test deploy~~
 **MOVED 2026-08-28:** this is a general workflow-system weak point, not
 specific to the zdata/USB investigation -- relocated to
-`known-weak-points-in-the-plan-file-and-workflow-sy-2026-08-27.md` (as
+`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md` (as
 G38 -- renumbered during a merge-conflict resolution since another
 session's PR landed its own G37 on master first) instead.
 ~~**MOVED 2026-08-28 (correction):** first filed this under
-`rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md` --
+`2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` --
 wrong plan, corrected to the line above.~~
 
 ## Findings (F)

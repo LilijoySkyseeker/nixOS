@@ -7,7 +7,7 @@ the backups are produced, see [`docs/backups.md`](../backups.md).
 > describes is deployed and replicating on all three hosts, but the `zfs`
 > commands below are standard, unverified-in-practice recipes — nobody has
 > done a real restore against this layout yet (tracked in
-> `build-and-test-a-full-restore-suite-scripts-proced-2026-08-25.md`).
+> `2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md`).
 > Verify each step's output rather than pasting the whole sequence, and
 > correct this doc once a restore has actually been done.
 
@@ -94,7 +94,7 @@ accepted losing whatever is currently there.
 For a large dataset add `-v` for progress, and consider running it under
 `tmux` — a multi-terabyte send over this hardware has previously taken
 ~40 hours (see
-`torrent-s-initial-full-backup-send-to-homelab-is-t-2026-08-21.md`).
+`2026-08-21-torrent-s-initial-full-backup-send-to-homelab-is-t.md`).
 
 Restart zrepl when done:
 

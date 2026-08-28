@@ -2,11 +2,14 @@
 
 ## Filename and frontmatter
 
-`docs/plans/<status>/<slug>-<YYYY-MM-DD>.md`
+`docs/plans/<status>/<YYYY-MM-DD>-<slug>.md`
 
-- `<slug>`: kebab-case, chosen once by `plan-new`, never renamed.
 - `<YYYY-MM-DD>`: creation date, fixed forever -- moving folders never
-  touches the filename.
+  touches the filename. Leads the filename (not the slug) so a plain
+  directory listing sorts chronologically.
+- `<slug>`: kebab-case, chosen once by `plan-new`, never renamed. Capped
+  at 70 characters, backing up to the last word boundary rather than
+  cutting mid-word.
 - Frontmatter mirrors the folder for greppability but is only ever written
   by the scripts:
   ```yaml
@@ -26,10 +29,10 @@ If a citation encoded the folder (`docs/plans/done/foo.md#D1`), then either
 every citation would need rewriting on every move, or a `done` file citing
 a plan that later moves would go permanently stale with no legal way to
 fix it (frozen means frozen). Citing by bare filename instead
-(`foo-2026-08-27.md#D1`) sidesteps both problems: the filename never
+(`2026-08-27-foo.md#D1`) sidesteps both problems: the filename never
 changes, so the citation is valid the instant it's written and stays valid
 forever, regardless of where the file currently sits. Resolving one is a
-single `git grep -rl 'foo-2026-08-27.md'` or an editor's "quick open."
+single `git grep -rl '2026-08-27-foo.md'` or an editor's "quick open."
 
 ## The three decision states, precisely
 
@@ -123,7 +126,7 @@ build for each other over Tailscale.
 than raw throughput.
 ### D2 -- should thinkpad ever be a build machine?
 **DEFERRED 2026-08-27:** not needed for the initial rollout.
-**CARRIED 2026-08-27:** see `thinkpad-build-machine-followup-2026-08-27.md`
+**CARRIED 2026-08-27:** see `2026-08-27-thinkpad-build-machine-followup.md`
 
 ## Gotchas (G)
 ### G1 -- nixos-anywhere --vm-test can't exercise cross-host SSH auth

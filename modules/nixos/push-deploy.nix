@@ -83,7 +83,7 @@ in
             armed until the next reboot.
 
             Currently false fleet-wide — see
-            rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md.
+            2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md.
           '';
         };
 

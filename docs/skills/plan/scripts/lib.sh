@@ -13,9 +13,19 @@ plan_repo_root() {
   git rev-parse --show-toplevel 2>/dev/null || plan_die "not inside a git repository."
 }
 
-# plan_slugify <title> -- lowercase, non-alnum runs -> single hyphen, trimmed.
+# plan_slugify <title> -- lowercase, non-alnum runs -> single hyphen, trimmed,
+# capped at 70 chars backing up to the last hyphen so a long title truncates
+# at a word boundary instead of mid-word.
 plan_slugify() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]\+/-/g' -e 's/^-\+//' -e 's/-\+$//' | cut -c1-50
+  local raw slug cap=70
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]\+/-/g' -e 's/^-\+//' -e 's/-\+$//')"
+  if [ "${#raw}" -gt "$cap" ]; then
+    slug="${raw:0:$cap}"
+    case "$slug" in *-*) slug="${slug%-*}" ;; esac
+  else
+    slug="$raw"
+  fi
+  printf '%s' "$slug"
 }
 
 # plan_get_field <file> <key> -- scalar value of a top-level frontmatter key.

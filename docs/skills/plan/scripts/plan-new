@@ -12,11 +12,11 @@ slug="$(plan_slugify "$title")"
 [ -n "$slug" ] || plan_die "title '$title' produced an empty slug."
 today="$(plan_today)"
 
-existing="$(cd "$root" && ls -1 docs/plans/*/"${slug}"-*.md 2>/dev/null)"
+existing="$(cd "$root" && ls -1 docs/plans/*/*-"${slug}".md 2>/dev/null)"
 [ -n "$existing" ] && plan_die "a plan with slug '$slug' already exists:
 $existing"
 
-rel="docs/plans/todo/${slug}-${today}.md"
+rel="docs/plans/todo/${today}-${slug}.md"
 mkdir -p "$root/docs/plans/todo"
 cat > "$root/$rel" <<EOF
 ---

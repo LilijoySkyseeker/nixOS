@@ -17,7 +17,7 @@ hardcoded into the new system, not just documented. `docs/procedures/
 workflow.md` already said this ("Pull first... before creating a new
 branch or worktree") but it was pure convention -- exactly the kind of
 rule the "hardcode with scripts, not agent judgment" tenet (see
-`establish-the-workflow-and-plan-file-system-2026-08-27.md`) exists for.
+`2026-08-27-establish-the-workflow-and-plan-file-system.md`) exists for.
 
 ## Progress
 

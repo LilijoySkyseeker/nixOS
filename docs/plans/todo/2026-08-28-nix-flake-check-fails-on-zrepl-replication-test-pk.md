@@ -10,7 +10,7 @@ frozen: false
 ## Original plan
 
 Discovered as a side-finding while working
-`homelab-zdata-pool-usb-uas-checksum-errors-2026-08-28.md`: `nix flake
+`2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md`: `nix flake
 check --no-build` fails unconditionally on this repo (reproduces
 identically on `master` with no other changes present, confirmed via
 `git stash`), unrelated to whatever else is being worked on. Fix or

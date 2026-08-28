@@ -9,7 +9,7 @@ frozen: false
 
 ## Original plan
 
-Tabled during `establish-the-workflow-and-plan-file-system-2026-08-27.md`
+Tabled during `2026-08-27-establish-the-workflow-and-plan-file-system.md`
 (D2/D14 area, see that plan's Gotchas for the surrounding context): the
 `workflow` skill hard-gates the cheap verification ladder (nixfmt, flake
 check, targeted build — `docs/skills/workflow/scripts/verify-ladder`), but

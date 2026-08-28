@@ -274,7 +274,7 @@ These each cost real investigation; none are obvious from the config.
   intermittent rather than reliably reproducible. **2026-08-26: the
   underlying race itself is now fixed too**, not just this consequence
   of it — see
-  `storage-storage-bulk-failed-their-first-mount-atte-2026-08-26.md`:
+  `2026-08-26-storage-storage-bulk-failed-their-first-mount-atte.md`:
   `storage/storage` and
   `storage/storage-bulk` now use `options.mountpoint = "legacy"` in
   `hosts/homelab/disko.nix` (disko's own `zfs-over-legacy` pattern), so
@@ -294,7 +294,7 @@ These each cost real investigation; none are obvious from the config.
   this reason — but disko only acts at pool *format* time, so if one gets
   destroyed later (as `backup/torrent` was, by mistake, in the
   capacity-cleanup incident described in
-  `replace-sanoid-syncoid-with-zrepl-repo-wide-2026-08-23.md`), deploying
+  `2026-08-23-replace-sanoid-syncoid-with-zrepl-repo-wide.md`), deploying
   that host's pull job
   fails until someone `zfs create`s it back by hand, matching disko's
   declared properties. `canmount` doesn't inherit in ZFS — it's
@@ -390,4 +390,4 @@ See `docs/procedures/backup-restore.md` for the restore paths out of both
 `zbackup` and Backblaze. It is written from the mechanics and has not yet
 been exercised as a real restore — verify each step's output as you go,
 and correct that doc once a real restore has been done (tracked in
-`build-and-test-a-full-restore-suite-scripts-proced-2026-08-25.md`).
+`2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md`).
