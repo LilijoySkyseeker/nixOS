@@ -102,17 +102,24 @@ meaningfully, or when homelab quiets down enough to give a run a clean
 > **Expect the staleness alarm to fire, and do not treat it as new
 > information.** `myHealthAlerts` pages when
 > `/var/lib/restic-backups-backblazeWeekly/last-success` is older than
-> 336h. That marker reads **2026-08-21 08:37:35**, so the alarm is due
-> around **2026-09-04**. Under this decision it will fire and it will be
-> correct — the backup genuinely is stale. Silence it deliberately or
-> accept the page; do not "fix" it by triggering a run without checking
-> whether the conditions above have changed.
+> the configured threshold. That marker reads **2026-08-21 08:37:35**.
+> Under this decision the alarm will fire and it will be correct — the
+> backup genuinely is stale. Silence it deliberately or accept the page;
+> do not "fix" it by triggering a run without checking whether the
+> conditions above have changed.
 >
-> Note also the alarm's own weakness, independent of this decision: the
-> 336h threshold and the weekly schedule land on nearly the same day, so
-> a successful 2026-09-04 run would refresh the marker at roughly the
-> moment the alarm was due. A fortnight with no offsite backup can pass
-> undetected. That is worth fixing regardless of D3.
+> **Threshold lowered to 312h on 2026-08-28 (`c6116ca`), which moves the
+> page to ~2026-09-03 08:37** — a day earlier than it would have been.
+> That was a deliberate fix, not a side effect: at 336h the alarm could
+> not report a missed run at all. 168h schedule + 168h worst-case run =
+> 336h, so the threshold matured at the same instant as the next
+> scheduled run, and a run that then succeeded refreshed the marker
+> exactly as the alarm came due. A fortnight with no offsite backup could
+> pass without ever paging — which this situation was one week away from
+> demonstrating. 312h makes the alarm fire 24h *before* the run that
+> would mask it.
+>
+> Takes effect only once homelab is deployed with that change.
 
 ## Decisions (D)
 
