@@ -27,17 +27,28 @@ jobs:
       # copy instead, so a PR can't pass this check by neutering the
       # script that's supposed to gate it. This still reads the PR's own
       # *data* (its commits' Plan: trailers, the plan files' content) --
-      # only the enforcement logic itself is pinned.
+      # only the enforcement logic itself is pinned. Degrades cleanly
+      # (nothing to gate) if the base branch doesn't have the script yet
+      # -- true only for the one PR that introduces plan-gate itself;
+      # every PR after that one has a real base-branch copy to pin to.
       - name: Pin the gate script to the base branch
+        id: pin
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           mkdir -p /tmp/plan-gate-trusted/skills/workflow/scripts /tmp/plan-gate-trusted/skills/plan/scripts
+          if ! git cat-file -e "origin/$BASE_REF:docs/skills/workflow/scripts/plan-gate" 2>/dev/null; then
+            echo "plan-gate does not exist yet on origin/$BASE_REF -- nothing to gate (this must be the PR introducing it)."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git show "origin/$BASE_REF:docs/skills/workflow/scripts/plan-gate" > /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
           git show "origin/$BASE_REF:docs/skills/plan/scripts/lib.sh" > /tmp/plan-gate-trusted/skills/plan/scripts/lib.sh
           chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
+          echo "found=true" >> "$GITHUB_OUTPUT"
 
       - name: Check every plan cited in this PR has its findings resolved
+        if: steps.pin.outputs.found == 'true'
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
