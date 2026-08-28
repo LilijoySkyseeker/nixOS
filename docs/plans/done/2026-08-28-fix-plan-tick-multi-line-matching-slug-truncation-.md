@@ -1,8 +1,8 @@
 ---
 slug: fix-plan-tick-multi-line-matching-slug-truncation-
 created: 2026-08-28
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Fix plan-tick multi-line matching, slug truncation, and date-first filenames (G3, G11, G17, G37)

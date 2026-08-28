@@ -23,3 +23,4 @@ f9768a80b0ae9ea792c67ffe34c6446aeac7c642d09e6c2eeb48dff08ff65f10  docs/plans/don
 805b6c9d8a3c11acf2e6eec484a704a1e0587e90e4b7bd5e35b2151b9fb275dd  docs/plans/done/2026-08-27-establish-the-workflow-and-plan-file-system.md
 1392d214707b7c8556b859324393fbd5120e21c8c57b58f7b155bd52bf99a4be  docs/plans/done/2026-08-27-git-reset-checkout-do-not-revert-a-path-with-no-he.md
 3bdba29aac7762e831cb1ff4cb77251975a88348c460897f898db1e70837cc42  docs/plans/done/2026-08-27-hardcode-pull-before-branching-as-a-hook.md
+34e832750e5b9b04da3172f0b8ef3d56bf3be225b071257064b38e235d34e00e  docs/plans/done/2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md
