@@ -66,6 +66,7 @@ every line below is currently unstarted.
 - [ ] G35 — see `design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md` (tabled separately)
 - [ ] G36 — see `resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md` (tabled separately)
 - [ ] G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
+- [ ] G38 — no priority signal on a plan file or in any index
 
 ## Decisions (D)
 
@@ -87,6 +88,18 @@ With real volume now (12 `todo/`, 6 `in-progress/`, 24+ `done/` after one
 session), a generated `docs/plans/INDEX.md` or a `plan-list [--status X]`
 script might earn its place — worth revisiting once the count grows
 further, not because the original call was wrong at the time.
+
+**Refinement 2026-08-28 (user-specified):** concrete shape proposed — a
+per-folder index (or one `docs/plans/INDEX.md` sectioned by status)
+listing each plan's bare filename plus a one-sentence blurb, regenerated
+by a script rather than hand-maintained. Candidate: a dedicated
+`plan-index` script, or folding regeneration into the existing mutating
+scripts (`plan-new`/`plan-move`/`plan-tick`/`plan-decide`) so the index
+self-updates on every change instead of needing a separate invocation
+someone has to remember to run. Where the one-sentence blurb comes from —
+first line of "Original plan", a dedicated frontmatter field, or
+author-supplied text at `plan-new` time — is still open. See also `G38`
+(priority tag), proposed as a field this same index would surface.
 
 ### G3 — `plan-tick`'s ID matching is line-bound and fragile
 `plan-tick` greps for the ID token on the *same line* as the `- [ ]`
@@ -334,6 +347,19 @@ renaming to stay consistent — a one-time bulk migration of every plan
 file already created under the old ordering, exactly the "rename target
 outside the normal scripts" risk `G31` already flags for citation
 integrity).
+
+### G38 — no priority signal on a plan file or in any index
+Every plan in `todo/`/`in-progress/` currently carries equal visual
+weight — nothing distinguishes a high-value item from low-priority
+backlog noise without opening each file individually (relevant now that
+`todo/` alone holds 13 files). Proposed: a `priority:` frontmatter field
+(e.g. `high`/`medium`/`low`), script-set like every other frontmatter
+field — never hand-written — surfaced both at the top of the plan file
+itself and, once it exists, in the `G2` index. Open questions: who sets
+priority and when (author only at `plan-new` time, or re-triaged later
+via a dedicated `plan-priority <file> <level>` script), whether it needs
+its own scale or can reuse an existing convention, and whether the index
+should sort/group by it.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
