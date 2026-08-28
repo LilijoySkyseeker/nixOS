@@ -44,8 +44,8 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 
 | # | sops key | Risk | Status |
 |---|---|---|---|
-| 1 | `cloudflare_octodns_token` | low | **[x] 2026-08-27** — new token verified live; old token pending deletion by user |
-| 2 | `homelab_discord_webhook` → `discord_webhook` | low | **[x] 2026-08-27** — rotated + consolidated; verified from homelab and vps |
+| 1 | `cloudflare_octodns_token` | low | **[x] complete 2026-08-28** — old token deleted at Cloudflare; `octodns-sync` re-verified with the new one as the only valid token |
+| 2 | `homelab_discord_webhook` → `discord_webhook` | low | **[x] complete 2026-08-28** — old webhook deleted; new one confirmed live (HTTP 200) from homelab and vps |
 | 3 | `tailscale_authkey_homelab` | low | **[x] not required** — spent single-use key, see item |
 | 4 | `tailscale_authkey_torrent` | low | **[x] not required** — spent single-use key, see item |
 | 5 | `wireguard_vps_homelab_psk` | med | **[x] 2026-08-27** — deployed and verified live; see item |
@@ -94,7 +94,15 @@ Manager sync:   0 total changes
 `populate` succeeding is the proof — it reads the zone through the API,
 so an invalid or under-scoped token fails there. `No changes` separately
 confirms declared state still matches Cloudflare. Zero failed units after.
-**Remaining: delete the old token in the Cloudflare dashboard.**
+
+**Complete 2026-08-28.** The user deleted the old token at Cloudflare, and
+`octodns-sync` was re-run afterwards: `Manager sync: 0 total changes`,
+`Result=success`. That second run is the one that matters — it is the
+first time the new token was the *only* valid credential, so it proves the
+rotation rather than proving the new token merely works alongside the old.
+Worth doing precisely because this rotation was silently reverted once
+mid-audit when homelab was deployed from a stale branch, and the symptom
+was `CloudflareAuthenticationError: Invalid access token`.
 
 ## 2 — `homelab_discord_webhook`
 
@@ -151,6 +159,29 @@ wrong, for two independent reasons:
 The one real constraint is the *provider* side, not git: the old
 **Discord** webhook should not be deleted until homelab and vps have been
 redeployed and verified on the new one.
+
+**Complete 2026-08-28.** The user deleted the old webhook. Verified
+afterwards **without posting anything to the channel**: a plain `GET` on a
+Discord webhook URL returns the webhook object if it exists and 404 if it
+does not, so
+
+```
+curl -sS -o /dev/null -w '%{http_code}' -K /run/secrets/discord_webhook
+```
+
+is a liveness check that sends no message. Both hosts returned **HTTP
+200**. curl reads the URL out of the secret file itself, so this verifies
+the credential without the value ever being displayed.
+
+The returned object also settles the question that actually mattered here
+— *which* webhook survived. Its id, `1542659123294900224`, is a Discord
+snowflake, and decoding the timestamp gives **2026-08-27 22:16:36 UTC**:
+the rotation session. So the live webhook is the new one, not the old one
+left in place by a mis-click. That check is worth keeping in mind for this
+sink specifically, because `myHealthAlerts` sends with `curl -sS -K … >
+/dev/null` and only fires when something is already wrong — a wrong or
+dead webhook here fails completely silently, which is the failure this
+item already hit once with the bare-URL format error.
 
 ## 3 and 4 — `tailscale_authkey_homelab`, `tailscale_authkey_torrent`
 

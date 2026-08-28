@@ -562,8 +562,13 @@ retries rather than losing anything.
 
 ### Still owed by the user
 
-- Delete the **old Cloudflare token** (item 1) and the **old Discord
-  webhook** (item 2).
+- ~~Delete the **old Cloudflare token** (item 1) and the **old Discord
+  webhook** (item 2).~~ **Done 2026-08-28**, and both re-verified after
+  deletion: `octodns-sync` succeeded with the new token as the *only*
+  valid one, and the Discord webhook returned HTTP 200 from both homelab
+  and vps with its snowflake decoding to 2026-08-27 — i.e. the surviving
+  webhook is the new one. Items 1 and 2 are now complete end to end,
+  provider side included.
 - Deploy homelab to pick up the **312h staleness threshold** (`c6116ca`).
 - Expect the backup staleness page ~**2026-09-03**; it will be correct.
 
