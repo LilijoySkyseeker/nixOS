@@ -78,12 +78,16 @@ in
         gid = vars.gids.multimedia;
         members = [ "jellyfin" ];
       };
-      systemd.tmpfiles.rules = [
-        "d ${config.services.jellyfin.configDir} 0770 jellyfin - - -"
-        "d ${config.services.jellyfin.cacheDir} 0770 jellyfin - - -"
-        "d ${config.services.jellyfin.dataDir} 0770 jellyfin - - -"
-        "d ${config.services.jellyfin.logDir} 0770 jellyfin - - -"
-      ];
+      # No tmpfiles rules for jellyfin's own directories, on purpose. The
+      # pinned nixpkgs jellyfin module already creates all four through the
+      # typed systemd.tmpfiles.settings API (rendered as jellyfinDirs.conf)
+      # at 0700 jellyfin:multimedia -- tighter than what this repo used to
+      # declare. The four raw rules that were here duplicated that in
+      # 00-nixos.conf at 0770, and since systemd-tmpfiles takes the first
+      # line it sees per path and 00-nixos.conf sorts first, their only
+      # effect was to *loosen* upstream from 0700 to 0770. Removed
+      # 2026-08-28 -- see
+      # fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md.
 
       # networking: dropped host-wide openFirewall/allowedTCPPorts (2026-08-26)
       # — homelab's LAN NIC carries a real public IPv6 address (ISP

@@ -53,6 +53,15 @@ in
         }
       ];
 
+      # Deny non-owner access to the server state directory. Declared here
+      # next to the path it protects; see the equivalent block in
+      # factorio.nix for the full reasoning, which applies unchanged:
+      # mode-only so an image bump cannot lock the container out, 0700
+      # rather than 0750 because the owning uid comes from the container
+      # image and `getent group 1000` is empty, and non-recursive so this
+      # stops the next disclosure rather than retracting past ones.
+      systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
+
       # mc server
       virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
         autoStart = true;

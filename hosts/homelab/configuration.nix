@@ -162,19 +162,33 @@
   };
 
   # directory permissions
+  #
+  # /srv is deliberately NOT managed here any more. It used to carry
+  # `d /srv 0770 root root -`, added to close a real finding: factorio's
+  # token/password and jellyfin's config sit under /srv and were
+  # world-readable. That rule broke jellyfin on 2026-08-28. /srv is a
+  # shared parent for three services running as three different non-root
+  # users, and 0770 root:root denies every one of them the `x` bit they
+  # need to traverse into their own data -- it is not a stricter version of
+  # correct, it is non-functional. It also fought two other systems that
+  # both assert 0755 (systemd's own home.conf, and impermanence's
+  # create-directories) and won only by sorting first, so whether it
+  # applied at all depended on boot vs switch.
+  #
+  # The exposure it was reaching for is real, but it lives one level down
+  # and is fixed there instead -- see the leaf modes below. /srv itself is
+  # a namespace, not a secret. See
+  # fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md.
   systemd.tmpfiles.rules = [
-    # Fields are: type path mode user group age [argument]. This previously
-    # read "d /srv 0770 - root root -", which puts "-" in the user field and
-    # shifts everything right, landing "root" in the *age* field --
-    # systemd-tmpfiles rejects the whole line with "Invalid age 'root'" and
-    # carries on, so /srv was silently left at its default 0755 for the
-    # entire life of this config. That matters because /srv holds factorio's
-    # server directories (which contain the account token and game password)
-    # and jellyfin's config, so they were world-readable throughout.
-    "d /srv 0770 root root -"
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
+
+  # The confidentiality rules for the game-server state directories are
+  # NOT here. They live in modules/services/{factorio,minecraft}.nix, next
+  # to the paths they protect -- a `z` rule silently becomes a no-op if its
+  # path is renamed, so keeping mode and path apart reintroduces exactly
+  # the silent-failure shape this whole change exists to remove.
 
   # sops
   sops.secrets = {
