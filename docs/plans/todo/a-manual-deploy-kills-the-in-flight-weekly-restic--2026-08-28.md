@@ -66,11 +66,53 @@ path nobody uses and misses the path everybody uses.
 
 ## Progress
 
-- [ ] D1 decide how to protect a manual deploy
+- [x] locks cleared and rotation item 10 closed — `restic-backblazeWeekly
+      unlock` then `key remove 3cf30d92`, 2026-08-28. Repository now has
+      exactly one key slot (`*8477d18a`), zero locks, and reads cleanly.
+- [x] D3 — **accepted**: no catch-up backup for now, see below
+- [ ] D1 decide how to protect a manual deploy — carried to
+      `rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md`
+      as **D6**, since the lesson is about entry points rather than
+      restic
 - [ ] D2 decide whether stale locks should be cleaned automatically
-- [ ] confirm the 2026-09-04 run completes — the first real test
-- [ ] consider whether one 536 GiB snapshot from 2026-08-18 is an
-      acceptable offsite position while this is open
+- [ ] revisit once homelab's near-term work settles — see D3
+
+### D3 — no catch-up backup run for now: ACCEPTED 2026-08-28
+
+The obvious next step was to trigger a manual run rather than wait for
+2026-09-04. The user declined, and the reasoning holds:
+
+- **The data has not changed in a relevant way.** The offsite copy is of
+  `zroot/local/state` and `zdata/storage/storage`; the churn since
+  2026-08-18 has been configuration and audit work, not the media and
+  service state that snapshot exists to protect. An older copy of
+  unchanged data is not a worse copy.
+- **The existing snapshot is intact and verified reachable.** `549f74e6`,
+  536.817 GiB, and the repository opens with the rotated password — that
+  was established while closing rotation item 10.
+- **Lots of homelab work is expected in the near term.** A run takes 8+
+  hours. Starting one into a period of frequent deploys mostly buys
+  another killed run and another stale lock, which is what just happened.
+
+So this is a deliberate acceptance, not an oversight. **Revisit when
+either input changes** — when the server's actual data changes
+meaningfully, or when homelab quiets down enough to give a run a clean
+8-hour window.
+
+> **Expect the staleness alarm to fire, and do not treat it as new
+> information.** `myHealthAlerts` pages when
+> `/var/lib/restic-backups-backblazeWeekly/last-success` is older than
+> 336h. That marker reads **2026-08-21 08:37:35**, so the alarm is due
+> around **2026-09-04**. Under this decision it will fire and it will be
+> correct — the backup genuinely is stale. Silence it deliberately or
+> accept the page; do not "fix" it by triggering a run without checking
+> whether the conditions above have changed.
+>
+> Note also the alarm's own weakness, independent of this decision: the
+> 336h threshold and the weekly schedule land on nearly the same day, so
+> a successful 2026-09-04 run would refresh the marker at roughly the
+> moment the alarm was due. A fortnight with no offsite backup can pass
+> undetected. That is worth fixing regardless of D3.
 
 ## Decisions (D)
 

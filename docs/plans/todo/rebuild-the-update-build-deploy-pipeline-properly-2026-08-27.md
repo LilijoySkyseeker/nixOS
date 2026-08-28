@@ -361,10 +361,59 @@ This repo's push/pull modules already carry real logic (deploy guards, the arith
 ### D5 -- signature verification for an auto-adopted ref (D2 and F-P0-01 option (b))?
 If the fleet auto-adopts a ref, verifying who signed it is the control that makes that safe -- settle alongside D2, not after.
 
+### D6 -- how does a deploy avoid destroying long-running work it happens to interrupt?
+Added 2026-08-28. Raised by
+`a-manual-deploy-kills-the-in-flight-weekly-restic--2026-08-28.md`, where
+generation 353 activated at 11:27 and restic died 84 seconds later,
+discarding an 8h28m run that had already uploaded 66.2 GB. restic has no
+resume, so an interrupted run is a lost run, and it left the repository
+locked -- which then silently blocked the *next* exclusive operation while
+read operations kept working.
+
+The interesting part for this plan is not restic. It is that **the
+protection already existed and pointed at the wrong path.**
+`myAutoUpdate.protectedUnits` names this exact service, with a comment
+saying a same-cycle switch would kill it mid-run. That guard covers
+`auto-switch` only; a manual `nixos-rebuild switch` consults nothing. And
+because all schedules are currently disabled fleet-wide, manual deploys
+are the *only* way anything gets deployed -- so the guard protects the
+path nobody uses and misses the path everybody uses.
+
+That is a design lesson for the rebuild rather than a bug to patch: a
+safety property attached to one entry point is not a safety property of
+the system. Whatever the new pipeline looks like, "is it safe to activate
+right now?" should be answerable at every entry point, including a human
+typing `nixos-rebuild switch` by hand -- or the human path should stop
+being a separate path at all.
+
+Two mechanisms to weigh, which fail differently and are probably both
+wanted:
+
+- a **pre-activation gate** that refuses or warns while a protected unit
+  is running -- catches a human at the right moment, but has to reach an
+  entry point this repo does not control;
+- **`restartIfChanged = false`** on the long-running units -- entirely
+  within the repo's control and works when nobody is watching, at the
+  cost that a genuinely changed unit does not take effect until its next
+  run.
+
+Related: `docs/procedures/workflow.md` already says never to restart or
+reboot torrent. There is no equivalent written rule for "do not deploy
+homelab while the weekly backup is running", and a written rule would not
+have helped here anyway, which is the argument for a mechanism.
+
 ## Gotchas (G)
 
 ### G1 -- one already-live consequence: homelab's /etc/nixos diverged with an unpushed auto-update commit
 Tracked as its own plan (homelab-s-etc-nixos-has-diverged-from-origin-with--2026-08-27.md) since it's a live-host state question needing the user's own judgement call, not blocked on this redesign.
+
+### G2 -- deploys are frequent on homelab right now, which makes D6 urgent rather than theoretical
+Recorded 2026-08-28. The user expects "lots of work on homelab in the
+near term", and the weekly restic run takes ~8+ hours. Those two facts
+collide on their own: any Friday-morning run has a high chance of being
+killed by ordinary work, and each kill costs the whole run plus a stale
+lock. Until D6 is settled, assume the offsite backup will not complete
+unless someone deliberately arranges a quiet window for it.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

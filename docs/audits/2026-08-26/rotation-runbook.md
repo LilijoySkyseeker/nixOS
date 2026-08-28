@@ -53,7 +53,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 8 | `homelab_vps_deploy_key` | **high** | **[x] 2026-08-28** — verified by authenticating with it; old key removed |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **deferred 2026-08-28**; needs the laptops' first audit-branch deploy *and* a reboot each, see item |
-| 10 | `homelab_backblaze_restic_password` | **highest** | **[x] 2026-08-28** — new slot verified live (the `*` moved); old slot `3cf30d92` pending removal by user |
+| 10 | `homelab_backblaze_restic_password` | **highest** | **[x] 2026-08-28** — verified live (the `*` moved); old slot removed, one slot remains |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
 | 12 | `factorio_token`, `factorio_game_password` | **high** | **[x] 2026-08-28** — rotated; container re-authenticated to factorio.com with the new token |
 
@@ -541,9 +541,22 @@ invocation rather than holding it open, so the deploy alone applied it.
 The empirical check is the same one used elsewhere: exercise the
 credential and read what comes back.
 
-- **You** — `restic-backblazeWeekly key remove 3cf30d92`. Safe now: the
-  live password opens `8477d18a`, so removing the old slot cannot lock
-  you out.
+- **[x] You** — `restic-backblazeWeekly key remove 3cf30d92`, done
+  2026-08-28. It first needed `restic-backblazeWeekly unlock`: two stale
+  locks had accumulated, from the 2026-08-21 run and from a 2026-08-28
+  run that a deploy killed mid-flight. Both holding PIDs were confirmed
+  dead before unlocking. Repository now has exactly one key slot,
+  `*8477d18a`, and zero locks.
+
+**Item 10 is complete, but it uncovered a separate and larger problem**:
+the weekly backup has not succeeded since 2026-08-21, because an ordinary
+manual deploy kills an in-flight run and `protectedUnits` only guards the
+automated path. Tracked in
+`a-manual-deploy-kills-the-in-flight-weekly-restic--2026-08-28.md`, with
+the design lesson carried into the pipeline rebuild plan as D6. The user
+has deliberately accepted the current backup staleness for now — the data
+has not meaningfully changed and homelab has heavy work incoming — so
+**expect the 336h alarm to fire around 2026-09-04 and be correct.**
 
 **Context worth carrying into that step.** The repository holds a single
 snapshot from 2026-08-18 and the last successful backup run was
