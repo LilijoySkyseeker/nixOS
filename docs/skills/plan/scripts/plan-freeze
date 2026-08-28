@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# plan-freeze <path-or-filename>
+# Marks a docs/plans/done/ file frozen: true, permanently. Normally called
+# by plan-move ... done, but safe to call directly (e.g. during migration)
+# once the file already sits under docs/plans/done/.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 1 ] || { printf 'usage: plan-freeze <path-or-filename>\n' >&2; exit 1; }
+root="$(plan_repo_root)"
+rel="$(plan_locate "$1" "$root")"
+
+case "$rel" in
+  docs/plans/done/*) ;;
+  *) plan_die "$rel is not under docs/plans/done/ -- use plan-move to move it there first." ;;
+esac
+
+plan_is_frozen "$root/$rel" && plan_die "$rel is already frozen."
+
+unresolved="$(plan_unresolved_decisions "$root/$rel")"
+if [ -n "$unresolved" ]; then
+  plan_die "cannot freeze -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
+$unresolved"
+fi
+
+plan_do_freeze "$root" "$rel"
+plan_note "$rel frozen."
+echo "$rel"

@@ -169,6 +169,7 @@ host — the point is to exercise the module, not to rebuild a host.
 A VM test proves the mechanism, not the deployment. It cannot see the
 real pools, the real data volumes, or how long a real transfer takes, and
 it says nothing about whether a change was actually switched into a
-running system. `TODO.md` records an incident where a fix was verified in
-isolation and never switched, and the broken service kept running for two
-days. **Check the live unit after deploying, not just the build.**
+running system. A fix verified only in isolation and never actually
+switched is not a fix — this has happened before in this repo, leaving a
+broken service running for days. **Check the live unit after deploying,
+not just the build.**

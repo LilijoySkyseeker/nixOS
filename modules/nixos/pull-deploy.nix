@@ -46,8 +46,8 @@ in
             `switch` actually stops a running timer instead of leaving it
             armed until the next reboot.
 
-            Currently false fleet-wide — see TODO.md's "rebuild the
-            update/build/deploy pipeline properly".
+            Currently false fleet-wide — see
+            rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md.
           '';
         };
 

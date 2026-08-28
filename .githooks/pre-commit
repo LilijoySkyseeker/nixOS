@@ -1,6 +1,54 @@
 #!/usr/bin/env bash
-# Block obviously-plaintext secrets from being committed.
+# Block obviously-plaintext secrets from being committed, and enforce that
+# frozen docs/plans/{done,rejected}/ files never change (see
+# docs/skills/plan/reference.md) -- both git-level, so they apply to any
+# tool or human, not just a Claude Code session.
 set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+# A frozen plan file is permanently un-editable, checked against the
+# checksum plan-freeze/plan-reject recorded -- compared directly against
+# the manifest, not against HEAD (diff-filter=M would miss a file that was
+# frozen and then re-tampered with before ever being committed at all,
+# since relative to HEAD it's still "Added", never "Modified"). Checking
+# every staged docs/plans/*/*.md file (not just done/) is deliberate: only
+# files with a manifest entry are actually frozen, so todo/in-progress
+# files are silently skipped by the lookup below regardless. Deletions are
+# allowed (e.g. repo reorganization) since this only guards against silent
+# content drift, not against removing the file outright.
+checksums="$repo_root/docs/plans/.checksums"
+if [[ -f "$checksums" ]]; then
+  staged_done="$(git diff --cached --name-only --diff-filter=ACMR -- 'docs/plans/*/*.md')"
+  if [[ -n "$staged_done" ]]; then
+    while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      recorded="$(awk -v f="$f" '$2==f{print $1}' "$checksums")"
+      [[ -z "$recorded" ]] && continue # not a frozen file plan-freeze knows about
+      actual="$(git show ":$f" | sha256sum | awk '{print $1}')"
+      if [[ "$actual" != "$recorded" ]]; then
+        echo "BLOCKED: $f is frozen (see docs/skills/plan/reference.md) -- new information becomes a new plan file that cites it, not an edit to this one." >&2
+        fail_frozen=1
+      fi
+    done <<<"$staged_done"
+  fi
+fi
+if [[ "${fail_frozen:-0}" -eq 1 ]]; then
+  echo "" >&2
+  echo "If this is a false positive (e.g. plan-freeze itself just ran), commit with 'git commit --no-verify'." >&2
+  exit 1
+fi
+
+# Every docs/skills/<name>/ and docs/agents/<name>.md must have a correct
+# symlink under .claude/ -- otherwise it silently vanishes from Claude Code
+# with no visible error (confirmed real pitfall, not speculative).
+if [[ -x "$repo_root/scripts/claude-links-check" ]]; then
+  if ! "$repo_root/scripts/claude-links-check"; then
+    echo "" >&2
+    echo "Run 'scripts/claude-links-check --fix' to repair, or 'git commit --no-verify' if intentional." >&2
+    exit 1
+  fi
+fi
 
 staged_files="$(git diff --cached --name-only --diff-filter=ACM)"
 [[ -z "$staged_files" ]] && exit 0

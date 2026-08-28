@@ -30,7 +30,7 @@ Update docs in the same commit as the code change, not as a follow-up:
   if different pieces of the change need different rationale.
 - **Discovered a stale reference** (a folder, file, or command that no
   longer exists but is still described somewhere) — fix it immediately if
-  it's a one-line change; if it's bigger, log it to `TODO.md` rather than
+  it's a one-line change; if it's bigger, log it with `plan-new` rather than
   leaving it.
 
 If a change doesn't fall into any of the above, it probably doesn't need a
@@ -61,8 +61,9 @@ them.
 
 Whenever a documentation issue is *noticed* but isn't being fixed right
 now — spotted mid-task, out of scope for the current change, or too large
-to fix inline — log it to `TODO.md`'s Active section immediately, the same
-session it was found in. Don't rely on memory or a mental note. Include:
+to fix inline — run `plan-new` immediately, the same session it was found
+in (see `docs/skills/plan/SKILL.md`). Don't rely on memory or a mental
+note. Include:
 
 - What's stale or wrong, and where (file + what it currently says).
 - What triggered noticing it (what you were actually doing when you found
@@ -86,8 +87,8 @@ no fixed schedule; do this opportunistically when:
 
 The check itself: re-read the doc against the current
 `modules/flake/hosts.nix`/`hosts/*/configuration.nix`/`modules/profiles/*.nix`,
-and fix whatever's drifted. Log what was found and fixed in `TODO.md` if it
-was non-trivial, so there's a record of when the last audit happened and
+and fix whatever's drifted. Log what was found and fixed with `plan-new` if
+it was non-trivial, so there's a record of when the last audit happened and
 what it caught.
 
 ## After a big refactor
@@ -98,8 +99,9 @@ per-commit updates insufficient, because the *structure* the docs describe
 has changed, not just its contents. Examples: splitting `modules/profiles/`
 into more/fewer roles, changing how hosts are pinned across nixpkgs
 channels, restructuring the secrets layout, or (already happened once, see
-`TODO.md`'s 2026-08-20 entry) migrating the whole composition mechanism, as
-the dendritic flake-parts + import-tree migration did.
+`build-switch-thinkpad-and-torrent-after-the-dendri-2026-08-20.md`)
+migrating the whole composition mechanism, as the dendritic flake-parts +
+import-tree migration did.
 
 When that happens, don't patch `docs/architecture.md` piecemeal — redo it
 properly:
@@ -118,6 +120,6 @@ properly:
    renamed by the refactor.
 5. **Update the root `README.md`'s Hosts table and Layout section** if the
    refactor changed either.
-6. **Log the rewrite in `TODO.md`** so there's a dated record of when the
+6. **Log the rewrite with `plan-new`** so there's a dated record of when the
    docs were last brought back in sync with a structural change, for the
    next person (or the next refactor) to check against.

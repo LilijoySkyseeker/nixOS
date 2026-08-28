@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# plan-reject <path> "<reason>"
+# Moves a todo/ or in-progress/ plan to docs/plans/rejected/ and freezes it
+# permanently -- for work that was started and abandoned, or superseded by
+# a different approach. Unlike plan-move ... done, this does NOT require
+# every decision to be resolved: abandoning the work legitimately moots
+# open questions, rather than obligating them to be answered first. A
+# reason is mandatory instead, appended as a dated marker (append-only,
+# same as everything else) -- if superseded by another plan, cite it by
+# bare filename in the reason text.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 2 ] || { printf 'usage: plan-reject <path> "<reason>"\n' >&2; exit 1; }
+arg="$1" reason="$2"
+[ -n "$reason" ] || plan_die "a reason is required -- why was this abandoned, or what superseded it?"
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+plan_require_not_frozen "$root/$rel"
+
+case "$(dirname "$rel")" in
+  docs/plans/todo | docs/plans/in-progress) ;;
+  *) plan_die "$rel is not in todo/ or in-progress/ -- nothing else is eligible for rejection." ;;
+esac
+
+today="$(plan_today)"
+printf '\n**REJECTED %s:** %s\n' "$today" "$reason" >> "$root/$rel"
+
+base="$(basename "$rel")"
+new_rel="docs/plans/rejected/${base}"
+git -C "$root" mv "$rel" "$new_rel"
+plan_set_field "$root/$new_rel" status rejected
+
+plan_do_freeze "$root" "$new_rel"
+plan_note "$new_rel rejected and frozen."
+echo "$new_rel"

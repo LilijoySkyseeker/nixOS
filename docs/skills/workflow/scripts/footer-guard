@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# PreToolUse hook (matcher: Bash). Hard-blocks AI-attribution footers in
+# git commit messages and `gh pr create`/`gh pr edit` bodies -- this is
+# docs/GIT_WORKFLOW.md's "no Co-Authored-By/session-link/footer" rule,
+# hardcoded per the "hardcode with scripts, not agent judgment" tenet
+# rather than left to memory.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=hook-lib.sh
+. "$SCRIPT_DIR/hook-lib.sh"
+
+input="$(cat)"
+tool_name="$(hook_json_str "$input" tool_name)"
+[ "$tool_name" = "Bash" ] || exit 0
+
+command="$(hook_json_command "$input")"
+[ -n "$command" ] || exit 0
+
+is_commit=false
+is_pr=false
+hook_anchored "$command" 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+commit([[:space:]]|$)' && is_commit=true
+hook_anchored "$command" 'gh[[:space:]]+pr[[:space:]]+(create|edit)([[:space:]]|$)' && is_pr=true
+
+if [ "$is_commit" != true ] && [ "$is_pr" != true ]; then
+  exit 0
+fi
+
+pattern='Co-Authored-By:[[:space:]]*Claude|Claude-Session:|Generated with \[?Claude Code|🤖'
+
+if printf '%s' "$command" | grep -Eiq -- "$pattern"; then
+  hook_deny "PreToolUse" "BLOCKED: this command's text contains an AI-attribution footer (Co-Authored-By: Claude / Claude-Session: / \"Generated with Claude Code\" / a robot emoji). docs/GIT_WORKFLOW.md is explicit: no such footer in commit messages or PR descriptions. Remove it and retry."
+fi
+
+exit 0

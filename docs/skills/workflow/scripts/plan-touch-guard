@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# PreToolUse hook (matcher: Bash). Blocks a bare `git commit` unless this
+# session has either touched a plan file (.claude/.active-plan exists and
+# points at a real file) or explicitly recorded a trivial-change
+# acknowledgment (.claude/.trivial-ack, via mark-trivial). Deliberately
+# does NOT -- and cannot -- judge which subagents ran or whether the plan
+# content is any good; that's the workflow skill's job, not this hook's.
+# See docs/skills/workflow/reference.md, "Why a hook at all".
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=hook-lib.sh
+. "$SCRIPT_DIR/hook-lib.sh"
+
+input="$(cat)"
+tool_name="$(hook_json_str "$input" tool_name)"
+[ "$tool_name" = "Bash" ] || exit 0
+
+command="$(hook_json_command "$input")"
+[ -n "$command" ] || exit 0
+
+hook_anchored "$command" 'git([[:space:]]+-C[[:space:]]+\S+)?[[:space:]]+commit([[:space:]]|$)' || exit 0
+
+cwd="$(hook_json_str "$input" cwd)"
+root="$(cd "${cwd:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$root" ] || exit 0 # not a git repo -- nothing for this hook to gate
+
+trivial="$root/.claude/.trivial-ack"
+[ -f "$trivial" ] && exit 0
+
+active="$root/.claude/.active-plan"
+if [ -f "$active" ]; then
+  rel="$(cat "$active")"
+  if [ -n "$rel" ] && [ -f "$root/$rel" ]; then
+    exit 0
+  fi
+fi
+
+hook_deny "PreToolUse" "BLOCKED: no docs/plans/ file was touched this session, and no trivial-change acknowledgment was recorded. Run the plan skill (plan-new/plan-move/plan-tick/plan-decide) first -- or if this really is a typo/one-line fix, run docs/skills/workflow/scripts/mark-trivial \"<reason>\" first."

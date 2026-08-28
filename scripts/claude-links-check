@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# claude-links-check [--fix]
+#
+# Verifies every docs/skills/<name>/ and docs/agents/<name>.md has a
+# correct, resolving relative symlink under .claude/skills/ or
+# .claude/agents/, and flags any .claude/{skills,agents} entry with no
+# corresponding docs/ source. A broken/missing symlink otherwise fails
+# *silently* in Claude Code (no visible error, only a debug-log entry) --
+# this is the mechanical backstop for that.
+#
+# --fix creates/repairs missing or wrong symlinks. Stray symlinks (present
+# in .claude/ with no docs/ source) are reported but never auto-removed.
+set -u
+fix=false
+[ "${1:-}" = "--fix" ] && fix=true
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not inside a git repository." >&2; exit 1; }
+cd "$root"
+
+problems=0
+
+check_link() {
+  local doc_target="$1" link_path="$2" want_rel="$3"
+  [ -e "$doc_target" ] || return 0
+
+  if [ -L "$link_path" ]; then
+    local got_rel
+    got_rel="$(readlink "$link_path")"
+    if [ "$got_rel" = "$want_rel" ] && [ -e "$link_path" ]; then
+      return 0
+    fi
+    echo "DRIFT: $link_path -> $got_rel (expected -> $want_rel)" >&2
+  elif [ -e "$link_path" ]; then
+    echo "DRIFT: $link_path exists but is not a symlink" >&2
+  else
+    echo "MISSING: $link_path (should link to $doc_target)" >&2
+  fi
+
+  problems=$((problems + 1))
+  if [ "$fix" = true ]; then
+    rm -rf "$link_path"
+    mkdir -p "$(dirname "$link_path")"
+    ln -s "$want_rel" "$link_path"
+    echo "FIXED: $link_path -> $want_rel" >&2
+    problems=$((problems - 1))
+  fi
+}
+
+if [ -d docs/skills ]; then
+  for d in docs/skills/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    check_link "docs/skills/$name" ".claude/skills/$name" "../../docs/skills/$name"
+  done
+fi
+
+if [ -d docs/agents ]; then
+  for f in docs/agents/*.md; do
+    [ -f "$f" ] || continue
+    name="$(basename "$f")"
+    check_link "docs/agents/$name" ".claude/agents/$name" "../../docs/agents/$name"
+  done
+fi
+
+for kind in skills agents; do
+  [ -d ".claude/$kind" ] || continue
+  for f in ".claude/$kind"/*; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    name="$(basename "$f")"
+    if [ "$kind" = "skills" ]; then src="docs/skills/$name"; else src="docs/agents/$name"; fi
+    if [ ! -e "$src" ]; then
+      echo "STRAY: $f has no corresponding $src (not auto-removed -- remove by hand if intentional)" >&2
+      problems=$((problems + 1))
+    fi
+  done
+done
+
+if [ "$problems" -gt 0 ]; then
+  echo "claude-links-check: $problems problem(s) found. Re-run with --fix to create missing/wrong symlinks (stray links are never auto-removed)." >&2
+  exit 1
+fi
+echo "claude-links-check: all docs/{skills,agents} <-> .claude/{skills,agents} links are in sync."
+exit 0

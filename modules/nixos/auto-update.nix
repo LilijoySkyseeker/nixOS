@@ -21,7 +21,8 @@ in
       # unlike the stock system.autoUpgrade this used to be; that's what
       # fixed the 2026-08-21 incident where a stale/dirty local checkout
       # getting switched silently reverted a manual `--target-host` deploy
-      # (see TODO.md). Only the scheduled one also applies the min-interval
+      # (see verify-android-smb-share-end-to-end-2026-08-18.md). Only the
+      # scheduled one also applies the min-interval
       # and protected-unit guards: those exist to keep an *unattended* run
       # from disrupting work in progress, not to second-guess a human who
       # just explicitly asked for a deploy right now.
@@ -204,8 +205,8 @@ in
             a `switch` actually stops a running timer instead of leaving
             it armed until the next reboot.
 
-            Fleet-wide this is currently **false** — see TODO.md's
-            "rebuild the update/build/deploy pipeline properly". The
+            Fleet-wide this is currently **false** — see
+            rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md. The
             profile-staleness check in `myHealthAlerts` is what makes
             that survivable: if the fleet stops deploying, it says so.
           '';
@@ -325,7 +326,8 @@ in
             # Persistent=false (default) is deliberate: after a long outage
             # this and auto-switch's timer would otherwise both fire their
             # missed run immediately at boot, piling I/O/CPU load on top of
-            # zrepl's own post-boot catch-up replication (see TODO.md). A
+            # zrepl's own post-boot catch-up replication (see
+            # homelab-backup-replication-stack-has-several-compo-2026-08-18.md). A
             # week's delay on picking up flake updates is a non-issue —
             # missing this window just means the next one runs on schedule.
             Persistent = false;
