@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# plan-resolve <path> F<N> <fixed|accepted|moot> "<note>"
+# Appends a dated resolution marker under a finding heading. Never rewrites
+# existing text. Exactly three terminal states:
+#   fixed    -- the underlying issue was fixed and verified.
+#   accepted -- the user explicitly accepted the risk; note why.
+#   moot     -- the affected code/config was removed or superseded, so the
+#               finding no longer applies; note what removed it.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 4 ] || { printf 'usage: plan-resolve <path> F<N> <fixed|accepted|moot> "<note>"\n' >&2; exit 1; }
+arg="$1" id="$2" state="$3" note="$4"
+
+case "$id" in F[0-9]*) ;; *) plan_die "second argument must look like F<N>, got '$id'." ;; esac
+case "$state" in
+  fixed) label="FIXED" ;;
+  accepted) label="ACCEPTED" ;;
+  moot) label="MOOT" ;;
+  *) plan_die "state must be exactly one of: fixed, accepted, moot (got '$state')." ;;
+esac
+[ -n "$note" ] || plan_die "a note is required -- what fixed it, why the risk is accepted, or what removed/superseded the affected code."
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+plan_require_not_frozen "$root/$rel"
+
+heading_re="^### ${id}([[:space:]]|\$)"
+today="$(plan_today)"
+plan_append_under_heading "$root/$rel" "$heading_re" "**${label} ${today}:** ${note}"
+git -C "$root" add "$rel"
+plan_mark_touched "$root" "$rel"
+echo "$rel: $id -> $label"

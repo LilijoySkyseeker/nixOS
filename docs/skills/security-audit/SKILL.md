@@ -209,7 +209,14 @@ The audit's durable output is not the fixes, it is the knowledge.
   questions (the audit's own `user-actions.md`), or rules everyone
   should follow (`docs/hardening.md`). A risk blocked on a user
   decision is not accepted — list it separately as pending.
-- Deferred remediation → `plan-new` (docs/skills/plan/SKILL.md).
+- Deferred remediation → `plan-new` (docs/skills/plan/SKILL.md). A finding
+  that graduates into a plan this way gets a fresh, plan-local `F<N>` in
+  the new plan's `## Findings (F)` section — cite the origin fleet id and
+  report file in that entry's first line (e.g. `originally F-P3-04,
+  docs/audits/2026-08-26/P3-....md`) rather than reusing the `F-P<n>-NN`
+  numbering, which stays scoped to its own audit report. `plan-freeze`
+  then gates on the plan-local id being `FIXED`/`ACCEPTED`/`MOOT` via
+  `plan-resolve`, same discipline as a Decision.
 - Add a row to `AGENTS.md`'s "Where things live" table for anything new.
 - **Fix docs that assert a boundary the config doesn't implement**
   (failure mode §7.5), not just docs that are missing a rule. Last run

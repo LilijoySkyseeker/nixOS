@@ -2,7 +2,8 @@
 # plan-move <path-or-filename> <in-progress|done>
 # Moves a plan between folders. No repo-wide citation rewrite is needed --
 # citations are bare-filename, which never encodes the folder. Moving to
-# `done` refuses if any decision is unresolved, then auto-freezes.
+# `done` refuses if any decision or finding is unresolved, or if the
+# `## State` section is missing or empty, then auto-freezes.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
@@ -31,6 +32,14 @@ if [ "$target" = "done" ]; then
     plan_die "cannot move to done/ -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
 $unresolved"
   fi
+
+  unresolved_f="$(plan_unresolved_findings "$root/$rel")"
+  if [ -n "$unresolved_f" ]; then
+    plan_die "cannot move to done/ -- unresolved findings (must be FIXED, ACCEPTED, or MOOT via plan-resolve):
+$unresolved_f"
+  fi
+
+  plan_has_state "$root/$rel" || plan_die "cannot move to done/ -- '## State' section is missing or empty; write a current-state summary before closing."
 fi
 
 git -C "$root" mv "$rel" "$new_rel"

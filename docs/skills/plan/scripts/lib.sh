@@ -138,6 +138,35 @@ plan_unresolved_decisions() {
   ' "$1"
 }
 
+# plan_unresolved_findings <file> -- one line per F<N> heading that is
+# neither FIXED, ACCEPTED, nor MOOT. Empty output = all resolved.
+plan_unresolved_findings() {
+  awk '
+    function report() {
+      if (id != "" && !resolved) print id
+    }
+    /^### F[0-9]+/ { report(); id=$0; resolved=0; next }
+    /\*\*FIXED/    { resolved=1 }
+    /\*\*ACCEPTED/ { resolved=1 }
+    /\*\*MOOT/     { resolved=1 }
+    END { report() }
+  ' "$1"
+}
+
+# plan_has_state <file> -- true (exit 0) if the "## State" section has at
+# least one non-blank line. "## State" is the one section this system
+# rewrites in place rather than appending to -- see plan/SKILL.md,
+# "Append-only, always" -- so this only checks presence/non-emptiness, not
+# history.
+plan_has_state() {
+  awk '
+    /^## State[[:space:]]*$/ { insec=1; next }
+    insec && /^##/ { insec=0 }
+    insec && $0 !~ /^[[:space:]]*$/ { found=1 }
+    END { exit !found }
+  ' "$1"
+}
+
 plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 
 # plan_do_freeze <root> <rel> -- the mechanical half of freezing, shared by
