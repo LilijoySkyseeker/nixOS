@@ -43,7 +43,7 @@ errors: No known data errors
 - [x] Decide on remediation (D1)
 - [x] Apply fix (PR #26, not yet merged): deployed to homelab directly via
       `nixos-rebuild switch --flake .#homelab --target-host root@homelab`
-      (built locally, activated remotely per G11/G37) and rebooted
+      (built locally, activated remotely per G11/G38) and rebooted
       2026-08-28 11:49. Confirmed via dmesg: all four enclosure ports now
       report `UAS is ignored for this device, using usb-storage instead`.
       `zpool clear` turned out unnecessary -- CKSUM reset to 0/0 on its own
@@ -198,7 +198,8 @@ not blocking this plan's commit.
 **MOVED 2026-08-28:** this is a general workflow-system weak point, not
 specific to the zdata/USB investigation -- relocated to
 `known-weak-points-in-the-plan-file-and-workflow-sy-2026-08-27.md` (as
-G37) instead.
+G38 -- renumbered during a merge-conflict resolution since another
+session's PR landed its own G37 on master first) instead.
 ~~**MOVED 2026-08-28 (correction):** first filed this under
 `rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md` --
 wrong plan, corrected to the line above.~~
