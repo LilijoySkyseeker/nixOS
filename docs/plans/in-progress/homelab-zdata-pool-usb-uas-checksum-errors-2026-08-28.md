@@ -40,7 +40,7 @@ errors: No known data errors
 - [x] Pulled SMART data on all four zdata+zbackup HDDs
 - [x] Checked dmesg/journalctl for ATA/USB link errors
 - [x] Identified physical transport (USB, not SATA) as the likely differentiator
-- [ ] Decide on remediation (D1)
+- [x] Decide on remediation (D1)
 - [ ] Apply fix if approved, then `zpool clear zdata`
 - [ ] Confirm no error recurrence after a full scrub cycle
 
