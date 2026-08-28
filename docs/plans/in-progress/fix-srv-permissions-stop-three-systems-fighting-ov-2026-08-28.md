@@ -1,7 +1,7 @@
 ---
 slug: fix-srv-permissions-stop-three-systems-fighting-ov
 created: 2026-08-28
-status: todo
+status: in-progress
 frozen: false
 ---
 
@@ -101,11 +101,38 @@ So the original finding was never actually closed.
 - [x] D3 tighten the two leaf directories, mode only — **0700, not 0750**
       (revised per F3), declared in the service modules (revised per F4/F5)
 - [ ] **rotate the factorio.com token and game password** — F1; the only
-      step that retracts anything
-- [ ] build homelab, deploy, confirm jellyfin starts and survives a
-      second switch
+      step that retracts anything. User agreed 2026-08-28 to do this.
+- [x] build homelab, deploy, confirm jellyfin starts and survives
+      tmpfiles re-running — **verified 2026-08-28, see G3**
 - [ ] separate plan for `/nix/state/.zfs` being 0777 — F1's root cause,
       broader than this plan
+
+### G3 — deployed and verified 2026-08-28
+
+Deployed to homelab. The activation restarted
+`systemd-tmpfiles-resetup.service`, which is the exact trigger that broke
+jellyfin before, so the failure condition was reproduced rather than
+avoided. Then re-ran that unit **again** by hand and waited for it to
+complete (it takes minutes — it walks the ACL rules on the 2.5 TB
+`/storage` and `/storage-bulk`), which is a stronger test than the
+"switch twice" this plan originally called for: a second switch of an
+unchanged config would not have restarted the unit at all.
+
+Final state, after `systemd-tmpfiles-resetup` completed:
+
+```
+drwxr-xr-x  root     root        /srv
+drwx------  jellyfin multimedia  /srv/jellyfin/data
+drwx------  845      845         /srv/factorio/main
+drwx------  1000     1000        /srv/minecraft/vanilla-plus
+```
+
+`jellyfin.service` active; `setpriv --reuid=999 --regid=999 ls
+/srv/jellyfin/data` succeeds; zero failed units. Both game containers
+(`docker-factorio-main`, `docker-minecraft-vanilla-plus`) stayed running
+on their now-0700 directories, which is expected — each runs as the uid
+that owns its directory, so 0700 costs them nothing. That was the main
+risk in tightening from 0755 and it did not materialise.
 
 ## Decisions (D)
 

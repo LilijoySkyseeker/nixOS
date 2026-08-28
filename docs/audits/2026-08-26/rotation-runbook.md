@@ -51,10 +51,11 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 5 | `wireguard_vps_homelab_psk` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 6 | `homelab_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
-| 8 | `homelab_vps_deploy_key` | **high** | [ ] |
+| 8 | `homelab_vps_deploy_key` | **high** | [ ] — new key authorised on vps + in sops; **unverified** |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **blocked**, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
+| 12 | `factorio_token`, `factorio_game_password` | **high** | [ ] — **proven disclosed**, promoted 2026-08-28, see item |
 
 **Access safety note.** My SSH to homelab and vps is over **Tailscale**,
 not over wg0, so items 5–7 cannot cut my access to either host. Item 8
@@ -512,6 +513,62 @@ one.
 
 
 ---
+
+## 12 — `factorio_token` + `factorio_game_password` — **proven disclosed**
+
+Promoted 2026-08-28 from the "after the ten" list below, where it sat as
+`F-P4-04` — a rotate-for-consistency item. It is not that. A security
+review of the `/srv` permission fix proved the credentials are readable
+**right now, by any local uid**, and the priority follows the evidence.
+
+**The proof.** `/nix/state/.zfs` is mode **0777**. `snapdir=hidden` only
+hides the directory from `readdir` — it does not block traversal by
+path. **57 retained `zroot/local/state` snapshots** hold
+`/srv/factorio/main/config/server-settings.json` at mode **0644**, which
+carries the factorio.com account token and the game password in
+plaintext. Verified live by reading it as uid 65534 (`nobody`) via
+`setpriv`.
+
+**Why that is reachable rather than theoretical.** `jellyfin` (uid 999)
+is the one internet-reachable service on homelab — vps Caddy + Anubis →
+wg0 → 8096 — and its pinned unit sets `ProtectSystem = true`, not
+`"strict"`, so `/nix/state` is fully readable from inside its sandbox.
+Any code execution in jellyfin reads these credentials.
+
+**The permission fix does not retract this and must not be mistaken for
+doing so.** `fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md`
+tightened `/srv/factorio/main` to 0700, but that is a *forward* fix: the
+snapshots already exist, they are replicated to `zbackup` on homelab, and
+`zroot/local/state` is one of the two datasets restic pushes to
+Backblaze — so unlike the laptop replicas discussed under `F-P7-02`,
+**this one genuinely is offsite**. Deleting snapshots would not help
+either, since the copies have already been readable for their whole
+retention. Rotation at factorio.com is the only thing that retracts
+anything.
+
+- **You** — factorio.com → account settings. Regenerate the account
+  token. Change the multiplayer game password while you are there; it is
+  in the same file and had the same exposure.
+- **You** — `sops secrets/secrets.yaml`, replace `factorio_token` and
+  `factorio_game_password`. `factorio_username` is not a credential and
+  does not need rotating.
+- **Me** — deploy homelab, then **verify by exercising it**: the
+  container's start script patches `server-settings.json` from the sops
+  values on every start, so confirm `docker-factorio-main` comes up and
+  the server authenticates to factorio.com rather than reading an
+  activation log. Per items 5-7, a clean log proves nothing.
+- **Me** — confirm the rewritten `server-settings.json` is inside a 0700
+  directory this time, so the new values do not immediately start
+  accumulating readable snapshot copies the way the old ones did.
+
+Rollback: put the old values back in sops and redeploy — but note the old
+token is what you are trying to invalidate, so rolling back re-exposes
+you. Prefer fixing forward.
+
+**Related, and deliberately not folded in here:** `/nix/state/.zfs` being
+0777 is the *mechanism* behind this exposure and affects every secret
+that has ever touched a persisted directory, not just factorio's. That
+needs its own plan rather than a line in this item.
 
 ## After the ten
 
