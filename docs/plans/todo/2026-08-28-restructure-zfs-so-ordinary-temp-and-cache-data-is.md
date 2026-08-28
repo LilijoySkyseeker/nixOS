@@ -61,7 +61,7 @@ homelab gets this free from impermanence: its root is rolled back to
 - [ ] G1 confirmed empirically — no action taken yet
 - [ ] D1 land `boot.tmp.useTmpfs` (agreed, not yet written)
 - [ ] D2 impermanence fleet-wide — see
-      `migrate-torrent-and-thinkpad-to-impermanence-2026-08-18.md`
+      `2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md`
 - [ ] D3 dataset split for `~/.cache` / Trash / Downloads — undecided
 
 ## Decisions (D)
@@ -86,7 +86,7 @@ capture. Folds in the inert thinkpad scaffolding flagged by `F-P5-14`
 in its initrd, so `/` is durable today and `@blank` is decorative).
 
 Execution belongs to
-`migrate-torrent-and-thinkpad-to-impermanence-2026-08-18.md`; this plan
+`2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md`; this plan
 owns the *reason* and the part impermanence does not cover.
 
 **Impermanence does not finish the job.** It fixes `/`, and therefore

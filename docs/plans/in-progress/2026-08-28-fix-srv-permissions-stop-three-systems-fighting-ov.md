@@ -279,7 +279,7 @@ jellyfin still starts, not just switching once and seeing green.
 
 ### F6 — the plan's "three systems fighting" table misdescribes impermanence, which follows rather than fights
 
-- **File:** `docs/plans/todo/fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md:29-42`; behaviour in the pinned impermanence input's `create-directories.bash`
+- **File:** `docs/plans/todo/2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md:29-42`; behaviour in the pinned impermanence input's `create-directories.bash`
 - **Severity:** INFO
 - **Confidence:** CONFIRMED
 - **Axis:** needed-used (documentation that does not match the code it describes)

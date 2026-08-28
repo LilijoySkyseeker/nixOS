@@ -87,7 +87,7 @@ in
       # line it sees per path and 00-nixos.conf sorts first, their only
       # effect was to *loosen* upstream from 0700 to 0770. Removed
       # 2026-08-28 -- see
-      # fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md.
+      # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
 
       # networking: dropped host-wide openFirewall/allowedTCPPorts (2026-08-26)
       # — homelab's LAN NIC carries a real public IPv6 address (ISP

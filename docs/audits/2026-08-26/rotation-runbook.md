@@ -552,7 +552,7 @@ credential and read what comes back.
 the weekly backup has not succeeded since 2026-08-21, because an ordinary
 manual deploy kills an in-flight run and `protectedUnits` only guards the
 automated path. Tracked in
-`a-manual-deploy-kills-the-in-flight-weekly-restic--2026-08-28.md`, with
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`, with
 the design lesson carried into the pipeline rebuild plan as D6. The user
 has deliberately accepted the current backup staleness for now — the data
 has not meaningfully changed and homelab has heavy work incoming — so
@@ -688,7 +688,7 @@ wg0 → 8096 — and its pinned unit sets `ProtectSystem = true`, not
 Any code execution in jellyfin reads these credentials.
 
 **The permission fix does not retract this and must not be mistaken for
-doing so.** `fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md`
+doing so.** `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`
 tightened `/srv/factorio/main` to 0700, but that is a *forward* fix: the
 snapshots already exist, they are replicated to `zbackup` on homelab, and
 `zroot/local/state` is one of the two datasets restic pushes to

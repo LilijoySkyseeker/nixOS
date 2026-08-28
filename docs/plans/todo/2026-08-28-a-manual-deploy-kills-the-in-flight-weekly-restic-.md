@@ -71,7 +71,7 @@ path nobody uses and misses the path everybody uses.
       exactly one key slot (`*8477d18a`), zero locks, and reads cleanly.
 - [x] D3 — **accepted**: no catch-up backup for now, see below
 - [ ] D1 decide how to protect a manual deploy — carried to
-      `rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md`
+      `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`
       as **D6**, since the lesson is about entry points rather than
       restic
 - [ ] D2 decide whether stale locks should be cleaned automatically
@@ -144,7 +144,7 @@ Options, none evaluated properly yet:
   human is not watching.
 
 Whatever is chosen belongs with
-`rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md` rather
+`2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` rather
 than being bolted on, since that plan is already reconsidering how
 deploys are gated.
 

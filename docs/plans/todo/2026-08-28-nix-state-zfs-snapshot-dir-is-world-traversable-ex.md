@@ -10,7 +10,7 @@ frozen: false
 ## Original plan
 
 Split out 2026-08-28 from
-`fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md`, whose
+`2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`, whose
 finding F1 proved this while reviewing an unrelated permission fix. That
 plan fixes one directory's mode; this is the mechanism underneath, and it
 is broader than any single service.

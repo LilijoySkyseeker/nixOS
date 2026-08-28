@@ -178,7 +178,7 @@
   # The exposure it was reaching for is real, but it lives one level down
   # and is fixed there instead -- see the leaf modes below. /srv itself is
   # a namespace, not a secret. See
-  # fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md.
+  # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
   systemd.tmpfiles.rules = [
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"

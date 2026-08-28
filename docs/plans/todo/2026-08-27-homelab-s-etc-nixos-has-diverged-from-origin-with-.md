@@ -91,7 +91,7 @@ The durable lesson is not about this one commit. It is that
 `myPushDeploy.flakeDir = "/etc/nixos"` makes a *live host's working
 checkout* an input to deploying a different host, so whatever branch
 someone last used on homelab silently becomes what vps gets. That belongs
-to `rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md`.
+to `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`.
 
 ### G1 -- F-P7-10's evidence was right about the remote, wrong about the machine
 "Not one `chore: automated flake.lock update` commit in the repository's 1371-commit history" is still true of the repo; it was not true of homelab's checkout -- the run happened, flake-update-test just could not publish (no openssh on PATH for the git push over SSH). D11 was closer to firing than documented: the auto-merge chain works end to end except the push.

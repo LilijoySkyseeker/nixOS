@@ -363,7 +363,7 @@ If the fleet auto-adopts a ref, verifying who signed it is the control that make
 
 ### D6 -- how does a deploy avoid destroying long-running work it happens to interrupt?
 Added 2026-08-28. Raised by
-`a-manual-deploy-kills-the-in-flight-weekly-restic--2026-08-28.md`, where
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`, where
 generation 353 activated at 11:27 and restic died 84 seconds later,
 discarding an 8h28m run that had already uploaded 66.2 GB. restic has no
 resume, so an interrupted run is a lost run, and it left the repository

@@ -147,7 +147,7 @@ in
       # non-recursive, so files inside keep their own modes, and ZFS
       # snapshots of this directory already hold copies at the old
       # permissions -- see F1/F2 in
-      # fix-srv-permissions-stop-three-systems-fighting-ov-2026-08-28.md.
+      # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
       # The factorio credentials are disclosed and must be rotated at
       # factorio.com (F-P4-04); this only stops the next disclosure.
       systemd.tmpfiles.settings."10-factorio-state"."/srv/factorio/main".z.mode = "0700";
