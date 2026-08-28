@@ -4,36 +4,68 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-27, end of the fifth session.**
+**Last updated: 2026-08-28, end of the sixth session.**
 
-> ## START HERE — state as of the fifth session
+> ## START HERE — state as of the sixth session
 >
-> **The audit branch is merged.** PR #24 landed; `master` is `9f39873`
-> plus everything since. The branch
-> `worktree-worktree-security-audit-plan` is still the working branch and
-> is **ahead of master again** with the fifth session's commits — open a
-> new PR when it is time to land them. Worktree:
-> `.claude/worktrees/worktree-security-audit-plan`.
+> **Branch:** `worktree-worktree-security-audit-plan`, worktree
+> `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
+> `origin/master` on 2026-08-28 (no conflicts). Ahead of master by the
+> fifth and sixth sessions' commits — **open a PR when it is time to land
+> them.** All four hosts build.
 >
-> **Deployed:** homelab **gen 350**, vps **gen 7**, both with zero failed
-> units. `torrent` and `thinkpad` have **never been switched** and still
-> run pre-audit configs with their `pull-deploy` timers armed.
+> **`TODO.md` no longer exists.** Master retired it for the plan-file
+> system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
+> and `workflow` skills. Plans are cited by **bare filename**, and
+> filenames are **date-first** (`2026-08-28-<slug>.md`). Older text in
+> this file still says `TODO.md`; read that as "the plan files".
 >
-> **All scheduled deploys are OFF fleet-wide** (`scheduleEnable = false`
-> on `myAutoUpdate`/`myPullDeploy`/`myPushDeploy`). Deliberate and
-> temporary — see the pipeline project in `TODO.md`. Nothing auto-updates
-> or auto-reverts any more; the safety net is the profile-staleness alert.
-> Both audit "clocks" are dead.
+> **Credential rotation is essentially finished.** This was the active
+> workstream and it is now **9 done, 2 not required, 1 deferred** — see
+> [`rotation-runbook.md`](rotation-runbook.md) for the table. Only **item
+> 9 (`homelab_zrepl_key`)** remains, and it is genuinely blocked (below).
+> Two extra items were added and completed during the audit: **11**
+> (`tailscale_authkey_isoimage`, revoked) and **12** (factorio
+> credentials, proven disclosed and rotated).
 >
-> **The active workstream is credential rotation**
-> ([`rotation-runbook.md`](rotation-runbook.md)), worked item by item
-> *with* the user. Items **1 and 2 are done and verified**; **3 and 4 are
-> not required**; **5–10 remain**. Next up is the WireGuard set (5–7).
+> **Deployed:** homelab **gen 358** and vps, both zero failed units,
+> WireGuard tunnel healthy on rotated keys. `torrent` and `thinkpad` have
+> **still never been switched** and run pre-audit configs.
 >
-> **The user works these interactively.** Do not batch them. Each item is
-> "user does the provider + sops half, agent does the repo + deploy +
-> verify half", and the verification is the point — it has caught two
-> real problems already.
+> **One change is committed but NOT deployed:** the restic staleness
+> threshold `336h → 312h` (`c6116ca`). The user chose to let it ride along
+> with their next homelab deploy rather than deploy separately.
+>
+> **All scheduled deploys remain OFF fleet-wide** (`scheduleEnable =
+> false`). Manual deploys are the only path anything takes. That is not
+> merely a state note — it is why a deploy killed the weekly backup this
+> session (see below).
+>
+> ### The three things most worth knowing before you touch anything
+>
+> 1. **A clean activation log is not evidence a rotated secret reached its
+>    consumer.** Hit three times: the WireGuard interface (`61f55cb`), the
+>    factorio container (`3dd1aa4`), and earlier the Discord webhook. Each
+>    logged `modifying secrets: …` with zero failed units while the
+>    service kept using the old value. The fix is `restartUnits`; the
+>    *lesson* is that verification means exercising the credential.
+>    Item 10 (restic) was the one case where no restart was needed — and
+>    that was checked, not assumed.
+> 2. **The offsite backup has not succeeded since 2026-08-21**, because a
+>    manual deploy kills an in-flight run. Deliberately accepted for now —
+>    see `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+>    D3. **Expect the staleness alarm to page ~2026-09-03 and be correct.**
+>    Do not "fix" it by triggering a run without reading that decision.
+> 3. **The factorio credentials were proven readable by any local uid**
+>    through `/nix/state/.zfs` (0777, 57 snapshots, `server-settings.json`
+>    at 0644). They have been rotated. The *mechanism* is not fixed and
+>    affects every secret ever written to a persisted directory —
+>    `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
+>
+> **The user works rotation items interactively.** Do not batch them. Each
+> is "user does the provider + sops half, agent does the repo + deploy +
+> verify half", and the verification is the point — it has now caught five
+> real problems.
 
 ---
 
@@ -96,8 +128,13 @@ file.
   `.claude/worktrees/worktree-security-audit-plan` — enter that rather
   than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
-- **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
-- **homelab is on gen 350 and vps on gen 7** as of the fifth session;
+- **Plan of record:** ~~the 2026-08-26 entry at the top of `TODO.md`~~ —
+  now `docs/plans/in-progress/2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md`
+  (TODO.md retired 2026-08-28)
+- **homelab is on gen 358** as of the sixth session (2026-08-28), vps
+  redeployed the same day; the lines below record earlier sessions' state
+  and are kept for the sequence.
+- ~~**homelab is on gen 350 and vps on gen 7** as of the fifth session;~~
   the line below records the fourth session's state and is kept for the
   sequence. homelab and vps are deployed (2026-08-27). homelab was switched
   twice — the audit's first switch, then again for the fourth session's
@@ -182,7 +219,12 @@ Nine commits. Six of the fourteen decisions were answered by the user.
   `alpha` while the version resolved at `release`.
 - **D11 — deliberately NOT answered.** The user asked for a
   re-evaluation and replan with a benefits/risk analysis instead; that is
-  now a `TODO.md` entry. **It fires Wed Sep 2.**
+  now `docs/plans/todo/2026-08-27-re-evaluate-and-replan-flake-update-test-s-executi.md`.
+  ~~**It fires Wed Sep 2.**~~ — **it does not fire.** That clock assumed
+  the schedules were armed; `scheduleEnable = false` fleet-wide means
+  `flake-update-test` has no timer. Corrected 2026-08-28; nothing is on a
+  clock any more except the backup staleness page (~2026-09-03), which is
+  expected and covered above.
 
 ### The deploy outage (`929efa3`) — the most important find
 
@@ -451,29 +493,79 @@ them, not the reasoning:
   replacements, which would have turned a spent single-use credential
   into a standing one. See items 3/4 in the runbook.
 
+## What happened in the sixth session (2026-08-28)
+
+Rotation went from "1 and 2 done" to essentially complete, and threw off
+four separate findings on the way. The pattern worth carrying forward is
+that **every one of them was found by verifying, not by building.**
+
+**Rotation completed:** 5–7 (WireGuard set), 8 (`homelab_vps_deploy_key`),
+10 (restic password), 11 (`tailscale_authkey_isoimage`, revoked not
+replaced), 12 (factorio credentials, added this session). 9 deferred.
+
+**Findings, each with its own plan file:**
+
+- **Rotated secrets do not reach running consumers.** WireGuard's
+  interface is a `RemainAfterExit` oneshot that reads `privateKeyFile`
+  once at link creation; the factorio container bakes its credentials into
+  `server-settings.json` at start. Both reported success while still using
+  the old value. Fixed with `restartUnits` (`61f55cb`, `3dd1aa4`). Note
+  `restartUnits` fires on *content change*, so it cannot repair the state
+  that exposes it — each needed one manual restart.
+- **`/srv` at 0770 root:root broke jellyfin** and masked rather than fixed
+  the exposure it was added for. Now
+  `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`.
+- **The factorio credentials were provably disclosed** through
+  `/nix/state/.zfs` (0777) across 57 snapshots, read live as uid 65534.
+  Mechanism split into
+  `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
+- **A manual deploy killed an 8h28m / 66 GB backup run** and left the
+  repository locked for a week.
+  `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`, with
+  the design lesson carried to the pipeline plan as **D6**.
+
+**Two corrections to earlier audit claims**, both of which would have led
+to wrong action: the stray zrepl key is on **torrent**, not homelab, and
+was cited as `F-P8-06` when it is `F-P7-02`; and restic does **not** push
+the laptop replicas offsite (it mounts only `zroot/local/state` and
+`zdata/storage/storage`).
+
+**A guard fired correctly and looked like success.** `push-deploy-vps`
+refused to run because `/etc/nixos` was not on master, logged
+`skipping this scheduled run`, and exited **0**. That is `F-P7-09`'s
+shape observed live. Item 8 was verified by authenticating directly
+instead — see the runbook item for the technique.
+
 ## What is left
 
-### Active: credential rotation (do this with the user, item by item)
+### Rotation — one item, genuinely blocked
 
-[`rotation-runbook.md`](rotation-runbook.md) is the script. **1 and 2
-done; 3 and 4 not required; 5–10 open.** Next is the WireGuard set
-(5–7), which is one commit: the PSK is shared and each private key needs
-the *other* host's peer `publicKey` updated
-(`hosts/vps/configuration.nix:357`, `hosts/homelab/configuration.nix:570`).
+[`rotation-runbook.md`](rotation-runbook.md) has the table. **9 done, 2
+not required, 1 deferred.**
 
-Two later items have prerequisites:
+**Item 9 (`homelab_zrepl_key`) is the only one open**, and it needs more
+than a decision. `vars.zreplPullerKey` is one value with two consumers
+(`hosts/torrent:96`, `hosts/thinkpad:121`), so both laptops must take the
+new public key together. Verified obstacles:
 
-- **9 (`homelab_zrepl_key`) is blocked.** `clients.homelab.publicKey` on
-  the laptops is a single value, not a list, so there is no
-  both-keys-valid window — torrent and thinkpad must take the new public
-  key at the same moment homelab takes the new private one, and neither
-  laptop has ever been deployed. Do 10 before 9.
-- **10 (restic) can lose data.** It is the repository password, not the
-  Backblaze application key. Replacing the sops value alone locks the
-  repo; use `restic key add` → verify → `key remove`.
+- **thinkpad has no remote shell** — `ssh root@thinkpad` is
+  `Permission denied (publickey)`; it is `forced-commands-only` with only
+  zrepl's forced command. No agent can deploy it.
+- **No automatic path** — `scheduleEnable = false` on both,
+  `pull-deploy.timer` is `not-found`.
+- **`operation = "boot"`** on both, so the key does not take effect until
+  each laptop **reboots**.
+- torrent must not be rebooted, and has never run the audit config.
 
-Still owed by the user from items already done: delete the **old
-Cloudflare token** and the **old Discord webhook**.
+Deferring is safe: replication is healthy, and a broken pull pauses and
+retries rather than losing anything.
+
+### Still owed by the user
+
+- Delete the **old Cloudflare token** (item 1) and the **old Discord
+  webhook** (item 2).
+- Deploy homelab to pick up the **312h staleness threshold** (`c6116ca`).
+- Expect the backup staleness page ~**2026-09-03**; it will be correct.
 
 ### Agent-doable, unblocked
 
@@ -566,9 +658,16 @@ expensive.
   `accepted-risks.md` §2 — that section is for risks that could be
   accepted, not for sizing and threshold choices.
 
-- **Log the plan and its state in [`TODO.md`](../../../TODO.md)**, not
-  only in this file. It is the repo-root entry point a session reaches
-  for before assuming a described feature is deployed.
+- **Log the plan and its state in a plan file**, not only in this file.
+  `TODO.md` was **retired on master 2026-08-28** in favour of
+  `docs/plans/{todo,in-progress,done,rejected}/` — load the `plan` skill
+  for the scripts and the append-only rules, and the `workflow` skill for
+  when a change needs a plan at all. Two things that bite: plans are
+  cited by **bare filename with no folder path** (so a citation survives
+  the file moving between folders, and a stale one fails *silently*
+  rather than loudly), and filenames are **date-first**
+  (`2026-08-28-<slug>.md`). Never hand-`mv` a plan or hand-write its
+  frontmatter; use the scripts.
 
 - **Correct the record when evidence contradicts it, in place.** Three
   claims in these docs turned out to be wrong when someone finally read
@@ -655,6 +754,49 @@ expensive.
   session (the sops-key ordering, the Tailscale keys, unstable for debug
   tooling) came from being challenged, and each time the challenge was
   correct. Check the claim against the repo before defending it.
+**Traps added in the sixth session:**
+
+- **A rotated secret does not reach a running consumer.** Three services
+  reported a clean activation (`modifying secrets: …`, zero failed units)
+  while still using the old value: WireGuard's `wg0` interface (a
+  `RemainAfterExit` oneshot that reads `privateKeyFile` only at link
+  creation), the factorio container (bakes credentials into
+  `server-settings.json` at start), and earlier the Discord webhook. Use
+  `restartUnits` — and note it fires on *content change*, so adding it
+  cannot repair the state that revealed the problem; that needs one
+  manual restart. Restic was the exception: its wrapper reads
+  `passwordFile` per invocation. **Check which kind you have; do not
+  assume either way.**
+- **A systemd exit code 0 can mean "skipped".** `push-deploy-vps` hit its
+  branch guard, logged `Not on master … skipping this scheduled run`, and
+  reported `Result=success ExecMainStatus=0`. The credential it was meant
+  to test was never used. Read the log, not the status — and prefer
+  exercising the credential directly.
+- **`myPushDeploy.flakeDir = "/etc/nixos"` makes a live host's working
+  checkout an input to deploying a *different* host.** Whatever branch
+  someone last used on homelab is what vps gets. This caused a real
+  revert: homelab was deployed from a branch without the WireGuard
+  rotation, which broke the tunnel and put back a Cloudflare token that
+  had been deleted at the provider.
+- **`protectedUnits` guards `auto-switch` only.** A manual
+  `nixos-rebuild switch` consults nothing and will kill a running restic
+  backup — losing the whole run, since restic has no resume, and leaving
+  a lock that silently blocks the next *exclusive* operation while reads
+  keep working. With schedules off fleet-wide, manual is the only path.
+- **Non-exclusive locks make a broken repository look healthy.**
+  `restic snapshots` and `key list` succeeded against a repo that had
+  been locked for a week with a failed backup. "The credential works" and
+  "the service works" are different claims.
+- **`/nix/state/.zfs` is 0777 and `snapdir=hidden` is not a boundary** —
+  it hides the directory from `readdir` but does not block traversal by
+  path. Any local uid can read any snapshot's contents at the permissions
+  they had when taken.
+- **The harness refuses more shapes than the fifth session recorded**:
+  `nix eval` piped into anything, multi-step compound commands it cannot
+  prove stay inside the worktree, and heredocs writing outside it. Break
+  them into plain separate commands, or use the Read/Edit tools — those
+  are not subject to the same check.
+
 - **When verifying a rendered unit, grep the payload, not the wrapper.**
   A `.service` file usually only holds
   `ExecStart=/nix/store/…-unit-script-<name>-start/bin/<name>-start`, and
