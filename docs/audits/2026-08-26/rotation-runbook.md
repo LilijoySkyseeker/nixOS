@@ -53,7 +53,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 8 | `homelab_vps_deploy_key` | **high** | **[x] 2026-08-28** — verified by authenticating with it; old key removed |
 | 9 | `homelab_zrepl_key` | **high** | [ ] — **deferred 2026-08-28**; needs the laptops' first audit-branch deploy *and* a reboot each, see item |
-| 10 | `homelab_backblaze_restic_password` | **highest** | [ ] |
+| 10 | `homelab_backblaze_restic_password` | **highest** | **[x] 2026-08-28** — new slot verified live (the `*` moved); old slot `3cf30d92` pending removal by user |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
 | 12 | `factorio_token`, `factorio_game_password` | **high** | **[x] 2026-08-28** — rotated; container re-authenticated to factorio.com with the new token |
 
@@ -506,6 +506,53 @@ homelab's PATH with the repo and rclone config already wired up.
 
 Do **not** remove the old key before the verify step passes. If it fails,
 the old password is still valid and you can put it back in sops.
+
+**Verified 2026-08-28. Remaining: the user removes the old slot.**
+
+Add-new → verify → remove-old, followed exactly. After
+`restic-backblazeWeekly key add` and the sops replacement, homelab was
+deployed and the repository opened with **only** the new password from
+`/run/secrets`:
+
+```
+ID        Time                 Host     Paths        Size
+549f74e6  2026-08-18 16:30:58  homelab  /tmp/restic  536.817 GiB
+1 snapshots
+
+ ID        User  Host     Created
+ 3cf30d92  root  homelab  2026-08-18 16:30:56
+*8477d18a  root  homelab  2026-08-28 13:56:37
+```
+
+**The moved `*` is the proof, and it is better evidence than `snapshots`
+succeeding on its own.** restic marks the slot that the supplied password
+actually unlocked. Before the deploy the star was on `3cf30d92`; after it,
+on `8477d18a`. So this is not "some valid password worked" — it is
+specifically the new one, which is the thing a rotation has to
+demonstrate. The unchanged snapshot id and size separately confirm the
+repository itself is untouched.
+
+**No consumer needed restarting here, and that was checked rather than
+assumed.** Unlike the WireGuard interface (`61f55cb`), the factorio
+container (`3dd1aa4`) and the Discord webhook, both the
+`restic-backblazeWeekly` wrapper and
+`restic-backups-backblazeWeekly.service` read `passwordFile` per
+invocation rather than holding it open, so the deploy alone applied it.
+The empirical check is the same one used elsewhere: exercise the
+credential and read what comes back.
+
+- **You** — `restic-backblazeWeekly key remove 3cf30d92`. Safe now: the
+  live password opens `8477d18a`, so removing the old slot cannot lock
+  you out.
+
+**Context worth carrying into that step.** The repository holds a single
+snapshot from 2026-08-18 and the last successful backup run was
+2026-08-21, seven days before this rotation. The weekly timer is active
+with the next run due 2026-09-04, and `myHealthAlerts` pages at 336h/14
+days. So the offsite copy was already a week stale when this was rotated
+— an argument for having done it now rather than after the next run, and
+a reason to confirm the 2026-09-04 run actually succeeds rather than
+assuming this rotation is finished when the old slot is gone.
 
 ---
 
