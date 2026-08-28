@@ -31,6 +31,22 @@ helper + convention) rather than re-solving it ad hoc each time.
       "diff-scoping" helper usable by any future gate) or something
       narrower.
 
+**2026-08-28 addendum, from
+`2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`
+(D2):** a related but distinct need came up in that same conversation —
+a code-*cleanliness* subagent (reuse, simplification, condensing into
+reused modules), not this plan's diff-*scoping* concern. User's framing:
+"let's try 2 first" — for now, `workflow` mandates the existing
+`/simplify` skill for every non-trivial change instead of building
+anything new (see `docs/skills/workflow/reference.md`'s subagent-selection
+table) — "and make a note that we may need to be 1 in the future": a
+dedicated repo-gated subagent, matching `security`/`docs-updater`'s shape
+(auto-invoked, appends findings into the plan file, repo-aware of this
+codebase's own module conventions in a way `/simplify` isn't). If that
+need materializes, decide then whether it's this plan's scope, folded into
+whatever comes out of the diff-scoping survey above, or a third,
+independent plan — don't assume it's automatically this one.
+
 ## Decisions (D)
 
 

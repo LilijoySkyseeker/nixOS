@@ -33,7 +33,7 @@ every line below is currently unstarted.
 - [ ] G2 — no index/dashboard view across all plans
 - [x] G3 — `plan-tick`'s ID matching is line-bound and fragile
 - [ ] G4 — heading-regex mismatches fail silently with no linter
-- [ ] G5 — no structural validator ("plan-lint") for a plan file
+- [x] G5 — no structural validator ("plan-lint") for a plan file
 - [ ] G6 — near-duplicate plan detection is judgment-only, not hardcoded
 - [ ] G7 — `subagent-stamp`'s `agent_type` allowlist is a hardcoded, easy-to-forget list
 - [ ] G8 — host-build detection logic is duplicated between `pre-push` and `verify-ladder`
@@ -48,7 +48,7 @@ every line below is currently unstarted.
 - [x] G17 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
 - [ ] G18 — `plan-reject`'s mandatory reason has no substance check
 - [ ] G19 — no retention/archival story for `done/`/`rejected/` at scale
-- [ ] G20 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
+- [x] G20 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
 - [ ] G21 — every hook in this system is bypassable (`--no-verify`, direct payload crafting) by design, not just in theory
 - [ ] G22 — `security`/`docs-updater` both hold `Bash`, which can fully defeat a "read-only" intent at the tool-restriction level
 - [ ] G23 — no verification that a subagent actually stayed in its intended scope
@@ -57,7 +57,7 @@ every line below is currently unstarted.
 - [ ] G26 — no recovery ("plan-doctor") for a plan left mid-operation by an interrupted `plan-freeze`/`plan-move`
 - [ ] G27 — the whole system exists on one unpushed/unmerged branch; multi-machine drift risk until it lands
 - [ ] G28 — no CI validation independent of local hooks
-- [ ] G29 — `security` subagent vs. the landed `docs/skills/security-audit/` skill: overlapping domain, unreconciled, incompatible ID schemes
+- [x] G29 — `security` subagent vs. the landed `docs/skills/security-audit/` skill: overlapping domain, unreconciled, incompatible ID schemes
 - [ ] G30 — `docs/agents/security/reference.md` is a copied/adapted rubric, not single-sourced from the audit's own reference material
 - [ ] G31 — no repo-wide citation-integrity checker confirming every bare-filename citation actually resolves
 - [ ] G32 — no chain-of-custody view for multi-hop `plan-carry`/supersession chains
@@ -127,6 +127,22 @@ from a Progress checkbox actually exists as a heading, or that the four
 required `##` sections are all present. Every plan file produced so far is
 correct by construction (via the scripts) or careful hand-authorship, not
 by any automated check.
+
+**RESOLVED 2026-08-28:** fixed in
+`2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`
+— new `plan-lint <file>` script, read-only, checking exactly the four
+things named above (frontmatter completeness, status-matches-folder,
+sequential/non-duplicate D/G/F ids, required sections present including
+the new `## State`) plus one more: every Progress checkbox citing a bare
+`D<N>`/`G<N>`/`F<N>` as its first token resolves to a real local heading.
+Not wired into any gate yet (not `verify-ladder`, not `plan-freeze`) — it's
+a manual check for now, same caveat as `verify-ladder`'s own diff-scoped
+lint being independent of VM-testing. The citation-resolution check was
+deliberately narrowed to "ID is the first token after the checkbox" after
+dogfooding it against this very plan's own Progress section, which
+legitimately mentions other files' G-ids in prose (`resolve G5/G20 in the
+known-weak-points plan`) — an earlier, broader version flagged those as
+false positives.
 
 ### G6 — near-duplicate plan detection is judgment-only, not hardcoded
 `plan-new` refuses an *exact* slug collision only. A near-duplicate title
@@ -231,6 +247,20 @@ of non-trivial, ungated work *before* ever attempting a commit (e.g. a
 long exploratory session that's abandoned without committing never
 touches the gate at all).
 
+**PARTIALLY RESOLVED 2026-08-28:** in
+`2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`
+— a real backstop now exists at the *merge/deploy* boundary specifically
+for unresolved security Findings: local `plan-gate` script plus (this
+repo's first) GitHub Actions check, wired as a required status check on
+the `master` ruleset (which also gained a require-pull-request rule it
+didn't have before, since a required check alone would have rejected
+every direct push outright). This closes the "local hooks are the only
+backstop, and they're all bypassable" gap **for Findings resolution only**
+— it does **not** address this gotcha's broader claim, that skill
+auto-invocation itself is unreliable or that ungated mid-task drift before
+any commit is attempted goes uncaught. Still open for anything that isn't
+"does the plan cited by this merge have unresolved findings."
+
 ### G21 — every hook in this system is bypassable by design, not just in theory
 `git commit --no-verify` skips the git-level hooks; a sufficiently
 sophisticated or careless agent session could in principle craft tool
@@ -304,6 +334,18 @@ real, landed skill (fleet-wide multi-agent audit, `F-P<n>-NN` finding IDs),
 coexisting with this session's own `security` subagent (per-task,
 `F<N>` finding IDs local to one plan file). No doc explains when to reach
 for which, and the two ID schemes don't cross-reference each other at all.
+
+**RESOLVED 2026-08-28:** documented in
+`2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`,
+which added "Findings graduating from a fleet-wide security audit" to
+`docs/skills/plan/reference.md`: the two schemes stay deliberately
+separate (fleet findings are per-audit-part, task findings are per-plan-
+file), and a fleet finding graduating into task-scoped follow-up work gets
+a fresh, local `F<N>` in the new plan citing its fleet origin in the
+heading (`### F1 -- <title> (from F-P3-07)`) — never renamed to fit either
+scheme. This is a documentation/convention fix, not a code change; when/
+which-subagent-to-reach-for is still governed by `workflow/reference.md`'s
+existing subagent-selection table, unchanged by this.
 
 ### G30 — `docs/agents/security/reference.md` is a copied/adapted rubric, not single-sourced from the audit's own reference material
 Harvested deliberately (per the user's own instruction) from
@@ -440,3 +482,5 @@ should sort/group by it.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+_security finished 2026-08-28T23:06:33Z -- see Findings above._

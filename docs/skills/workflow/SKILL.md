@@ -19,7 +19,12 @@ this file stays short on purpose (progressive disclosure).
    this task; `plan-move <file> in-progress` an existing `todo/` match,
    or `plan-new "<title>"` if nothing exists.
 3. **Do the work**, following existing conventions unchanged
-   (`docs/style-guide.md`, `AGENTS.md`'s hard-confirm rules).
+   (`docs/style-guide.md`, `AGENTS.md`'s hard-confirm rules). Write
+   comments right the first time -- lowercase, terse, mechanics-only,
+   citing the plan by anchored id (`# plan: <date>-<slug>.md#D2`) for any
+   "why" rather than inlining the reasoning -- rather than leaning on
+   `docs-updater` to clean it up afterward; that subagent is a backstop
+   for what slips through, not the primary mechanism.
 4. **Run the cheap verification ladder**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
    `nixfmt --check`, `nix flake check`, a targeted `nixos-rebuild build`,
@@ -28,11 +33,15 @@ this file stays short on purpose (progressive disclosure).
    VM-testing, which is not yet part of this system -- see reference.md.
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
    `### G<N>` entries, append-only.
-6. **Invoke `security`/`docs-updater` where relevant** (reference.md has
-   the selection table). Each appends findings into the *same* current
-   plan file; a `SubagentStop` hook stamps proof it actually finished,
-   independent of whether this skill's own sequencing "waited" for it --
-   see reference.md, "Why a hook at all", for why that matters.
+6. **Invoke `security`/`docs-updater` where relevant, and `/simplify`
+   always** (reference.md has the selection table). `security`/
+   `docs-updater` append findings into the *same* current plan file; a
+   `SubagentStop` hook stamps proof it actually finished, independent of
+   whether this skill's own sequencing "waited" for it -- see
+   reference.md, "Why a hook at all", for why that matters. `/simplify`
+   is required for any non-trivial change (reuse/simplification/
+   condensation-into-modules review) -- run it before step 7, and if it
+   proposes fixes, apply them before moving on.
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.

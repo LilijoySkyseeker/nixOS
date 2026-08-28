@@ -25,6 +25,15 @@ if [ -n "$unresolved" ]; then
 $unresolved"
 fi
 
+unresolved_f="$(plan_unresolved_findings "$root/$rel")"
+if [ -n "$unresolved_f" ]; then
+  plan_die "cannot freeze -- unresolved findings (must be FIXED, ACCEPTED, or MOOT -- use plan-resolve):
+$unresolved_f"
+fi
+
+state_problem="$(plan_state_problem "$root/$rel")"
+[ -n "$state_problem" ] && plan_die "cannot freeze -- $state_problem"
+
 plan_do_freeze "$root" "$rel"
 plan_note "$rel frozen."
 echo "$rel"

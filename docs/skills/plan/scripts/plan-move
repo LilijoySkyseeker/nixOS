@@ -31,6 +31,15 @@ if [ "$target" = "done" ]; then
     plan_die "cannot move to done/ -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
 $unresolved"
   fi
+
+  unresolved_f="$(plan_unresolved_findings "$root/$rel")"
+  if [ -n "$unresolved_f" ]; then
+    plan_die "cannot move to done/ -- unresolved findings (must be FIXED, ACCEPTED, or MOOT -- use plan-resolve):
+$unresolved_f"
+  fi
+
+  state_problem="$(plan_state_problem "$root/$rel")"
+  [ -n "$state_problem" ] && plan_die "cannot move to done/ -- $state_problem"
 fi
 
 git -C "$root" mv "$rel" "$new_rel"
