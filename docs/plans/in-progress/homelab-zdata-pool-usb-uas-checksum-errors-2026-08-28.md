@@ -41,8 +41,16 @@ errors: No known data errors
 - [x] Checked dmesg/journalctl for ATA/USB link errors
 - [x] Identified physical transport (USB, not SATA) as the likely differentiator
 - [x] Decide on remediation (D1)
-- [ ] Apply fix if approved, then `zpool clear zdata`
-- [ ] Confirm no error recurrence after a full scrub cycle
+- [x] Apply fix (PR #26, not yet merged): deployed to homelab directly via
+      `nixos-rebuild switch --flake .#homelab --target-host root@homelab`
+      (built locally, activated remotely per G11/G37) and rebooted
+      2026-08-28 11:49. Confirmed via dmesg: all four enclosure ports now
+      report `UAS is ignored for this device, using usb-storage instead`.
+      `zpool clear` turned out unnecessary -- CKSUM reset to 0/0 on its own
+      across the reboot/re-import (see G6 correction).
+- [ ] Confirm no error recurrence after a full scrub cycle (fresh 0/0
+      baseline as of 2026-08-28 11:49 boot)
+- [ ] Merge PR #26 now that the fix is confirmed working live
 
 ## Decisions (D)
 ### D1 -- how to remediate: apply USB UAS quirk, just clear errors, or investigate further first?
@@ -98,16 +106,30 @@ disconnect/reset/over-current events for the enclosure. The corruption
 which is itself typical of this class of UAS bridge bug -- it happens
 silently within a "successful" transfer, not as a dropped/retried one.
 
-### G6 -- CKSUM counters (22/27) are a lifetime total since pool creation, never cleared
-`zpool history zdata` shows the pool was created 2024-07-29 and contains
+~~### G6 -- CKSUM counters (22/27) are a lifetime total since pool creation, never cleared~~
+~~`zpool history zdata` shows the pool was created 2024-07-29 and contains
 no `zpool clear` entry, ever. So 22 and 27 CKSUM errors represent the
 *entire ~25-month life of the pool*, not a recent burst -- averaging
 roughly 1 per month per disk. That's a slow, low-grade trickle, not an
-accelerating failure. Also notable: 21 separate `zpool import -N` boot
+accelerating failure.~~ Also notable: 21 separate `zpool import -N` boot
 events over that lifetime (one per reboot), clustered unusually tightly on
 2026-08-24 (4 imports within 50 minutes) and 2026-08-26 (2 imports) --
 consistent with recent config/deploy work in this repo around that date
 rather than crash-looping, but worth keeping in mind as context.
+
+**CORRECTED 2026-08-28:** disproven by direct observation. After
+deploying the `usb-storage.quirks` fix and rebooting (new boot
+2026-08-28 11:49), `zpool status zdata` shows CKSUM back to **0/0** on
+both mirror members, with no `zpool clear` ever issued. So the READ/
+WRITE/CKSUM counters do *not* persist as a lifetime total across a
+reboot/re-import as assumed above -- they reset per-boot. That means the
+22/27 CKSUM count actually accumulated only since the *previous* boot
+(2026-08-26 13:51) through whenever the alert fired, a window of at most
+~2 days, not 25 months. Severity reframe: this was accumulating far
+faster than "~1/month" -- on the order of 10+ CKSUM errors/day/disk under
+UAS -- which argues the fix was more urgent than G6 originally concluded,
+not less. Good news is the same observation: post-fix, a fresh 0/0
+baseline is now in place to watch going forward (see Progress).
 
 ### G7 -- kernel's live checksum-ereport ring buffer holds nothing (as expected)
 `zpool events zdata | grep checksum` returns 0 matches -- the in-kernel
@@ -171,6 +193,15 @@ diff, unrelated to the homelab host, and outside this plan's scope to fix
 `nixos/tests/ssh-keys.nix` a different way, or a Nix version change).
 Recommend a separate `docs/plans/todo/` entry if this is worth fixing;
 not blocking this plan's commit.
+
+~~### G11 -- workflow gap: don't build on the target host itself for a manual pre-merge test deploy~~
+**MOVED 2026-08-28:** this is a general workflow-system weak point, not
+specific to the zdata/USB investigation -- relocated to
+`known-weak-points-in-the-plan-file-and-workflow-sy-2026-08-27.md` (as
+G37) instead.
+~~**MOVED 2026-08-28 (correction):** first filed this under
+`rebuild-the-update-build-deploy-pipeline-properly-2026-08-27.md` --
+wrong plan, corrected to the line above.~~
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
