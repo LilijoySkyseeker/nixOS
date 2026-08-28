@@ -51,13 +51,13 @@ config reads as policy and does nothing:
 
 | Instance | File | What silently does not happen |
 |---|---|---|
-| `/srv` tmpfiles rule malformed (`0770 - root root -` puts `root` in the Age field) | `hosts/homelab/configuration.nix:80` | systemd rejects the line (`Invalid age 'root'`, exit 65); `/srv` is created implicitly at `0755`, so game-server data (RCON passwords, op lists) is world-readable to every local account (F-P3-12) |
+| `/srv` tmpfiles rule malformed (`0770 - root root -` puts `root` in the Age field) | `hosts/homelab/configuration.nix:80` | systemd rejects the line (`Invalid age 'root'`, exit 65); `/srv` is created implicitly at `0755`, so game-server data (RCON passwords, op lists) is world-readable to every local account (F-P3-12). **[Corrected 2026-08-28: the syntax was fixed to a working `0770 root:root` rule, which then broke jellyfin (uid 999, not root/group-root, has no traverse bit) — see `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`. Redesigned: `/srv` itself now stays at the distro default 0755 (it is a namespace, not a secret), confidentiality moved to the leaf directories (`/srv/factorio/main`, `/srv/minecraft/vanilla-plus` now 0700, co-located in `modules/services/{factorio,minecraft}.nix`), jellyfin's duplicate rules deleted so upstream's 0700 applies unweakened. Deployed and verified live. That plan's own F1: this closes only the *next* disclosure — the factorio credentials were already read out of world-traversable ZFS snapshots (`/nix/state/.zfs`, 0777) before the fix landed and remain disclosed until rotated at factorio.com.]** |
 | `SSH_AUTH_SOCK = "/home/<user>/…"` — literal placeholder | `modules/profiles/PC.nix:165-166` | the Bitwarden SSH agent has **never** been in the path; every `ssh` falls through to the on-disk fleet-root key (F-P1-07, F-P8-22(2)) |
 | `triggeredBy` used as a systemd attribute name | `modules/nixos/iso-autobuild.nix:69-74` | renders a phantom `pull-deploy.service.service`; the recovery ISO has never been rebuilt, and `/var/lib/iso-autobuild/result` is now a dangling symlink (F-P7-12) |
 | `services.networkd-dispatcher` on a NetworkManager host | `hosts/homelab/configuration.nix:27-36` | can never fire (its only trigger is `org.freedesktop.network1`); the tailscale UDP-GRO tweak has never applied, and an unsandboxed root Python daemon idles forever (F-P3-19) |
 | `docker` in `extraGroups` with `virtualisation.docker.enable = false` | `modules/profiles/PC.nix:313` | no group is created and no warning is emitted; a line that reads as a root-equivalent grant is inert (F-P1-13, F-P5-13) |
 | `security.sudo.execWheelOnly` / package override under `enable = false`; `services.pulseaudio.support32Bit` under `enable = false` | `default.nix:60-65`, `PC.nix:293-294` | decoration that reads like policy (F-P1-15) |
-| `factorio-new`'s floating `stable` tag | `modules/services/factorio.nix:149-159` | `pull` defaults to `"missing"` and `/var/lib/docker` is persisted, so the documented "picks up engine updates on restart" never happens (F-P4-13) |
+| `factorio-new`'s floating `stable` tag | `modules/services/factorio.nix:149-159` | `pull` defaults to `"missing"` and `/var/lib/docker` is persisted, so the documented "picks up engine updates on restart" never happens (F-P4-13). **[Moot 2026-08-28: `factorio-new` was removed entirely (`7a047b7`, "declared unused") — the container, its volume, its persistence entry, its mod-mirroring preStart, and the DNAT/hashlimit/firewall rules for its port are all gone. The surviving server is just `factorio.<domain>` (`factorio-main`, tag `2.1.14`). No action needed; the finding no longer has a subject.]** |
 | jellyfin's `KnownProxies` patch is `[ -f "$networkXml" ]`-guarded | `modules/services/jellyfin.nix:62-71` | on first boot the file does not exist, the patch no-ops, jellyfin then writes an empty `KnownProxies`, and the brute-force lockout is inert for one boot (F-P4-11) |
 
 **Proposed rule.** *Verify effect, not presence. A NixOS option, a
@@ -284,6 +284,11 @@ limits are a CONFIRMED absence.
   `--cpus`, and no `userns-remap` (verified: daemon settings contain only
   `userland-proxy = false`), so container uid 0 is host uid 0 on the bind
   mounts and any container OOM is host OOM on the box holding `zbackup`.
+  **[Partially closed 2026-08-27: `--memory=7g` and `--pids-limit` (512
+  factorio / 1024 minecraft) are now set and deployed on both game
+  containers, per D15 ("no container may exceed 50% of host memory").
+  `--cpus` and `userns-remap` remain unset — the latter is item 4 in
+  RESUME.md's agent-doable list, the former is undecided.]**
   The units are `docker run` wrappers with no sandboxing — inherent to
   `oci-containers` — which also means `factorio.nix:103-123`'s two
   secret-handling `preStart` scripts run as unsandboxed root. Credit where
@@ -525,7 +530,16 @@ finding rather than claimed as a blanket.
    material with nothing indicating a pending change.
    `docs/procedures/secrets.md` says consumers get the new value "at next
    rebuild/switch or next boot" — true of the *file*, easy to read as a
-   claim about the *service* (F-P8-14).
+   claim about the *service* (F-P8-14). **[Closed for the wireguard trio
+   and the factorio container secrets, 2026-08-28: `restartUnits` added
+   (`61f55cb`, `3dd1aa4`) after this exact gap was hit live during
+   rotation — both reported a clean activation while still using the old
+   value, confirming the finding's prediction. `restartUnits` fires only
+   on content change, so each already-rotated secret still needed one
+   manual restart to pick up the fix; that is not a gap in the fix, it is
+   the one-time cost of applying it after the fact. The other ~19
+   declarations are unreviewed — this closes the two the audit actually
+   named, not the general SYS-11 gap.]**
 
 **Proposed rule.** *Set `restartUnits` on every secret whose consumer
 caches it at start — the wireguard trio and the factorio container
@@ -987,6 +1001,25 @@ property of other units' configs, not of these, and homelab runs
 then re-check the per-service directory modes, which are the real
 control.
 
+**[Corrected 2026-08-28: the first leg is fixed, not as originally
+suggested.** `factorio-new` no longer exists (`7a047b7`) — only
+`/srv/factorio/main`, `/srv/minecraft/vanilla-plus` and `/srv/jellyfin/*`
+remain. The one-line fix suggested here (`0770` on `/srv`) was tried and
+reverted live because it denies every one of `/srv`'s three non-root,
+non-root-group service users the traverse bit they need — see
+`2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`. The
+actual fix moved confidentiality to the leaves instead: `/srv` stays at
+the distro default 0755, the two game-server directories are now 0700,
+and jellyfin's own duplicate tmpfiles rules were deleted so upstream's
+0700 applies. **`userns-remap` and the restic `/tmp` mount are both still
+open** — this promotion's second and third legs are unchanged.
+**Read that plan's F1 before treating any of this as closed**: the
+factorio credentials were already disclosed through world-traversable ZFS
+snapshots before the leaf-mode fix landed, and a permission change cannot
+retract a snapshot already taken — only rotation at factorio.com does
+that, and it is still pending (rotation runbook item 9's neighbor,
+F-P4-04).]**
+
 ### PROMO-04 — the only outward alerting channel is unreliable in exactly the way that hides a silent failure
 
 **Parts:** F-P7-13 (LOW), F-P2-21 (INFO), F-P7-10 (LOW), F-P7-12 (LOW),
@@ -1082,7 +1115,7 @@ config, not about whether to act.
 
 | Item | File:line | What it was for | Evidence it is broken | Safe to remove? |
 |---|---|---|---|---|
-| `/srv` tmpfiles rule | `hosts/homelab/configuration.nix:80` | make `/srv` `0770` so game-server data is not casually traversable | pinned `systemd-260.2` rejects the line: `Invalid age 'root'`, exit 65 (reproduced); `/srv` is created implicitly at `0755` (F-P3-12) | **no — fix**: `"d /srv 0770 root root - -"`, then re-check child modes |
+| `/srv` tmpfiles rule | `hosts/homelab/configuration.nix:80` | make `/srv` `0770` so game-server data is not casually traversable | pinned `systemd-260.2` rejects the line: `Invalid age 'root'`, exit 65 (reproduced); `/srv` is created implicitly at `0755` (F-P3-12) | ~~**no — fix**: `"d /srv 0770 root root - -"`, then re-check child modes~~ **superseded 2026-08-28: that exact fix was applied, then reverted live because it broke jellyfin's traverse access. Redesigned — see the `/srv` entry in §2's SYS-01 table for the current shape and `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md` for the full record.** |
 | `SSH_AUTH_SOCK` placeholder | `modules/profiles/PC.nix:165-166` | route `ssh` through the Bitwarden agent instead of on-disk keys | literal `<user>` never substituted; live `env` on torrent shows the placeholder verbatim while the real socket is at `/home/lilijoy/` (F-P1-07, F-P8-22) | **no — fix with the deploy-key story**, not alone: a locked agent breaks unattended `myPullDeploy` |
 | `myIsoAutobuild.triggeredBy` | `modules/nixos/iso-autobuild.nix:69-74` | rebuild the recovery ISO after a successful `pull-deploy` | `lib.genAttrs` uses the value as an attribute name, so NixOS renders `pull-deploy.service.service`; confirmed live, and the real unit has no `OnSuccess` (F-P7-12) | **no — fix** (`lib.removeSuffix ".service"` + an assertion on names containing `.`); wire after F-P7-09 or every skipped run triggers a multi-GB build |
 | `/var/lib/iso-autobuild/result` | same | the built ISO's store path | dangling symlink to a garbage-collected path; a manual `iso-copy-to-downloads` exits 0 with "No iso has been built yet" (F-P7-12) | consequence of the above |
@@ -1094,10 +1127,10 @@ config, not about whether to act.
 | health-alerts Discord payload | `modules/nixos/health-alerts.nix:132` | a formatted code block in Discord | Nix indented strings do not process `\n` and `jq --arg` escapes the backslash; the emitted JSON renders as one run-on line containing literal `\n` (F-P7-13) | **no — fix** |
 | `/var/lib/health-alerts` not persisted | `hosts/vps/configuration.nix:248-270` | keep cooldown stamps across reboot | absent from the persist list on a tmpfs-root host, so every boot re-alerts for anything still broken. Not `DynamicUser`, so a plain directory entry works (F-P2-21) | **no — add** to the persist list |
 | jellyfin `KnownProxies` patch | `modules/services/jellyfin.nix:62-71` | make the per-IP brute-force lockout work behind the tunnel | the `[ -f "$networkXml" ]` guard no-ops on first boot; jellyfin then creates the file with an empty `KnownProxies` and the lockout is inert until restart. The comment's "self-heals" claim covers the clearing case, not the creation case (F-P4-11) | **no — fix**; logging loudly on the skip is free and probably sufficient |
-| `factorio-new`'s floating `stable` tag | `modules/services/factorio.nix:149-159` | "pick up engine updates automatically on restart" | `pull` defaults to `"missing"` (visible as `--pull missing` in the realised argv) and `/var/lib/docker` is persisted, so the image never refreshes (F-P4-13) | **no — decide**: `pull = "newer"` and accept the trade, or correct the comment. Also digest-pin `factorio-main`, whose `2.1.14` is a mutable tag |
+| `factorio-new`'s floating `stable` tag | `modules/services/factorio.nix:149-159` | "pick up engine updates automatically on restart" | `pull` defaults to `"missing"` (visible as `--pull missing` in the realised argv) and `/var/lib/docker` is persisted, so the image never refreshes (F-P4-13) | ~~**no — decide**: `pull = "newer"` and accept the trade, or correct the comment.~~ **moot 2026-08-28: `factorio-new` removed entirely (`7a047b7`).** Also digest-pin `factorio-main`, whose `2.1.14` is a mutable tag — **this half is still open** |
 | samba `hosts allow` is IPv4-only | `modules/services/samba.nix:50-52` | restrict SMB to the tailnet | rendered `hosts allow=100.64.0.0/10`; `smbd` binds `[::]:445` and every tailnet node has an `fd7a:115c:a1e0::/48` address, so v6 peers are rejected. Fails closed today (F-P4-14) | **no — fix**: add the v6 prefix |
 | samba `hosts deny=0.0.0.0/0` | `modules/services/samba.nix:50-52` | "defense in depth" | does nothing (the allow list already excludes everything else) and covers no IPv6; a future reader relaxing `hosts allow` while trusting it opens 445 to every v6 source (F-P4-14) | **yes** (or add `::/0`) |
-| duplicate `safe.directory` appended on every run | `modules/flake/deploy-guards.nix:24` | suppress git's dubious-ownership refusal | `git config --global --add`, same value, never checked; unbounded growth on torrent and thinkpad where `/root` persists, self-limiting on homelab where it does not (F-P7-16) | **no — guard with `--get-all`**, or remove entirely as part of F-P7-01 |
+| duplicate `safe.directory` appended on every run | `modules/flake/deploy-guards.nix:24` | suppress git's dubious-ownership refusal | `git config --global --add`, same value, never checked; unbounded growth on torrent and thinkpad where `/root` persists, self-limiting on homelab where it does not (F-P7-16) | ~~**no — guard with `--get-all`**, or remove entirely as part of F-P7-01~~ **superseded (`929efa3`, third session): removed entirely rather than guarded.** The whole `git config --global --add` approach was replaced by a `git() { command git -c safe.directory="$PWD" "$@"; }` wrapper (found necessary for an unrelated reason — root's `~/.config/git/config` is a home-manager store symlink, so the old code's global-config write broke on a read-only store). The new form writes nothing, so there is nothing left to grow. Deployed and verified live on homelab and vps. |
 | `.githooks/pre-push` pathspec filter | `.githooks/pre-push:23,37` | build only when build-relevant paths change | filters on `profiles/` and `services/`, which do not exist at top level (they are `modules/profiles/`, `modules/services/`), and **misses `files/`**, which *is* build-relevant (`PC.nix:242` reads `files/gruvbox-dark-rainbow.png`) — so a `files/` change can land unbuilt (F-P7-16) | **no — fix**: add `files/`, drop the two dead pathspecs |
 | sshd `PermitRootLogin` / `X11Forwarding` in `extraConfig` | `hosts/vps/configuration.nix:321-331`, `hosts/homelab/configuration.nix:376-386` | the SSH hardening baseline | inert — the module emits both first and sshd_config is first-directive-wins; verified with `sshd -T` against mutated copies (F-P2-09, F-P3-18) | **no — move to `settings.*`**: byte-identical output, a no-op to behaviour and a real change to safety |
 | `tmux.nix` header | `modules/home-manager/tmux.nix:6-8` | claims "shared by every host (root on servers, lilijoy on PCs)" | only `server.nix:56` imports it; `PC.nix:152-157` does not, so `lilijoy` gets the binary with no configuration (F-P8-23) | **no — decide**; review `@continuum-restore 'on'` before adding it to `PC.nix` (it re-executes saved command lines from a user-writable home) |

@@ -1,7 +1,7 @@
 ---
 slug: restructure-zfs-so-ordinary-temp-and-cache-data-is
 created: 2026-08-28
-status: todo
+status: in-progress
 frozen: false
 ---
 
@@ -59,7 +59,7 @@ homelab gets this free from impermanence: its root is rolled back to
 ## Progress
 
 - [ ] G1 confirmed empirically — no action taken yet
-- [ ] D1 land `boot.tmp.useTmpfs` (agreed, not yet written)
+- [x] D1 land `boot.tmp.useTmpfs` (agreed, not yet written)
 - [ ] D2 impermanence fleet-wide — see
       `2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md`
 - [ ] D3 dataset split for `~/.cache` / Trash / Downloads — undecided
