@@ -4,15 +4,18 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-28, end of the sixth session.**
+**Last updated: 2026-08-28, end of the seventh session.**
 
-> ## START HERE — state as of the sixth session
+> ## START HERE — state as of the seventh session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
-> `origin/master` on 2026-08-28 (no conflicts). Ahead of master by the
-> fifth and sixth sessions' commits — **open a PR when it is time to land
-> them.** All four hosts build.
+> `origin/master` as of the sixth session (no conflicts). Ahead of master
+> by the fifth through seventh sessions' commits — **open a PR when it is
+> time to land them.** All five `nixosConfigurations` build. The seventh
+> session added two doc/config commits (`findings-tail.md` corrections,
+> `boot.tmp.useTmpfs`) — see "What happened in the seventh session" below;
+> neither is deployed anywhere.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -535,6 +538,57 @@ refused to run because `/etc/nixos` was not on master, logged
 `skipping this scheduled run`, and exited **0**. That is `F-P7-09`'s
 shape observed live. Item 8 was verified by authenticating directly
 instead — see the runbook item for the technique.
+
+## What happened in the seventh session (2026-08-28)
+
+Two things, neither deployed anywhere.
+
+**`findings-tail.md` reviewed against current repo state.** Sessions 3-6
+fixed several things that consolidation still described as open; a fork
+verified each citation against the live repo rather than trusting the
+doc, and annotated seven stale entries in place (strikethrough/bracketed
+correction, per this file's own "correct the record" rule): the `/srv`
+tmpfiles row (fixed, then broke jellyfin, then redesigned — see below),
+`factorio-new`'s floating tag (moot, the container is gone), the
+container resource-ceiling bullet in SYS-07 (`--memory`/`--pids-limit`
+now set), SYS-11's `restartUnits` gap (closed for the wireguard trio and
+factorio secrets, the two the audit actually named), PROMO-03 (first leg
+fixed differently than suggested), and the `safe.directory` row in the
+§5.1 table (superseded by the `git()` wrapper from the deploy-outage
+fix). Left alone, confirmed still accurate: the sshd `extraConfig`→
+`settings.*` migration (SYS-02) and waydroid's `trustedInterfaces` grant
+(SYS-03) — neither has been touched. One item flagged but not annotated:
+whether the ISO-staleness finding (L-03) is still live depends on
+torrent/thinkpad's deploy state, which needed SSH access to confirm and
+wasn't checked. Commit `4e2278c`.
+
+**`boot.tmp.useTmpfs = true` landed fleet-wide**, closing D1 of
+`2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md` (agreed
+2026-08-27, not yet written before this session). One line in
+`modules/profiles/default.nix`, which every host imports including vps.
+All five `nixosConfigurations` build; the rendered `tmp.mount` was read
+back (not just built) on torrent and vps, confirming `Type=tmpfs`,
+`size=50%`, `nosuid`, `nodev`.
+
+The `security` subagent's review raised a MEDIUM finding — that
+nix-daemon's build scratch space would now compete with tmpfs `/tmp` for
+RAM — which **checking the pinned Nix docs against live state refuted**:
+Nix 2.34.8 defaults `build-dir` to `$NIX_STATE_DIR/builds`
+(`/nix/var/nix/builds`, confirmed to exist, on `/nix` not `/tmp`), not
+`$TMPDIR` as older Nix versions did, and `nix-daemon.service`'s rendered
+environment sets no `TMPDIR`. Downgraded to INFO in the plan with that
+evidence rather than accepting the PLAUSIBLE claim at face value — the
+same "check the source, don't assume" discipline this file's obligations
+section already asks for. One real residual from that review, LOW and
+still open: homelab's restic backup mounts a ZFS snapshot under
+`/tmp/restic/$snap`, and nobody has verified that mount-stacking onto the
+new tmpfs still works — deliberately not tested live, since a careless
+check risks kicking off part of the multi-day backup. Tracked as a
+Progress item to check at homelab's next real deploy. Commit `193bbc0`.
+
+**Not deployed anywhere.** Both changes are build-verified only; they
+take effect at each host's next switch, whenever the user chooses to
+deploy.
 
 ## What is left
 
