@@ -65,6 +65,7 @@ every line below is currently unstarted.
 - [ ] G34 — see `design-the-vm-testing-subagent-s-2026-08-27.md` (tabled separately)
 - [ ] G35 — see `design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md` (tabled separately)
 - [ ] G36 — see `resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md` (tabled separately)
+- [ ] G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 
 ## Decisions (D)
 
@@ -316,6 +317,23 @@ generalized diff-scoped-linting skill
 (`design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md`), and the
 unresolved samba persistence conflict
 (`resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md`).
+
+### G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
+`plan-new` names files `<slug>-<created-date>.md` (slug first, date as a
+disambiguating suffix — see `G17`). Because the date sits at the *end*,
+`ls docs/plans/<status>/` and most file pickers sort entries
+alphabetically by slug, not by creation order — there's no way to eyeball
+"what's newest" without opening each file's frontmatter or reaching for
+`ls -t`/`git log`. A `<created-date>-<slug>.md` ordering (e.g.
+`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md`) would
+make plain alphabetical/directory-listing order double as chronological
+order, at the cost of a citation-format change (`workflow`/`plan`
+skill docs, every existing bare-filename citation across the repo,
+`plan-new`'s slugify/naming logic, and — since existing files would need
+renaming to stay consistent — a one-time bulk migration of every plan
+file already created under the old ordering, exactly the "rename target
+outside the normal scripts" risk `G31` already flags for citation
+integrity).
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
