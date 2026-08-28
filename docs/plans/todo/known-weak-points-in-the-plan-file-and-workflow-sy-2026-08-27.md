@@ -66,6 +66,7 @@ every line below is currently unstarted.
 - [ ] G35 — see `design-a-diff-scoped-linting-skill-or-subagent-2026-08-27.md` (tabled separately)
 - [ ] G36 — see `resolve-whether-samba-s-var-lib-samba-persistence--2026-08-27.md` (tabled separately)
 - [ ] G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
+- [ ] G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
 
 ## Decisions (D)
 
@@ -338,6 +339,44 @@ guard's mechanism) that checks for worktree isolation *before* `plan-new`/
 with the same guidance the `Edit` guard gives, or by rejecting until
 `EnterWorktree` has run, whichever the isolation guard's authors intended
 scripts (not just the `Edit`/`Write` tools) to respect.
+
+### G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
+Surfaced 2026-08-28 while deploying a fix for
+`homelab-zdata-pool-usb-uas-checksum-errors-2026-08-28.md`: the user
+wanted PR #26 (a `hosts/homelab/configuration.nix` change) actually
+verified live on `homelab` *before* merging, rather than trusting
+`nixos-rebuild build` alone. The obvious-looking move — fetch the branch
+into the target host's own `/etc/nixos` checkout and run `nixos-rebuild
+build --flake .#<host>` there over SSH — was corrected by the user:
+don't build on the target host itself, since it's a live
+storage/service host and a full Nix evaluation+build burns its own
+CPU/IO for no benefit when a separate build machine exists. The `workflow`
+skill's step sequence (`docs/skills/workflow/SKILL.md`) covers triviality
+check → plan → work → `verify-ladder` → commit, but says nothing about
+*this* shape of task — validate an unmerged change on a specific host
+before merging — and there's no equivalent of
+`modules/nixos/push-deploy.nix`'s pattern (which only fits the opposite
+direction: homelab, the more capable build host, building *for* vps) for
+"build here, deploy/activate on `<host>`, don't build there." The correct
+manual incantation is
+`nixos-rebuild switch --flake .#<host> --target-host root@<host>` alone --
+~~`--build-host localhost` required since `--target-host` alone builds
+remotely by default~~ **CORRECTED 2026-08-28:** verified via
+`nixos-rebuild --help`: "If `--build-host` is not explicitly specified or
+empty, building will take place locally" -- i.e. `--target-host` alone
+already builds locally and only activates remotely; the opposite of what
+was first assumed here. Still had to be re-derived/verified in the moment
+rather than looked up. Worth a named convention or helper script in
+`docs/procedures/` — and/or a `workflow` step — for "validate a branch on
+a real host pre-merge," so this doesn't need re-deriving next time.
+
+**2026-08-28 addendum:** user's suggested shape for the fix — deploying
+(build-here/activate-there, per-host target selection, the
+`--build-host`/`--target-host` incantation, pre-merge validation vs. real
+merge-and-adopt) should be its own dedicated skill, the same way `plan`
+and `workflow` are, rather than logic re-derived ad hoc each time or
+buried inside `workflow`'s existing step sequence. Would give this a
+proper home instead of a footnote on `workflow`.
 
 ### G34, G35, G36 — already tracked as their own separate plans
 Listed here only as an index pointer, not duplicated: VM-testing's
