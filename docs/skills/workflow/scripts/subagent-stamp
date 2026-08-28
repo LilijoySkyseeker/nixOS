@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# SubagentStop hook. Fires whenever any subagent finishes (foreground or
+# background) -- confirmed by direct testing that the payload includes
+# agent_type (e.g. "security", "docs-updater") and cwd. Only acts when
+# agent_type matches one of this repo's named review subagents; appends a
+# timestamped completion stamp to the currently-active plan file (per
+# .claude/.active-plan) as mechanical proof the step actually ran. This is
+# what closes the gap where a skill invoking a subagent doesn't reliably
+# block on it (confirmed Claude Code behavior, not an assumption -- see
+# docs/skills/workflow/reference.md).
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=hook-lib.sh
+. "$SCRIPT_DIR/hook-lib.sh"
+
+input="$(cat)"
+[ "$(hook_json_str "$input" hook_event_name)" = "SubagentStop" ] || exit 0
+
+agent_type="$(hook_json_str "$input" agent_type)"
+case "$agent_type" in
+  security | docs-updater) ;;
+  *) exit 0 ;;
+esac
+
+cwd="$(hook_json_str "$input" cwd)"
+root="$(cd "${cwd:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$root" ] || exit 0
+
+active="$root/.claude/.active-plan"
+[ -f "$active" ] || exit 0
+rel="$(cat "$active")"
+[ -n "$rel" ] && [ -f "$root/$rel" ] || exit 0
+
+# Never touch a frozen plan, even for a completion stamp.
+grep -q '^frozen: true' "$root/$rel" && exit 0
+
+ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+printf '\n_%s finished %s -- see Findings above._\n' "$agent_type" "$ts" >> "$root/$rel"
+git -C "$root" add "$rel" 2>/dev/null || true
+
+exit 0

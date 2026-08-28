@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# verify-ladder -- the cheap, already-tooled part of
+# docs/procedures/testing-changes.md's verification ladder, wired in as a
+# hard gate in the `workflow` skill's own step sequence instead of left to
+# memory. Hard-blocks on nixfmt --check, nix flake check, a targeted
+# nixos-rebuild build, and statix/deadnix -- but only for *newly introduced*
+# warnings (line falls inside the actual diff), never pre-existing debt
+# elsewhere in a touched file; linting a whole file over a one-line edit
+# would otherwise block on unrelated history. Requires jq for the
+# diff-scoped precision; falls back to informational-only if jq is missing.
+# Independent of the tabled vm-testing question -- never VM-boots or
+# switches anything.
+set -uo pipefail
+root="$(git rev-parse --show-toplevel)" || { echo "not inside a git repository." >&2; exit 1; }
+cd "$root"
+
+fail=0
+changed_nix="$( { git diff --name-only HEAD -- '*.nix'; git diff --cached --name-only -- '*.nix'; } | sed '/^$/d' | sort -u)"
+
+echo "== nixfmt --check =="
+if [ -z "$changed_nix" ]; then
+  echo "(no changed .nix files)"
+elif command -v nixfmt >/dev/null 2>&1; then
+  if ! printf '%s\n' "$changed_nix" | xargs -r nixfmt --check; then
+    echo "BLOCKED: nixfmt --check failed on the file(s) above. Run 'nixfmt <file>' to fix." >&2
+    fail=1
+  fi
+else
+  echo "nixfmt not on PATH -- skipping (expected inside 'nix develop')." >&2
+fi
+
+# changed_lines <file> -- one new-file line number per line, for every
+# added/modified line relative to HEAD (working tree + staged combined).
+changed_lines() {
+  git diff -U0 HEAD -- "$1" 2>/dev/null | awk '
+    /^@@/ {
+      match($0, /\+([0-9]+)(,([0-9]+))?/, m)
+      start = m[1] + 0
+      count = (m[3] == "" ? 1 : m[3] + 0)
+      for (i = 0; i < count; i++) print start + i
+    }
+  '
+}
+
+if [ -z "$changed_nix" ]; then
+  echo "== statix / deadnix =="
+  echo "(no changed .nix files)"
+elif ! command -v jq >/dev/null 2>&1; then
+  echo "== statix / deadnix (informational -- jq missing, can't diff-scope precisely) =="
+  command -v statix >/dev/null 2>&1 && printf '%s\n' "$changed_nix" | while IFS= read -r f; do statix check "$f" || true; done
+  command -v deadnix >/dev/null 2>&1 && printf '%s\n' "$changed_nix" | xargs -r deadnix || true
+else
+  echo "== statix check (new issues only, blocking) =="
+  if command -v statix >/dev/null 2>&1; then
+    statix_out="$(mktemp)"
+    printf '%s\n' "$changed_nix" | while IFS= read -r f; do
+      lines_file="$(mktemp)"
+      changed_lines "$f" > "$lines_file"
+      statix check --format json "$f" 2>/dev/null \
+        | jq -r '.report[]? | .diagnostics[]? | "\(.at.from.line) \(.at.to.line) \(.note)"' \
+        | while read -r from to note; do
+            for ((l = from; l <= to; l++)); do
+              if grep -qx "$l" "$lines_file"; then
+                echo "NEW: $f:$from-$to: $note"
+                break
+              fi
+            done
+          done
+      rm -f "$lines_file"
+    done > "$statix_out" 2>&1 || true
+    cat "$statix_out"
+    [ -s "$statix_out" ] && fail=1
+    [ -s "$statix_out" ] || echo "(no new statix issues in the changed lines)"
+    rm -f "$statix_out"
+  else
+    echo "statix not on PATH -- skipping." >&2
+  fi
+
+  echo "== deadnix (new issues only, blocking) =="
+  if command -v deadnix >/dev/null 2>&1; then
+    deadnix_out="$(mktemp)"
+    printf '%s\n' "$changed_nix" | while IFS= read -r f; do
+      lines_file="$(mktemp)"
+      changed_lines "$f" > "$lines_file"
+      deadnix --output-format json "$f" 2>/dev/null \
+        | jq -r '.results[]? | "\(.line) \(.message)"' \
+        | while read -r line rest; do
+            if grep -qx "$line" "$lines_file"; then
+              echo "NEW: $f:$line: $rest"
+            fi
+          done
+      rm -f "$lines_file"
+    done > "$deadnix_out" 2>&1 || true
+    cat "$deadnix_out"
+    [ -s "$deadnix_out" ] && fail=1
+    [ -s "$deadnix_out" ] || echo "(no new deadnix issues in the changed lines)"
+    rm -f "$deadnix_out"
+  else
+    echo "deadnix not on PATH -- skipping." >&2
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "BLOCKED: new statix/deadnix issue(s) in changed lines. See above." >&2
+fi
+
+echo "== nix flake check --no-build =="
+if ! nix flake check --no-build; then
+  echo "BLOCKED: nix flake check failed. See output above." >&2
+  fail=1
+fi
+
+# Targeted build: same host-detection pattern as .githooks/pre-push, but
+# against the working tree (staged + unstaged) rather than a push range,
+# since this runs mid-session before a commit even exists.
+changed_all="$( { git diff --name-only HEAD -- hosts/ modules/ flake.nix flake.lock; git diff --cached --name-only -- hosts/ modules/ flake.nix flake.lock; } | sed '/^$/d' | sort -u)"
+
+if [ -n "$changed_all" ]; then
+  to_build=""
+  for host in $(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n'); do
+    if printf '%s\n' "$changed_all" | grep -qE "^(hosts/${host}/|modules/|flake\.nix|flake\.lock)"; then
+      to_build="$to_build $host"
+    fi
+  done
+  for host in $to_build; do
+    echo "== nixos-rebuild build --flake .#${host} =="
+    if ! nixos-rebuild build --flake ".#${host}"; then
+      echo "BLOCKED: build failed for host '${host}'. Fix it before committing." >&2
+      fail=1
+    fi
+  done
+else
+  echo "(no host/module changes -- skipping targeted build)"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "" >&2
+  echo "verify-ladder: one or more checks failed. Fix them before committing." >&2
+  exit 1
+fi
+echo "verify-ladder: all checks passed."
+exit 0

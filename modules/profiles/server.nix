@@ -36,7 +36,8 @@ in
       # nix store — mirrors profiles/PC.nix's lilijoy identity, same shared
       # sops secret, just rendered to root's home instead. Needed for
       # myAutoUpdate's flake-update-test commit step (was previously unset,
-      # failing every run — see TODO.md).
+      # failing every run — see
+      # flake-update-test-service-failing-on-homelab-root--2026-08-19.md).
       sops.secrets.git_username = { };
       sops.secrets.git_email = { };
       sops.templates."git-identity" = {

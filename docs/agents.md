@@ -30,21 +30,47 @@ pin while existing on another's — this isn't a hypothetical, it's an
 active split maintained on purpose. Don't assume parity between hosts
 just because they're in the same repo.
 
-## Why rationale lives in commit messages, not inline comments
+## Why rationale lives in the plan file, not inline comments (or the commit)
 
 The stated policy (`docs/style-guide.md`) is that inline comments cover
-mechanics/labeling only; non-obvious rationale goes in the commit
-message instead. The reasoning: this repo's failure mode historically
-hasn't been "insufficiently documented code," it's been re-deriving the
-same already-solved problem (a boot-time sops identity issue, a gid
-collision, a `nixos-rebuild-ng --sudo` behavior) because the reasoning
-behind a specific config shape wasn't recorded anywhere near the code.
-A commit message that says *why* a change is shaped the way it is
-prevents that specific class of repeated investigation — `git log`/
-`git blame` on the affected lines surfaces it later. A commit message
-that just restates what the diff does doesn't — write the why, and
-split into multiple commits if different pieces need different
-rationale.
+mechanics/labeling only; non-obvious rationale doesn't belong there. The
+reasoning: this repo's failure mode historically hasn't been
+"insufficiently documented code," it's been re-deriving the same
+already-solved problem (a boot-time sops identity issue, a gid collision,
+a `nixos-rebuild-ng --sudo` behavior) because the reasoning behind a
+specific config shape wasn't recorded anywhere findable.
+
+Before the plan-file system (`docs/skills/plan/SKILL.md`) existed, the
+commit message was that findable place — and a commit message with real
+rationale is still better than a bare "what." But a commit message can't
+be appended to once decisions keep evolving, can't be cited by a typed ID
+from multiple places, and isn't grouped with the gotchas/findings that
+came out of the same task. The plan file supersedes the commit message for
+anything that went through the `workflow` gate: the reasoning lives there,
+a comment/doc cites it with a one-line pointer
+(`// plan: <slug>-<date>.md#D2`), and the commit stays short and human,
+optionally with a `Plan:` trailer for traceability. A trivial change that
+skipped the gate entirely can still put its one-line "why" in the commit
+message — there's no plan file to cite for those.
+
+## Why the trust hierarchy is ordered this way
+
+`docs/procedures/workflow.md`'s trust hierarchy (documentation → source →
+local build → VM testing → an actual switch) generalizes something the
+2026-08-26 security audit learned the hard way at a larger scale: each
+rung can lie in a way the next rung can't. Documentation drifts from the
+config it describes (an entire audit failure-mode category was
+"documentation asserting a boundary the config doesn't implement"). Source
+code can evaluate fine and still not build (a missing package on the
+pinned channel). A build can succeed and the resulting unit can still fail
+at runtime, or fail only under an interaction a single-host build can't
+exercise (this is exactly what `docs/procedures/vm-testing.md`'s own
+closing line is about: "a VM test proves the mechanism, not the
+deployment"). And a VM lacks the real host's ZFS pools, sops host key, and
+network, so even a passing VM test doesn't prove a real switch will behave
+the same way. None of this means always climbing to the top rung for
+every change — it means knowing which rung a given claim is actually
+resting on, and not treating a cheaper rung's silence as proof.
 
 ## Where to look before assuming
 

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# mark-trivial "<one-line reason>" -- records that the workflow skill
+# judged the current task genuinely trivial (a typo fix, a single-line
+# correction) and is intentionally skipping the plan-file gate for it.
+# Read by the commit-time PreToolUse hook (plan-touch-guard). This is the
+# one deliberately judgment-based step in the whole system -- everything
+# downstream of the judgment call itself is still hardcoded.
+set -u
+[ $# -eq 1 ] || { printf 'usage: mark-trivial "<one-line reason>"\n' >&2; exit 1; }
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not inside a git repository." >&2; exit 1; }
+
+marker="$root/.claude/.trivial-ack"
+mkdir -p "$(dirname "$marker")"
+printf '%s: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" > "$marker"
+echo "trivial-ack recorded: $1"

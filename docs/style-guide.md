@@ -83,17 +83,20 @@ shouldn't have to reverse-engineer the key from the file's contents.
 See `docs/architecture.md`'s "Navigating: what does host X actually run?"
 for how this is used in practice.
 
-## Why context: commit messages, not comments
+## Why context: the plan file, not comments
 
 Non-obvious rationale — a workaround, a surprising constraint, a
 tradeoff, an incident the config is defending against — belongs in the
-git commit message, not an inline comment. Explain what changed and,
-more importantly, why, so `git log`/`git blame` on the affected lines
-surfaces the reasoning later. Split a change into multiple commits
-when different pieces need different rationale, rather than cramming
-it all into one comment or one commit message.
+task's plan file (`docs/skills/plan/SKILL.md`), not an inline comment. A
+one-line citation pointing at it is fine inline (`// plan:
+<slug>-<date>.md#D2`) — that's a citation, not the rationale itself, and
+is exempt from the "mechanics/labeling only" rule below. For a trivial
+change that never got a plan file, a short note in the commit message is
+still fine; see `docs/agents.md` for why the plan file is the primary home
+for anything that went through the `workflow` gate.
 
-Inline comments are for mechanics/labeling only — see below.
+Inline comments (beyond a citation pointer) are for mechanics/labeling
+only — see below.
 
 ## Inline comments
 

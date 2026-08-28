@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# plan-move <path-or-filename> <in-progress|done>
+# Moves a plan between folders. No repo-wide citation rewrite is needed --
+# citations are bare-filename, which never encodes the folder. Moving to
+# `done` refuses if any decision is unresolved, then auto-freezes.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 2 ] || { printf 'usage: plan-move <path-or-filename> <in-progress|done>\n' >&2; exit 1; }
+arg="$1" target="$2"
+case "$target" in
+  in-progress|done) ;;
+  *) plan_die "target must be 'in-progress' or 'done', got '$target'." ;;
+esac
+
+root="$(plan_repo_root)"
+rel="$(plan_locate "$arg" "$root")"
+plan_require_not_frozen "$root/$rel"
+
+base="$(basename "$rel")"
+current_dir="$(dirname "$rel")"
+new_rel="docs/plans/${target}/${base}"
+
+[ "$current_dir" = "docs/plans/${target}" ] && plan_die "$rel is already in docs/plans/${target}/."
+
+if [ "$target" = "done" ]; then
+  unresolved="$(plan_unresolved_decisions "$root/$rel")"
+  if [ -n "$unresolved" ]; then
+    plan_die "cannot move to done/ -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
+$unresolved"
+  fi
+fi
+
+git -C "$root" mv "$rel" "$new_rel"
+plan_set_field "$root/$new_rel" status "$target"
+plan_mark_touched "$root" "$new_rel"
+
+if [ "$target" = "done" ]; then
+  git -C "$root" add "$new_rel"
+  exec "$SCRIPT_DIR/plan-freeze" "$new_rel"
+else
+  git -C "$root" add "$new_rel"
+  echo "$new_rel"
+fi

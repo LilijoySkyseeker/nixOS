@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# plan-new "<title>" -- create a new plan file in docs/plans/todo/.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 1 ] || { printf 'usage: plan-new "<title>"\n' >&2; exit 1; }
+title="$1"
+root="$(plan_repo_root)"
+slug="$(plan_slugify "$title")"
+[ -n "$slug" ] || plan_die "title '$title' produced an empty slug."
+today="$(plan_today)"
+
+existing="$(cd "$root" && ls -1 docs/plans/*/"${slug}"-*.md 2>/dev/null)"
+[ -n "$existing" ] && plan_die "a plan with slug '$slug' already exists:
+$existing"
+
+rel="docs/plans/todo/${slug}-${today}.md"
+mkdir -p "$root/docs/plans/todo"
+cat > "$root/$rel" <<EOF
+---
+slug: ${slug}
+created: ${today}
+status: todo
+frozen: false
+---
+
+# ${title}
+
+## Original plan
+
+
+## Progress
+
+
+## Decisions (D)
+
+
+## Gotchas (G)
+
+
+## Findings (F)
+*(populated by security/docs-updater when invoked)*
+EOF
+
+git -C "$root" add "$rel"
+plan_mark_touched "$root" "$rel"
+echo "$rel"

@@ -199,9 +199,9 @@ in
       # `sops` CLI's own identity discovery (SOPS_AGE_SSH_PRIVATE_KEY_FILE
       # env var or ~/.config/sops/age/keys.txt on whatever machine runs the
       # command), independent of this module. So it was pure downside with
-      # no upside -- confirmed as the fix for TODO.md's "sops-nix
-      # age.keyFile fallback doesn't fire" item (it was never a fallback
-      # that could fire in the first place).
+      # no upside -- confirmed as the fix in
+      # sops-nix-age-keyfile-fallback-doesn-t-actually-fir-2026-08-18.md
+      # (it was never a fallback that could fire in the first place).
       sops.age.keyFile = "/var/lib/sops-nix/key.txt";
       sops.age.generateKey = true;
 
@@ -309,7 +309,7 @@ in
       # nothing. The replacement is a networked Brother MFC-L2740DW that
       # does not have a static address yet, so there is deliberately no
       # printer declared here: CUPS runs and prints to nothing until
-      # TODO.md's printer entry is worked through.
+      # set-up-the-new-network-printer-scanner-brother-mfc-2026-08-27.md is worked through.
       #
       # When adding it, prefer a driverless IPP queue pointed at the
       # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)

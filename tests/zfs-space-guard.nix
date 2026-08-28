@@ -6,7 +6,8 @@
 # once at install) on each configured dataset. An earlier version also
 # auto-pruned on a timer down to a keep-newest floor; removed, because that
 # doesn't actually solve the real problem -- see the module's own comment
-# and TODO.md for why. `nixos-rebuild build` only proves the unit parses;
+# and zfs-space-guard-myzfsspaceguard-reviewed-tested-an-2026-08-25.md for
+# why. `nixos-rebuild build` only proves the unit parses;
 # it can't prove any of this, because there's no real pool at build time.
 # This builds a throwaway VM with a real zpool and checks:
 #

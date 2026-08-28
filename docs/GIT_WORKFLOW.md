@@ -4,8 +4,8 @@ Solo repo, worked on from multiple machines concurrently (thinkpad, torrent,
 homelab, vps). PR-based: branch, open a PR, merge via PR (a real merge
 commit — `gh pr merge` without `--squash`/`--rebase`, matching the existing
 `Merge pull request #N ...` history) — reserve a direct commit to `master`
-for something genuinely small (a typo, a one-line doc correction, a TODO.md
-note) where opening a PR would be pure ceremony.
+for something genuinely small (a typo, a one-line doc correction) where
+opening a PR would be pure ceremony.
 
 ## Setup (per machine)
 
@@ -40,11 +40,19 @@ Enforced by the `commit-msg` hook.
 
 No `Co-Authored-By: Claude ...` or `Claude-Session:` trailer in commit
 messages — the git author/committer identity already records who/what made
-the commit, so both are redundant noise in history.
+the commit, so both are redundant noise in history. Hard-blocked, not just
+documented: `docs/skills/workflow/scripts/footer-guard` (a `PreToolUse`
+hook) denies any `git commit`/`gh pr create`/`gh pr edit` whose text
+contains one.
 
 Same for PR descriptions: no "🤖 Generated with Claude Code" footer or
 `claude.ai/code/session_...` link. Let the body end at its last real
 content line (e.g. the test plan).
+
+A commit for work tracked in a plan file (`docs/skills/plan/SKILL.md`) may
+add a `Plan: <slug>-<date>.md` trailer for traceability — but never inline
+the plan's decisions/findings into the commit body; the body stays short
+and human, the reasoning stays in the plan.
 
 ## Hooks
 
@@ -71,8 +79,8 @@ content line (e.g. the test plan).
   `master` first if it's fallen behind, then merge the PR (a real merge
   commit, not squash/rebase) once it builds clean.
 - Commit directly to `master` only for something genuinely small (a typo, a
-  one-line doc correction, a TODO.md note) — if you're unsure whether a
-  change qualifies, open a PR.
+  one-line doc correction) — if you're unsure whether a change qualifies,
+  open a PR.
 - Test with `nixos-rebuild build`/`dry-build` before committing anything that
   changes a host's config; only `switch` when you intend to deploy.
 - Once a branch's content has landed on `master`, prune it if safe: delete
