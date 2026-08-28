@@ -163,9 +163,29 @@ in
       # `game_password`, `token` (a factorio.com account auth token,
       # equally sensitive), and `username` are secrets; `name`/
       # `description`/`tags`/`non_blocking_saving` aren't.
-      sops.secrets.factorio_game_password = { };
-      sops.secrets.factorio_token = { };
-      sops.secrets.factorio_username = { };
+      # restartUnits is load-bearing, not tidiness. These values are not
+      # read at request time -- they are baked into server-settings.json by
+      # the preStart patch below, which runs only when the container
+      # starts. sops-nix rewriting /run/secrets underneath a running
+      # container changes nothing the server is actually using, so without
+      # this the rotation is inert and the *revoked* credentials stay live
+      # until something else happens to restart the unit.
+      #
+      # Observed for real during rotation item 12 on 2026-08-28: activation
+      # logged "modifying secrets: factorio_game_password, factorio_token"
+      # and finished clean, while the container was still running from
+      # 11:51:43 and server-settings.json still carried its 11:51:43
+      # contents -- i.e. the old token, which had already been invalidated
+      # at factorio.com. Exactly the failure shape as the WireGuard
+      # interface in 61f55cb: a clean activation log is not evidence that a
+      # rotated secret reached its consumer.
+      sops.secrets.factorio_game_password.restartUnits = [ "docker-factorio-main.service" ];
+      sops.secrets.factorio_token.restartUnits = [ "docker-factorio-main.service" ];
+      # username is not a credential and is not rotated, but it lands in
+      # the same generated file, so it gets the same treatment for
+      # consistency -- a changed username with a stale file would be just
+      # as confusing to debug.
+      sops.secrets.factorio_username.restartUnits = [ "docker-factorio-main.service" ];
       systemd.services.docker-factorio-main.preStart = mkServerSettingsPatch {
         directory = "/srv/factorio/main";
         name = "GC Space Age!!";
