@@ -65,8 +65,10 @@ every line below is currently unstarted.
 - [ ] G34 — see `2026-08-27-design-the-vm-testing-subagent-s.md` (tabled separately)
 - [ ] G35 — see `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md` (tabled separately)
 - [ ] G36 — see `2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md` (tabled separately)
-- [x] G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
-- [ ] G38 — no priority signal on a plan file or in any index
+- [ ] G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
+- [ ] G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
+- [x] G39 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
+- [ ] G40 — no priority signal on a plan file or in any index
 
 ## Decisions (D)
 
@@ -98,7 +100,7 @@ scripts (`plan-new`/`plan-move`/`plan-tick`/`plan-decide`) so the index
 self-updates on every change instead of needing a separate invocation
 someone has to remember to run. Where the one-sentence blurb comes from —
 first line of "Original plan", a dedicated frontmatter field, or
-author-supplied text at `plan-new` time — is still open. See also `G38`
+author-supplied text at `plan-new` time — is still open. See also `G40`
 (priority tag), proposed as a field this same index would surface.
 
 ### G3 — `plan-tick`'s ID matching is line-bound and fragile
@@ -207,7 +209,7 @@ currently a collision risk (the date suffix still disambiguates in
 practice), but the truncation point is arbitrary and can make a filename
 citation less self-descriptive than intended.
 
-**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan_slugify`'s cap raised from 50 to 70 chars and truncation now backs up to the last word boundary instead of cutting mid-word. The filename above is left as historical evidence of the bug (this plan is append-only) and was not re-slugified — only reordered to date-first by the same fix's migration (see `G37` below).
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan_slugify`'s cap raised from 50 to 70 chars and truncation now backs up to the last word boundary instead of cutting mid-word. The filename above is left as historical evidence of the bug (this plan is append-only) and was not re-slugified — only reordered to date-first by the same fix's migration (see `G39` below).
 
 ### G18 — `plan-reject`'s mandatory reason has no substance check
 The gate is "non-empty string." A one-word reason ("no", "abandoned")
@@ -337,7 +339,74 @@ generalized diff-scoped-linting skill
 unresolved samba persistence conflict
 (`2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md`).
 
-### G37 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
+### G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
+Hit for real in a background-job session (`kde-connect-bluetooth-crash-
+loop-troubleshooting-2026-08-27.md`'s own troubleshooting work, chatting
+about it here): the session ran `plan-new` and `plan-move ... in-progress`
+*before* calling `EnterWorktree`, per the `plan` skill's own documented
+sequencing not being cross-checked against the background-job worktree-
+isolation requirement. Both scripts succeeded and wrote real files into
+the shared checkout — `plan-new`/`plan-move` have no worktree-awareness
+and no guard equivalent to the `Edit`/`Write`-tool-level isolation
+enforcement that later blocked a plain `Edit` call on the same path. Only
+that *separate* `Edit`-tool guard caught the problem, and only on the next
+write attempt, not at the point the scripts themselves ran.
+
+Consequence: `EnterWorktree` (correctly) only carries over the git-tracked
+working tree, not untracked files, so the freshly created `todo/`-then-
+`in-progress/`-status plan file was invisible inside the new worktree.
+The plan had to be recreated from scratch there (`plan-new` again, same
+title, re-typing all content), and the original untracked copy was left
+behind in the shared checkout with no cleanup path — `plan-new`/`plan-move`
+have no "undo" or "move this untracked file into a worktree" operation,
+and nothing currently detects or flags the leftover file as orphaned
+(closest existing report is asking the user to `rm` it by hand after the
+fact). A `plan`-skill instruction (or a hook, mirroring the `Edit`/`Write`
+guard's mechanism) that checks for worktree isolation *before* `plan-new`/
+`plan-move` write anything would close this — either by refusing early
+with the same guidance the `Edit` guard gives, or by rejecting until
+`EnterWorktree` has run, whichever the isolation guard's authors intended
+scripts (not just the `Edit`/`Write` tools) to respect.
+
+### G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
+Surfaced 2026-08-28 while deploying a fix for
+`2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md`: the user
+wanted PR #26 (a `hosts/homelab/configuration.nix` change) actually
+verified live on `homelab` *before* merging, rather than trusting
+`nixos-rebuild build` alone. The obvious-looking move — fetch the branch
+into the target host's own `/etc/nixos` checkout and run `nixos-rebuild
+build --flake .#<host>` there over SSH — was corrected by the user:
+don't build on the target host itself, since it's a live
+storage/service host and a full Nix evaluation+build burns its own
+CPU/IO for no benefit when a separate build machine exists. The `workflow`
+skill's step sequence (`docs/skills/workflow/SKILL.md`) covers triviality
+check → plan → work → `verify-ladder` → commit, but says nothing about
+*this* shape of task — validate an unmerged change on a specific host
+before merging — and there's no equivalent of
+`modules/nixos/push-deploy.nix`'s pattern (which only fits the opposite
+direction: homelab, the more capable build host, building *for* vps) for
+"build here, deploy/activate on `<host>`, don't build there." The correct
+manual incantation is
+`nixos-rebuild switch --flake .#<host> --target-host root@<host>` alone --
+~~`--build-host localhost` required since `--target-host` alone builds
+remotely by default~~ **CORRECTED 2026-08-28:** verified via
+`nixos-rebuild --help`: "If `--build-host` is not explicitly specified or
+empty, building will take place locally" -- i.e. `--target-host` alone
+already builds locally and only activates remotely; the opposite of what
+was first assumed here. Still had to be re-derived/verified in the moment
+rather than looked up. Worth a named convention or helper script in
+`docs/procedures/` — and/or a `workflow` step — for "validate a branch on
+a real host pre-merge," so this doesn't need re-deriving next time.
+
+**2026-08-28 addendum:** user's suggested shape for the fix — deploying
+(build-here/activate-there, per-host target selection, the
+`--build-host`/`--target-host` incantation, pre-merge validation vs. real
+merge-and-adopt) should be its own dedicated skill, the same way `plan`
+and `workflow` are, rather than logic re-derived ad hoc each time or
+buried inside `workflow`'s existing step sequence. Would give this a
+proper home instead of a footnote on `workflow`.
+
+### G39 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 `plan-new` names files `<slug>-<created-date>.md` (slug first, date as a
 disambiguating suffix — see `G17`). Because the date sits at the *end*,
 `ls docs/plans/<status>/` and most file pickers sort entries
@@ -356,7 +425,7 @@ integrity).
 
 **RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan-new` now emits `<date>-<slug>.md`, and the user opted for the full migration: all 44 pre-existing plan files were renamed, `docs/plans/.checksums` updated for the frozen ones (two frozen files needed a citation-text edit too, recorded there as its own gotcha), and every citation repo-wide (not just under `docs/plans/`) swept to the new filenames. This file's own name is now the literal example given above.
 
-### G38 — no priority signal on a plan file or in any index
+### G40 — no priority signal on a plan file or in any index
 Every plan in `todo/`/`in-progress/` currently carries equal visual
 weight — nothing distinguishes a high-value item from low-priority
 backlog noise without opening each file individually (relevant now that
