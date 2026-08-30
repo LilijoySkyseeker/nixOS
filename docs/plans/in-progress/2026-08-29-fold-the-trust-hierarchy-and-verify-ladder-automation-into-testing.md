@@ -90,3 +90,5 @@ Both are direct fixes (stale/ambiguous text, not misplaced rationale), so
 no separate `D`/`G` follow-up needed.
 
 _docs-updater finished 2026-08-30T06:05:56Z -- see Findings above._
+
+**FIXED 2026-08-29:** Fixed in commit 6f675b0: dropped the ambiguous 'pre-commit gate' phrase in testing-changes.md and updated AGENTS.md's stale docs-table row.
