@@ -33,18 +33,25 @@ fleet-wide. Another (Nix store GC) was checked against
 covered — that module is confirmed to be a manual snapshot-space escape
 hatch only (its own comments say it removed automatic threshold-based
 pruning on purpose), a different problem from unmanaged store generations,
-so the gap stands.
+~~so the gap stands~~.
+
+**CORRECTED 2026-08-29:** the gap does not stand — see F2, resolved MOOT.
+`zfs-space-guard.nix` really doesn't cover it, but a separate mechanism
+(`programs.nh.clean`) does, and the first pass didn't check for it. See
+G2.
 
 ## State
 
-**2026-08-29, just created.** All 9 findings open, none resolved. F1
+**2026-08-29.** F2 (Nix store GC) resolved MOOT on user request to verify
+it — the original claim was wrong, GC is already handled fleet-wide via
+`programs.nh.clean`. 8 findings remain open (F1, F3-F9). F1
 (`stateVersion`) is the one worth checking first — it needs a factual
-answer (when was each host actually first installed?) before it can even
-be fixed correctly.
+answer (when was each host actually first installed, D1) before it can
+even be fixed correctly.
 
 ## Progress
 - [ ] F1
-- [ ] F2
+- [x] F2
 - [ ] F3
 - [ ] F4
 - [ ] F5
@@ -68,6 +75,17 @@ A wrong value doesn't error; it just quietly hands a newly-added stateful
 service older compatibility defaults than the host's real install date
 calls for.
 
+### G2 -- grepping for a feature's *native* option name misses a vendor tool that already implements it
+F2 originally claimed Nix store GC was entirely unmanaged, based on
+grepping for `nix.gc`/`nix.optimise`/`min-free`/`max-free` and finding
+nothing. It missed `programs.nh.clean` (`modules/profiles/default.nix`),
+which already runs a `nix-collect-garbage` reimplementation daily. The
+repo does the same *job* through a different NixOS module than the one
+searched for. When checking whether something is "unhandled," search for
+the outcome (a systemd timer named `*clean*`/`*gc*`, or the actual disk
+behavior) in addition to the canonical option name — not the option name
+alone.
+
 ## Findings (F)
 
 ### F1 -- `stateVersion` is set once as a shared constant across all 4 hosts
@@ -87,8 +105,8 @@ profiles into each `hosts/<name>/configuration.nix`, set to that host's
 true first-install release; never bump it afterward, including this
 correction. **Priority: HIGH.**
 
-### F2 -- Nix store disk space is entirely unmanaged
-No `nix.gc.automatic`, `nix.optimise.automatic`, or `min-free`/`max-free`
+### F2 -- ~~Nix store disk space is entirely unmanaged~~
+~~No `nix.gc.automatic`, `nix.optimise.automatic`, or `min-free`/`max-free`
 anywhere in the repo. Confirmed `zfs-space-guard.nix` doesn't cover this —
 it's a manual snapshot-space escape hatch, a different problem from
 unreclaimed store generations. Bites hardest on `homelab`/`vps`, which
@@ -102,7 +120,30 @@ space at all). **Mechanism:** `nix.gc = { automatic = true; dates =
 `nix.optimise.automatic = true` (hardlinks identical store paths across
 the fleet's largely-shared closures). `nix.settings.min-free`/`max-free`
 for opportunistic GC during builds on build-heavy hosts. **Priority:
-HIGH.**
+HIGH.**~~
+
+**CORRECTED 2026-08-29:** This was wrong. The original research pass grepped
+for the *native* `nix.gc`/`nix.optimise` option names and missed that this
+fleet already automates GC through a different mechanism — see G2. GC is in
+fact configured fleet-wide: `modules/profiles/default.nix:206-214` sets
+`programs.nh = { enable = true; clean = { enable = true; dates = "daily";
+extraArgs = "--keep-since 7d --keep 7"; }; }`. `nh clean` is nixpkgs'
+`programs.nh` module wrapping a `nix-collect-garbage`
+reimplementation — it deletes old NixOS/home-manager generations and
+collects gcroots on a daily systemd timer, keeping 7 days/7 generations.
+`server.nix:30-33` additionally points `programs.nh.flake` at
+`/etc/nixos` for root's use, on top of the same daily clean.
+
+**What's genuinely still missing, narrower than the original claim:** store
+*optimisation* — deduplicating/hardlinking identical paths across the
+fleet's largely-shared closures (`nix.settings.auto-optimise-store` or a
+periodic `nix store optimise`). `nh clean` does not do this; nh's own docs
+describe it only as a GC/gcroot-cleanup reimplementation. This is a minor,
+low-stakes gap on top of an otherwise-solved problem, not spun into its own
+finding here.
+
+
+**MOOT 2026-08-29:** GC is already handled fleet-wide by programs.nh.clean (daily, --keep-since 7d --keep 7) in modules/profiles/default.nix -- verified by reading the config directly and cross-checking nh's own docs. Original claim was based on grepping only the native nix.gc/nix.optimise option names (see G2). The narrower remaining gap -- no store-optimise/dedup -- is noted in the correction but not spun into its own finding.
 
 ### F3 -- ZFS ARC has no ceiling on the one host running mixed workloads
 `homelab` runs Docker containers (Minecraft/Factorio, each capped at 7G
