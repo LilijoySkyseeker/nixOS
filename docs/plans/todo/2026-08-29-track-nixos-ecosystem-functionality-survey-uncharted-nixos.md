@@ -63,10 +63,12 @@ features, no realistic use case here).
 
 ## State
 
-**2026-08-29, just created.** All 11 findings open, none triaged. Given
-the loose fixed/accepted/moot mapping above, expect most of these to
-resolve `accepted` (deliberately not pursued) rather than `fixed` — that's
-a normal, non-alarming outcome for an opportunity survey, unlike the other
+**2026-08-29.** F12 (`nixpkgs-multiverse`) added on request, researched and
+verified against the project's own GitHub repo and docs site rather than
+assumed. All 12 findings open, none triaged. Given the loose
+fixed/accepted/moot mapping above, expect most of these to resolve
+`accepted` (deliberately not pursued) rather than `fixed` — that's a
+normal, non-alarming outcome for an opportunity survey, unlike the other
 two plans where `accepted` means a risk was knowingly left in place.
 
 ## Progress
@@ -81,6 +83,7 @@ two plans where `accepted` means a risk was knowingly left in place.
 - [ ] F9
 - [ ] F10
 - [ ] F11
+- [ ] F12
 
 ## Decisions (D)
 None yet — each finding resolves independently.
@@ -217,3 +220,46 @@ stable and reasonably popular in 2026. Neither addresses a capability
 gap — KDE Plasma already works. Included only because they're genuinely
 well-regarded in the current Nix desktop ecosystem, not because anything
 is missing. **Maturity: stable. Value: optional, pure taste.**
+
+### F12 -- `nixpkgs-multiverse`, added 2026-08-29 on request
+Real project (`fzakaria/nixpkgs-multiverse`, MIT, single maintainer Farid
+Zakaria, docs at nixmultiverse.com), verified directly against its GitHub
+repo and docs rather than assumed. Indexes **every version of every
+nixpkgs package that ever existed** — 307,119+ package versions across
+32,011 attributes, from 1,539 nixpkgs revisions spanning 2012-07-05 to
+2026-08-23 — reachable from a single flake input, without vendoring a
+second nixpkgs pin per version needed. Two access modes: a normal
+evaluation path, and a "fast" path that skips fetching/evaluating
+nixpkgs entirely by reading a pre-computed store-path index and
+substituting the already-built output straight from `cache.nixos.org` —
+seconds instead of minutes, and **no new trust dependency**: it rides on
+the same substituter and signing key this fleet already trusts, not a
+new binary cache. An `mvs` CLI queries version history entirely offline
+(reads a baked-in index, fetches nothing). The NixOS/nix-darwin/
+home-manager module lets a host pin one package's exact historical
+version declaratively: `multiverse.enable = true; multiverse.pins.<pkg> =
+"<version>";`.
+
+**Why this is a specific fit, not generic novelty:** `accepted-risks.md`
+AR-7 already names "pin individual projects by version where a mod
+matters more than its freshness" as an available-but-undone tightening
+for the Minecraft/Factorio auto-updating mod servers — multiverse is
+close to a turnkey mechanism for exactly that, without hand-vendoring a
+second nixpkgs input just to freeze one package. It's also a fast,
+low-ceremony way to bisect "did the nixpkgs bump that `flake-update-test`
+auto-merged change this package's behavior" without standing up a second
+flake input, which is directly adjacent to the open D11 decision (whether
+`flake-update-test` should keep auto-merging on build success alone) —
+multiverse doesn't answer D11, but it's a cheap diagnostic tool for
+living with that policy in the meantime.
+
+**Honest caveats:** brand new (both of the maintainer's own blog posts
+introducing it are dated August 2026 — this project is roughly three
+weeks old as of today) and single-maintainer, so treat it as exploratory
+rather than load-bearing; running a much older package version than
+nixpkgs' current one also means whatever security patching happened
+since that version shipped doesn't apply to it, which matters more for
+network-facing packages than for a game-server mod dependency. **Maturity:
+bleeding edge — real and functional, but single-maintainer and ~3 weeks
+old. Value: worth a look, specifically for the AR-7 mod-pinning
+tightening.**
