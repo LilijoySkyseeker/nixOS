@@ -674,6 +674,20 @@
     ];
   };
 
+  # /nix/state's .zfs/snapshot directory was world-traversable (0777),
+  # letting any local uid read old snapshot contents at whatever
+  # permissions they had at snapshot time -- proven live, and how the
+  # factorio credentials leaked. `snapdir=disabled` closes it entirely
+  # (verified: even root gets ENOENT on the exact path that used to
+  # succeed for uid 65534) and, unlike a raw chmod on `.zfs`, is real
+  # dataset metadata that survives a mount cycle rather than resetting.
+  # Servers only -- see
+  # `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`#D1
+  # for why the PCs are deliberately excluded and the caveat that this
+  # needs a mount cycle (not just a switch) to fully close access already
+  # cached before the property changes.
+  myZfsDatasetProperties."zroot/local/state".snapdir = "disabled";
+
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;

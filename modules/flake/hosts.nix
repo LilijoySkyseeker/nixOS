@@ -64,6 +64,7 @@ in
         nixosModules."push-deploy"
         nixosModules."zrepl"
         nixosModules."docker-publish-guard"
+        nixosModules."zfs-dataset-properties"
         nixosModules.jellyfin
         nixosModules.minecraft
         nixosModules.factorio
