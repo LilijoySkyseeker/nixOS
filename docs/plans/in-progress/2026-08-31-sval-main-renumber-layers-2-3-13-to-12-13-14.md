@@ -20,17 +20,29 @@ chance to move out). Then fix every other place in the file that
 pointed at the old layer numbers so behavior is preserved, not just
 the raw layer contents relocated.
 
+**2026-08-31 addendum:** user asked to fold an already-made,
+pre-existing edit to `files/doio.vil` (a separate DOIO macropad Vial
+keymap) into this same PR/branch. That edit was made by the user
+outside of this session, sitting as an uncommitted working-tree
+change in the main checkout before this plan existed; not authored
+here, just carried into this branch and commit at the user's request.
+
 ## State
 
-Done. `files/sval_main.vil` was rewritten via a one-off Python script
-(not committed to the repo -- ran from the job's scratch dir) that
-loaded the JSON, relocated the three layer arrays, rewrote every
-`MO(2)`/`MO(3)` reference to `MO(12)`/`MO(13)`, and updated one
-`key_override` layer bitmask. Verified with a full recursive diff
-against the pre-edit file: only the intended cells changed, nothing
-else in the 21KB file moved. File committed in worktree
-`sval-main-layer-remap` (branch `worktree-sval-main-layer-remap`),
-not yet merged to master.
+Done, and scope now covers two files. `files/sval_main.vil` was
+rewritten via a one-off Python script (not committed to the repo --
+ran from the job's scratch dir) that loaded the JSON, relocated the
+three layer arrays, rewrote every `MO(2)`/`MO(3)` reference to
+`MO(12)`/`MO(13)`, and updated one `key_override` layer bitmask.
+Verified with a full recursive diff against the pre-edit file: only
+the intended cells changed, nothing else in the 21KB file moved.
+`files/doio.vil`'s pending change (relocating 4 real keycodes --
+`LGUI(KC_L)`, `LGUI(KC_S)`, `HYPR(KC_R)`, `HYPR(KC_S)` -- from row 0's
+first four matrix slots into column 3 of each of the four row groups;
+diffed to confirm nothing else in that file changed) was copied into
+this branch as-is. Both committed in worktree
+`sval-main-layer-remap` (branch `worktree-sval-main-layer-remap`,
+PR #35), not yet merged to master.
 
 ## Progress
 
@@ -51,6 +63,10 @@ not yet merged to master.
       nothing else to fix)
 - [x] Full recursive JSON diff of old vs new to confirm no unintended
       changes
+- [x] Bundle the user's pending `files/doio.vil` working-tree edit
+      into this same branch/PR at their request; diffed old vs new to
+      confirm the change is confined to relocating the 4 real
+      keycodes and nothing else in that file shifted
 
 ## Decisions (D)
 
