@@ -69,6 +69,7 @@ every line below is currently unstarted.
 - [ ] G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
 - [x] G39 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 - [ ] G40 — no priority signal on a plan file or in any index
+- [ ] G41 — `/simplify` is mandated unconditionally in step 6, even for docs-only changes
 
 ## Decisions (D)
 
@@ -479,6 +480,20 @@ priority and when (author only at `plan-new` time, or re-triaged later
 via a dedicated `plan-priority <file> <level>` script), whether it needs
 its own scale or can reuse an existing convention, and whether the index
 should sort/group by it.
+
+### G41 — `/simplify` is mandated unconditionally in step 6, even for docs-only changes
+`docs/skills/workflow/SKILL.md` step 6 says `/simplify` is "required for
+any non-trivial change... always," no judgment call. Observed firing on a
+docs-only change (`2026-08-29-fold-the-trust-hierarchy-and-verify-ladder-
+automation-into-testing.md`, editing only `.md` files) where there was no
+code to review for reuse/simplification/efficiency/module-condensation —
+its stated purpose per `reference.md`'s subagent-selection table. Unlike
+`docs-updater` (explicitly gated on "touched a doc, a comment, or a
+config surface a doc describes"), `/simplify`'s mandate has no such
+content-type gate. Proposed: scope step 6's `/simplify` requirement to
+changes that touch at least one non-doc file (code, config, scripts),
+mirroring how `docs-updater`/`security` are already condition-gated
+rather than blanket-mandated.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
