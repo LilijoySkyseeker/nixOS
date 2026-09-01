@@ -33,8 +33,11 @@ session needs is here or linked from here.
 > **Confirmed live on homelab** (`systemctl show push-deploy-vps.service`):
 > `ProtectSystem=strict`, `PrivateTmp=yes`,
 > `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`. Zero failed units.
-> vps itself was not switched this session — its only pending diff is
-> unrelated backlog (`glow`, the tmpfs mount unit), already covered below.
+> **vps was also switched, same session, on a separate explicit ask** —
+> its pending diff (`glow`, the `tmp.mount` tmpfs unit) is unrelated
+> backlog, now live: zero failed units, public site still `302`s. **All
+> four hosts are now fully caught up to this branch's HEAD** — nothing
+> build-verified-only remains fleet-wide as of this session's end.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -1207,9 +1210,21 @@ finished in ~22s CPU, in line with its own prior-run average (21.27s).
 `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`, live. `/run/current-system`
 matches the new build's store path.
 
-**vps was not touched this session.** Its own pending diff (`glow`, the
-tmpfs mount) is unrelated backlog from earlier sessions, already
-build-verified, not yet deployed — a separate, still-open decision.
+**vps deployed too, same session, on a separate explicit ask.** Its
+pending diff (`glow`, the `tmp.mount` tmpfs unit) was unrelated backlog
+from earlier sessions (`glow` from the ninth session's fleet-default
+profile addition, `tmp.mount` from the seventh session's
+`boot.tmp.useTmpfs`) — build-verified only until now. Re-verified the
+diff hadn't changed since the earlier check (`nvd diff` against
+`/run/current-system`, identical output), got confirmation, then
+`nixos-rebuild switch --flake .#vps --target-host root@vps`. Switch log:
+`anubis-jellyfin.service` and `polkit.service` restarted (dbus-broker/
+firewall reloaded), `tmp.mount` started fresh. Verified after, not just
+exit 0: `systemctl --failed` — zero; `/run/current-system` matches the
+new build; `tmp.mount` active as tmpfs; public site
+(`https://jellyfin.skyseekerlabs.net`) still returns `302`, unaffected.
+**All four hosts (homelab, vps, torrent, thinkpad) are now on this
+branch's exact HEAD** — nothing left build-verified-only fleet-wide.
 
 ## What is left
 
