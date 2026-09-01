@@ -37,6 +37,7 @@ in
           eza
           tldr
           bat
+          glow # markdown reader
           zoxide
           git
           lazygit
