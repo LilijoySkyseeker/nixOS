@@ -121,6 +121,18 @@ meaningfully, or when homelab quiets down enough to give a run a clean
 >
 > Takes effect only once homelab is deployed with that change.
 
+**Revisit condition met, 2026-09-01: the user ran a manual backup and it
+completed cleanly.** Started 2026-08-29 22:50 (off-schedule, confirming
+manual trigger), finished 2026-08-30 08:46 after 9h56m wall clock,
+`restic check` reported no errors, exit 0/SUCCESS.
+`/var/lib/restic-backups-backblazeWeekly/last-success` now reads
+2026-08-30 08:46:48. At the 312h threshold the alarm is not due again
+until ~2026-09-12, past the 2026-09-04 03:00 scheduled run — so the
+~2026-09-03 page this plan predicted will **not** fire; that prediction is
+superseded, not wrong for the conditions it was written under. Progress's
+D3 checkbox reflects the original "no catch-up for now" acceptance and is
+left as-is (append-only); this note is the record of the revisit.
+
 ## Decisions (D)
 
 ### D1 — how should a manual deploy avoid killing a running backup? UNDECIDED

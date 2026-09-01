@@ -57,11 +57,15 @@ session needs is here or linked from here.
 >    *lesson* is that verification means exercising the credential.
 >    Item 10 (restic) was the one case where no restart was needed — and
 >    that was checked, not assumed.
-> 2. **The offsite backup has not succeeded since 2026-08-21**, because a
->    manual deploy kills an in-flight run. Deliberately accepted for now —
->    see `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
->    D3. **Expect the staleness alarm to page ~2026-09-03 and be correct.**
->    Do not "fix" it by triggering a run without reading that decision.
+> 2. ~~**The offsite backup has not succeeded since 2026-08-21**… **Expect
+>    the staleness alarm to page ~2026-09-03**.~~ **Resolved: the user ran
+>    a manual backup that completed cleanly** (started 22:50 on
+>    2026-08-29, off-schedule, confirming manual; finished 9h56m later,
+>    `no errors were found`, exit 0). `last-success` is now 2026-08-30
+>    08:46 — the alarm will not fire at 312h from that mark until
+>    ~2026-09-12, past the next scheduled run. D3's revisit condition in
+>    `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+>    was met.
 > 3. **The factorio credentials were proven readable by any local uid**
 >    through `/nix/state/.zfs` (0777, 57 snapshots, `server-settings.json`
 >    at 0644). They have been rotated. The *mechanism* is not fixed and
@@ -766,7 +770,8 @@ outstanding.**
 - ~~Deploy homelab to pick up the **312h staleness threshold**
   (`c6116ca`).~~ **Done 2026-09-01** — homelab was switched as part of the
   ninth session's zrepl-key rotation, which carried this along.
-- Expect the backup staleness page ~**2026-09-03**; it will be correct.
+- ~~Expect the backup staleness page ~**2026-09-03**.~~ **Resolved** — a
+  manual backup completed cleanly; see the corrected note above.
 - ~~Delete `/tmp/homelab_zrepl_key` and its `.pub` on torrent.~~ **Done
   2026-09-01**, after the new key was already verified working.
 
