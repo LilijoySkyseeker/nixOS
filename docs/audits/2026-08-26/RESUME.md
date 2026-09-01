@@ -808,14 +808,18 @@ and empirical testing before any decision, not a guess:
 `nixosConfigurations`; torrent/thinkpad/vps are byte-identical to before
 (the module is opt-in and only homelab sets it). Commit `47c4f89`, pushed.
 
-**Requested next, not started yet:** consolidate the repeated disko
-options duplicated across each host's `disko.nix` (the
-`acltype`/`xattr`/`atime`/`compression`/`mountpoint`/`canmount`/`devices`/
-`sync`/`"com.sun:auto-snapshot"` block appears near-identically per zpool,
-per host) into one shared place, for the same "don't let this drift"
-reason as `myZfsDatasetProperties` above. **Wait for explicit go-ahead
-before wiring it in** — the user asked for this to be prepared but not
-applied without a separate sign-off.
+**Disko consolidation done, same session, on explicit go-ahead.** The
+repeated `rootFsOptions` block (byte-identical across all five zpool
+definitions — torrent's and thinkpad's `zroot`, homelab's own
+`zroot`/`zdata`/`zbackup`) and the root-SSD disk layout (identical shape
+on all three ZFS hosts, differing only in swap size) both now live once
+in `modules/flake/vars.nix` (`zfsRootFsOptions`, `mkZfsRootSsd`), matching
+the same pattern `vars.zreplPullerKey` already used. Pure refactor,
+verified by identical outcome rather than by inspection: all five
+`nixosConfigurations` build to **byte-identical store paths** before and
+after. vps has no ZFS and is untouched. Commit `718c396`, pushed. Not
+deployed anywhere — a no-op refactor has nothing to deploy differently,
+but it still rides along with each host's next real switch.
 
 ## What is left
 
