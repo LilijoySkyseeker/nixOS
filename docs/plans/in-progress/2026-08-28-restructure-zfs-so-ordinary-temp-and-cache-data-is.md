@@ -60,7 +60,7 @@ homelab gets this free from impermanence: its root is rolled back to
 
 - [ ] G1 confirmed empirically — no action taken yet
 - [x] D1 land `boot.tmp.useTmpfs` (agreed, not yet written)
-- [ ] F2 — verify homelab's restic `mount -t zfs` under `/tmp/restic/$snap`
+- [x] F2 — verify homelab's restic `mount -t zfs` under `/tmp/restic/$snap`
       still works with `/tmp` now tmpfs, at homelab's next real deploy
       (mount-stacking should be unaffected by reasoning, but per
       hardening.md rule 9 that needs the daemon's own output, not
@@ -176,6 +176,9 @@ durable, and only `/tmp` is what people reach for by default.
 > actual large build (e.g. a from-source package or an ISO build); if
 > one is ever observed to stress `/tmp`, re-open this with that evidence.
 
+
+**MOOT 2026-09-01:** Checked against the pinned nix-2.34.8 source and live nix-daemon.service: build-dir defaults to /nix/var/nix/builds, not $TMPDIR, so derivation build scratch never lands on the new tmpfs /tmp. Already reasoned in-doc (severity revised MEDIUM -> INFO); this only adds the formal marker. Residual (fetcher/evaluation-time scratch use) not separately measured -- reopen if ever observed to stress /tmp.
+
 ### F2 — this session's rendered-unit verification skipped the one host with an actual `/tmp` consumer
 
 - **File:** `hosts/homelab/configuration.nix:216-233` (the `backupPrepareCommand`/`backupCleanupCommand` that `mkdir -p /tmp/restic/$snapshot` and `mount -t zfs $snapshot /tmp/restic/$snapshot` for the weekly, multi-day, ~2.9TiB offsite restic backup); plan text's own "Landed 2026-08-28" note under D1
@@ -186,6 +189,9 @@ durable, and only `/tmp` is what people reach for by default.
 - **Rule:** hardening.md rule 9, "verify that config actually takes effect — rendering is not applying" — followed for the option in general, not for the specific consumer most likely to interact with it unusually.
 - **Finding:** Mounting a different filesystem (`zfs`) over a directory that lives inside the new tmpfs `/tmp` is ordinary Linux mount-stacking and should not consume tmpfs capacity for the mounted snapshot's own data (only the empty directory entry does) — so by reasoning alone this should keep working unchanged. But that is reasoning, not verification, and it is exactly the kind of case hardening.md's rule 9 says to check with the daemon's own output rather than infer. Nobody has run `systemctl start restic-backups-backblazeWeekly` (or even rendered its unit alongside the new `tmp.mount`) against a build that actually has `boot.tmp.useTmpfs = true`, on the one host where this mount-under-`/tmp` pattern exists.
 - **Fix risk:** Actually exercising this (even a `--dry-run`-style restic run against a small test dataset) risks kicking off part of a multi-day, multi-TB backup job if done carelessly on the real host; should be tested against a throwaway dataset/snapshot first, not against production `zroot/local/state`/`zdata/storage/storage`.
+
+
+**MOOT 2026-09-01:** Superseded by a4f5e95 (fix(restic): mount snapshots under a 0700 RuntimeDirectory, not /tmp), landed the same session for an unrelated reason (L-02, findings-tail.md -- /tmp/restic was world-traversable and mkdir -p would follow a planted symlink). backupPrepareCommand/backupCleanupCommand now mount exclusively under $RUNTIME_DIRECTORY (/run/restic-backups-backblazeWeekly), which is always tmpfs under /run by systemd default -- completely independent of boot.tmp.useTmpfs. Confirmed live in hosts/homelab/configuration.nix: no /tmp/restic reference remains. The mount-stacking-under-tmpfs question this finding raised no longer has a code path to apply to.
 
 ## Checked and clean
 
