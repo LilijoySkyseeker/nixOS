@@ -4,29 +4,31 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the eleventh session.**
+**Last updated: 2026-09-01, end of the twelfth session.**
 
-> ## START HERE — state as of the eleventh session
+> ## START HERE — state as of the twelfth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
-> `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
-> `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through eleventh sessions' commits — **open a PR when it is
-> time to land them.** All five `nixosConfigurations` build. The eighth
-> session fixed two LOW findings from the tail (L-01 anubis egress on
-> vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
-> hosts to this branch and closed out credential rotation; the tenth
-> corrected the restic staleness prediction and closed D1 of the
-> `.zfs`-traversal plan (`snapdir=disabled` on homelab); the eleventh
-> unified `myZfsDatasetProperties` and `disko.nix` — see "What happened in
-> the eleventh session" below. The L-01/L-02, D1, and unification fixes
-> are all build-verified only, not deployed to any host yet.
+> `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
+> PR #39 as of the twelfth session** (`6a68cb3`) — everything through the
+> eleventh session (waves 1-2, credential rotation, the two LOW findings,
+> the `.zfs`-traversal fix, the disko unification) is on `master` now.
+> This branch is currently **one commit ahead of master**: `d470a61`,
+> explicit WIP `push-deploy-vps` sandboxing — **not build-broken, but not
+> VM-verified and not deployed anywhere.** All five `nixosConfigurations`
+> build.
 >
-> **NEXT UP:** nothing queued. Item 0 of "Agent-doable, unblocked" below
-> (the disko unification) is now done — see the eleventh session. The
-> remaining agent-doable items are 1 (`push-deploy-vps` sandboxing) and 4
-> (`userns-remap`), both deferred on purpose pending a real-target VM
-> test; everything else needs either a user decision or a live host.
+> **NEXT UP: finish item 1, `push-deploy-vps` sandboxing (F-P7-06 / wave 2
+> item 2.6).** Read "What happened in the twelfth session" below in full
+> before touching anything — it has the exact mechanism (grounded in
+> `nixos-rebuild-ng`'s own source), the six real bugs the VM test already
+> caught and fixed, and the specific thing it's currently blocked on (a
+> from-scratch `glibc`/`stdenv` rebuild inside the sandboxed test VM) plus
+> a concrete next step to try. **Do not deploy the current hardening to
+> vps** — it is unverified beyond a local build, which is exactly the
+> risk this item was deferred to avoid. Item 4 (`userns-remap`) is the
+> other agent-doable item, also deferred pending its own VM test;
+> everything else needs either a user decision or a live host.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -144,10 +146,12 @@ file.
 
 ## Where things are
 
-- **Branch:** `worktree-worktree-security-audit-plan`, pushed, clean,
-  **42 commits ahead of master**. Live worktree at
-  `.claude/worktrees/worktree-security-audit-plan` — enter that rather
-  than making a new one.
+- **Branch:** `worktree-worktree-security-audit-plan`, pushed, clean.
+  ~~42 commits ahead of master~~ **merged to master via PR #39, twelfth
+  session** (`6a68cb3`) — now just **one commit ahead** (`d470a61`,
+  WIP `push-deploy-vps` sandboxing, not yet VM-verified). Live worktree
+  at `.claude/worktrees/worktree-security-audit-plan` — enter that
+  rather than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** ~~the 2026-08-26 entry at the top of `TODO.md`~~ —
   now `docs/plans/in-progress/2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md`
@@ -921,6 +925,136 @@ move by design).
 **Not deployed anywhere.** All three rounds of this session's work are
 build-verified only.
 
+## What happened in the twelfth session (2026-09-01)
+
+**Landed PR #39**, closing out the backlog from the fifth through
+eleventh sessions (credential rotation, the two LOW findings, the
+`.zfs`-traversal fix, the disko/`myZfsDatasetProperties` unification).
+`origin/master` had moved on independently (a plan-file-system rework,
+including a new `plan-gate` CI check) — merged in first, one real
+conflict (`docs/plans/.checksums`, an append-only manifest, resolved as
+a union of both sides' lines). `plan-gate` then correctly blocked the PR
+on two genuinely unresolved findings (F1, F2) on
+`2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md`, both
+predating `plan-gate`'s own existence: F1 was already reasoned to INFO
+in-doc and just needed the formal `plan-resolve` marker; F2 was
+genuinely moot, since the code it was about (`/tmp/restic` mounts) had
+already been replaced for an unrelated reason (`a4f5e95`, the eighth
+session's L-02 fix) — its own `RuntimeDirectory` lives under `/run`,
+always tmpfs, independent of `boot.tmp.useTmpfs`. Resolved both, gate
+passed, merged (`6a68cb3`).
+
+**Then started item 1, `push-deploy-vps` sandboxing (F-P7-06 / wave 2
+item 2.6's deferred third) — in progress, not finished.** Grounded the
+design in `nixos-rebuild-ng`'s actual Python source
+(`nixos_rebuild/tmpdir.py`, `process.py`) rather than the guesswork the
+item was deferred to avoid: it opens its own SSH `ControlMaster=auto`
+through a tempdir under `$TMPDIR`/`nixos-rebuild.<rand>`, created once
+at import time via `tempfile.TemporaryDirectory()`. `ProtectSystem =
+"strict"` alone makes `/tmp` read-only and this fails immediately (a
+guaranteed, reproducible break, not a subtle one);  `PrivateTmp = true`
+fixes it, since the socket only ever needs to be reachable from this
+unit's own process tree, which shares one mount namespace for the life
+of a single oneshot run. `nix show-config` confirmed
+`use-xdg-base-directories = false` (the pinned default), so nix's own
+eval/build cache genuinely has to be `~/.cache`, ruling out an
+`XDG_CACHE_HOME` redirect.
+
+Applied to `modules/nixos/push-deploy.nix`:
+`ProtectSystem=strict`, `PrivateTmp=true`,
+`ReadWritePaths=[flakeDir "/root/.ssh" "/root/.cache"]`, plus
+`systemd.tmpfiles.rules` creating `.cache`/`.ssh` — added only after the
+VM test (below) proved `ReadWritePaths` does **not** auto-create its
+target, and that a `+`-prefixed `ExecStartPre` does **not** help (the
+mount namespace is set up once for the whole unit before any
+`ExecStartPre` runs — `+` only bypasses privilege-dropping, not
+sandboxing). Build-verified on all five `nixosConfigurations`, committed
+as explicit WIP (`d470a61`) — **not deployed, and the module's own
+sandboxing is not yet proven to actually work end-to-end.**
+
+**`tests/push-deploy-sandbox.nix`, a real two/three-node VM test (the
+finding's own stated requirement), is built and registered
+(`modules/flake/checks.nix`) but has not yet gone green.** Imports the
+real module (not a copy); `deployer` runs the genuine
+`push-deploy-target.service` against `target` (an unprivileged `deploy`
+user over real ssh, the same run0-alias-plus-polkit elevation vps's own
+dispatcher uses); `deployer-broken`, a second node identical except
+`PrivateTmp` forced off, is the negative control proving that flag is
+load-bearing rather than incidental. Six real, non-obvious bugs were
+found and fixed by iterating against actual failures, not guessed:
+
+1. `myPushDeploy.minSwitchInterval`'s type is `positive-int`, not
+   `>= 0` — the test's `0` needed to become `1`.
+2. `security.run0.enableSudoAlias` needs `security.run0.enable = true`
+   *and* `security.sudo.enable = false` alongside it (an assertion
+   failure without both — checked against `modules/profiles/default.nix`'s
+   own real pattern, not guessed).
+3. **The load-bearing one.** `ReadWritePaths` does not create the
+   directory it grants access to — on a genuinely fresh root user with
+   no prior `.cache`, mount-namespace setup fails outright with ENOENT
+   before the script even starts. The first fix attempt (a
+   `+`-prefixed `ExecStartPre` to `mkdir -p` it) **also failed with the
+   identical error**, empirically disproving the assumption that `+`
+   bypasses sandboxing — it only bypasses privilege-dropping. Fixed
+   properly with `systemd.tmpfiles.rules`, which runs at boot,
+   independent of this unit entirely.
+4. A local Python variable in the test script named `log` shadowed the
+   test driver's own built-in `log` symbol (its logger) — caught by the
+   test driver's static type checker, not a runtime failure. Renamed to
+   `unit_journal`.
+5. A VM test node boots straight from its built closure and never runs
+   a real install/`nixos-rebuild switch`, so
+   `/nix/var/nix/profiles/system` — which the script itself `stat`s
+   over ssh before proceeding — doesn't exist on `target`. Added the
+   symlink in the test setup, plus `touch -h -d @0` to keep its mtime
+   from racing `minSwitchInterval`'s skip guard on a same-second
+   coincidence.
+6. The minimal flake being pushed pulled in NixOS's default
+   `documentation.nixos.enable`, which needs `nixos-render-docs`
+   (Python) — not pre-cached in the sandboxed test VM, no network to
+   fetch a source tarball with. Added `documentation.enable = false;`
+   to the pushed flake's module.
+
+**Currently blocked on a seventh issue, not yet root-caused: the pushed
+flake's evaluation triggers a from-scratch rebuild of `glibc`/`stdenv`/
+Python inside the deployer VM**, rather than reusing store paths already
+present in its own closure — even though the flake's `nixpkgs` input is
+pinned via `path:${pkgs.path}` to the exact same nixpkgs the VMs
+themselves were built from. This is precisely the shape
+`remediation.md` originally predicted when it deferred this item
+("building a full system closure inside a test VM and pushing it to a
+second node, far heavier than the zrepl two-node test and probably
+impractical as written") — the *mechanism* under test (SSH/sandboxing)
+turned out tractable and caught six real bugs, but the *closure-build*
+half is the part proving genuinely heavy, exactly as warned.
+
+**Most promising next step, not yet tried:** force the pushed target's
+`toplevel` to already be present in `deployer`'s own store closure
+before the test VM ever boots, rather than relying on evaluation
+naturally reusing it. Concretely: evaluate the *same* minimal
+`nixosSystem` (same `pkgs.path` pin, same module) once in the **outer**
+Nix expression that builds `tests/push-deploy-sandbox.nix` itself (not
+inside the VM), reference its `.config.system.build.toplevel` from
+somewhere in `deployer`'s own node config (e.g.
+`environment.etc."prebuilt-target-marker".source = targetToplevel;`) so
+it becomes part of `deployer`'s closure and gets copied into the VM at
+boot — then when `nixos-rebuild` inside the VM evaluates the identical
+flake, it should get the identical derivation, already realized, with
+nothing left to build. Two secondary fallbacks if that doesn't pan out:
+(a) narrow the test to exercise just the SSH/sandboxing mechanics
+directly (control-master, `nix-store --serve --write`, sudo-elevated
+`switch-to-configuration`) as literal shell commands under the real
+`serviceConfig`, without a full flake evaluation at all — less
+end-to-end fidelity, but avoids the closure-build problem entirely; or
+(b) accept the audit's original judgment that a full closure-push VM
+test is impractical, and instead deploy the current build-verified
+hardening to vps directly on the user's explicit go-ahead, watching
+vps's own profile-staleness alert (now wired up, see item 2 below) to
+catch a wrong guess quickly rather than silently.
+
+**Nothing deployed.** The hardening in `modules/nixos/push-deploy.nix`
+must not be treated as done — it is unverified beyond a local build.
+
 ## What is left
 
 ### Rotation — done
@@ -956,12 +1090,20 @@ outstanding.**
    in the eleventh session" above and
    `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
    Build-verified only, not deployed.
-1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6,
-   deferred on purpose. Needs a VM test with a **real remote target**,
-   because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH
-   control-master path and nix's fetcher cache. A wrong guess means vps
-   silently stops updating — though that is now *detectable*, since vps
-   watches its own profile mtime (see item 2).
+1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6.
+   **In progress as of the twelfth session, not finished** — see "What
+   happened in the twelfth session" above for the full state:
+   hardening applied to `modules/nixos/push-deploy.nix` and
+   build-verified (`d470a61`, explicit WIP), grounded in
+   `nixos-rebuild-ng`'s own source rather than guessed, but
+   `tests/push-deploy-sandbox.nix` (the finding's own required real
+   remote-target VM test) has not yet gone green — blocked on the
+   pushed flake triggering a from-scratch `glibc`/`stdenv` rebuild
+   inside the sandboxed VM. **Do not deploy this to vps** until either
+   the VM test passes or the user explicitly accepts deploying
+   build-verified-but-not-VM-verified hardening. A wrong guess means
+   vps silently stops updating — though that is now *detectable*, since
+   vps watches its own profile mtime (see item 2).
 2. ~~**The skipped-deploy half of `F-P7-09`**~~ — **done in the fourth
    session.** All four hosts watch `/nix/var/nix/profiles/system` for
    staleness, and `onSuccess` is replaced by a gated
