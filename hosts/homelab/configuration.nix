@@ -326,7 +326,15 @@
   # snapshot is taken -- which matters here because zbackup sits behind a
   # USB link (USB 2.0 and heavily contended until the 2026-08-23 cable
   # change moved it to USB 3.0; see hosts/homelab/README.md).
-  sops.secrets.homelab_zrepl_key = { };
+  # go-netssh shells out to the system ssh binary per connection attempt,
+  # which reads -i's target fresh each time -- unlike wireguard's
+  # RemainAfterExit oneshot, this is plausibly a per-invocation reader
+  # already. Not verified either way (SYS-11's rule: check which kind you
+  # have, don't assume), and restartUnits costs nothing here -- a zrepl
+  # pull that gets killed mid-run simply retries on the next interval, per
+  # rotation-runbook.md item 9 -- so set it rather than rely on the
+  # per-invocation read actually being true.
+  sops.secrets.homelab_zrepl_key.restartUnits = [ "zrepl.service" ];
 
   # zrepl's ssh+stdinserver client (go-netssh, shelling out to system ssh)
   # has no interactive TTY to prompt on an unrecognized host key, so the

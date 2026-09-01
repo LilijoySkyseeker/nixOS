@@ -11,7 +11,7 @@
     # homelab_zrepl_key sops secret). Both source hosts pin this same key
     # to a forced `zrepl stdinserver` command in root's authorized_keys, so
     # it lives here rather than being repeated per host.
-    zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHGCZd2jS1ZzBQckagi87/+h0musJxPpCkZvYFkmUzgi homelab-zrepl-pull";
+    zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
     username = "lilijoy";
     # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
     # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
