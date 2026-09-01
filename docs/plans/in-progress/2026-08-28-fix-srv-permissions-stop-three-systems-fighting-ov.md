@@ -100,12 +100,14 @@ So the original finding was never actually closed.
       verified in the built closure
 - [x] D3 tighten the two leaf directories, mode only — **0700, not 0750**
       (revised per F3), declared in the service modules (revised per F4/F5)
-- [ ] **rotate the factorio.com token and game password** — F1; the only
-      step that retracts anything. User agreed 2026-08-28 to do this.
+- [x] ~~rotate the factorio.com token and game password~~ — F1; the only
+      step that retracts anything. **Done 2026-08-28, confirmed 2026-09-01**
+      — see F1's resolution below and rotation-runbook.md item 12.
 - [x] build homelab, deploy, confirm jellyfin starts and survives
       tmpfiles re-running — **verified 2026-08-28, see G3**
 - [ ] separate plan for `/nix/state/.zfs` being 0777 — F1's root cause,
-      broader than this plan
+      broader than this plan — see
+      `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`
 
 ### G3 — deployed and verified 2026-08-28
 
@@ -233,6 +235,9 @@ jellyfin still starts, not just switching once and seeing green.
 - **Rule:** same shape as `docs/hardening.md` standing rule 1 ("recipient rotation is not value rotation") — changing who may read a secret going forward does not un-disclose it. Also rule 8 and rule 10's last bullet: this dataset is snapshotted, replicated to `zbackup` by zrepl, and shipped to Backblaze by `restic-backups-backblazeWeekly` (which backs up a mounted snapshot of `zroot/local/state`).
 - **Finding:** the plan's own table says `/srv/factorio/main` has been **0755 for the life of this config**, and D3 treats a chmod as the remediation. It is not. `server-settings.json` carries the factorio.com **account token**, the game password and the username, it is mode 0644, and every retained snapshot preserves both the 0755 directory and the 0644 file. Setting the live directory to 0750 changes nothing about the ~57 snapshots already on disk, the copies zrepl has already replicated into `zbackup`, or the copies restic has already pushed to Backblaze. Those credentials should be treated as disclosed to every local principal on homelab for the whole period, and rotated at factorio.com. Rotation is a user action (`docs/procedures/secrets.md`) — this subagent has not decrypted or read anything. Note the value is also *pushed into* that 0644 file from sops on every container start by `modules/services/factorio.nix`'s `mkServerSettingsPatch`, so the plaintext keeps being re-materialised outside sops's control. The same argument applies, less severely, to `/srv/jellyfin/{config,cache,data,log}`: they are **0770 `jellyfin:multimedia` live right now** (verified), so the tightening to upstream's 0700 is prospective only — every snapshot keeps the 0770, and jellyfin's `config` holds its user database and API keys.
 - **Fix risk:** rotating the factorio token/password requires a factorio.com credential change plus a `sops secrets/secrets.yaml` edit and a container restart; the game password change disconnects players. Destroying the affected snapshots would break zrepl's replication cursors and the restic history — do not do that as a first move; rotate the values instead, which is the only thing that actually works given the copies already offsite.
+
+
+**FIXED 2026-09-01:** Rotated at factorio.com 2026-08-28 -- new token + game password in sops, container re-authenticated. See rotation-runbook.md item 12 (marked [x] in the table) for the full record and verification (docker-factorio-main confirmed authenticating with the new token, not just a clean activation log).
 
 ### F2 — 0750 on the directory is the single remaining bit protecting a 0755 subdirectory holding a 0644 secret, and nothing re-asserts it between activations
 

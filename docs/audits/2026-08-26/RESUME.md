@@ -4,18 +4,19 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-28, end of the seventh session.**
+**Last updated: 2026-09-01, end of the eighth session.**
 
-> ## START HERE — state as of the seventh session
+> ## START HERE — state as of the eighth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
 > `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through seventh sessions' commits — **open a PR when it is
-> time to land them.** All five `nixosConfigurations` build. The seventh
-> session added two doc/config commits (`findings-tail.md` corrections,
-> `boot.tmp.useTmpfs`) — see "What happened in the seventh session" below;
-> neither is deployed anywhere.
+> by the fifth through eighth sessions' commits — **open a PR when it is
+> time to land them.** All five `nixosConfigurations` build. The eighth
+> session fixed two LOW findings from the tail (L-01 anubis egress on
+> vps, L-02 restic's `/tmp` mount on homelab) and added a new VM test —
+> see "What happened in the eighth session" below; **neither fix is
+> deployed anywhere**, build/VM-test-verified only.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -589,6 +590,84 @@ Progress item to check at homelab's next real deploy. Commit `193bbc0`.
 **Not deployed anywhere.** Both changes are build-verified only; they
 take effect at each host's next switch, whenever the user chooses to
 deploy.
+
+## What happened in the eighth session (2026-09-01)
+
+Credential rotation is done except the genuinely-blocked item 9 (see
+above, unchanged). This session worked the tail instead: two agent-doable
+LOW findings from `findings-tail.md`, both fully fixed and verified
+without touching a real host.
+
+**L-01 — caddy's admin API reachable from anubis on vps, fixed and
+VM-tested.** `hosts/vps/configuration.nix` now sets
+`systemd.services.anubis-jellyfin.serviceConfig = { IPAddressDeny = "any";
+IPAddressAllow = [ "10.100.0.2/32" ]; }`. Build-verified on the rendered
+unit. Then VM-tested for real, per the finding's own instruction ("needs
+a VM test with a real request through caddy, not a unit start"): new
+`tests/anubis-admin-egress.nix`
+(`checks.anubis-admin-egress`) boots caddy + anubis + a stand-in backend
+on a dummy interface at the same address anubis's real `TARGET` uses, and
+proves — not just asserts — five things: the restriction renders live;
+a real request through caddy's unix-socket reverse proxy still reaches
+the backend; a probe shell **migrated into anubis-jellyfin.service's own
+cgroup** (`echo $$ > /sys/fs/cgroup<ControlGroup>/cgroup.procs`, the
+direct way to exercise a cgroup-attached BPF egress filter rather than
+trust the rendered directive) cannot reach a real caddy admin API on
+`127.0.0.1:2019`; the same cgroup can still reach the real backend
+(ruling out "the probe technique itself is broken"); and clearing the
+restriction live with `systemctl set-property` makes the same probe
+succeed again, proving causation the same way `docker-publish-guard.nix`
+does for the firewall guard. `nix build .#checks.x86_64-linux.anubis-admin-egress`
+passes all five subtests.
+
+**L-02 — restic's `/tmp` snapshot mounts, fixed.** The finding said the
+unit "already has `RuntimeDirectory`" — checked against the file and that
+was wrong; it had `StateDirectory` (persistent `/var/lib/…`, used for the
+`last-success` marker), which was never going to help. Corrected in place
+in `findings-tail.md`. The actual fix, in
+`hosts/homelab/configuration.nix`: added a real
+`RuntimeDirectory = "restic-backups-backblazeWeekly"` at `0700` (closes
+both halves the finding named — the symlink-plant risk on a hand-rolled
+`mkdir -p /tmp/restic`, and the world-traversable `/tmp` exposure for a
+mount that can sit for a week); `backupPrepareCommand` mounts under
+`$RUNTIME_DIRECTORY` and now sorts snapshots by `-s creation` instead of
+by name (the finding's "fragile if the naming scheme ever changes" nit);
+`backupCleanupCommand` now unmounts only what this run actually mounted,
+read from `/proc/mounts`, instead of piping every snapshot on the system
+— including `zbackup`'s replicated ones — into `umount`. `awk` was the
+first draft's cleanup tool; the unit's own `path` list carries no `gawk`,
+caught by reading the rendered script rather than assumed, so it uses
+`grep`+`cut` instead. Verified by reading the rendered
+`…/bin/restic-backups-backblazeWeekly-pre-start` and `-post-stop` scripts
+out of `nixos-rebuild build`'s `./result`, the audit's own "verify the
+fix, not the build" technique — deliberately **not** exercised with a
+real restic run, since
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+already decided not to risk kicking off part of a multi-day backup this
+way.
+
+**Also folded in**: `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`'s
+F1 checkbox (rotate the factorio.com token/password) was still unticked
+even though `rotation-runbook.md` item 12 had recorded it done since the
+sixth session — synced, no new action taken.
+
+**What was looked at and deliberately left alone**: the rest of the tail
+(L-03 through L-15, SYS-01 through SYS-12, the promotion candidates, and
+the needed/used rollup) — most of it is either a user-only decision, a
+provider-side action, or genuinely needs a live host to observe (e.g.
+L-04's "check thinkpad for an existing `authorized_keys` file first" —
+no SSH access to thinkpad). The four 2026-08-28 plan files' own open
+items (the `.zfs`-traversal mechanism decision, the manual-deploy-vs-restic
+D1/D2, the `~/.cache`/`Downloads` dataset split, restic's own F2 live
+test) are untouched, per their own status — they were already correctly
+blocked, not overlooked. `nix flake check --no-build` was run once for a
+broad sanity pass; it fails on `checks.zrepl-replication` for an
+unrelated, already-tracked reason
+(`2026-08-28-nix-flake-check-fails-on-zrepl-replication-test-pk.md`), not
+on anything this session touched — confirmed by building and VM-testing
+this session's own two checks individually, both clean.
+
+**Not deployed anywhere.** Both fixes are build/VM-test-verified only.
 
 ## What is left
 

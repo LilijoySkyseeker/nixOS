@@ -652,6 +652,20 @@ unaffected by `IPAddress*`, so the socket keeps working) — BPF-based and
 cgroup-wide, so it fails closed in ways easy to misdiagnose as an anubis
 bug; needs a VM test with a real request through caddy, not a unit start.
 
+**[Fixed 2026-09-01 (eighth session):** `hosts/vps/configuration.nix`
+sets exactly that on `systemd.services.anubis-jellyfin.serviceConfig`.
+Build-verified rendered unit shows `IPAddressDeny=any` /
+`IPAddressAllow=10.100.0.2/32`. VM-tested rather than trusted on the
+rendered directive alone (`tests/anubis-admin-egress.nix`,
+`checks.anubis-admin-egress`): a probe shell migrated into the live
+`anubis-jellyfin.service` cgroup cannot reach a real caddy admin API on
+`127.0.0.1:2019`, the same cgroup **can** still reach the real backend
+address, caddy still serves a real request through the unix socket end to
+end, and clearing the restriction live (`systemctl set-property … 
+IPAddressDeny= IPAddressAllow=`) makes the same probe succeed again —
+proving the restriction, not something else, is what was blocking it.
+**Not deployed** — build/VM-test only, per this session's scope.]**
+
 ### L-02 — the restic job mounts ZFS snapshots into the shared `/tmp` for up to a week (F-P3-13)
 
 **homelab · CONFIRMED config, PLAUSIBLE exploitability.**
@@ -673,6 +687,27 @@ snapshot on the system into `umount` (thousands, including everything
 received into `zbackup`), and `backupPrepareCommand` picks the newest
 snapshot with `tail -n 1` on a name sort, correct only while the
 `zrepl_` timestamp prefix keeps sorting lexicographically.
+
+**[Corrected 2026-09-01 (eighth session): the unit had `StateDirectory`,
+not `RuntimeDirectory`, before this fix** — `StateDirectory` gives
+`/var/lib/<name>` (persistent, already used for the `last-success`
+marker) and was never going to help here; `RuntimeDirectory` gives
+`/run/<name>`, created fresh and symlink-safe by systemd on every start,
+which is what the fix actually needed. **Fixed** in
+`hosts/homelab/configuration.nix`: added
+`RuntimeDirectory = "restic-backups-backblazeWeekly"` with
+`RuntimeDirectoryMode = "0700"` (closes the "enumerable by any local
+account" half, not just the symlink-plant half), `backupPrepareCommand`
+mounts under `$RUNTIME_DIRECTORY` and sorts by `-s creation` instead of
+name, and `backupCleanupCommand` now unmounts only what is actually
+mounted under `$RUNTIME_DIRECTORY` (read from `/proc/mounts`) instead of
+piping every snapshot on the system into `umount`. Build-verified by
+reading the rendered `…/bin/restic-backups-backblazeWeekly-pre-start` and
+`-post-stop` scripts out of `nixos-rebuild build`'s `./result`, per this
+audit's own "verify the fix, not the build" rule — not run live, since
+exercising this needs a real multi-day restic run
+(`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+already deliberately defers that). **Not deployed.**]**
 
 ### L-03 — the recovery ISO is auto-built into a user-writable directory and bakes in the fleet admin keys (F-P5-10)
 
@@ -1011,8 +1046,10 @@ non-root-group service users the traverse bit they need — see
 actual fix moved confidentiality to the leaves instead: `/srv` stays at
 the distro default 0755, the two game-server directories are now 0700,
 and jellyfin's own duplicate tmpfiles rules were deleted so upstream's
-0700 applies. **`userns-remap` and the restic `/tmp` mount are both still
-open** — this promotion's second and third legs are unchanged.
+0700 applies. **`userns-remap` is still open; the restic mount leg is
+fixed** — see L-02's 2026-09-01 closure note: it no longer mounts under
+`/tmp` at all (moved to a 0700 `RuntimeDirectory`), so this promotion's
+third leg is closed and only the second (`userns-remap`) remains.
 **Read that plan's F1 before treating any of this as closed**: the
 factorio credentials were already disclosed through world-traversable ZFS
 snapshots before the leaf-mode fix landed, and a permission change cannot
