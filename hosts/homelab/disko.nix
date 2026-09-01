@@ -1,3 +1,4 @@
+{ vars, ... }:
 {
   # Sources:
   # https://github.com/lovesegfault/nix-config/blob/eebebff8e682ba2deb96320afa35789537a1e58e/hosts/plato/disko.nix#L1
@@ -11,37 +12,7 @@
 
   disko.devices =
     let
-      rootSsd = idx: id: {
-        type = "disk";
-        device = "/dev/disk/by-id/${id}";
-        content = {
-          type = "gpt";
-          partitions = {
-            esp = {
-              size = "512M";
-              type = "EF00";
-              content = {
-                type = "filesystem";
-                format = "vfat";
-                mountpoint = if idx == 1 then "/boot" else "/boot-${builtins.toString idx}";
-              };
-            };
-            swap = {
-              size = "8G";
-              content = {
-                type = "swap";
-              };
-            };
-            zfs = {
-              size = "100%";
-              content = {
-                type = "zfs";
-                pool = "zroot";
-              };
-            };
-          };
-        };
-      };
+      rootSsd = vars.mkZfsRootSsd;
       dataHdd = id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
@@ -74,7 +45,7 @@
     {
       disk = {
         # Root pool disks
-        nvme-a = rootSsd 1 "ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512";
+        nvme-a = rootSsd 1 "ata-SAMSUNG_MZNLN256HMHQ-00000_S2SVNX0J403512" "8G";
 
         # Data pool disks
         hdd-a = dataHdd "ata-HUH721212ALE601_8CH9J1UE";
@@ -89,17 +60,7 @@
         zdata = {
           type = "zpool";
           mode = "mirror";
-          rootFsOptions = {
-            acltype = "posixacl";
-            xattr = "sa";
-            atime = "off";
-            compression = "lz4";
-            mountpoint = "none";
-            canmount = "off";
-            devices = "off";
-            sync = "disabled";
-            "com.sun:auto-snapshot" = "false";
-          };
+          rootFsOptions = vars.zfsRootFsOptions;
           options.ashift = "12"; # IMPORTANT
           datasets = {
             "storage" = {
@@ -128,17 +89,7 @@
         zbackup = {
           type = "zpool";
           mode = "mirror";
-          rootFsOptions = {
-            acltype = "posixacl";
-            xattr = "sa";
-            atime = "off";
-            compression = "lz4";
-            mountpoint = "none";
-            canmount = "off";
-            devices = "off";
-            sync = "disabled";
-            "com.sun:auto-snapshot" = "false";
-          };
+          rootFsOptions = vars.zfsRootFsOptions;
           options.ashift = "12"; # IMPORTANT
           datasets = {
             # "backup/<host>/..." tree — one convention for everything (no
@@ -177,17 +128,7 @@
         zroot = {
           type = "zpool";
           mode = "";
-          rootFsOptions = {
-            acltype = "posixacl";
-            xattr = "sa";
-            atime = "off";
-            mountpoint = "none";
-            canmount = "off";
-            compression = "lz4";
-            devices = "off";
-            sync = "disabled";
-            "com.sun:auto-snapshot" = "false";
-          };
+          rootFsOptions = vars.zfsRootFsOptions;
           options.ashift = "12"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
           datasets = {
             "local" = {

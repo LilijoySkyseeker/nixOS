@@ -25,5 +25,61 @@
     # impermanence persistence root shared by profiles/default.nix and the
     # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
+
+    # disko.nix's zpool rootFsOptions -- byte-identical across every zpool
+    # on every host (torrent's zroot, thinkpad's zroot, homelab's
+    # zroot/zdata/zbackup) before this was consolidated. One copy here
+    # instead of five, so a change doesn't have to be made five times and
+    # can't quietly drift between them.
+    zfsRootFsOptions = {
+      acltype = "posixacl";
+      xattr = "sa";
+      atime = "off";
+      mountpoint = "none";
+      canmount = "off";
+      compression = "lz4";
+      devices = "off";
+      sync = "disabled";
+      "com.sun:auto-snapshot" = "false";
+    };
+
+    # disko.nix's root-SSD disk layout (ESP + swap + a zroot-pool
+    # partition) -- identical shape on homelab/torrent/thinkpad, differing
+    # only in swap size. `idx` picks the boot mountpoint (`/boot` for 1,
+    # `/boot-<idx>` otherwise, for hosts with more than one ESP) and feeds
+    # disko's partition-label uniqueness requirement.
+    mkZfsRootSsd =
+      idx: id: swapSize:
+      {
+        type = "disk";
+        device = "/dev/disk/by-id/${id}";
+        content = {
+          type = "gpt";
+          partitions = {
+            esp = {
+              size = "512M";
+              type = "EF00";
+              content = {
+                type = "filesystem";
+                format = "vfat";
+                mountpoint = if idx == 1 then "/boot" else "/boot-${builtins.toString idx}";
+              };
+            };
+            swap = {
+              size = swapSize;
+              content = {
+                type = "swap";
+              };
+            };
+            zfs = {
+              size = "100%";
+              content = {
+                type = "zfs";
+                pool = "zroot";
+              };
+            };
+          };
+        };
+      };
   };
 }
