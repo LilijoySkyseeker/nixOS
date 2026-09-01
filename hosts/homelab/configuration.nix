@@ -213,26 +213,37 @@
         b2-hard-delete = "false";
       };
       rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
-      # mount all the most recent backups in a temp folder for restic to trawl
+      # Mount the most recent snapshot of each dataset under $RUNTIME_DIRECTORY
+      # (systemd-managed, 0700, created fresh by this unit) rather than a
+      # hand-rolled /tmp/restic: /tmp is world-traversable for the run's
+      # whole multi-day duration, and mkdir -p on a path an unprivileged
+      # process pre-planted as a symlink would follow it — systemd's
+      # RuntimeDirectory creation refuses that (docs/audits/2026-08-26/findings-tail.md L-02).
       backupPrepareCommand = ''
         datasets="zroot/local/state zdata/storage/storage"
 
         for dataset in $datasets; do
-          snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
+          snapshot=$(zfs list -H -t snapshot -o name -s creation -r $dataset | tail -n 1)
           if [[ -n "$snapshot" ]]; then
-            mkdir -p /tmp/restic/$snapshot
-            mount -t zfs $snapshot /tmp/restic/$snapshot
+            mkdir -p "$RUNTIME_DIRECTORY/$snapshot"
+            mount -t zfs "$snapshot" "$RUNTIME_DIRECTORY/$snapshot"
           fi
         done
         echo "### Mounted Snapshots ###"
       '';
       backupCleanupCommand = ''
-        zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {} 2> /dev/null
+        # Unmount only what this run mounted under $RUNTIME_DIRECTORY, not
+        # every snapshot on the system (the previous version piped every
+        # zfs snapshot name — including zbackup's replicated ones — into
+        # umount). cut, not awk: this unit's `path` carries no gawk.
+        grep " on $RUNTIME_DIRECTORY/" /proc/mounts \
+          | cut -d' ' -f2 \
+          | tac \
+          | xargs -r -I{} umount -t zfs {}
         echo "### Unmounted Snapshots ###"
-          rm -rf /tmp/restic
       '';
       user = "root";
-      paths = [ "/tmp/restic" ];
+      paths = [ "/run/restic-backups-backblazeWeekly" ];
       timerConfig = {
         OnCalendar = "Fri 03:00:00";
         # Persistent=false (default) is deliberate: after a long outage this
@@ -271,6 +282,11 @@
       PrivateTmp = lib.mkForce false;
       TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeWeekly";
+      # 0700: the mounted snapshots hold the whole persisted-state and
+      # media trees for up to a week; nothing but root should be able to
+      # traverse into them (findings-tail.md L-02).
+      RuntimeDirectory = "restic-backups-backblazeWeekly";
+      RuntimeDirectoryMode = "0700";
       # backblaze bucket config
       ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # time since last success timer for alerting
