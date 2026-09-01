@@ -4,9 +4,9 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the twelfth session.**
+**Last updated: 2026-09-01, end of the thirteenth session.**
 
-> ## START HERE — state as of the twelfth session
+> ## START HERE — state as of the thirteenth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
@@ -1055,6 +1055,59 @@ catch a wrong guess quickly rather than silently.
 **Nothing deployed.** The hardening in `modules/nixos/push-deploy.nix`
 must not be treated as done — it is unverified beyond a local build.
 
+## What happened in the thirteenth session (2026-09-01)
+
+Picked the twelfth session's `push-deploy-vps` VM test back up and got it
+fully green — `nix build .#checks.x86_64-linux.push-deploy-sandbox -L`
+now passes both subtests. Full blow-by-blow (nine distinct bugs, each
+found by iterating against a real failure) is in
+`2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`,
+opened this session specifically so this level of detail didn't live only
+in a conversation transcript; summary here:
+
+The twelfth session's own theory (registering a matching closure in
+`deployer`'s config so the guest's nix would trust it) turned out
+incomplete: nix's `path:` flake fetcher re-copies even an
+already-store-resident nixpkgs tree into a freshly-hashed location, so
+nixpkgs' own internal `./relative` imports resolve against a *different*
+copy than what's already built and registered on the host — the real
+reason a from-scratch bootstrap was being triggered, not fixable by
+registering a closure computed against the original, un-rewrapped path.
+`builtins.storePath`, `builtins.getFlake` on a store path, and a bare
+path literal were all tried as ways to reference an already-built path
+without re-evaluating nixpkgs at all, and all three are rejected outright
+in the pure evaluation `nix build --flake` always runs under. The fix
+that actually works: a declared, locked `path:` input with `flake =
+false`, pointed at an already-built *leaf* derivation (a finished system
+closure, a package) rather than at nixpkgs itself — a leaf has no
+internal relative-path references left to re-root, so the fetcher's
+re-copy is just a filesystem copy, not a rebuild.
+
+That got the deploy as far as a real `switch-to-configuration switch`
+actually running against the real remote target — which then surfaced a
+run of five more real bugs, each only visible once the mechanism was
+genuinely running end to end: the pushed config silently dropping sshd/
+the deploy user (hangs the deploy instead of erroring, since it's killing
+the very ssh session driving the switch); the test framework's own
+inter-VM network interface and 9p-store overlay torn down by the same
+gap (fixed properly by building the pushed config through `nixpkgs.lib.
+nixos.evalTest` — the same low-level function `runNixOSTest` itself uses
+to build every node — rather than hand-reconstructing each piece of
+config, which visibly failed a second time even after a near-exact
+reconstruction, since overlayfs can't remount with even identical
+parameters); `system.switch.enable` defaulting off for VM test nodes,
+silently dropping `switch-to-configuration` from the closure; a genuine
+switch attempting real bootloader installation that a test node's normal
+kernel/initrd boot never exercises; and an isolated single-node
+`evalTest` call computing different network addressing than the real
+three-node test, colliding with `deployer`'s own address. Every one of
+these, plus the general pattern each teaches, is now in
+`docs/procedures/vm-testing.md`'s "Things that will bite you" for the
+next VM test author.
+
+**Not deployed to vps.** VM-verified is not deployed — that is still a
+separate, explicit user decision, same as always.
+
 ## What is left
 
 ### Rotation — done
@@ -1090,20 +1143,31 @@ outstanding.**
    in the eleventh session" above and
    `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
    Build-verified only, not deployed.
-1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6.
-   **In progress as of the twelfth session, not finished** — see "What
-   happened in the twelfth session" above for the full state:
-   hardening applied to `modules/nixos/push-deploy.nix` and
-   build-verified (`d470a61`, explicit WIP), grounded in
-   `nixos-rebuild-ng`'s own source rather than guessed, but
-   `tests/push-deploy-sandbox.nix` (the finding's own required real
-   remote-target VM test) has not yet gone green — blocked on the
-   pushed flake triggering a from-scratch `glibc`/`stdenv` rebuild
-   inside the sandboxed VM. **Do not deploy this to vps** until either
-   the VM test passes or the user explicitly accepts deploying
-   build-verified-but-not-VM-verified hardening. A wrong guess means
-   vps silently stops updating — though that is now *detectable*, since
-   vps watches its own profile mtime (see item 2).
+1. ~~**`push-deploy-vps` sandboxing**~~ — **VM test fully green as of the
+   thirteenth session (2026-09-01).** `nix build .#checks.x86_64-linux.
+   push-deploy-sandbox -L` passes both subtests: the real, hardened unit
+   builds locally, copies the closure over real ssh, and runs a real
+   remote `switch-to-configuration switch` that actually activates on
+   `target`; the negative control (`PrivateTmp` forced off) fails exactly
+   as predicted (`Read-only file system` creating nixos-rebuild-ng's own
+   ssh-controlmaster tmpdir), proving `PrivateTmp` is load-bearing, not
+   incidental. F-P7-06 / wave 2 item 2.6 is now fully closed — all three
+   deferred items are VM-tested. Getting here took nine more real,
+   distinct bugs beyond the twelfth session's six (root-caused, not
+   guessed) — the from-scratch-rebuild blocker turned out to be nix's
+   `path:` fetcher re-copying nixpkgs into a freshly-hashed location, not
+   fixable by registering a matching closure as originally planned; the
+   actual fix was building the pushed config through `nixpkgs.lib.nixos.
+   evalTest` (the same machinery `runNixOSTest` itself uses) instead of a
+   plain `nixosSystem` call, plus five smaller gaps that only that switch
+   surfaced. Full detail — every gotcha, the abandoned approaches and why
+   they didn't work, worth reading before touching this test again — is
+   in `2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`
+   (not yet `plan-move`d to `done/`; one formality-only decision, D1, is
+   moot now but wants a real `plan-decide` before that move) and in
+   `docs/procedures/vm-testing.md`'s own "Things that will bite you".
+   **Still not deployed to vps** — VM-verified is not the same as
+   deployed, and that remains a separate, explicit user decision.
 2. ~~**The skipped-deploy half of `F-P7-09`**~~ — **done in the fourth
    session.** All four hosts watch `/nix/var/nix/profiles/system` for
    staleness, and `onSuccess` is replaced by a gated

@@ -44,6 +44,11 @@
       checks.push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";
+        # The exact flake, not just its already-instantiated `pkgs`, so the
+        # test can call `.lib.nixosSystem` itself and get the byte-identical
+        # derivation the pushed flake's own `nixpkgs.lib.nixosSystem` call
+        # will produce inside the VM -- see the test file's own comment.
+        nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
     };
 }

@@ -163,6 +163,117 @@ host — the point is to exercise the module, not to rebuild a host.
   reap them.
 - **`pgrep -f qemu` matches your own command line.** Check with
   `ps -eo args` before concluding something is still running.
+- **The VM's `/nix/store` is a 9p mount of the *host's real store*, but a
+  file being physically present there is not the same as nix trusting
+  it.** The guest's nix only considers a store path valid once it is
+  registered in *that VM's own* local database, and only the closure of
+  the booted node's `system.build.toplevel` gets registered at boot —
+  everything else on the shared store is invisible to the guest's nix
+  even though it's sitting right there on disk. A flake evaluated
+  *inside* the VM (e.g. `nixos-rebuild --flake` against a pushed target)
+  that references a derivation outside that closure looks unbuilt, and
+  since the VM is also network-isolated, nix falls back to building it
+  from scratch — a from-source bootstrap of glibc/stdenv if the gap
+  reaches that deep, impractically slow on a single-core test VM. Fix:
+  evaluate the identical derivation once in the *outer* Nix expression
+  that builds the test (same nixpkgs flake input, same modules) and pull
+  its `.config.system.build.toplevel` into the booted node's own config
+  (`environment.etc.<name>.source = thatToplevel;` is enough — nothing
+  needs to read the file, existing in the closure is the point) so its
+  whole closure, glibc included, is already registered when the VM
+  boots. `tests/push-deploy-sandbox.nix` is the worked example.
+- **`ReadWritePaths` does not create the directory it grants access to.**
+  On a fresh root user with no prior `.cache`, `ProtectSystem=strict` +
+  `ReadWritePaths=[...]` fails mount-namespace setup outright with ENOENT
+  before the unit's script even runs — a real trap only a VM test with a
+  genuinely fresh user catches, not a build. A `+`-prefixed
+  `ExecStartPre: mkdir -p` does **not** fix it: `+` only bypasses
+  privilege-dropping (`User=`/`Group=`), not the mount namespace, which is
+  set up once for the whole unit before any `ExecStartPre` runs. The
+  directory has to exist before the unit starts at all — use
+  `systemd.tmpfiles.rules`.
+- **`security.run0.enableSudoAlias` needs `security.run0.enable = true`
+  *and* `security.sudo.enable = false` set together**, or you get an
+  assertion failure. Check the combination already in real use (e.g.
+  `modules/profiles/default.nix`) rather than guessing it.
+- **A VM test node boots straight from its built closure and never runs a
+  real install or `nixos-rebuild switch`.**
+  `/nix/var/nix/profiles/system` won't exist unless the test creates it —
+  needed by anything that stats a target's "current generation" over ssh.
+  Add `ln -sfn /run/current-system /nix/var/nix/profiles/system`, and pin
+  its mtime (`touch -h -d @0 ...`, not `-L`) if anything nearby checks
+  elapsed time, so the symlink's just-created mtime can't race a
+  same-second skip guard.
+- **`documentation.nixos.enable` (on by default) needs
+  `nixos-render-docs`, which pulls a real Python source fetch** — an
+  unexpected network dependency in an isolated test VM. Set
+  `documentation.enable = false;` on a minimal pushed/test config unless
+  documentation generation is actually what's under test.
+- **A restrictive Nix option type is stricter than it looks.** E.g. an
+  option typed `ints.positive` rejects `0` — a test that wants "no wait"
+  needs `1` instead. Check the option's real type before assuming a
+  boundary value like `0` is accepted.
+- **A local Python variable can shadow a name the test driver already
+  uses** — e.g. naming something `log` shadows the driver's own built-in
+  logger. Caught by the driver's static type checker, not a runtime
+  failure; the fix is just renaming the local.
+- **Pushing a "foreign" config to an already-running test node? Build it
+  through `nixpkgs.lib.nixos.evalTest`, not a plain `nixosSystem` call.**
+  `pkgs.testers.runNixOSTest`'s own implementation
+  (`pkgs/build-support/testers/default.nix`) is a thin wrapper around
+  `nixos.runTest`/`evalTest` (`nixos/lib/testing/default.nix`) with the
+  same `hostPkgs`/`node.pkgs` you'd pass yourself. Call `evalTest`
+  directly with the same args and a `nodes.<name>` shaped like the real
+  node, and the result inherits the test framework's own per-node wiring
+  automatically — inter-VM vlan networking (`eth1`), the 9p-mounted-store
+  overlay, `backdoor.service` — none of which exist on a plain
+  `nixosSystem` config and none of which are easy to hand-reconstruct
+  correctly (a near-exact `fileSystems`/`networking.interfaces` copy of
+  the real config still isn't enough — see the next few points).
+  `evalResult.config.nodes.<name>` is the resolved config directly (no
+  extra `.config` beneath that). `tests/push-deploy-sandbox.nix` is the
+  worked example.
+- **Even inheriting the right wiring, a few defaults still need forcing
+  back on for a node that's actually meant to be switched into:**
+  - `system.switch.enable` (`nixos/modules/system/activation/
+    switchable-system.nix`) defaults to `false` on VM test nodes — makes
+    sense for a throwaway VM never meant to switch itself, but it deletes
+    `${toplevel}/bin/switch-to-configuration` entirely, so a real
+    `nixos-rebuild switch --target-host` against it fails immediately
+    with "Failed to find executable .../bin/switch-to-configuration".
+    Unrelated to `system.tools.nixos-rebuild.enable`, which only controls
+    whether the `nixos-rebuild` *package* gets installed into
+    `environment.systemPackages`.
+  - A real switch attempts real bootloader installation, which a test
+    node's own normal boot (straight from a `-kernel`/`-initrd` qemu was
+    handed, bypassing any bootloader) never exercises — so
+    `boot.loader.grub.enable` defaulting `true` looks harmless until a
+    genuine switch tries to run `grub-install` against the test's virtio
+    root disk and fails ("will not proceed with blocklists", no BIOS boot
+    partition). Set `boot.loader.grub.enable = false;` on the pushed
+    config unless bootloader installation is what's under test.
+- **An `evalTest` call built with only the one node you care about
+  computes different per-node network addresses than the real multi-node
+  test.** `nixos/lib/testing/network.nix`'s node-numbering
+  (`zipListsWith nameValuePair (attrNames config.allMachines) (range 1
+  254)`, alphabetical by node name) depends on *every* node name present
+  in that specific `evalTest` call — an isolated single-node call makes
+  that one node "node 1", giving it a different `eth1` address than it
+  gets in the real test, which can collide with another real node's own
+  address. Symptom is a silent hang, not an error: the moment the pushed
+  config activates and claims that address, whichever real node already
+  had it loses its own network identity mid-connection, with nothing to
+  log because the wire just goes quiet. Fix: declare empty placeholder
+  nodes for every *other* real node name in the isolated `evalTest` call
+  (`nodes.deployer = {};` etc.) purely so the alphabetical numbering
+  lines up — their contents don't matter, only their names do.
+- **After a real `switch-to-configuration switch`, `/etc` is genuinely
+  read-only** — correct, declarative NixOS behavior, not a bug — so a
+  test script step that writes to `/etc/<file>` assuming the boot-only
+  VM's writable closure will fail with "Read-only file system" once a
+  real switch has actually happened. Check state a different way (does a
+  value still equal what it should) rather than trying to reset by
+  writing to `/etc` again.
 
 ## What these still don't cover
 
