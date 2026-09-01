@@ -1000,17 +1000,22 @@ outstanding.**
 
 ### User-only
 
-`user-actions.md` is the live checklist, and its **§0 is time-critical**
-— the two timers above. Unchanged headline: **rotate the
-ten credentials from `F-P8-02`** — the largest unmitigated risk in the
-audit, and nothing an agent does moves it. The repo is public, so only
-rotation at each provider retracts anything.
+`user-actions.md` is the live checklist. ~~Its **§0 is time-critical** —
+the two timers above.~~ **Stale, corrected 2026-09-01 (eleventh
+session):** both timers were resolved in the third session (see "READ
+THIS FIRST" above — `scheduleEnable = false` fleet-wide stopped them),
+and this paragraph was never updated to match. ~~Unchanged headline:
+rotate the ten credentials from `F-P8-02`.~~ **Also stale, same
+correction:** rotation closed 2026-09-01, see "Rotation — done" above —
+this line was contradicting that section in the same file.
 
-Still open: **D1, D2, D4, D5, D6, D7, D8, D11, D12**, plus **D15**
-(container `--memory` ceiling — blocks half of the resource-ceilings
-item) and **D16** (confirm the new deploy-staleness thresholds; not
-blocking), both added in the fourth session. **D11 is time-critical.**
-Also the factorio
+Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
+`--memory` ceiling — blocks half of the resource-ceilings item) and
+**D16** (confirm the new deploy-staleness thresholds; not blocking),
+both added in the fourth session. ~~D11 is time-critical.~~ **Not
+time-critical** — same stale-timer correction above; D11 itself (the
+`flake-update-test` auto-merge re-evaluation) is still genuinely
+unanswered, just not on a clock. Also the factorio
 account token is still exposed in ZFS snapshots and restic backups taken
 before `/srv/factorio/new` was deleted, and is the **same** credential
 `factorio-main` uses.
