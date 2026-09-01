@@ -93,6 +93,11 @@
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
 
+  # zroot root dataset's own properties, self-healed live too now, not
+  # just at disko install. plan:
+  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
+  myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
+
   # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
   # sanoid + the syncoid-based myBackupPush). Passive side -- see the
   # equivalent block in hosts/torrent/configuration.nix for the reasoning.
@@ -168,13 +173,13 @@
   # legitimately offline for long stretches, so "no news" has always been
   # indistinguishable from "deploying fine" -- and it is the host the
   # audit could not verify live at all, precisely because it was dark.
-  sops.secrets.homelab_discord_webhook = {
+  sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
   };
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkSmart = false;
     # A laptop that wakes after weeks off will fire one batch of alerts
     # for anything that failed while it was down. That is the intended

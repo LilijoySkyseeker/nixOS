@@ -1,4 +1,13 @@
-{ inputs, ... }:
+# `inputs` is deliberately not taken here: the outer one was unused even
+# before this file grew a `let` (deadnix flagged it at HEAD), and the
+# inner module gets its own via specialArgs.
+{ config, ... }:
+let
+  # Captured out here, before the inner module's own `config` shadows the
+  # flake-parts one — see docs/architecture.md's "config shadowing"
+  # gotcha, and modules/flake/deploy-guards.nix for the same pattern.
+  debugTools = config.flake.debugTools;
+in
 {
   flake.modules.nixos."profile-default" =
     {
@@ -20,32 +29,45 @@
         inputs.impermanence.nixosModules.impermanence
         inputs.nix-flatpak.nixosModules.nix-flatpak
       ];
-      environment.systemPackages = with pkgs-unstable; [
-        btop
-        wget
-        eza
-        tldr
-        bat
-        zoxide
-        git
-        lazygit
-        neovim
-        nixfmt
-        rsync
-        sops # secrets management
-        smartmontools
-        helix
-        trippy # ping+traceroute tool
-        psmisc # fuser, killall, pstree
-        ffmpeg
-        flac
-        bitwarden-cli
-        topgrade
-        tmux
+      environment.systemPackages =
+        with pkgs-unstable;
+        [
+          btop
+          wget
+          eza
+          tldr
+          bat
+          glow # markdown reader
+          zoxide
+          git
+          lazygit
+          neovim
+          nixfmt
+          rsync
+          sops # secrets management
+          smartmontools
+          helix
+          trippy # ping+traceroute tool
+          psmisc # fuser, killall, pstree
+          ffmpeg
+          flac
+          bitwarden-cli
+          topgrade
+          tmux
 
-        zfs-prune-snapshots # TEMP, zfs needs module
+          zfs-prune-snapshots # TEMP, zfs needs module
 
-      ];
+        ]
+        # Shared with the devshell — one list, in modules/flake/debug-tools.nix,
+        # so a tool added for local use also lands on the hosts.
+        #
+        # Always `pkgs-unstable`, deliberately, including on homelab, which
+        # is otherwise pinned to nixpkgs-stable. Debug tooling should be
+        # the same version everywhere: a command learned on one host then
+        # behaves identically on the next, and you are never debugging a
+        # live problem against a year-old set of flags. It also matches the
+        # rest of this list, which is already unstable.
+        ++ debugTools pkgs-unstable;
 
       security = lib.mkMerge [
         # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module;
@@ -243,6 +265,9 @@
         editor = false;
       };
       boot.loader.efi.canTouchEfiVariables = true;
+
+      # plan: 2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md#D1
+      boot.tmp.useTmpfs = true;
 
       # Enable networking
       networking.networkmanager.enable = true;

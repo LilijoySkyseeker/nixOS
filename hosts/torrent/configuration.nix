@@ -72,6 +72,11 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
+  # zroot root dataset's own properties, self-healed live too now, not
+  # just at disko install. plan:
+  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
+  myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
+
   # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
   # sanoid + the syncoid-based myBackupPush).
   #
@@ -173,18 +178,30 @@
   # and never enters `systemctl --failed`; closing that needs the
   # deploy-marker half of F-P7-09, which is not this change.
   #
-  # Reusing homelab's webhook rather than minting a per-host one: adding
-  # a key is a user-only sops edit, and under .sops.yaml's single
-  # creation_rules entry every host already decrypts all 31 secrets, so
-  # this grants no access this host did not already have. Re-point it at
-  # a per-host key when .sops.yaml is split per path (F-P8-01, F-P8-05).
-  sops.secrets.homelab_discord_webhook = {
+  # One fleet-wide webhook, deliberately, resolving the open question in
+  # the audit's "mint per-host webhook keys -- or decide the shared one
+  # is fine" item: the shared one is fine.
+  #
+  # There used to be two sops keys holding the same URL --
+  # homelab_discord_webhook (read by homelab, torrent AND thinkpad) and
+  # vps_discord_webhook -- so the host prefix described nothing real and
+  # actively misled. Now a single unprefixed `discord_webhook`, matching
+  # how other fleet-shared secrets are named (git_email, open_weather_key).
+  #
+  # What the shared key gives up: after .sops.yaml is split per path
+  # (F-P8-01, F-P8-05), a compromise of any one host leaks the fleet's
+  # only alert sink and it cannot be revoked per host. Accepted -- the
+  # webhook is a write-only sink to one channel, so the worst case is
+  # forged or drowned-out alerts, not access; and all four hosts
+  # legitimately consume it, so a per-path split still has to grant it to
+  # all four. Splitting is cheap to revisit if that trade ever changes.
+  sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
   };
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     # checkSmart is the one option here that costs something: the module
     # grants the unit the "disk" group plus CAP_SYS_RAWIO so smartctl can
     # issue its SG_IO ioctls, and /dev/sd* is root:disk 0660 -- read *and

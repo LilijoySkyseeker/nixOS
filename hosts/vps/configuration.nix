@@ -293,8 +293,13 @@ in
     # needed for sshd
     shell = "${pkgs.bash}/bin/bash";
     openssh.authorizedKeys.keys = [
-      # homelab -> vps push-deploy key
-      "command=\"${vpsDeployDispatcher}\",restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINDGczUoWFSHuf+96aLLrGd+Eqkz5KTFY1gYbSaqJJFp homelab-vps-deploy"
+      # homelab -> vps push-deploy key. Rotated 2026-08-28, item 8 of
+      # docs/audits/2026-08-26/rotation-runbook.md. The superseded key
+      # (SHA256:HKcWtV9Oloo2z4XXma5P9jLJ7i7GyHwDmA6uTFu1+1c) was removed
+      # here only after the replacement was proven by authenticating with
+      # it -- see the runbook item for what "proven" meant, since the
+      # obvious test did not work.
+      "command=\"${vpsDeployDispatcher}\",restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlJbrWrcdGkWtpXnBZgAJ0gHHR1G36SSmdeoLHzqPGn homelab-vps-deploy"
     ];
   };
   users.groups.vps-deploy = { };
@@ -345,8 +350,15 @@ in
   networking.firewall.logRefusedConnections = true;
 
   # wireguard tunnel
-  sops.secrets.vps_wireguard_private_key = { };
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  # Same latent bug as homelab's, reached by a different route: wg0 here is
+  # a systemd-networkd .netdev, which embeds the peer's public key but
+  # reads PrivateKeyFile at link setup. The 2026-08-27 rotation restarted
+  # networkd only because the *peer* key changed, rewriting 40-wg0.netdev.
+  # Rotating this host's own private key alone would have changed no unit
+  # file and left the interface on the old key, exactly as happened on
+  # homelab. Make the dependency explicit rather than incidental.
+  sops.secrets.vps_wireguard_private_key.restartUnits = [ "systemd-networkd.service" ];
+  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "systemd-networkd.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;
@@ -354,7 +366,7 @@ in
     peers = [
       {
         # homelab
-        publicKey = "GH5vw+bR1d28xPPTlB4cn9VLp529QAyyNAJhnhmzVXE=";
+        publicKey = "d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         allowedIPs = [ "10.100.0.2/32" ];
       }
@@ -570,6 +582,18 @@ in
     settings = {
       TARGET = "http://10.100.0.2:8096";
     };
+  };
+  # anubis's own hardening restricts syscalls and namespaces but nothing
+  # narrows what it can *connect to* -- it sits outermost in the path of
+  # untrusted internet traffic and, with no address restriction, can reach
+  # caddy's admin API on 127.0.0.1:2019 (which can replace caddy's whole
+  # running config, including a file_server rooted where the ACME account
+  # key lives). AF_UNIX is unaffected by IPAddress{Deny,Allow}, so the
+  # caddy<->anubis reverse_proxy socket keeps working
+  # (docs/audits/2026-08-26/findings-tail.md L-01).
+  systemd.services.anubis-jellyfin.serviceConfig = {
+    IPAddressDeny = "any";
+    IPAddressAllow = [ "10.100.0.2/32" ];
   };
 
   # caddy: public HTTPS entry point, jellyfin routes through anubis
@@ -865,13 +889,13 @@ in
   '';
 
   # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
-  sops.secrets.vps_discord_webhook = {
+  sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
   };
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.vps_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkZfs = false;
     checkSmart = false;
     # This host does not deploy itself — homelab builds its closure and

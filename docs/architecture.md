@@ -46,9 +46,9 @@ key:
 
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
-| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard` |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `jellyfin`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
+| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties` |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties` |
+| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `zfs-dataset-properties`, `jellyfin`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
 | `isoimage` | unstable | `copyparty-iso` |
 

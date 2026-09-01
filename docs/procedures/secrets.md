@@ -72,11 +72,42 @@ No dedicated rotation script or automation exists beyond what's below
 ### Removing a recipient (decommissioning a host, revoking access)
 
 Same shape in reverse: remove the key/anchor from `.sops.yaml`, then
-run `sops updatekeys secrets/secrets.yaml` again. Note this does not
-rotate the *secret values themselves* — a host that's had its
-decrypt access removed may already have decrypted copies on disk from
-before revocation. If that matters (compromised host, not just routine
-decommissioning), rotate the actual secret values too (see below).
+run `sops updatekeys secrets/secrets.yaml` again.
+
+> ### Removing a recipient **requires** rotating every value it could read
+>
+> **This repository is public.** Every prior revision of
+> `secrets/secrets.yaml` is permanently downloadable by anyone, with no
+> account and no trace. `updatekeys` re-wraps only the *data key* for
+> the new recipient set — it does not change the encrypted values, and
+> it cannot un-publish anything. So a retired recipient key can still
+> decrypt every value it was ever a recipient of, forever, from history.
+>
+> **Removing a recipient is therefore not a revocation.** It is only a
+> revocation once every value that recipient could read has been rotated
+> **at its provider**. Until then the access is intact and merely
+> undocumented, which is worse.
+>
+> This is not theoretical: `F-P8-02` in the 2026-08-26 audit found three
+> retired vps age keys that were recipients of public revisions holding
+> the **byte-identical, currently-live** ciphertext for ten fleet-total
+> credentials — proven by ciphertext comparison, with no decryption. The
+> reinstall that retired them rotated exactly one value out of
+> thirty-one.
+>
+> Two practical rules follow:
+>
+> - **Pair the two operations.** Recipient rotation and value rotation
+>   are one task, not two. Sequence each value **add-new → verify →
+>   remove-old**.
+> - **Do the recipient update once, at the end.** A reinstall that
+>   churns through host keys should update `.sops.yaml` against the
+>   *final* key, not once per intermediate. Each intermediate commit
+>   permanently widens the historical recipient set for no benefit —
+>   which is exactly how those three keys got there.
+
+Separately, and smaller: a host that has had its decrypt access removed
+may already hold decrypted copies on disk from before revocation.
 
 ### Rotating a secret's actual value
 

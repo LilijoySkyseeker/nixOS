@@ -66,6 +66,33 @@ A live host's git state, explicitly flagged in the original entry as "yours" (th
 
 ## Gotchas (G)
 
+### G3 -- 2026-08-27: D1 was answered and acted on, then overtaken by events
+
+Surfaced again while preparing rotation item 8, whose verification step is
+`systemctl start push-deploy-vps` on homelab -- and `myPushDeploy.flakeDir`
+is `/etc/nixos`. Running it in that state would have built `.#vps` from a
+pre-audit tree still containing `publicKey = "GH5vw+bR1d28..."` and pushed
+it to vps: old WireGuard key back, tunnel broken, vps reverted off the
+config it was running. The rotation would have looked like it failed for
+reasons unrelated to the key.
+
+The user answered D1: **discard**. `/etc/nixos` was checked out on
+`worktree-worktree-security-audit-plan` at `eb8ce08`, local `master` reset
+to `origin/master`, `1c2eec5` abandoned.
+
+**That state did not survive the day.** As of 2026-08-28 homelab's
+`/etc/nixos` is on branch `homelab-usb-uas-quirk` at `d313935` and homelab
+was switched from it at 11:27 (generation 353). So D1's *decision* stands
+-- the orphan commit is gone and is not coming back -- but the checkout is
+once again on something other than what the fleet is meant to be running,
+by a different route. Left `todo` rather than `done` for that reason.
+
+The durable lesson is not about this one commit. It is that
+`myPushDeploy.flakeDir = "/etc/nixos"` makes a *live host's working
+checkout* an input to deploying a different host, so whatever branch
+someone last used on homelab silently becomes what vps gets. That belongs
+to `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`.
+
 ### G1 -- F-P7-10's evidence was right about the remote, wrong about the machine
 "Not one `chore: automated flake.lock update` commit in the repository's 1371-commit history" is still true of the repo; it was not true of homelab's checkout -- the run happened, flake-update-test just could not publish (no openssh on PATH for the git push over SSH). D11 was closer to firing than documented: the auto-merge chain works end to end except the push.
 

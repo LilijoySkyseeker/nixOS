@@ -185,26 +185,87 @@ remains published and decryptable by any key that was ever a recipient.
       of public revisions holding the byte-identical **currently-live**
       values for all ten:
 
-  | # | Credential | Where to rotate |
-  |---|---|---|
-  | 1 | Backblaze application key | Backblaze console |
-  | 2 | Cloudflare API token | Cloudflare dashboard |
-  | 3 | Tailscale auth key(s) | Tailscale admin console |
-  | 4 | WireGuard keypair — homelab | regenerate both ends together |
-  | 5 | WireGuard keypair — vps | regenerate both ends together |
-  | 6 | WireGuard preshared key | regenerate both ends together |
-  | 7 | Discord webhook | Discord channel settings |
-  | 8 | vps-deploy keypair | regenerate, update `authorized_keys` |
-  | 9 | zrepl keypair | see the next item — order matters |
-  | 10 | Samba `android-smb` password | reset via `smbpasswd` |
+  **Step-by-step instructions for each of the ten, in order, with the
+  exact commands and what to verify: [`rotation-runbook.md`](rotation-runbook.md).**
+  Work from that; this table is the index.
+
+  **This table was rewritten 2026-08-27 — the previous version had two
+  errors that would have cost you.** It listed "Backblaze application
+  key" (the wrong secret — see #3) and "Samba `android-smb` password",
+  which is **not** one of `F-P8-02`'s ten at all, while collapsing the
+  two Tailscale auth keys into one row. Working it literally would have
+  rotated something irrelevant, missed a key, and — following the
+  Backblaze row — risked locking you out of the offsite backup.
+
+  The ten are exactly the sops keys `F-P8-02` names, in the order they
+  should be done. Every one follows **add-new → verify → remove-old**;
+  never remove first.
+
+  | # | sops key | What it actually is | Rotate how | Risk |
+  |---|---|---|---|---|
+  | 1 | `cloudflare_octodns_token` | DNS API token (`octodns.nix:151`) | **DONE 2026-08-27** — verified via `octodns-sync`; old token still to delete | low |
+  | 2 | `homelab_discord_webhook` | alert sink (`myHealthAlerts`) | **DONE 2026-08-27** — rotated *and* consolidated to one `discord_webhook`; verified from both hosts | low |
+  | 3 | `tailscale_authkey_homelab` | node **enrollment** key | **NOT REQUIRED** — spent single-use key; see the runbook | none |
+  | 4 | `tailscale_authkey_torrent` | same, for torrent | **NOT REQUIRED** — same | none |
+  | 5 | `wireguard_vps_homelab_psk` | shared PSK, **same value both ends** | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
+  | 6 | `homelab_wireguard_private_key` | homelab wg0 identity | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
+  | 7 | `vps_wireguard_private_key` | vps wg0 identity | **DONE 2026-08-27** — deployed vps then homelab, verified live handshake both ends + game port over the tunnel | med |
+  | 8 | `homelab_vps_deploy_key` | SSH key → `vps-deploy@vps`, i.e. **root on vps** | add new pubkey to vps `authorized_keys`, verify a deploy, then remove old | **high** |
+  | 9 | `homelab_zrepl_key` | SSH key → **root on torrent and thinkpad** | see the separate item below — ordering matters, and the public half is `vars.zreplPullerKey` in this repo | **high** |
+  | 10 | `homelab_backblaze_restic_password` | the restic **repository password** | **not a console action** — see the warning below | **highest** |
+  | 11 | `tailscale_authkey_isoimage` | node enrollment key that was **never used** | **REVOKED 2026-08-27** — revoke, do **not** replace; nothing consumes it. Console confirmed unused. Remaining: delete the sops key | med |
+
+  **#10 is the one that can lose data, and the old row got it wrong.**
+  `homelab_backblaze_restic_password` is restic's `passwordFile`
+  (`hosts/homelab/configuration.nix:182`) — the password that unlocks
+  the repository's master key. It is **not** the Backblaze application
+  key; that is a *different, separate* secret
+  (`homelab_backblaze_rclone_config`, the `rcloneConfigFile`), and it is
+  **not** among `F-P8-02`'s ten.
+
+  Simply replacing the value in sops does **not** rotate it — it makes
+  restic unable to open the repository at all, which is losing access to
+  the offsite copy of asset #1. Restic keeps multiple key slots, so the
+  correct sequence is:
+
+  1. `restic-backblazeWeekly key add` (the `createWrapper` wrapper is
+     already on homelab's PATH) — adds a new password, old still valid
+  2. put the new password in sops, deploy homelab
+  3. **verify**: a `restic-backblazeWeekly snapshots` succeeds with only
+     the new password in place
+  4. `restic-backblazeWeekly key list`, then `key remove <old-id>`
+
+  Do **not** do step 4 before step 3 succeeds.
+
+  **Ordering rationale.** 1–4 are independent and reversible, so they
+  build confidence first. 5–7 are the WireGuard set: the PSK is a single
+  shared value and the two private keys each require the *other* host's
+  peer stanza to change, so all three want one commit and a deploy of
+  both hosts. 8 and 9 are the two the finding names as costliest to get
+  wrong (the only deploy path to vps, and root on both laptops) — do
+  them with console access available. 10 last, because it is the only
+  one where a mistake is not recoverable by redeploying.
 
 - [ ] **Rotate the zrepl key, and only then delete
-      `/tmp/homelab_zrepl_key`.** It is the live private half of
-      `vars.zreplPullerKey`, mode 0600, dated 2026-08-23, sitting on the
-      ZFS root — so **40 snapshots** plus the offsite copy already
-      contain it. Deleting the file does not retract it; rotation is
-      what retracts it. Delete second, not first, or replication breaks
-      before the new key is in place. *(F-P8-06)*
+      `/tmp/homelab_zrepl_key` — which is on `torrent`, not homelab.**
+      It is the live private half of `vars.zreplPullerKey`, mode 0600,
+      dated 2026-08-23, sitting on `zroot/local/root` because `/tmp` is
+      not a separate mount there. **61 snapshots** on torrent contain it
+      as of 2026-08-27, plus **69** in homelab's `zbackup` replica.
+      Deleting the file does not retract it; rotation is what retracts
+      it. Delete second, not first, or replication breaks before the new
+      key is in place. *(F-P7-02)*
+
+      Three corrections to an earlier version of this item, all found on
+      2026-08-27 while checking it: it cited **F-P8-06**, which is the
+      flat-tailnet-ACL finding and unrelated; it said **40 snapshots**,
+      which was the count at audit time and keeps growing at one per five
+      minutes; and it said "plus the offsite copy", which is **wrong** —
+      restic backs up only `zroot/local/state` and
+      `zdata/storage/storage`, never `zbackup/*`, so no laptop replica
+      reaches Backblaze. It also did not name the host, and the rotation
+      runbook's item 9 said "on homelab", so following either would have
+      shredded nothing.
 
 ---
 
@@ -236,7 +297,7 @@ rather than done in a branch.
   | `winapps_password` | password | no winapps anywhere |
   | `open_weather_key` | API key | no consumer |
   | `restic` | unclear | `homelab_backblaze_restic_password` is the live one; this looks like its predecessor |
-  | `tailscale_authkey_isoimage` | tailnet auth key | isoimage has `services.tailscale.enable = false` and no sops |
+  | `tailscale_authkey_isoimage` | tailnet auth key | isoimage has `services.tailscale.enable = false` and no sops. **Key revoked at Tailscale 2026-08-27** (console confirmed it had never been used) and `tag:isoimage` is out of `docs/tailscale-acl.json` — see runbook item 11. Deleting the sops key is all that is left, and it retracts nothing on its own |
 
   Rotate-or-revoke each at its provider as well as deleting it. A
   Cloudflare Tunnel token and a Nextcloud admin password do not expire
