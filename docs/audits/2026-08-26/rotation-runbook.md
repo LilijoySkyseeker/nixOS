@@ -52,7 +52,7 @@ Editing a secret: `nix develop`, then `sops secrets/secrets.yaml`.
 | 6 | `homelab_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 7 | `vps_wireguard_private_key` | med | **[x] 2026-08-27** — deployed and verified live; see item |
 | 8 | `homelab_vps_deploy_key` | **high** | **[x] 2026-08-28** — verified by authenticating with it; old key removed |
-| 9 | `homelab_zrepl_key` | **high** | **[x] 2026-09-01** — laptops deployed first, then homelab; `zrepl.service` restarted (`restartUnits`) and verified by a real pull completing against both on the new key, not just a clean log; old `/tmp/homelab_zrepl_key` on torrent still pending deletion, see item |
+| 9 | `homelab_zrepl_key` | **high** | **[x] complete 2026-09-01** — laptops deployed first, then homelab; `zrepl.service` restarted (`restartUnits`) and verified by a real pull completing against both on the new key, not just a clean log; old `/tmp/homelab_zrepl_key` on torrent deleted, see item |
 | 10 | `homelab_backblaze_restic_password` | **highest** | **[x] 2026-08-28** — verified live (the `*` moved); old slot removed, one slot remains |
 | 11 | `tailscale_authkey_isoimage` | med | **[x] 2026-08-27** — key revoked at Tailscale, confirmed **never used**; ACL + repo done; sops key deletion pending |
 | 12 | `factorio_token`, `factorio_game_password` | **high** | **[x] 2026-08-28** — rotated; container re-authenticated to factorio.com with the new token |
@@ -542,13 +542,13 @@ fire.
 >    the source hosts' own latest local snapshot, within a couple of
 >    minutes of the restart. Zero failed units on all three hosts.
 >
-> **Still open, and now the user's alone:** delete
-> `/tmp/homelab_zrepl_key` and its `.pub` **on torrent** — delete second,
-> never first, and note deleting it does not retract the old key (still in
-> ~61+ snapshots plus homelab's `zbackup` replica; rotation is what
-> retracted it, this step is just cleanup). The structural fix for the
-> underlying `/tmp`-durability mechanism is the ZFS restructure plan,
-> unaffected by this closing.
+> **Cleanup done 2026-09-01: `/tmp/homelab_zrepl_key` and its `.pub`
+> deleted on torrent**, after the new key was already verified working
+> end to end above -- deleted second, not first. This does not retract
+> the old key from the snapshots/`zbackup` replicas that already held it;
+> rotation is what retracted it, this was just cleanup. **Item 9 is fully
+> closed.** The structural fix for the underlying `/tmp`-durability
+> mechanism is the ZFS restructure plan, unaffected by this closing.
 
 ## 10 — `homelab_backblaze_restic_password` — **the one that can lose data**
 

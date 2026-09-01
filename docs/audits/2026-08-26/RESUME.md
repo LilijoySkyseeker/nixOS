@@ -30,8 +30,8 @@ session needs is here or linked from here.
 > physical access to both laptops. Two extra items were added and
 > completed during the audit: **11** (`tailscale_authkey_isoimage`,
 > revoked) and **12** (factorio credentials, proven disclosed and
-> rotated). Only cleanup remains: delete the stale `/tmp/homelab_zrepl_key`
-> on torrent (user-only).
+> rotated). **Fully closed 2026-09-01** — the stale `/tmp/homelab_zrepl_key`
+> on torrent has been deleted too. Nothing outstanding from rotation.
 >
 > **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
 > now switched to this branch, zero failed units, WireGuard tunnel and
@@ -739,11 +739,10 @@ user on request, since the harness's own classifier — independent of
 from doing it directly): `4561889` (glow) and `3aa78a8` (zrepl key
 rotation). Pushed.
 
-**Still open, user-only:** delete `/tmp/homelab_zrepl_key` and its `.pub`
-on torrent — delete second, never first, and deleting it does not retract
-the old key (still in dozens of snapshots plus `zbackup`; rotation is what
-retracted it). See `rotation-runbook.md` item 9's closure note for the
-full detail.
+**Cleanup done 2026-09-01:** `/tmp/homelab_zrepl_key` and its `.pub`
+deleted on torrent, after the new key. Item 9 is fully closed — nothing
+outstanding from rotation. See `rotation-runbook.md` item 9's closure note
+for the full detail.
 
 ## What is left
 
@@ -751,9 +750,9 @@ full detail.
 
 [`rotation-runbook.md`](rotation-runbook.md) has the table. **10 done, 2
 not required.** Item 9 (`homelab_zrepl_key`), the last one, closed
-2026-09-01 — see "What happened in the ninth session" above and the
-runbook's own closure note. Only cleanup remains: delete
-`/tmp/homelab_zrepl_key`/`.pub` on torrent (user-only, see below).
+2026-09-01 including cleanup — see "What happened in the ninth session"
+above and the runbook's own closure note. **Rotation has nothing
+outstanding.**
 
 ### Still owed by the user
 
@@ -768,9 +767,8 @@ runbook's own closure note. Only cleanup remains: delete
   (`c6116ca`).~~ **Done 2026-09-01** — homelab was switched as part of the
   ninth session's zrepl-key rotation, which carried this along.
 - Expect the backup staleness page ~**2026-09-03**; it will be correct.
-- **Delete `/tmp/homelab_zrepl_key` and its `.pub` on torrent** — the old
-  rotation-9 key, now retracted but not yet cleaned up. Delete second,
-  never first (see `rotation-runbook.md` item 9's closure note).
+- ~~Delete `/tmp/homelab_zrepl_key` and its `.pub` on torrent.~~ **Done
+  2026-09-01**, after the new key was already verified working.
 
 ### Agent-doable, unblocked
 
