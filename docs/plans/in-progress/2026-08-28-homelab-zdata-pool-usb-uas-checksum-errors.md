@@ -34,6 +34,17 @@ config:
 errors: No known data errors
 ```
 
+## State
+**2026-09-01.** Fix is confirmed active and working, with one caveat found
+this session (G12): a fresh scrub-cycle alert on 2026-09-01 showed 1
+CKSUM error (repaired) on the same disk as the original incident, not a
+clean 0/0. Investigated live on homelab -- verified the kernel quirk is
+still active, no link-layer symptoms, SMART still clean, and the error
+rate is ~20x lower than pre-fix. Treating this as an accepted residual
+risk of the mitigation (G8), not a fix failure. Remaining open item:
+let the current scrub finish and confirm its final summary shows 0
+permanent/uncorrectable errors, then this plan can move to `done/`.
+
 ## Progress
 - [x] Confirmed pool health via `zpool status -v` on all three pools (zdata/zbackup/zroot)
 - [x] Mapped wwn IDs on the errored devices to physical disk serials
@@ -50,8 +61,15 @@ errors: No known data errors
       reboot/re-import (see G6 correction).
 - [x] Merge PR #26 now that the fix is confirmed working live -- merged
       2026-08-28 (`d2f357d`)
-- [ ] Confirm no error recurrence after a full scrub cycle (fresh 0/0
-      baseline as of 2026-08-28 11:49 boot)
+- [x] Confirm no error recurrence after a full scrub cycle (fresh 0/0
+      baseline as of 2026-08-28 11:49 boot) -- **partially confirmed
+      2026-09-01:** a scrub-cycle alert fired, see G12. Not a clean 0/0
+      but a single repaired error consistent with an accepted residual
+      risk, not a fix failure. Still waiting on this scrub's final
+      summary to confirm 0 permanent/uncorrectable errors before closing
+      the plan.
+- [ ] Confirm this scrub's final summary shows 0 permanent/uncorrectable
+      errors, then close out the plan
 
 ## Decisions (D)
 ### D1 -- how to remediate: apply USB UAS quirk, just clear errors, or investigate further first?
@@ -204,6 +222,37 @@ session's PR landed its own G37 on master first) instead.
 ~~**MOVED 2026-08-28 (correction):** first filed this under
 `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` --
 wrong plan, corrected to the line above.~~
+
+### G12 -- post-fix scrub surfaced 1 residual CKSUM error, ~20x below pre-fix rate; not a fix failure
+Health-alert email received 2026-09-01: `zpool status` showed 1 CKSUM
+error (`repairing`) on `wwn-0x5000cca26fd26b20-part1` -- the same
+physical disk as the original incident (sdb, serial `8CH9J1UE`, see G4)
+-- surfaced during a full-pool scrub that started 2026-09-01 01:39:37,
+on a system that had been up since the 2026-08-28 11:49 fix-deploy boot
+(~4 days). Live-checked on homelab:
+- `/proc/cmdline` still has `usb-storage.quirks=174c:55aa:u`; dmesg
+  confirms all four enclosure ports are still on `usb-storage`, not
+  `uas`, since that boot.
+- No ATA/USB reset, link-down, or disconnect events in dmesg since boot
+  (same "silent corruption" signature as G5).
+- `zpool events zdata | grep checksum` empty, same as G7 -- ring buffer,
+  not evidence of absence.
+- SMART on sdb still clean: 0 reallocated/pending sectors,
+  `UDMA_CRC_Error_Count`=0, overall-health PASSED.
+Conclusion: this is not the fix failing, it's the fix working
+imperfectly under the worst-case load the enclosure sees. Pre-fix, this
+same disk racked up 22 CKSUM errors in at most ~2 days of *normal* light
+I/O (G6 correction); post-fix, it took 4 days *including a full-pool
+scrub reading ~2.9TB* to produce a single error, which ZFS repaired with
+no data loss and no application impact. That's directionally consistent
+with G8's power-sag theory: forced BOT mode reduces but doesn't fully
+eliminate the enclosure bridge chip's vulnerability to bus-power sag
+under peak sustained I/O (a scrub being the heaviest sustained load this
+pool ever sees). No further remediation applied -- next escalation step
+if this recurs more than rarely would be a powered USB hub/different
+enclosure/direct SATA, but a single repaired error per multi-day
+heavy-I/O cycle does not currently justify that cost. No `zpool clear`
+needed; the CKSUM counter resets per-boot on its own (G6 correction).
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
