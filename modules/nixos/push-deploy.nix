@@ -165,33 +165,61 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
-            # This unit runs `nixos-rebuild switch`/`boot` against a remote
-            # target, not this machine — no local system activation happens
-            # here, so unlike pull-deploy/auto-switch the carve-out in
-            # docs/hardening.md does not apply to it and it genuinely
-            # should be sandboxed further. It is not, and NoNewPrivileges
-            # is all it has (F-P7-06).
+            # F-P7-06. VM-tested with a real remote target
+            # (tests/push-deploy-sandbox.nix) rather than guessed --
+            # nixos-rebuild-ng's own source settles the two hazards this
+            # comment used to only speculate about:
             #
-            # This comment used to claim "ReadOnlyPaths on ${cfg.flakeDir}
-            # plus NoNewPrivileges is enough for now". That was false in
-            # both halves: no ReadOnlyPaths was ever set, and none could
-            # be, because the unit's first action is fetch_and_merge_master
-            # which *writes* to flakeDir. Corrected rather than left to
-            # have a future reader budget for a control that never existed.
-            #
-            # Still to do: the full stack, with ProtectHome off (git and
-            # ssh read /root) and ReadWritePaths covering flakeDir,
-            # /root/.ssh and /root/.cache. Deliberately not done blind:
-            # `nixos-rebuild --target-host` shells out to ssh and
-            # nix-copy-closure, and PrivateTmp plus ProtectSystem=strict
-            # can break the SSH control-master socket path and nix's
-            # fetcher cache. A wrong guess here means vps silently stops
-            # updating, which nothing currently alerts on (F-P7-09's
-            # skipped-deploy half is still open), so it needs a real
-            # remote-target test rather than a build.
+            # - It runs its SSH ControlMaster through a tempdir made by
+            #   Python's `tempfile.TemporaryDirectory()`, which resolves
+            #   against `$TMPDIR`/`/tmp` (nixos_rebuild/tmpdir.py) --
+            #   created once at import time, before anything else runs.
+            #   `ProtectSystem=strict` alone makes `/tmp` read-only and
+            #   this fails immediately; `PrivateTmp=true` fixes it, since
+            #   the socket only ever needs to be reachable from this
+            #   unit's own process tree, which shares one mount namespace
+            #   throughout a single oneshot run.
+            # - The initial local flake build/eval (before anything ever
+            #   reaches the network) needs `/root/.cache` writable for
+            #   nix's own eval/build scratch -- covered by ReadWritePaths
+            #   below rather than `ProtectHome=false`, so only that one
+            #   path opens up, not all of /root. `nix show-config`
+            #   confirms `use-xdg-base-directories = false` (the pinned
+            #   default), so this genuinely has to be `~/.cache`, not an
+            #   `XDG_CACHE_HOME` redirect to somewhere self-creating.
+            # - `ReadWritePaths` does not create the directory it grants
+            #   access to -- caught by the VM test on a genuinely fresh
+            #   root user with no prior `.cache`: mount-namespace setup
+            #   fails outright with ENOENT before the script even starts.
+            #   A `+`-prefixed ExecStartPre does NOT help here (also
+            #   caught by the same test, on the retry): `+` only bypasses
+            #   privilege-dropping (User=/Group=), not the mount
+            #   namespace, which is established once for the whole unit
+            #   before any ExecStartPre runs. The directory has to exist
+            #   before this unit starts at all -- see the tmpfiles rule
+            #   below instead.
             NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            PrivateTmp = true;
+            ReadWritePaths = [
+              cfg.flakeDir # fetch_and_merge_master writes here
+              "/root/.ssh" # known_hosts (StrictHostKeyChecking=accept-new)
+              "/root/.cache" # nix's own eval/build scratch
+            ];
           };
         };
+
+        # Both ReadWritePaths targets above have to exist before the unit
+        # ever starts -- the mount namespace is set up once for the whole
+        # unit, before any ExecStartPre runs, so nothing inside the unit
+        # itself can create them first (see the serviceConfig comment).
+        # `.ssh` is very likely already there on a real host, but this
+        # doesn't assume it -- both are declared unconditionally rather
+        # than trusting incidental prior state.
+        systemd.tmpfiles.rules = [
+          "d /root/.cache 0700 root root -"
+          "d /root/.ssh 0700 root root -"
+        ];
 
         systemd.timers."push-deploy-${cfg.hostAttr}" = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];

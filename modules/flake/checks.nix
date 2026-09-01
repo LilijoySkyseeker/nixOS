@@ -40,5 +40,10 @@
       checks.anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
         pkgs = config.flake.pkgsUnstable;
       };
+
+      checks.push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
+        pkgs = config.flake.pkgsUnstable;
+        pushDeployModule = config.flake.modules.nixos."push-deploy";
+      };
     };
 }
