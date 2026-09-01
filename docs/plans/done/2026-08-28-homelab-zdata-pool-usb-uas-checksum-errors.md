@@ -1,8 +1,8 @@
 ---
 slug: homelab-zdata-pool-usb-uas-checksum-errors
 created: 2026-08-28
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # homelab zdata pool USB/UAS checksum errors
@@ -35,15 +35,18 @@ errors: No known data errors
 ```
 
 ## State
-**2026-09-01.** Fix is confirmed active and working, with one caveat found
-this session (G12): a fresh scrub-cycle alert on 2026-09-01 showed 1
-CKSUM error (repaired) on the same disk as the original incident, not a
-clean 0/0. Investigated live on homelab -- verified the kernel quirk is
-still active, no link-layer symptoms, SMART still clean, and the error
-rate is ~20x lower than pre-fix. Treating this as an accepted residual
-risk of the mitigation (G8), not a fix failure. Remaining open item:
-let the current scrub finish and confirm its final summary shows 0
-permanent/uncorrectable errors, then this plan can move to `done/`.
+**2026-09-01, investigation complete.** Fix is confirmed active and
+working. A fresh scrub-cycle alert on 2026-09-01 showed a CKSUM error on
+the same disk as the original incident, not a clean 0/0 (G12);
+live-checked on homelab and confirmed the kernel quirk is still active,
+no link-layer symptoms, SMART clean. The scrub has since finished:
+`scrub repaired 256K in 09:43:35 with 0 errors` -- ZFS's own summary
+confirms zero permanent/uncorrectable data errors, one more small
+repaired CKSUM on the second mirror disk in the final stretch, no data
+loss (G12 addendum). Treating the residual CKSUM trickle as an accepted
+risk of the mitigation (G8) -- real but ~20x below pre-fix rate and
+fully self-healed. Nothing left to do on the investigation; ready to
+merge this plan-doc update and move the plan to `done/`.
 
 ## Progress
 - [x] Confirmed pool health via `zpool status -v` on all three pools (zdata/zbackup/zroot)
@@ -68,8 +71,10 @@ permanent/uncorrectable errors, then this plan can move to `done/`.
       risk, not a fix failure. Still waiting on this scrub's final
       summary to confirm 0 permanent/uncorrectable errors before closing
       the plan.
-- [ ] Confirm this scrub's final summary shows 0 permanent/uncorrectable
-      errors, then close out the plan
+- [x] Confirm this scrub's final summary shows 0 permanent/uncorrectable
+      errors, then close out the plan -- **confirmed 2026-09-01:** final
+      scan line reads `scrub repaired 256K in 09:43:35 with 0 errors on
+      Tue Sep  1 11:23:12 2026`. See G12 addendum.
 
 ## Decisions (D)
 ### D1 -- how to remediate: apply USB UAS quirk, just clear errors, or investigate further first?
@@ -253,6 +258,20 @@ if this recurs more than rarely would be a powered USB hub/different
 enclosure/direct SATA, but a single repaired error per multi-day
 heavy-I/O cycle does not currently justify that cost. No `zpool clear`
 needed; the CKSUM counter resets per-boot on its own (G6 correction).
+
+**ADDENDUM 2026-09-01:** the scrub referenced above finished. Final scan
+line: `scrub repaired 256K in 09:43:35 with 0 errors on Tue Sep  1
+11:23:12 2026`. Final per-disk CKSUM tally: `wwn-...d26b20`
+(sdb/`8CH9J1UE`) = 1, `wwn-...e3d464` (sde/`8CJJUE6E`) = 1 -- the second
+disk picked up its own single repaired error in the scrub's final ~7%,
+matching G2's observation that both `zdata` mirror members (not just
+one) are exposed to this residual failure mode. ZFS's own summary
+reports **0 errors** (its term for uncorrectable/permanent data loss --
+distinct from the CKSUM column, which counts corrected-in-flight
+events). Total repaired across the whole ~9h43m, 2.9TB scrub: 256KB.
+Conclusion holds: fix is working, residual risk is real but small and
+fully self-healed, no data loss. Closing out this plan's investigation
+here.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
