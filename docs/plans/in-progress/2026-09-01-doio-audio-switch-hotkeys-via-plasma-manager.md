@@ -92,7 +92,9 @@ becomes PipeWire's default sink.
       reworked `files/doio.vil` to row0/row1/row2 col2 = RC-505/Monitor/
       AudioEngine per their answer; re-verified `nixos-rebuild build`
       for torrent afterward
-- [ ] Flash `files/doio.vil` onto the physical DOIO macropad (Vial GUI)
+- [x] Flash `files/doio.vil` onto the physical DOIO macropad (Vial GUI)
+      -- done by the user, confirmed loaded (2026-09-01); this step is
+      the user's to do, not this session's -- never attempted here
 - [ ] `nixos-rebuild switch` (or pull-deploy) on torrent to activate the
       KDE shortcuts in the live session
 - [ ] Press each of the three keys on real hardware and confirm the
