@@ -4,19 +4,22 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the ninth session.**
+**Last updated: 2026-09-01, end of the tenth session.**
 
-> ## START HERE — state as of the ninth session
+> ## START HERE — state as of the tenth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
 > `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through ninth sessions' commits — **open a PR when it is
+> by the fifth through tenth sessions' commits — **open a PR when it is
 > time to land them.** All five `nixosConfigurations` build. The eighth
 > session fixed two LOW findings from the tail (L-01 anubis egress on
 > vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
-> hosts to this branch and closed out credential rotation — see "What
-> happened in the ninth session" below.
+> hosts to this branch and closed out credential rotation; the tenth
+> corrected the restic staleness prediction and closed D1 of the
+> `.zfs`-traversal plan (`snapdir=disabled` on homelab) — see "What
+> happened in the tenth session" below. The L-01/L-02 and D1 fixes are
+> build/VM-verified only, not deployed to any host yet.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -34,13 +37,12 @@ session needs is here or linked from here.
 > on torrent has been deleted too. Nothing outstanding from rotation.
 >
 > **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
-> now switched to this branch, zero failed units, WireGuard tunnel and
-> zrepl replication both healthy on rotated keys. L-01/L-02 (eighth
-> session) are the only build/VM-verified-but-undeployed changes left.
->
-> **One change is committed but NOT deployed:** the restic staleness
-> threshold `336h → 312h` (`c6116ca`). The user chose to let it ride along
-> with their next homelab deploy rather than deploy separately.
+> switched to this branch as of the ninth session (including the restic
+> `312h` threshold, `c6116ca`), zero failed units, WireGuard tunnel and
+> zrepl replication both healthy on rotated keys. **L-01/L-02 (eighth
+> session) and D1's `snapdir=disabled` fix (tenth session) are the only
+> build/VM-verified-but-undeployed changes left** — none need a host
+> switch to be true statements, only to take effect.
 >
 > **All scheduled deploys remain OFF fleet-wide** (`scheduleEnable =
 > false`). Manual deploys are the only path anything takes. That is not
@@ -66,11 +68,13 @@ session needs is here or linked from here.
 >    ~2026-09-12, past the next scheduled run. D3's revisit condition in
 >    `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
 >    was met.
-> 3. **The factorio credentials were proven readable by any local uid**
->    through `/nix/state/.zfs` (0777, 57 snapshots, `server-settings.json`
->    at 0644). They have been rotated. The *mechanism* is not fixed and
->    affects every secret ever written to a persisted directory —
->    `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
+> 3. ~~**The factorio credentials were proven readable by any local uid**
+>    through `/nix/state/.zfs`… The *mechanism* is not fixed…~~
+>    **Mechanism fixed 2026-09-01, servers only, not yet deployed.**
+>    `snapdir=disabled` on `zroot/local/state` closes it on homelab; PCs
+>    (`zroot/local/home` on torrent/thinkpad) deliberately excluded, see
+>    `2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
+>    Full detail: `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
 >
 > **The user works rotation items interactively.** Do not batch them. Each
 > is "user does the provider + sops half, agent does the repo + deploy +
@@ -747,6 +751,71 @@ rotation). Pushed.
 deleted on torrent, after the new key. Item 9 is fully closed — nothing
 outstanding from rotation. See `rotation-runbook.md` item 9's closure note
 for the full detail.
+
+## What happened in the tenth session (2026-09-01)
+
+**Restic's staleness prediction was corrected.** The user ran a manual
+backup (2026-08-29 22:50 → 2026-08-30 08:46, `no errors were found`, exit
+0) that this file and
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md` had
+both predicted would page ~2026-09-03. It won't — `last-success` is now
+2026-08-30, and the alarm at 312h isn't due until ~2026-09-12. Corrected
+in place in both files rather than left to mislead the next reader.
+
+**D1 of `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`
+answered and implemented** — the mechanism behind the factorio
+disclosure, not just that one credential. The user asked for research
+and empirical testing before any decision, not a guess:
+
+- A first pass (forked, then redirected to test on homelab directly)
+  found `chmod 0700` on `.zfs` works but does not persist — the control
+  directory is synthesized fresh on every mount, so it silently resets to
+  0777 on the next unmount/mount or reboot. Would have needed a custom
+  reapply-on-mount unit to mean anything.
+- Web research plus direct empirical testing on homelab (throwaway
+  datasets, destroyed after, never touching real data) found
+  `snapdir=disabled` instead: real dataset metadata, survives a full
+  unmount/mount cycle with the block intact, blocks **all** access
+  including root's own (`ENOENT`, not a permission check) on a dataset
+  never previously touched. One real caveat, also verified empirically
+  rather than assumed: an already-cached automount from *before* the
+  property changes stays reachable until that dataset's next
+  unmount/mount or reboot — flipping the property alone doesn't
+  retroactively close it. No regression to restic, confirmed directly:
+  its offsite backup mounts snapshots by explicit name
+  (`mount -t zfs <snap> <target>`), a mechanism entirely separate from
+  `.zfs`, unaffected by `snapdir` either way.
+- Applied to `zroot/local/state` on homelab only. New reusable module
+  `modules/nixos/zfs-dataset-properties.nix` (`myZfsDatasetProperties`)
+  is the actual deliverable requested alongside the fix — a single place
+  for declarative ZFS dataset properties across current and future
+  hosts, self-healing every boot/switch via a `zfs-mount.service`-hooked
+  oneshot, rather than one-off `zfs set` commands that drift out of sync
+  host to host. **PCs deliberately excluded** — the user browses backups
+  via `.zfs/snapshot` on torrent/thinkpad directly, and `disabled` would
+  remove that outright. Carried to
+  `2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`
+  as its own backlog plan (D1 there, undecided) rather than left
+  unresolved in the closed plan.
+- VM-tested (`tests/zfs-dataset-properties.nix`): sandbox baseline, the
+  property actually reaching the dataset, the opt-in-only scope (a second
+  unconfigured dataset stays untouched), the block itself, and the
+  documented remount caveat — all asserted against a real pool, following
+  this repo's "verify the fix, not the build" rule the same way every
+  other VM test in `tests/` does.
+
+**Not deployed anywhere.** Build-verified on all five
+`nixosConfigurations`; torrent/thinkpad/vps are byte-identical to before
+(the module is opt-in and only homelab sets it). Commit `47c4f89`, pushed.
+
+**Requested next, not started yet:** consolidate the repeated disko
+options duplicated across each host's `disko.nix` (the
+`acltype`/`xattr`/`atime`/`compression`/`mountpoint`/`canmount`/`devices`/
+`sync`/`"com.sun:auto-snapshot"` block appears near-identically per zpool,
+per host) into one shared place, for the same "don't let this drift"
+reason as `myZfsDatasetProperties` above. **Wait for explicit go-ahead
+before wiring it in** — the user asked for this to be prepared but not
+applied without a separate sign-off.
 
 ## What is left
 
