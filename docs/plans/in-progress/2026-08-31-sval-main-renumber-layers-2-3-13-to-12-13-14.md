@@ -27,6 +27,13 @@ outside of this session, sitting as an uncommitted working-tree
 change in the main checkout before this plan existed; not authored
 here, just carried into this branch and commit at the user's request.
 
+**2026-08-31 addendum 2:** user also asked to add
+`files/sval_main.vil.backup` (their own pre-edit backup of
+`sval_main.vil`, made before this session started) to the same
+branch/PR. Confirmed it differs from the post-renumber
+`sval_main.vil` (i.e. it genuinely is the untouched pre-edit
+snapshot, not a stray duplicate) before adding it as-is.
+
 ## State
 
 Done, and scope now covers two files. `files/sval_main.vil` was
@@ -67,6 +74,9 @@ PR #35), not yet merged to master.
       into this same branch/PR at their request; diffed old vs new to
       confirm the change is confined to relocating the 4 real
       keycodes and nothing else in that file shifted
+- [x] Add `files/sval_main.vil.backup` to the same branch/PR at
+      request; confirmed it's the genuine untouched pre-renumber
+      snapshot before adding
 
 ## Decisions (D)
 
