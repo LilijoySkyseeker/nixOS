@@ -23,6 +23,7 @@ in
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
       ];
     };
@@ -43,6 +44,7 @@ in
         nixosModules."iso-autobuild"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
+        nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
       ];
     };
@@ -53,7 +55,9 @@ in
         pkgs-stable = pkgsStable;
         vars = vars;
         # use the home-manager release matching nixpkgs-stable to avoid a version mismatch
-        inputs = inputs // { home-manager = inputs.home-manager-stable; };
+        inputs = inputs // {
+          home-manager = inputs.home-manager-stable;
+        };
       };
       modules = [
         ../../hosts/homelab/configuration.nix

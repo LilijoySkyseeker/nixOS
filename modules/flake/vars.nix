@@ -43,43 +43,60 @@
       "com.sun:auto-snapshot" = "false";
     };
 
+    # Shared lookup for any ZFS host's disko.nix: reads a dataset's real zfs
+    # properties from that host's own myZfsDatasetProperties
+    # (modules/nixos/zfs-dataset-properties.nix) instead of a second
+    # hand-written literal, so disko's install-time `-o prop=value` and the
+    # live self-heal oneshot both come from one declaration. Takes that
+    # host's own `config` explicitly (vars.nix has no NixOS config of its
+    # own) -- a host's disko.nix binds `zfsProps = vars.zfsProps config;`
+    # once and calls `zfsProps "<pool>" "<dataset>"` from there. Returns
+    # `{ }` for any pool/dataset with no entry, so it's safe to merge into
+    # every dataset's `options`, not just ones that currently set something.
+    # Only meaningful for a host that imports zfs-dataset-properties --
+    # `config.myZfsDatasetProperties` doesn't exist as an option otherwise,
+    # so this fails loudly at eval time on a host that hasn't (a deliberate
+    # coupling, not a bug: see
+    # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md).
+    zfsProps =
+      config: pool: dataset:
+      config.myZfsDatasetProperties."${pool}/${dataset}" or { };
+
     # disko.nix's root-SSD disk layout (ESP + swap + a zroot-pool
     # partition) -- identical shape on homelab/torrent/thinkpad, differing
     # only in swap size. `idx` picks the boot mountpoint (`/boot` for 1,
     # `/boot-<idx>` otherwise, for hosts with more than one ESP) and feeds
     # disko's partition-label uniqueness requirement.
-    mkZfsRootSsd =
-      idx: id: swapSize:
-      {
-        type = "disk";
-        device = "/dev/disk/by-id/${id}";
-        content = {
-          type = "gpt";
-          partitions = {
-            esp = {
-              size = "512M";
-              type = "EF00";
-              content = {
-                type = "filesystem";
-                format = "vfat";
-                mountpoint = if idx == 1 then "/boot" else "/boot-${builtins.toString idx}";
-              };
+    mkZfsRootSsd = idx: id: swapSize: {
+      type = "disk";
+      device = "/dev/disk/by-id/${id}";
+      content = {
+        type = "gpt";
+        partitions = {
+          esp = {
+            size = "512M";
+            type = "EF00";
+            content = {
+              type = "filesystem";
+              format = "vfat";
+              mountpoint = if idx == 1 then "/boot" else "/boot-${builtins.toString idx}";
             };
-            swap = {
-              size = swapSize;
-              content = {
-                type = "swap";
-              };
+          };
+          swap = {
+            size = swapSize;
+            content = {
+              type = "swap";
             };
-            zfs = {
-              size = "100%";
-              content = {
-                type = "zfs";
-                pool = "zroot";
-              };
+          };
+          zfs = {
+            size = "100%";
+            content = {
+              type = "zfs";
+              pool = "zroot";
             };
           };
         };
       };
+    };
   };
 }

@@ -1,9 +1,10 @@
-{ vars, ... }:
+{ vars, config, ... }:
 {
   # disko
   disko.devices =
     let
       rootSsd = vars.mkZfsRootSsd;
+      zfsProps = vars.zfsProps config; # see vars.nix
     in
     {
       disk = {
@@ -14,28 +15,40 @@
         zroot = {
           type = "zpool";
           mode = "";
-          rootFsOptions = vars.zfsRootFsOptions;
+          rootFsOptions = config.myZfsDatasetProperties."zroot";
           options.ashift = "13"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
           datasets = {
             "local" = {
               type = "zfs_fs";
-              options.mountpoint = "none"; # top dir is options.mountpoint
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none"; # top dir is options.mountpoint
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zroot" "local";
             };
             "local/nix" = {
               type = "zfs_fs";
               mountpoint = "/nix";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zroot" "local/nix";
             };
             "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zroot" "local/root";
             };
             "local/home" = {
               type = "zfs_fs";
               mountpoint = "/home";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zroot" "local/home";
             };
           };
         };

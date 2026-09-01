@@ -1,4 +1,4 @@
-{ vars, ... }:
+{ vars, config, ... }:
 {
   # Sources:
   # https://github.com/lovesegfault/nix-config/blob/eebebff8e682ba2deb96320afa35789537a1e58e/hosts/plato/disko.nix#L1
@@ -13,6 +13,7 @@
   disko.devices =
     let
       rootSsd = vars.mkZfsRootSsd;
+      zfsProps = vars.zfsProps config; # see vars.nix
       dataHdd = id: {
         type = "disk";
         device = "/dev/disk/by-id/${id}";
@@ -60,13 +61,16 @@
         zdata = {
           type = "zpool";
           mode = "mirror";
-          rootFsOptions = vars.zfsRootFsOptions;
+          rootFsOptions = config.myZfsDatasetProperties."zdata";
           options.ashift = "12"; # IMPORTANT
           datasets = {
             "storage" = {
               type = "zfs_fs";
-              options.mountpoint = "none"; # "none" needs option.mountpoint
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none"; # "none" needs option.mountpoint
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zdata" "storage";
             };
             "storage/storage" = {
               type = "zfs_fs";
@@ -75,21 +79,27 @@
               # trying to mount this dataset at boot, racing against the
               # fstab-generated storage.mount unit (disko's documented
               # zfs-over-legacy pattern, see example/zfs.nix upstream).
-              options.mountpoint = "legacy";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "legacy";
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zdata" "storage/storage";
             };
             "storage/storage-bulk" = {
               type = "zfs_fs";
               mountpoint = "/storage-bulk";
-              options.mountpoint = "legacy"; # see storage/storage above
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "legacy"; # see storage/storage above
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zdata" "storage/storage-bulk";
             };
           };
         };
         zbackup = {
           type = "zpool";
           mode = "mirror";
-          rootFsOptions = vars.zfsRootFsOptions;
+          rootFsOptions = config.myZfsDatasetProperties."zbackup";
           options.ashift = "12"; # IMPORTANT
           datasets = {
             # "backup/<host>/..." tree — one convention for everything (no
@@ -105,48 +115,66 @@
             # backup/torrent/home.
             "backup" = {
               type = "zfs_fs";
-              options.mountpoint = "none"; # "none" needs option.mountpoint
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none"; # "none" needs option.mountpoint
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zbackup" "backup";
             };
             "backup/homelab" = {
               type = "zfs_fs";
-              options.mountpoint = "none";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none";
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zbackup" "backup/homelab";
             };
             "backup/thinkpad" = {
               type = "zfs_fs";
-              options.mountpoint = "none";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none";
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zbackup" "backup/thinkpad";
             };
             "backup/torrent" = {
               type = "zfs_fs";
-              options.mountpoint = "none";
-              options."com.sun:auto-snapshot" = "false";
+              options = {
+                mountpoint = "none";
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zbackup" "backup/torrent";
             };
           };
         };
         zroot = {
           type = "zpool";
           mode = "";
-          rootFsOptions = vars.zfsRootFsOptions;
+          rootFsOptions = config.myZfsDatasetProperties."zroot";
           options.ashift = "12"; # MAKE SURE THIS IS CORRECT WITH DIFFRENT DRIVE
           datasets = {
             "local" = {
               type = "zfs_fs";
-              options.mountpoint = "none"; # top dir is options.mountpoint
+              options = {
+                mountpoint = "none"; # top dir is options.mountpoint
+              }
+              // zfsProps "zroot" "local";
             };
             "local/state" = {
               type = "zfs_fs";
               mountpoint = "/nix/state"; # sub dir are just mountpoint
+              options = zfsProps "zroot" "local/state";
             };
             "local/nix" = {
               type = "zfs_fs";
               mountpoint = "/nix";
+              options = zfsProps "zroot" "local/nix";
             };
             "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
               postCreateHook = "zfs snapshot zroot/local/root@blank";
+              options = zfsProps "zroot" "local/root";
             };
           };
         };
