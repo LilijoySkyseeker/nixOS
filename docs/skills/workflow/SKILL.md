@@ -27,10 +27,11 @@ this file stays short on purpose (progressive disclosure).
    for what slips through, not the primary mechanism.
 4. **Run the cheap verification ladder**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
-   `nixfmt --check`, `nix flake check`, a targeted `nixos-rebuild build`,
-   and any *newly introduced* statix/deadnix issue (pre-existing debt
-   elsewhere in a touched file never blocks). This is independent of
-   VM-testing, which is not yet part of this system -- see reference.md.
+   `nixfmt --check`, `nix flake check --no-build`, a targeted
+   `nixos-rebuild build`, and any *newly introduced* statix/deadnix issue
+   (pre-existing debt elsewhere in a touched file never blocks). This is
+   independent of VM-testing, which is not yet part of this system -- see
+   reference.md.
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
    `### G<N>` entries, append-only.
 6. **Invoke `security`/`docs-updater` where relevant, and `/simplify`
