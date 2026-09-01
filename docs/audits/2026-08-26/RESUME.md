@@ -4,27 +4,29 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the tenth session.**
+**Last updated: 2026-09-01, end of the eleventh session.**
 
-> ## START HERE — state as of the tenth session
+> ## START HERE — state as of the eleventh session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
 > `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through tenth sessions' commits — **open a PR when it is
+> by the fifth through eleventh sessions' commits — **open a PR when it is
 > time to land them.** All five `nixosConfigurations` build. The eighth
 > session fixed two LOW findings from the tail (L-01 anubis egress on
 > vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
 > hosts to this branch and closed out credential rotation; the tenth
 > corrected the restic staleness prediction and closed D1 of the
-> `.zfs`-traversal plan (`snapdir=disabled` on homelab) — see "What
-> happened in the tenth session" below. The L-01/L-02 and D1 fixes are
-> build/VM-verified only, not deployed to any host yet.
+> `.zfs`-traversal plan (`snapdir=disabled` on homelab); the eleventh
+> unified `myZfsDatasetProperties` and `disko.nix` — see "What happened in
+> the eleventh session" below. The L-01/L-02, D1, and unification fixes
+> are all build-verified only, not deployed to any host yet.
 >
-> **NEXT UP:** unify `myZfsDatasetProperties` and `disko.nix` into one
-> shared declaration — see item 0 in "Agent-doable, unblocked" below and
-> `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
-> Design agreed, not yet built.
+> **NEXT UP:** nothing queued. Item 0 of "Agent-doable, unblocked" below
+> (the disko unification) is now done — see the eleventh session. The
+> remaining agent-doable items are 1 (`push-deploy-vps` sandboxing) and 4
+> (`userns-remap`), both deferred on purpose pending a real-target VM
+> test; everything else needs either a user decision or a live host.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -826,6 +828,99 @@ after. vps has no ZFS and is untouched. Commit `718c396`, pushed. Not
 deployed anywhere — a no-op refactor has nothing to deploy differently,
 but it still rides along with each host's next real switch.
 
+## What happened in the eleventh session (2026-09-01)
+
+**Item 0 of "Agent-doable, unblocked" done** — the disko/
+`myZfsDatasetProperties` unification queued at the end of the tenth
+session. Full detail and verification steps in
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`;
+summary here.
+
+`hosts/homelab/disko.nix`'s per-dataset `options` blocks now read
+`config.myZfsDatasetProperties."<pool>/<dataset>"` instead of never
+referencing it at all — so `snapdir=disabled` on `zroot/local/state`
+(closed in the tenth session, live-reapply only) now also seeds at
+`disko-install`/`nixos-anywhere` creation time, meaning a *fresh* install
+of homelab gets the property from that dataset's very first mount, with
+**no** "already-cached automount" window at all (that window is specific
+to an already-installed host picking the property up live, see the
+`.zfs`-traversal plan's G1/D1).
+
+**Extended further, same session, on explicit ask.** Mid-session the user
+asked what else was safe to fold into the same mechanism. Answer worked
+out and confirmed: any real ZFS *property* (`zfs`/`zpool` `get`/`set`) is
+always safe to reapply idempotently; *structure* (partitioning, `zpool
+create`/vdev topology, `ashift` — fixed permanently at vdev creation
+despite living in `options.ashift`) is one-shot and must stay disko-only.
+`vars.zfsRootFsOptions` (the tenth session's own consolidation — `acltype`,
+`xattr`, `atime`, `mountpoint`, `canmount`, `compression`, `devices`,
+`sync`, `com.sun:auto-snapshot`) is entirely real properties, so it got
+the same treatment for **homelab only**:
+`hosts/homelab/configuration.nix` sets
+`myZfsDatasetProperties."zroot"/"zdata"/"zbackup" = vars.zfsRootFsOptions;`
+and `hosts/homelab/disko.nix`'s three `rootFsOptions` now read that
+option instead of `vars.zfsRootFsOptions` directly. `vars.zfsRootFsOptions`
+itself is untouched and stays the one literal source — torrent/thinkpad's
+`disko.nix` still reads it directly, unaffected, since neither imports
+`zfs-dataset-properties` (the PC exclusion is about `snapdir`/backup
+browsing specifically, not revisited here).
+
+**Verified, not just built**, per this audit's standing rule:
+- `nix build .#nixosConfigurations.homelab.config.system.build.diskoScript`
+  rendered to the identical store path before and after the
+  `rootFsOptions` change — proof the install-time behavior for
+  `zroot`/`zdata`/`zbackup` creation is byte-for-byte unchanged, a pure
+  refactor for what disko already did.
+- The rendered live-oneshot script
+  (`…/bin/zfs-dataset-properties-start`, read out of `nixos-rebuild
+  build`'s closure, not assumed from the unit file per this file's own
+  "grep the payload, not the wrapper" rule) now has 27 new `zfs set`
+  lines (nine properties × three pools) ahead of the pre-existing
+  `snapdir=disabled` line.
+- All five `nixosConfigurations` build; torrent/thinkpad/vps/isoimage
+  render to the exact same store paths as before this session's edits —
+  only `hosts/homelab/configuration.nix` and `hosts/homelab/disko.nix`
+  were touched, confirmed by outcome, not just by diff.
+
+**Extended a third time, same session, to torrent and thinkpad.** On
+further explicit ask, the two remaining ZFS hosts got the identical
+treatment, and the per-host `zfsProps` helper (previously a 3-line local
+`let` binding duplicated wherever it was needed) was generalized into
+`vars.zfsProps` (`modules/flake/vars.nix`) — one definition, each host's
+`disko.nix` binds `zfsProps = vars.zfsProps config;` once. Both hosts now
+import `nixosModules."zfs-dataset-properties"` (`modules/flake/hosts.nix`)
+and set `myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;` in their
+own `configuration.nix`. Importing the module is inert on its own — it
+only acts on keys actually set, so thinkpad's own `local/state` dataset
+(structurally identical to homelab's, sitting right next to the shared
+`zfsProps` wiring) still gets no `snapdir` value, exactly preserving the
+PC exclusion from the `.zfs`-traversal plan's D1.
+
+Verified the same way as the first two rounds, not by trusting the build:
+homelab's disko script still renders to the identical store path from the
+`rootFsOptions` check above (the helper's *definition* moved, not its
+*output*); torrent's and thinkpad's rendered disko scripts were read
+directly and their `zpool create` commands carry the identical nine `-O`
+flags disko always applied (matching `vars.zfsRootFsOptions` verbatim,
+verified value-by-value, not just "it built"), with every other dataset's
+`options` unchanged from before; both hosts' rendered live-oneshot scripts
+are byte-identical to each other and apply exactly those same nine
+properties to `zroot` and nothing else, confirmed by reading the actual
+payload script out of each host's build (via a distinct `--out-link` per
+host, since building both via the shared default `./result` link would
+clobber one with the other). `nixfmt --check` clean on every file this
+session touched; the `statix`/`deadnix` warnings present are all
+pre-existing, on lines this session never edited.
+
+Plan moved to `docs/plans/done/` — D1 answered, every Progress item
+checked, nothing left open.
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`
+citations elsewhere are unaffected (bare-filename citations survive the
+move by design).
+
+**Not deployed anywhere.** All three rounds of this session's work are
+build-verified only.
+
 ## What is left
 
 ### Rotation — done
@@ -855,14 +950,12 @@ outstanding.**
 
 ### Agent-doable, unblocked
 
-0. **NEXT UP, queued 2026-09-01:** unify `myZfsDatasetProperties` and
-   `disko.nix`'s per-dataset `options` into one shared declaration, so a
-   fresh install and an already-installed host's live reapply both come
-   from the same source instead of two hand-written copies that can
-   drift. Design already agreed with the user in conversation, not yet
-   built — full writeup in
-   `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`,
-   D1 there is answered (build it), the *how* is Progress work.
+0. ~~**Unify `myZfsDatasetProperties` and `disko.nix`'s per-dataset
+   `options`**~~ — **done in the eleventh session**, and extended to
+   `vars.zfsRootFsOptions` (pool root datasets) too. See "What happened
+   in the eleventh session" above and
+   `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
+   Build-verified only, not deployed.
 1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6,
    deferred on purpose. Needs a VM test with a **real remote target**,
    because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH

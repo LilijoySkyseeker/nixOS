@@ -47,9 +47,18 @@ in jellyfin reads any of it.
 (`tests/zfs-dataset-properties.nix`), not yet deployed. D2 (extend to the
 PCs) deferred and carried to
 `2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
-Remaining open items are the two Progress bullets below — auditing for
-other secrets that sat in persisted dirs at readable modes, and rotating
-whatever that turns up.
+**Same day, follow-up:** `hosts/homelab/disko.nix` now reads this
+property (and, further, every zfs-property-shaped value in
+`myZfsDatasetProperties`, including the root-dataset properties in
+`vars.zfsRootFsOptions`) from the same declaration instead of a second
+hand-written literal, so a *fresh* install of homelab gets
+`snapdir=disabled` from `zroot/local/state`'s very first mount — no
+"already-cached automount" window at all. See
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`
+for the how; build/VM-verified, not deployed. Doesn't change anything
+about this plan's own remaining scope. Remaining open items are the two
+Progress bullets below — auditing for other secrets that sat in
+persisted dirs at readable modes, and rotating whatever that turns up.
 
 ## Progress
 
