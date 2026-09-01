@@ -1,8 +1,8 @@
 ---
 slug: vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6
 created: 2026-09-01
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # VM-verify push-deploy-vps sandboxing (F-P7-06 / wave 2 item 2.6)
@@ -69,11 +69,11 @@ needed) -- resolve it. Then `plan-move ... done`.
   address (G11), and the negative-control's marker-reset assuming a
   writable post-switch `/etc` (G12)
 - [x] Full green run of `tests/push-deploy-sandbox.nix`, both subtests
-- [ ] Resolve D1 (moot -- test passed)
-- [ ] Update `docs/audits/2026-08-26/RESUME.md` with the outcome
-- [ ] `docs/procedures/vm-testing.md` gotchas for G8-G12 (G1-G7 already
+- [x] Resolve D1 (moot -- test passed)
+- [x] Update `docs/audits/2026-08-26/RESUME.md` with the outcome
+- [x] `docs/procedures/vm-testing.md` gotchas for G8-G12 (G1-G7 already
   written)
-- [ ] Commit and push
+- [x] Commit and push
 
 ## Decisions (D)
 
@@ -87,6 +87,12 @@ user confirmation happened, and the skill's freeze gate requires one) --
 with no carry needed, since it's moot rather than backlog) before
 `plan-move ... done`. Deploying to vps itself is a separate, still-open,
 user-only action -- VM-verified is not the same as deployed.
+
+
+**DEFERRED 2026-09-01:** Premise moot: VM test passed, so the build-verified-only fallback this asked about was never needed. No backlog carry.
+
+
+**ANSWERED 2026-09-01:** User confirmed 2026-09-01: premise moot (VM test passed), no backlog carry needed -- deploying to vps remains a separate, still-open, user-only action tracked outside this plan.
 
 ## Gotchas (G)
 
