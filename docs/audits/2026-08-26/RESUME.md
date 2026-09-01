@@ -4,31 +4,37 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the thirteenth session.**
+**Last updated: 2026-09-01, end of the fourteenth session.**
 
-> ## START HERE — state as of the thirteenth session
+> ## START HERE — state as of the fourteenth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
 > PR #39 as of the twelfth session** (`6a68cb3`) — everything through the
 > eleventh session (waves 1-2, credential rotation, the two LOW findings,
 > the `.zfs`-traversal fix, the disko unification) is on `master` now.
-> This branch is currently **one commit ahead of master**: `d470a61`,
-> explicit WIP `push-deploy-vps` sandboxing — **not build-broken, but not
-> VM-verified and not deployed anywhere.** All five `nixosConfigurations`
-> build.
+> The thirteenth session got `tests/push-deploy-sandbox.nix` fully green
+> (`0789429`) and closed F-P7-06 / wave 2 item 2.6 entirely. The
+> fourteenth session (this one) re-confirmed the VM test with a forced
+> fresh rebuild (not a cache hit) and **deployed the hardening to
+> homelab** — see below, "What happened in the fourteenth session", for
+> the full detail including a real correction to how the twelfth/
+> thirteenth sessions described this item.
 >
-> **NEXT UP: finish item 1, `push-deploy-vps` sandboxing (F-P7-06 / wave 2
-> item 2.6).** Read "What happened in the twelfth session" below in full
-> before touching anything — it has the exact mechanism (grounded in
-> `nixos-rebuild-ng`'s own source), the six real bugs the VM test already
-> caught and fixed, and the specific thing it's currently blocked on (a
-> from-scratch `glibc`/`stdenv` rebuild inside the sandboxed test VM) plus
-> a concrete next step to try. **Do not deploy the current hardening to
-> vps** — it is unverified beyond a local build, which is exactly the
-> risk this item was deferred to avoid. Item 4 (`userns-remap`) is the
-> other agent-doable item, also deferred pending its own VM test;
-> everything else needs either a user decision or a live host.
+> **`push-deploy-vps`'s hardening is now live, and it's on homelab, not
+> vps.** `myPushDeploy.enable = true` (with `hostAttr = "vps"`) is set in
+> `hosts/homelab/configuration.nix` — the hardened `push-deploy-vps.service`
+> **runs on homelab**, builds vps's config there, and pushes+activates it
+> over SSH as `vps-deploy@vps`. vps itself never runs this unit at all;
+> it is purely the passive target. Earlier session notes (including this
+> file's own prior "deploy the hardening to vps" phrasing) described this
+> imprecisely — worth reading the fourteenth session's writeup before
+> assuming "vps" means the vps host for this item specifically.
+> **Confirmed live on homelab** (`systemctl show push-deploy-vps.service`):
+> `ProtectSystem=strict`, `PrivateTmp=yes`,
+> `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`. Zero failed units.
+> vps itself was not switched this session — its only pending diff is
+> unrelated backlog (`glow`, the tmpfs mount unit), already covered below.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -48,10 +54,14 @@ session needs is here or linked from here.
 > **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
 > switched to this branch as of the ninth session (including the restic
 > `312h` threshold, `c6116ca`), zero failed units, WireGuard tunnel and
-> zrepl replication both healthy on rotated keys. **L-01/L-02 (eighth
+> zrepl replication both healthy on rotated keys. ~~**L-01/L-02 (eighth
 > session) and D1's `snapdir=disabled` fix (tenth session) are the only
-> build/VM-verified-but-undeployed changes left** — none need a host
-> switch to be true statements, only to take effect.
+> build/VM-verified-but-undeployed changes left**~~ — **stale as of the
+> fourteenth session**: homelab picked up the `push-deploy-vps` sandboxing
+> and the eleventh session's `zfs-dataset-properties` extension in the
+> same switch (2026-09-01). vps's own pending diff (`glow`, the tmpfs
+> mount unit) is still build-verified-only. None of these need a host
+> switch to be *true statements*, only to take effect.
 >
 > **All scheduled deploys remain OFF fleet-wide** (`scheduleEnable =
 > false`). Manual deploys are the only path anything takes. That is not
@@ -1105,8 +1115,101 @@ these, plus the general pattern each teaches, is now in
 `docs/procedures/vm-testing.md`'s "Things that will bite you" for the
 next VM test author.
 
-**Not deployed to vps.** VM-verified is not deployed — that is still a
-separate, explicit user decision, same as always.
+**Not deployed anywhere as of this session's own end.** VM-verified is
+not deployed — that is still a separate, explicit user decision, same as
+always. ~~Deployed the following session — see "What happened in the
+fourteenth session".~~
+
+## What happened in the fourteenth session (2026-09-01)
+
+Closed out the thirteenth session's one remaining formality, then
+deployed the VM-verified `push-deploy-vps` hardening for real — but not
+to the host its name suggests.
+
+**D1 closed properly.** The thirteenth session's plan
+(`2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`)
+had one open decision, D1, left formally unresolved on purpose (its
+premise — the VM test still failing — had gone moot, but the plan
+skill's freeze gate needs a real user confirmation, not a hand-written
+marker). Asked the user; they confirmed there's nothing to decide and no
+backlog carry is needed. Recorded via `plan-decide … D1 answered "…"`
+(a `deferred` first attempt didn't satisfy `plan-move`'s freeze gate,
+which requires either `answered` or a `deferred`-then-`plan-carry`d item
+— re-recorded as `answered` since the user's confirmation was real). Three
+other Progress checkboxes (RESUME.md update, `vm-testing.md` gotchas,
+commit+push) were already done in `0789429` but still showed unchecked —
+ticked by hand since they're plain progress items with no `D`/`G`/`F` id
+for `plan-tick` to target. `plan-lint` clean, `plan-move … done` succeeded,
+committed (`3e30d75`) and pushed.
+
+**The VM test was re-run for real, not just re-trusted.** A first
+`nix build .#checks.x86_64-linux.push-deploy-sandbox -L` came back exit 0
+with an **empty log** — a Nix store cache hit from the thirteenth
+session's own build, still valid in the local store, not a fresh
+execution. Re-ran with `--rebuild` to force a genuine re-execution: both
+subtests passed again, cleanly, including the negative control's exact
+`Read-only file system` failure on the unmodified `PrivateTmp`-forced-off
+node. Worth remembering for any "please re-run the test" ask on this repo:
+`nix build` alone proves the derivation is still valid, not that the test
+was re-executed — use `--rebuild` when the point is to reproduce, not just
+to check.
+
+**Correction: the hardening deploys to homelab, not vps.** Asked the user
+whether to deploy "to vps" (matching how the finding and prior sessions'
+notes phrased it) and they said yes — but before switching anything, a
+`grep` of `myPushDeploy.enable` found it set only in
+`hosts/homelab/configuration.nix` (line 462), not `hosts/vps/configuration.nix`.
+`modules/nixos/push-deploy.nix` names its unit
+`systemd.services."push-deploy-${cfg.hostAttr}"`, and with
+`hostAttr = "vps"` that renders to `push-deploy-vps.service` — but the
+unit lives wherever `myPushDeploy.enable = true` is set, which is
+homelab. homelab builds vps's config locally and pushes+activates it over
+SSH as `vps-deploy@vps`; vps itself never runs this service. Confirmed
+empirically before saying anything: a build-verify + `nvd diff` of vps's
+current running system against its newest build showed **zero**
+push-deploy-related changes (only unrelated pre-existing backlog — `glow`,
+the tmpfs mount unit) — proof that "deploy to vps" would not have put the
+hardening live at all. Flagged this to the user rather than proceeding on
+the literal ask; they confirmed deploying to homelab instead.
+
+**homelab deployed, hardening confirmed live.** Build-verified homelab
+(`nix build .#nixosConfigurations.homelab.config.system.build.toplevel`),
+diffed the result against `/run/current-system` (via `nix copy` +
+`nvd diff`, then a direct `diff` of the rendered
+`push-deploy-vps.service` unit file itself, since `nvd`'s package-level
+view didn't surface the in-place service-file content change under a
+same-named entry): the only changes were `push-deploy-vps.service` gaining
+`ProtectSystem=strict`, `PrivateTmp=true`, and the three `ReadWritePaths`,
+plus the already-decided, previously-undeployed `zfs-dataset-properties`
+unit from the eleventh session. Shown to the user, confirmed, then
+`nixos-rebuild switch --flake .#homelab --target-host root@homelab`.
+
+**One slow-but-legitimate wait during the switch, root-caused rather than
+assumed hung.** `systemd-tmpfiles-resetup.service` (triggered because
+`push-deploy.nix`'s two new tmpfiles rules — `/root/.cache`, `/root/.ssh`
+— changed the rendered tmpfiles config) took about 2.5 minutes, long
+enough to check for a real hang: `/proc/<pid>/stack` showed it blocked in
+`poll()` waiting on a job-completion socket (normal while a subordinate
+systemd job runs, not evidence of a deadlock), and the subordinate job's
+own CPU/IO counters climbed steadily across repeated checks rather than
+sitting static — genuine progress, not a stall. Checked what it could
+possibly delete before concluding nothing valuable was at risk: homelab's
+own custom tmpfiles rules are all `A`-type (ACL-only, no deletion), the
+unit's journal for this run has zero "Removed" lines, and NixOS's built-in
+age-cleanup rules only target `/tmp`/`/var/tmp`, both already tmpfs
+(wiped every boot since the seventh session's `boot.tmp.useTmpfs`). It
+finished in ~22s CPU, in line with its own prior-run average (21.27s).
+
+**Verified after the switch, not just that it exited 0:** `systemctl
+--failed` — zero. `systemctl show push-deploy-vps.service -p ProtectSystem
+-p PrivateTmp -p ReadWritePaths` on homelab —
+`ProtectSystem=strict`, `PrivateTmp=yes`,
+`ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`, live. `/run/current-system`
+matches the new build's store path.
+
+**vps was not touched this session.** Its own pending diff (`glow`, the
+tmpfs mount) is unrelated backlog from earlier sessions, already
+build-verified, not yet deployed — a separate, still-open decision.
 
 ## What is left
 
@@ -1144,7 +1247,8 @@ outstanding.**
    `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
    Build-verified only, not deployed.
 1. ~~**`push-deploy-vps` sandboxing**~~ — **VM test fully green as of the
-   thirteenth session (2026-09-01).** `nix build .#checks.x86_64-linux.
+   thirteenth session (2026-09-01), re-confirmed with a forced fresh
+   rebuild and deployed in the fourteenth.** `nix build .#checks.x86_64-linux.
    push-deploy-sandbox -L` passes both subtests: the real, hardened unit
    builds locally, copies the closure over real ssh, and runs a real
    remote `switch-to-configuration switch` that actually activates on
@@ -1163,11 +1267,16 @@ outstanding.**
    surfaced. Full detail — every gotcha, the abandoned approaches and why
    they didn't work, worth reading before touching this test again — is
    in `2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`
-   (not yet `plan-move`d to `done/`; one formality-only decision, D1, is
-   moot now but wants a real `plan-decide` before that move) and in
-   `docs/procedures/vm-testing.md`'s own "Things that will bite you".
-   **Still not deployed to vps** — VM-verified is not the same as
-   deployed, and that remains a separate, explicit user decision.
+   (`plan-move`d to `done/` in the fourteenth session, D1 formally
+   `answered`) and in `docs/procedures/vm-testing.md`'s own "Things that
+   will bite you". **Deployed 2026-09-01 (fourteenth session) — to
+   homelab, not vps.** The hardened unit (`push-deploy-vps.service`) runs
+   on homelab, which builds vps's config and pushes+activates it over
+   SSH; vps itself never runs this unit. Confirmed live via `systemctl
+   show`: `ProtectSystem=strict`, `PrivateTmp=yes`,
+   `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`, zero failed
+   units. See "What happened in the fourteenth session" above for the
+   full correction and verification detail.
 2. ~~**The skipped-deploy half of `F-P7-09`**~~ — **done in the fourth
    session.** All four hosts watch `/nix/var/nix/profiles/system` for
    staleness, and `onSuccess` is replaced by a gated
