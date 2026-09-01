@@ -583,6 +583,18 @@ in
       TARGET = "http://10.100.0.2:8096";
     };
   };
+  # anubis's own hardening restricts syscalls and namespaces but nothing
+  # narrows what it can *connect to* -- it sits outermost in the path of
+  # untrusted internet traffic and, with no address restriction, can reach
+  # caddy's admin API on 127.0.0.1:2019 (which can replace caddy's whole
+  # running config, including a file_server rooted where the ACME account
+  # key lives). AF_UNIX is unaffected by IPAddress{Deny,Allow}, so the
+  # caddy<->anubis reverse_proxy socket keeps working
+  # (docs/audits/2026-08-26/findings-tail.md L-01).
+  systemd.services.anubis-jellyfin.serviceConfig = {
+    IPAddressDeny = "any";
+    IPAddressAllow = [ "10.100.0.2/32" ];
+  };
 
   # caddy: public HTTPS entry point, jellyfin routes through anubis
   # caddy needs group membership to reverse_proxy into anubis's unix socket
