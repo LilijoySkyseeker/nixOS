@@ -81,14 +81,97 @@ frozen: false
       (intentional, just needs to stay documented) and observing the
       `Persistent = false` deploy through an actual long-outage reboot.
 
-## Progress
+## State
+**2026-08-30.** Manually triggered `restic-backups-backblazeWeekly` end to
+end (2026-08-29 22:50 -> 2026-08-30 08:46, 9h56m) to clear the Aug 21
+staleness and check on the Aug 28 failure. Run succeeded, `last-success`
+marker updated, `restic check` reports no errors. Confirmed pruning is
+already automatic (G1) and captured a full timing/throughput benchmark
+(G3) for sizing future backup work. One loose end: G2's orphaned-pack
+warning should be re-checked on the next scheduled run (Fri 2026-09-04)
+to confirm it clears on its own.
 
+## Progress
+- [x] G1 -- confirmed pruning is already automatic
+- [ ] G2 -- confirm orphaned-pack warning clears on the 2026-09-04 scheduled run
+- [x] G3 -- captured full-run timing/throughput benchmark
 
 ## Decisions (D)
 
 
 ## Gotchas (G)
+### G1 -- pruning is already automatic, not something to add
+Confirmed against the pinned nixpkgs `nixos/modules/services/backup/restic.nix`
+(`pruneCmd`/`checkCmd` construction, ~line 409-464): when `pruneOpts` is
+non-empty, the module appends `restic unlock` + `restic forget --prune
+<pruneOpts>` to the *same* `ExecStart` as the backup itself, then `restic
+check` -- all inside one `restic-backups-backblazeWeekly.service` run, in
+that order. `hosts/homelab/configuration.nix`'s `backblazeWeekly` block
+already sets `pruneOpts = [ "--retry-lock 15m" "--keep-daily 2" ]`, so
+this was already wired up. The 2026-08-30 manual run's own journal
+confirms it executed: `Applying Policy: keep 2 daily snapshots` /
+`keep 2 snapshots: 549f74e6 ... 6ec73aed ...`. Nothing to fix here --
+noting it so a future read of this plan doesn't re-propose it.
 
+### G2 -- an interrupted run leaves orphaned B2 pack data that the very next automatic prune doesn't fully clear
+The 2026-08-30 run's `restic check` step (which runs *after* `forget
+--prune` in the same service invocation, see G1) reported: `63 additional
+files were found in the repo, which likely contain duplicate data. This
+is non-critical, you can run 'restic prune' to correct this.` These are
+almost certainly leftover pack files from the 2026-08-28 run that failed
+with `unable to save snapshot: context canceled` -- data was uploaded to
+B2 but never referenced by a completed snapshot/index, so the following
+run's `forget --prune` (which prunes data unreachable from *kept*
+snapshots) didn't have a snapshot to hang the cleanup off. Working
+hypothesis, not yet confirmed: this self-resolves via the `rclone backend
+lifecycle ... daysFromHidingToDeleting=1` B2 setting
+(`hosts/homelab/configuration.nix` `ExecStartPre`) once whatever `prune`
+already hid finishes its 1-day hide-to-delete window, and/or clears on
+the *next* scheduled run's `forget --prune` once the orphan packs are
+visible to that run's index load. **Needs a check on the next scheduled
+run (Fri 2026-09-04)**: if the "additional files" warning is gone,
+hypothesis confirmed, nothing to do. If it persists or grows, that's a
+real gap -- interrupted runs need an explicit `restic prune` (or
+`unlock` + `prune`) as part of recovering from a failure, not just
+waiting for the next weekly run.
+
+### G3 -- full manual-run timing/throughput benchmark (2026-08-29 22:50 -> 2026-08-30 08:46, 9h56m total)
+Captured while watching this run live (hourly ETA checks cross-referenced
+against `zpool iostat`, `/proc/<pid>/io`, and a Cloudflare upload-speed
+test), useful as a real baseline for sizing any future backup redesign:
+- **Scan/hash phase: ~45 min.** CPU-bound (restic pegged ~97% of one
+  core hashing for content-defined chunking). Read up to ~500 MB/s where
+  ZFS ARC-cached, but the *real* disk-bound ceiling -- confirmed via
+  `zpool iostat -v` sustained samples once cache-cold -- is **~260-280
+  MB/s combined**, split ~130-140 MB/s per disk across the `zdata`
+  mirror's 2x HGST Ultrastar He12 (`HUH721212ALE601`, 12TB, 7200rpm,
+  USB-attached). That matches this drive model's rated sustained
+  sequential throughput -- the mirror isn't doubling single-disk speed
+  here, ZFS is splitting reads across both sides of the mirror.
+- **Upload phase: ~9h, the dominant cost.** Steady, remarkably flat
+  **~2.5 MB/s** the entire time (verified hour over hour: 2.54, 2.53,
+  2.52, 2.55, 2.55, 2.54 MB/s) -- this matches homelab's directly
+  measured upload bandwidth (**2.31 MB/s / 18.5 Mbps**, via a 50MB
+  upload to `speed.cloudflare.com/__up`) almost exactly. **Home upload
+  bandwidth, not disk, not CPU, not B2/rclone, is the hard ceiling on
+  this backup's runtime.** Total uploaded this run: 83.31 GB -- larger
+  than any working hypothesis tried along the way (not just the ~66 GB
+  the failed 2026-08-28 run had pushed before erroring), so this genuinely
+  was a heavier-than-usual delta, not just a re-push of the failed run's
+  data.
+- **Check phase: ~3.5 min** (`--read-data-subset=1%`, 380/380 packs, no
+  errors -- see G2 for the one non-error note it did raise).
+- **Sizing implication:** at the measured ~2.3 MB/s (~8.3 GB/hour)
+  upload ceiling, runtime is now essentially `(new/changed data in GB) /
+  8.3` hours, full stop, once the ~45min scan overhead is accounted for.
+  A future redesign (dedicated backup-window scheduling, WAN upgrade,
+  smaller backup scope, more frequent/smaller runs to cap the worst-case
+  delta) should size against this rate, not against the `~2.9TiB of I/O`
+  estimate in `modules/nixos/auto-update.nix`'s comment or the original
+  2026-08-18 plan bullet above -- that figure predates any real
+  measurement and looks like a pessimistic guess (actual dataset
+  `refer` size is ~885 GB today, and the very first full backup on
+  2026-08-21 uploaded 522.8 GB, not 2.9 TiB).
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

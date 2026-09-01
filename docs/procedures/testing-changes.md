@@ -6,6 +6,17 @@ genuinely cannot tell you whether something works. This consolidates
 what's scattered across `AGENTS.md`'s command list into one place: what
 each check actually catches, and when to reach for it.
 
+These layers are the concrete commands behind `docs/procedures/
+workflow.md`'s **trust hierarchy** — documentation → source code → local
+build → VM testing → an actual switch on a real host, least to most
+trusted. Layers 1-3 below are the "local build" rung, layer 4 is "VM
+testing," and layers 5-6 are "an actual switch." The hierarchy's
+corollary applies throughout: **a fix that is not declarative and
+reproducible is no fix at all** — a value patched by hand on a live host
+doesn't count as tested or fixed until it's expressed in this repo's Nix
+and deployed from it (see `docs/procedures/workflow.md` for the full
+rationale).
+
 ## The layers, cheapest to most thorough
 
 1. **`nixfmt <file>` / `statix check .` / `deadnix .`** — formatting
@@ -71,8 +82,8 @@ each check actually catches, and when to reach for it.
 - **`commit-msg` hook** — enforces Conventional Commits format on the
   subject line (`<type>(<scope>)?: <subject>`), skipping merge/
   fixup/squash commits.
-- **`pre-push` hook** — the main automated layer. For every commit
-  being pushed, diffs the range against `hosts/`, `modules/`,
+- **`pre-push` hook** — the main git-level automated layer. For every
+  commit being pushed, diffs the range against `hosts/`, `modules/`,
   `flake.nix`, `flake.lock`; for each host whose own directory changed
   *or* any of those shared paths changed (`modules/` covers
   `modules/nixos/`, `modules/home-manager/`, `modules/profiles/`,
@@ -83,12 +94,22 @@ each check actually catches, and when to reach for it.
   manually). This is why a docs-only commit that happens to touch
   `hosts/<name>/README.md` still triggers a real build — the hook
   matches by path prefix, not by file extension.
-- **Not automated at all**: `nix flake check`, the `tests/` VM checks,
-  `statix`, `deadnix`, `nvd diff`, and anything runtime (actually
-  switching and watching a service) — all manual, run when relevant to
-  what's being changed. The `pre-push` hook deliberately does not run
-  the VM tests; they cost minutes each, and a push is the wrong place
-  to discover that.
+- **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
+  skill's step-4 hard gate for any non-trivial agentic change, run
+  before commit rather than at push time. Automates layers 1-3 above:
+  `nixfmt --check`, `nix flake check --no-build`, a targeted
+  `nixos-rebuild build --flake .#<host>` for any host whose directory or
+  a shared path actually changed, and `statix`/`deadnix` — but
+  diff-scoped, so only *newly introduced* issues on changed lines block;
+  pre-existing debt elsewhere in a touched file never does. This is a
+  skill-invoked script, not a git hook, so it only fires when the
+  `workflow` skill's sequence is actually followed — it does not
+  backstop a commit made outside that skill the way `pre-push` does.
+- **Not automated at all**: the `tests/` VM checks, `nvd diff`, and
+  anything runtime (actually switching and watching a service) — all
+  manual, run when relevant to what's being changed. Neither
+  `pre-push` nor `verify-ladder` runs the VM tests; they cost minutes
+  each, and neither is the right place to discover that.
 
 ## When to reach for which layer
 
