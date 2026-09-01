@@ -21,6 +21,11 @@ session needs is here or linked from here.
 > happened in the tenth session" below. The L-01/L-02 and D1 fixes are
 > build/VM-verified only, not deployed to any host yet.
 >
+> **NEXT UP:** unify `myZfsDatasetProperties` and `disko.nix` into one
+> shared declaration — see item 0 in "Agent-doable, unblocked" below and
+> `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
+> Design agreed, not yet built.
+>
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
 > and `workflow` skills. Plans are cited by **bare filename**, and
@@ -850,6 +855,14 @@ outstanding.**
 
 ### Agent-doable, unblocked
 
+0. **NEXT UP, queued 2026-09-01:** unify `myZfsDatasetProperties` and
+   `disko.nix`'s per-dataset `options` into one shared declaration, so a
+   fresh install and an already-installed host's live reapply both come
+   from the same source instead of two hand-written copies that can
+   drift. Design already agreed with the user in conversation, not yet
+   built — full writeup in
+   `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`,
+   D1 there is answered (build it), the *how* is Progress work.
 1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6,
    deferred on purpose. Needs a VM test with a **real remote target**,
    because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH
