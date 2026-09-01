@@ -1,8 +1,8 @@
 ---
 slug: sval-main-renumber-layers-2-3-13-to-12-13-14
 created: 2026-08-31
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # sval_main: renumber layers 2/3/13 to 12/13/14
@@ -49,7 +49,8 @@ first four matrix slots into column 3 of each of the four row groups;
 diffed to confirm nothing else in that file changed) was copied into
 this branch as-is. Both committed in worktree
 `sval-main-layer-remap` (branch `worktree-sval-main-layer-remap`,
-PR #35), not yet merged to master.
+PR #35). PR #35 merged to master as commit `797f2576`
+(2026-09-01T00:14:06Z).
 
 ## Progress
 
