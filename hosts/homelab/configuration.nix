@@ -688,15 +688,9 @@
   # cached before the property changes.
   myZfsDatasetProperties."zroot/local/state".snapdir = "disabled";
 
-  # Each pool's own root dataset (canmount=off, mountpoint=none -- never
-  # itself mounted, but its properties are the inherited default for any
-  # child dataset that doesn't set its own override). Same
-  # vars.zfsRootFsOptions disko.nix already applies at creation
-  # (`718c396`'s consolidation); routing it through here too means this
-  # host's copy also self-heals every boot/switch instead of only being
-  # correct the day it was installed. torrent/thinkpad don't import
-  # zfs-dataset-properties (see the snapdir note above) so their
-  # disko.nix keeps reading vars.zfsRootFsOptions directly -- unaffected.
+  # Each pool root dataset's own properties, self-healed live too now,
+  # not just at disko install. plan:
+  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G2
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zdata" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;

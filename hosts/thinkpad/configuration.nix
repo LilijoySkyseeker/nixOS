@@ -93,13 +93,9 @@
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
 
-  # The zroot root dataset's own properties (canmount=off, mountpoint=none
-  # -- never itself mounted, but the inherited default for any child
-  # dataset without its own override). Same vars.zfsRootFsOptions
-  # disko.nix applies at creation; routing it through here too means this
-  # host's copy self-heals every boot/switch instead of only being
-  # correct the day it was installed. See
-  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md.
+  # zroot root dataset's own properties, self-healed live too now, not
+  # just at disko install. plan:
+  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
 
   # zfs snapshots, and serving them to homelab's puller (zrepl; replaced

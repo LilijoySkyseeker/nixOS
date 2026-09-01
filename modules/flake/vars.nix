@@ -43,21 +43,12 @@
       "com.sun:auto-snapshot" = "false";
     };
 
-    # Shared lookup for any ZFS host's disko.nix: reads a dataset's real zfs
-    # properties from that host's own myZfsDatasetProperties
-    # (modules/nixos/zfs-dataset-properties.nix) instead of a second
-    # hand-written literal, so disko's install-time `-o prop=value` and the
-    # live self-heal oneshot both come from one declaration. Takes that
-    # host's own `config` explicitly (vars.nix has no NixOS config of its
-    # own) -- a host's disko.nix binds `zfsProps = vars.zfsProps config;`
-    # once and calls `zfsProps "<pool>" "<dataset>"` from there. Returns
-    # `{ }` for any pool/dataset with no entry, so it's safe to merge into
-    # every dataset's `options`, not just ones that currently set something.
-    # Only meaningful for a host that imports zfs-dataset-properties --
-    # `config.myZfsDatasetProperties` doesn't exist as an option otherwise,
-    # so this fails loudly at eval time on a host that hasn't (a deliberate
-    # coupling, not a bug: see
-    # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md).
+    # Shared lookup for a ZFS host's disko.nix: reads a dataset's properties
+    # from that host's own myZfsDatasetProperties instead of a second
+    # hand-written literal. Call as `(vars.zfsProps config) "<pool>"
+    # "<dataset>"`; fails loudly at eval time on a host that doesn't import
+    # zfs-dataset-properties (deliberate coupling). plan:
+    # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
     zfsProps =
       config: pool: dataset:
       config.myZfsDatasetProperties."${pool}/${dataset}" or { };
