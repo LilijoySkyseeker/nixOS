@@ -4,19 +4,19 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the eighth session.**
+**Last updated: 2026-09-01, end of the ninth session.**
 
-> ## START HERE — state as of the eighth session
+> ## START HERE — state as of the ninth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
 > `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through eighth sessions' commits — **open a PR when it is
+> by the fifth through ninth sessions' commits — **open a PR when it is
 > time to land them.** All five `nixosConfigurations` build. The eighth
 > session fixed two LOW findings from the tail (L-01 anubis egress on
-> vps, L-02 restic's `/tmp` mount on homelab) and added a new VM test —
-> see "What happened in the eighth session" below; **neither fix is
-> deployed anywhere**, build/VM-test-verified only.
+> vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
+> hosts to this branch and closed out credential rotation — see "What
+> happened in the ninth session" below.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -24,17 +24,19 @@ session needs is here or linked from here.
 > filenames are **date-first** (`2026-08-28-<slug>.md`). Older text in
 > this file still says `TODO.md`; read that as "the plan files".
 >
-> **Credential rotation is essentially finished.** This was the active
-> workstream and it is now **9 done, 2 not required, 1 deferred** — see
-> [`rotation-runbook.md`](rotation-runbook.md) for the table. Only **item
-> 9 (`homelab_zrepl_key`)** remains, and it is genuinely blocked (below).
-> Two extra items were added and completed during the audit: **11**
-> (`tailscale_authkey_isoimage`, revoked) and **12** (factorio
-> credentials, proven disclosed and rotated).
+> **Credential rotation is done.** **10 done, 2 not required** — see
+> [`rotation-runbook.md`](rotation-runbook.md) for the table. Item 9
+> (`homelab_zrepl_key`), the last one, closed 2026-09-01 once the user had
+> physical access to both laptops. Two extra items were added and
+> completed during the audit: **11** (`tailscale_authkey_isoimage`,
+> revoked) and **12** (factorio credentials, proven disclosed and
+> rotated). Only cleanup remains: delete the stale `/tmp/homelab_zrepl_key`
+> on torrent (user-only).
 >
-> **Deployed:** homelab **gen 358** and vps, both zero failed units,
-> WireGuard tunnel healthy on rotated keys. `torrent` and `thinkpad` have
-> **still never been switched** and run pre-audit configs.
+> **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
+> now switched to this branch, zero failed units, WireGuard tunnel and
+> zrepl replication both healthy on rotated keys. L-01/L-02 (eighth
+> session) are the only build/VM-verified-but-undeployed changes left.
 >
 > **One change is committed but NOT deployed:** the restic staleness
 > threshold `336h → 312h` (`c6116ca`). The user chose to let it ride along
@@ -137,7 +139,13 @@ file.
   (TODO.md retired 2026-08-28)
 - **homelab is on gen 358** as of the sixth session (2026-08-28), vps
   redeployed the same day; the lines below record earlier sessions' state
-  and are kept for the sequence.
+  and are kept for the sequence. **Updated further in the ninth session
+  (2026-09-01): torrent and thinkpad are both now switched to this branch
+  too** — see "What happened in the ninth session". `torrent`'s "never
+  switched" claim two lines below turned out to already be stale before
+  this session even started (torrent was independently switched to
+  something very close to this branch's HEAD on 2026-08-27, outside the
+  audit's own session log) — corrected there rather than silently.
 - ~~**homelab is on gen 350 and vps on gen 7** as of the fifth session;~~
   the line below records the fourth session's state and is kept for the
   sequence. homelab and vps are deployed (2026-08-27). homelab was switched
@@ -669,29 +677,83 @@ this session's own two checks individually, both clean.
 
 **Not deployed anywhere.** Both fixes are build/VM-test-verified only.
 
+## What happened in the ninth session (2026-09-01)
+
+**Rotation item 9 (`homelab_zrepl_key`) closed — the last rotation item.**
+The blocker in the eighth session's "What is left" (below, now corrected)
+was cleared simply: the user had physical access to both laptops.
+
+- **First correction: torrent was not actually behind by 40 commits.**
+  Before touching anything, live checks (`avahi-daemon` absent, all deploy
+  timers reporting 0, and an `nvd diff` against the running system showing
+  only `ipset`/`jq`-docs/`tmp.mount` as new) showed torrent's generation
+  122 (switched 2026-08-27 21:26, outside this audit's own sessions) was
+  already nearly at this branch's HEAD. `RESUME.md`'s repeated "torrent
+  has never been switched" claim was stale, not current — corrected here
+  rather than carried forward again. The switch itself needed no reboot
+  (no kernel change) and was a small diff, not the fourth session's feared
+  "first-ever, carries all of wave 1" jump.
+- **Both laptops deployed to this branch.** torrent switched locally
+  (small diff, confirmed above); thinkpad switched at its own console by
+  the user, since it has no remote shell — I could not verify it directly
+  the way I did torrent.
+- **New keypair generated by the user**; private half re-encrypted into
+  `secrets/secrets.yaml`, public half (`homelab-zrepl-puller`) placed in
+  `modules/flake/vars.nix`, replacing `homelab-zrepl-pull`.
+- **`sops.secrets.homelab_zrepl_key` given `restartUnits = [
+  "zrepl.service" ]`** (`hosts/homelab/configuration.nix`) — this secret
+  had none, unlike the WireGuard/factorio pair `SYS-11` already closed.
+  Go-netssh shells out to the system `ssh` binary per pull attempt, which
+  plausibly makes it a per-invocation reader already (unlike WireGuard's
+  `RemainAfterExit` oneshot) — not verified either way, and a killed pull
+  just retries, so `restartUnits` was added rather than trusting the
+  assumption.
+- **Build-verified all three hosts before any switch**, including reading
+  the rendered `authorized_keys.d/root` on torrent/thinkpad (new key
+  present, forced command intact) and the sops manifest on homelab
+  (`restartUnits` present, correct `sopsFileHash`) out of `./result` —
+  same "verify the fix, not the build" discipline as the rest of this
+  audit.
+- **Deployed laptops first, then homelab**, per the runbook's fail-safe
+  order. All manual `switch`, not the disabled `boot`-mode auto-deploy, so
+  the "needs a reboot" caveat in the runbook's original item 9 text did
+  not apply — the key took effect immediately. Zero failed units on all
+  three.
+- **Verified by exercising the credential.** Homelab's activation log did
+  show `modifying secret: homelab_zrepl_key` and `zrepl.service`
+  restarting — exactly the shape that fooled three earlier rotations in
+  this audit into a false "done" — so it was not trusted alone. Forced a
+  pull with `zrepl signal wakeup torrent`/`wakeup thinkpad` and watched
+  `zbackup`'s replicas directly: both picked up a fresh snapshot
+  (`@zrepl_20260901_175824_000` / `…175816_000`) matching each source
+  host's own latest local snapshot, within about two minutes.
+- **Also landed**: `glow` added to `modules/profiles/default.nix` (fleet
+  default profile) for reading markdown docs, build-verified on all five
+  `nixosConfigurations`, deployed as part of the same torrent/homelab
+  switches above (thinkpad has it build-verified, not yet confirmed live).
+
+**Two commits landed this session** (a third, the `glow` addition, was
+authored directly; `secrets/secrets.yaml` changes were committed by the
+user on request, since the harness's own classifier — independent of
+`AGENTS.md`'s "I never edit or decrypt secrets" rule — blocked the agent
+from doing it directly): `4561889` (glow) and `3aa78a8` (zrepl key
+rotation). Pushed.
+
+**Still open, user-only:** delete `/tmp/homelab_zrepl_key` and its `.pub`
+on torrent — delete second, never first, and deleting it does not retract
+the old key (still in dozens of snapshots plus `zbackup`; rotation is what
+retracted it). See `rotation-runbook.md` item 9's closure note for the
+full detail.
+
 ## What is left
 
-### Rotation — one item, genuinely blocked
+### Rotation — done
 
-[`rotation-runbook.md`](rotation-runbook.md) has the table. **9 done, 2
-not required, 1 deferred.**
-
-**Item 9 (`homelab_zrepl_key`) is the only one open**, and it needs more
-than a decision. `vars.zreplPullerKey` is one value with two consumers
-(`hosts/torrent:96`, `hosts/thinkpad:121`), so both laptops must take the
-new public key together. Verified obstacles:
-
-- **thinkpad has no remote shell** — `ssh root@thinkpad` is
-  `Permission denied (publickey)`; it is `forced-commands-only` with only
-  zrepl's forced command. No agent can deploy it.
-- **No automatic path** — `scheduleEnable = false` on both,
-  `pull-deploy.timer` is `not-found`.
-- **`operation = "boot"`** on both, so the key does not take effect until
-  each laptop **reboots**.
-- torrent must not be rebooted, and has never run the audit config.
-
-Deferring is safe: replication is healthy, and a broken pull pauses and
-retries rather than losing anything.
+[`rotation-runbook.md`](rotation-runbook.md) has the table. **10 done, 2
+not required.** Item 9 (`homelab_zrepl_key`), the last one, closed
+2026-09-01 — see "What happened in the ninth session" above and the
+runbook's own closure note. Only cleanup remains: delete
+`/tmp/homelab_zrepl_key`/`.pub` on torrent (user-only, see below).
 
 ### Still owed by the user
 
@@ -702,8 +764,13 @@ retries rather than losing anything.
   and vps with its snowflake decoding to 2026-08-27 — i.e. the surviving
   webhook is the new one. Items 1 and 2 are now complete end to end,
   provider side included.
-- Deploy homelab to pick up the **312h staleness threshold** (`c6116ca`).
+- ~~Deploy homelab to pick up the **312h staleness threshold**
+  (`c6116ca`).~~ **Done 2026-09-01** — homelab was switched as part of the
+  ninth session's zrepl-key rotation, which carried this along.
 - Expect the backup staleness page ~**2026-09-03**; it will be correct.
+- **Delete `/tmp/homelab_zrepl_key` and its `.pub` on torrent** — the old
+  rotation-9 key, now retracted but not yet cleaned up. Delete second,
+  never first (see `rotation-runbook.md` item 9's closure note).
 
 ### Agent-doable, unblocked
 
@@ -743,12 +810,11 @@ retries rather than losing anything.
    the user's.**
 4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
    mount. Re-maps existing volume ownership, so it needs its own VM test.
-5. **Deploy `torrent` and `thinkpad`** if the user wants — still
-   build-verified only. ~~vps still carries a stale DNAT rule for the
-   deleted 34198~~ — **vps deployed 2026-08-27 (generation 4)**, and
-   that DNAT is gone; see the vps section below. homelab is deployed
-   (generation 346). The laptops still have armed `pull-deploy` timers,
-   which stop when they are next switched.
+5. ~~**Deploy `torrent` and `thinkpad`**~~ — **done 2026-09-01**, as part
+   of the ninth session's zrepl-key rotation; see above. ~~vps still
+   carries a stale DNAT rule for the deleted 34198~~ — **vps deployed
+   2026-08-27 (generation 4)**, and that DNAT is gone; see the vps section
+   below. All four hosts are now deployed to this branch.
 
 ### User-only
 
