@@ -1345,10 +1345,16 @@ Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
 both added in the fourth session. ~~D11 is time-critical.~~ **Not
 time-critical** — same stale-timer correction above; D11 itself (the
 `flake-update-test` auto-merge re-evaluation) is still genuinely
-unanswered, just not on a clock. Also the factorio
-account token is still exposed in ZFS snapshots and restic backups taken
-before `/srv/factorio/new` was deleted, and is the **same** credential
-`factorio-main` uses.
+unanswered, just not on a clock. ~~Also the factorio account token is
+still exposed in ZFS snapshots and restic backups taken before
+`/srv/factorio/new` was deleted, and is the **same** credential
+`factorio-main` uses.~~ **Stale as of 2026-09-01 — moot.** That claim
+was true only because the pre-exposure token was still live; rotation
+item 12 (`rotation-runbook.md`, done 2026-08-28) replaced
+`factorio_token`/`factorio_game_password` at factorio.com and in sops.
+The old value sitting in pre-2026-08-28 ZFS snapshots and restic backups
+no longer authenticates to anything — it is dead, not merely hidden.
+Nothing left to do here.
 
 ---
 

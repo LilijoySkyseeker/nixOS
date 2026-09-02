@@ -804,10 +804,15 @@ needs its own plan rather than a line in this item.
 - Rotate the remaining live secrets too, for consistency — `F-P8-02`'s
   fix says "plus the rest of the live set", since ciphertext comparison
   proves only that these ten were exposed, not that others were not.
-- The factorio account token is a separate exposure (`F-P4-04`): it sat
+- ~~The factorio account token is a separate exposure (`F-P4-04`): it sat
   in `/srv/factorio/new/config/server-settings.json`, is the **same**
   credential `factorio-main` uses, and is still in ZFS snapshots and
   restic backups taken before that directory was deleted. Rotate it at
-  factorio.com and update sops.
+  factorio.com and update sops.~~ **Done — same rotation as item 12
+  above** (2026-08-28). `F-P4-04` and item 12 turned out to be the same
+  credential under two names; rotating `factorio_token`/
+  `factorio_game_password` at factorio.com and in sops covered both. The
+  copies in pre-2026-08-28 ZFS snapshots and restic backups are of the
+  now-invalidated old value — exposed history, not a live credential.
 - Then work `user-actions.md` §3 — dropping the nine orphan keys and
   restructuring `.sops.yaml` into per-path `creation_rules`.

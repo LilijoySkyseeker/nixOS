@@ -1050,12 +1050,14 @@ and jellyfin's own duplicate tmpfiles rules were deleted so upstream's
 fixed** — see L-02's 2026-09-01 closure note: it no longer mounts under
 `/tmp` at all (moved to a 0700 `RuntimeDirectory`), so this promotion's
 third leg is closed and only the second (`userns-remap`) remains.
-**Read that plan's F1 before treating any of this as closed**: the
+~~**Read that plan's F1 before treating any of this as closed**: the
 factorio credentials were already disclosed through world-traversable ZFS
 snapshots before the leaf-mode fix landed, and a permission change cannot
 retract a snapshot already taken — only rotation at factorio.com does
 that, and it is still pending (rotation runbook item 9's neighbor,
-F-P4-04).]**
+F-P4-04).]**~~ **Retracted 2026-09-01**: rotation runbook item 12 (not
+9 — corrected reference) did this rotation 2026-08-28, at factorio.com
+and in sops. The disclosed value is dead; nothing pending here.
 
 ### PROMO-04 — the only outward alerting channel is unreliable in exactly the way that hides a silent failure
 

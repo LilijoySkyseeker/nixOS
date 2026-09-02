@@ -125,13 +125,18 @@ broken neither could fire.
       nothing since. Factorio autosaves continuously while a player is
       connected, so one autosave means nobody ever joined.
 
-      **The credential exposure is not retracted by this.**
+      ~~**The credential exposure is not retracted by this.**
       `config/server-settings.json` held the factorio.com account token
       and game password, and those are still in every ZFS snapshot and
       restic backup taken while the directory existed; they age out on
       normal retention. It is the *same* credential
       `factorio-main` still uses, so treat it as exposed until rotated at
-      factorio.com — and rotating means updating sops too. *(F-P4-04)*
+      factorio.com — and rotating means updating sops too. *(F-P4-04)*~~
+      **Retracted 2026-09-01.** Rotation item 12 (`rotation-runbook.md`,
+      done 2026-08-28) rotated this exact credential
+      (`factorio_token`/`factorio_game_password`) at factorio.com and in
+      sops. The copies in pre-2026-08-28 snapshots/backups are of the now
+      dead old value — nothing left to do here.
 
 - [x] **After deploying, confirm the deploy path actually recovers.**
       **Done 2026-08-27**, and then deliberately made moot.
