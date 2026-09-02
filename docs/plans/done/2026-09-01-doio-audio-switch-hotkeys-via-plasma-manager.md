@@ -1,8 +1,8 @@
 ---
 slug: doio-audio-switch-hotkeys-via-plasma-manager
 created: 2026-09-01
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # doio audio-switch hotkeys via plasma-manager
@@ -20,36 +20,37 @@ plan file existed, per the repo's workflow gate.
 
 ## State
 
-In progress -- all Nix-side and keymap-file work is done and
-build-verified, but nothing has been flashed or activated on real
-hardware yet, so treat this as unproven until that happens (see below).
+Done and confirmed working on real hardware. Final key layout:
+`doio.vil` row0 col2 (next to Lock) = `HYPR(KC_F2)` -> RC-505, row1
+col2 (next to Sleep) = `HYPR(KC_F1)` -> Monitor, row2 col2 (next to
+Reboot) = `HYPR(KC_F3)` -> AudioEngine; row3 (Shutdown) and all other
+cells untouched. Bound to Hyper+F1-3, not the originally-chosen
+Hyper+F13-15 (D2), after discovering (D4/G6) that this system's XKB
+`evdev` rules remap the F13-F24 range to legacy XF86 multimedia-key
+symbols rather than plain function-key symbols, so a
+`kglobalshortcutsrc` binding on "...+F13" could never match a physical
+F13 keypress. Getting Hyper+F1-3 free required clearing 3 legacy
+per-app "launch this app" shortcuts (feishin/cider-genten/spotify) that
+already sat on plain Meta+Ctrl+Alt+Shift+F1/F2/F3, orphaned from an old
+macropad binding that no longer exists in any current keymap file.
 
-`flake.nix`/`flake.lock` (re-added `plasma-manager` input),
-`modules/home-manager/audio-switch.nix` (new, torrent-only
-home-manager module), and `modules/flake/hosts.nix` (wires the module
-into torrent's own modules list, not `profile-pc`) are final.
-`files/doio.vil`'s cell placement went through one revision after D3:
-final layout is row0 col2 (next to the Lock key) = `HYPR(KC_F14)`
-(RC-505), row1 col2 (next to Sleep) = `HYPR(KC_F13)` (Monitor), row2
-col2 (next to Reboot) = `HYPR(KC_F15)` (AudioEngine); row3 (Shutdown)
-and all other cells untouched. Build-tested via `nixos-rebuild build`
-for both `torrent` and `thinkpad` after the D3 rework (thinkpad's store
-path stayed byte-identical throughout, confirming `profile-pc` scoping
-never leaked into it -- and torrent's store path was unchanged
-before/after the D3 keymap-cell move too, since `doio.vil` isn't
-consumed by Nix at all). Verified past the build step, via the actual
-built home-manager activation package's `data.json`, that
-`~/.config/kglobalshortcutsrc` will get `Meta+Ctrl+Alt+Shift+F13/14/15`
-bound to the three `plasma-manager-commands.desktop` actions, whose
-`Exec=` lines correctly invoke the built `audio-switch-output` script
-with each target's `node.name`.
-
-Remaining real-world steps (not doable from this session): flash
-`files/doio.vil` to the physical DOIO macropad via the Vial GUI;
-`nixos-rebuild switch` (or the usual pull-deploy path) on torrent so
-the KDE shortcuts actually land in the live session; then confirm by
-pressing each of the three new keys that the right output actually
-becomes PipeWire's default sink.
+All Nix-side pieces are final and build-tested (`nixos-rebuild build`
+for both `torrent` and `thinkpad`; `thinkpad`'s store path stayed
+byte-identical throughout every revision, confirming the `profile-pc`
+scoping never leaked into it): `flake.nix`/`flake.lock` (re-added
+`plasma-manager` input), `modules/home-manager/audio-switch.nix` (the
+`audio-switch-output` script plus `programs.plasma.hotkeys.commands`
+and the `programs.plasma.shortcuts` clear-block), and
+`modules/flake/hosts.nix` (wires the module into torrent's own modules
+list only). `nixos-rebuild switch` was applied twice on torrent (both
+times on the user's explicit "switch now"), and the final live state
+was confirmed, via the user testing the physical keys, to actually
+switch PipeWire's default sink correctly for all three outputs. The
+user did have to manually re-set the shortcuts once more in System
+Settings and reload Vial's GUI after the second switch before
+kglobalaccel picked up the corrected key bindings (G7) -- after that,
+live state matches the Nix declaration with no drift, per the user:
+"now everything is working, and also done declaratively."
 
 ## Progress
 
@@ -99,8 +100,21 @@ becomes PipeWire's default sink.
       asked "switch now"); confirmed live `~/.config/kglobalshortcutsrc`
       now has all three `audio-output-*=Meta+Ctrl+Alt+Shift+F13/14/15`
       lines
-- [ ] Press each of the three keys on real hardware and confirm the
-      right output becomes PipeWire's default sink
+- [x] Pressed each of the three keys on real hardware -- initially none
+      worked (D4/G6: XKB remaps F13-F15 to legacy XF86 keys, not plain
+      function-key symbols)
+- [x] D4 -- switched `doio.vil` and the nix module from Hyper+F13/14/15
+      to Hyper+F1/F2/F3 per user's request; cleared the 3 legacy
+      per-app launch shortcuts occupying those keys (2 by the user via
+      System Settings, 1 -- cider/genten -- declaratively via
+      `programs.plasma.shortcuts`, verified against `data.json` to
+      touch nothing else); re-verified `nixos-rebuild build` for
+      torrent and thinkpad (thinkpad unchanged), `switch`ed on user's
+      explicit "switch now"
+- [x] G7 -- live key binding still stale after switch alone; user
+      manually re-set the shortcuts in System Settings + reloaded Vial;
+      user confirmed 2026-09-01: "now everything is working, and also
+      done declaratively" -- live state matches the Nix declaration
 
 ## Decisions (D)
 
@@ -151,6 +165,36 @@ in.
 
 
 **ANSWERED 2026-09-01:** user: 'the 3 keys next to the current lock/sleep/reboot/shutdown line. it should be in rc505/monitor/audioengine order, next to the first 3 of the previousl list.'
+
+### D4 -- Hyper+F13-15 turned out not to work at all; switched to Hyper+F1-3
+After activation, all three keys did nothing. Diagnosed live (KWin's own
+debug console, "Keyboard"/Input Events tab): pressing the physical keys
+produced key symbols "Launch5"/"Tools"/"Launch6", never "F13"/"F14"/
+"F15" -- this system's XKB `evdev` rules map Linux keycodes 183-185
+(`KEY_F13..F15`) to the legacy MS-keyboard extra-keys range, not plain
+function-key symbols, so a `kglobalshortcutsrc` entry for
+"...+F13" can never match (see G6). This invalidates D2's premise
+(D2 is left as-is, append-only; superseded here rather than edited).
+User: "lets try swapping everything to hyper plus F1-F3. you will have
+to clear out legacy keybinds that kde may allready have." Confirmed via
+`doio.vil`'s own JSON that none of its macro slots 7-15 (the orphaned
+Hyper+F1-F9 macros) are invoked from any key in the current layout, so
+repurposing F1-F3 was safe from the keymap side. F1/F2/F3 were each
+already occupied by a per-app "launch this app" global shortcut
+(`[services][feishin.desktop]`, `[services][sh.cider.genten.desktop]`,
+`[services][spotify.desktop]`, each `_launch=Meta+Ctrl+Alt+Shift+Fn`) --
+user manually cleared feishin (F1) and spotify (F3) via System Settings
+before asking me to check for leftovers; I found cider/genten (F2)
+still set and cleared it declaratively via a new
+`programs.plasma.shortcuts."services/sh.cider.genten.desktop"."_launch"
+= [ ];` block (verified via the built `data.json` that this writes
+`'none'` -- the same value KDE already used for the two the user'd
+cleared by hand -- and touches nothing else in the file). User
+confirmed afterward: "now everything is working, and also done
+declaratively."
+
+
+**ANSWERED 2026-09-01:** user: 'lets try swapping everything to hyper plus F1-F3. you will have to clear out legacy keybinds that kde may allready have.' Confirmed working afterward: 'now everything is working, and also done declaratively.'
 
 ## Gotchas (G)
 
@@ -222,6 +266,43 @@ our setup. Logging out and back in (not attempted from this session --
 restarting KWin in place on Wayland is itself disruptive/risky, closer
 to a mini-crash than a clean reload) is the expected fix; no further
 rebuild needed once that happens.
+
+### G6 -- XKB's `evdev` rules remap KEY_F13-F24 to legacy MS-keyboard XF86 keys, not plain function-key symbols
+Confirmed live via KWin's own debug console (`qdbus org.kde.KWin /KWin
+org.kde.KWin.showDebugConsole`, Keyboard/Input Events tab): pressing
+the physical Hyper+F13/F14/F15 keys produced key symbols
+"Launch5"/"Tools"/"Launch6", not "F13"/"F14"/"F15". This system's XKB
+rules are `rules: evdev, model: pc105, layout: us` (checked via
+`setxkbmap -query` against the XWayland compat layer KWin also runs) --
+under the standard `evdev` ruleset, Linux keycodes 183-194
+(`KEY_F13..F24`) are historically aliased to the old
+Microsoft-multimedia-keyboard extra-keys range (Launch1-8, Tools, My
+Computer, etc.) rather than to plain `F13..F24` keysyms. A
+`kglobalshortcutsrc` entry written as "...+F13" therefore can never
+match what a physical F13 keycode actually produces on this host --
+this isn't a bug in our config, it's this XKB ruleset's long-standing
+behavior for that keycode range. Plain `F1..F12` don't have this
+problem; only the F13-and-up extended range does. See D4.
+
+### G7 -- kglobalaccel also doesn't live-reload an *already-registered* component's key value from a `switch` alone
+Even after `nixos-rebuild switch` regenerated the `.desktop` file and
+`kglobalshortcutsrc` with the corrected Hyper+F1/F2/F3 values (verified
+on disk), `qdbus --literal org.kde.kglobalaccel
+/component/plasma_manager_commands_desktop
+org.kde.kglobalaccel.Component.allShortcutInfos` still reported the
+*old* F13/F14/F15 key codes -- confirming this is a distinct gotcha
+from G5 (G5 was about a component not existing in kglobalaccel's
+registry at all; this is about an *already-active* component's bound
+key not refreshing from a config-file change plus a service restart
+alone, unlike G5's fix path). The System Settings "Apply" trick that
+worked in G5 for making a brand-new component active did not, by
+itself, force a re-read of the new key value for an already-known
+component in this instance. What actually got it working: the user
+manually re-set the three shortcuts' key combinations directly in
+System Settings (not just re-Applying the same value) and reloaded the
+keymap in Vial's GUI once more -- after which the live state matched
+what's declared in Nix and stayed there (no drift), so no further Nix
+change was needed.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
