@@ -1,8 +1,8 @@
 ---
 slug: declare-f13-f24-as-usual-function-keys-via-xkb-on-pc-hosts
 created: 2026-09-01
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Declare F13-F24 as usual function keys via XKB on PC hosts
