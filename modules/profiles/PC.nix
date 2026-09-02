@@ -117,6 +117,12 @@ in
       #qmk, allow udev rules
       hardware.keyboard.qmk.enable = true;
 
+      # kde: keyboard > keyboard > key bindings > function keys > "use
+      # f13-f24 as usual function keys" -- system-wide xkb option, not
+      # kde/kxkbrc-specific, so applies at login and on any tty too
+      # plan: 2026-09-01-declare-f13-f24-as-usual-function-keys-via-xkb-on-pc-hosts.md#G1
+      services.xserver.xkb.options = "terminate:ctrl_alt_bksp,fkeys:basic_13-24";
+
       #flatpak
       # gid pinned off its dynamically-allocated default (which lands on 999)
       # to keep 999 free for the "multimedia" group — see
