@@ -95,8 +95,10 @@ becomes PipeWire's default sink.
 - [x] Flash `files/doio.vil` onto the physical DOIO macropad (Vial GUI)
       -- done by the user, confirmed loaded (2026-09-01); this step is
       the user's to do, not this session's -- never attempted here
-- [ ] `nixos-rebuild switch` (or pull-deploy) on torrent to activate the
-      KDE shortcuts in the live session
+- [x] `nixos-rebuild switch` on torrent (2026-09-01, user explicitly
+      asked "switch now"); confirmed live `~/.config/kglobalshortcutsrc`
+      now has all three `audio-output-*=Meta+Ctrl+Alt+Shift+F13/14/15`
+      lines
 - [ ] Press each of the three keys on real hardware and confirm the
       right output becomes PipeWire's default sink
 
