@@ -22,11 +22,15 @@ to the KDE Plasma desktop environment (see D2).
 
 ## State
 
-Implemented. `services.xserver.xkb.options` set in
+Implemented and committed. `services.xserver.xkb.options` set in
 `modules/profiles/PC.nix` (the shared `profile-pc` NixOS module both
 `torrent` and `thinkpad` import via `modules/flake/hosts.nix`), not via
 plasma-manager and not in `modules/nixos/kde.nix`. Both hosts build
-clean (`nixos-rebuild build`, not switched). Not yet committed.
+clean (`nixos-rebuild build`, not switched); pre-push hook also rebuilt
+the whole fleet clean. Committed as `b4faed8` on branch
+`worktree-plasma-manager-fkeys`, PR #42 opened, not yet merged. Not
+switched on either live host -- that's the user's call, per repo
+convention.
 
 ## Progress
 
