@@ -202,5 +202,26 @@ topology/serial rather than assigned at runtime. `audio-switch-output`
 resolves `node.name` -> current id via `pw-dump | jq` each time it
 runs, immediately before calling `wpctl set-default`.
 
+### G5 -- kglobalaccel doesn't pick up new `.desktop`-based shortcuts without a logout
+After `nixos-rebuild switch`, all three shortcuts were confirmed correct
+at rest (`.desktop` file at
+`/etc/profiles/per-user/lilijoy/share/applications/plasma-manager-commands.desktop`
+has the right `Actions=`/`Exec=` lines; `~/.config/kglobalshortcutsrc`
+has the right `Meta+Ctrl+Alt+Shift+F13/14/15` bindings) but none of the
+three keys worked. `qdbus --literal org.kde.kglobalaccel /kglobalaccel
+org.kde.KGlobalAccel.allComponents` showed no `plasma-manager-commands`
+component registered at all. On this Plasma 6/Wayland session,
+`org.kde.kglobalaccel` is answered by `kwin_wayland` itself (checked via
+`dbus-send ... GetConnectionUnixProcessID` -> PID matched
+`kwin_wayland`), which only scans `.desktop`-based global-shortcut
+components at KWin/session startup -- there's no live-reload path for a
+file that changed out from under it. plasma-manager's own README lists
+"real-time updates of configuration without having to log out and back
+in" under what's not well supported, confirming this isn't specific to
+our setup. Logging out and back in (not attempted from this session --
+restarting KWin in place on Wayland is itself disruptive/risky, closer
+to a mini-crash than a clean reload) is the expected fix; no further
+rebuild needed once that happens.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
