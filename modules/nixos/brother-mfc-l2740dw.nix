@@ -37,6 +37,18 @@ _: {
         };
       };
 
+      # ensurePrinters' own module only orders after cups.service, but
+      # `-m everywhere` does a live IPP query against the printer at
+      # setup time -- it needs the network up too, or it fails outright
+      # with no retry (Type=oneshot, no Restart=). Hit this for real: a
+      # 2026-09-02 boot ran lpadmin the same second NetworkManager
+      # started, before torrent had a route to the LAN.
+      # plan: 2026-09-03-ensure-printers-service-boot-race-on-torrent-order-after-network.md#G1
+      systemd.services.ensure-printers = {
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+      };
+
       # WSD's reply comes back unicast from the printer to whatever
       # ephemeral port sane-airscan bound that run -- a different source
       # than the original multicast probe's destination, so conntrack
