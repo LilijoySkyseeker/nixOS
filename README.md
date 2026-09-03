@@ -49,7 +49,7 @@ See [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md).
 |---|---|---|
 | `thinkpad` | Desktop | Secondary laptop. |
 | `torrent` | Desktop | Primary desktop. |
-| `homelab` | Server | Home server: media (Jellyfin), game servers, NFS, DNS automation, backups. |
+| `homelab` | Server | Home server: media (Jellyfin), photo/video backup (Immich, tailnet-only), game servers, NFS, DNS automation, backups. |
 | `vps` | Server | Public-facing edge: reverse proxy, WireGuard tunnel back to homelab, DDoS/bot mitigation. |
 | `isoimage` | Standalone | Bootable recovery/install ISO, outside the normal profile hierarchy. |
 

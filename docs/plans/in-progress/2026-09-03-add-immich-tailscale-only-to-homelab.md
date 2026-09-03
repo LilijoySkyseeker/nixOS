@@ -417,3 +417,5 @@ didn't cover), D2's public-share-link loss (accepted, tracked as
 follow-up), and D3's GPU-acceleration deferral (F2, already investigated
 in this plan) -- reviewed here only to confirm this diff's actual code
 matches what those decisions describe, not to re-argue the decisions.
+
+_docs-updater finished 2026-09-03T20:59:01Z -- see Findings above._
