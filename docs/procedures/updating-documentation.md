@@ -19,6 +19,16 @@ Update docs in the same commit as the code change, not as a follow-up:
 - **Changed something host-specific worth remembering later** (an incident,
   a gotcha, a deploy quirk) — record it in that host's own
   `hosts/<name>/README.md`, not a shared doc.
+- **Changed a host's services, packages, containers, storage, firewall,
+  timers, users, or secrets** — re-run `scripts/doc-host.sh <host>` to
+  refresh that README's machine-generated "Host Inventory" block. Outside
+  the `workflow` skill's gate (e.g. a manual edit), this is still on
+  discipline; inside it, the `docs-updater` subagent checks and refreshes
+  this block itself as part of its normal pass — see
+  `docs/agents/docs-updater.md`. Decided in
+  `2026-09-03-auto-generated-per-host-inventory-doc-services-packages-containers.md#D1`
+  rather than a separate pre-commit hook or `nix flake check` derivation,
+  since `docs-updater` already runs for exactly this class of change.
 - **Discovered a non-obvious cross-cutting gotcha** while making a change
   (an ordering dependency, a footgun, a "don't do X here, do it in Y
   instead") — add it to `docs/architecture.md`'s Gotchas section if it's

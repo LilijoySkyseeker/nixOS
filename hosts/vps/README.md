@@ -112,3 +112,52 @@ After install:
   boot-race fixes (retry-on-failure for crowdsec/the bouncer, a longer
   `tailscaled-autoconnect` timeout) can only be confirmed against
   DigitalOcean's real network-arming delay, not a local VM.
+
+<!-- inventory:start -->
+## Host Inventory
+
+_Auto-generated from `nixosConfigurations.vps`. Regenerate with
+`scripts/doc-host.sh vps` -- do not hand-edit between the markers._
+
+### Services (enabled)
+
+caddy, cloud-init, crowdsec, crowdsec-firewall-bouncer, dbus, fail2ban, fstrim, fwupd, getty, logind, logrotate, lvm, mingetty, nixosManual, nscd, openssh, resolved, sshd, tailscale, timesyncd, udev, udisks2, zram-generator
+
+### Packages
+
+acl, attr, audit, bash-interactive, bat, bcache-tools, bind, bitwarden-cli, btop, bzip2, comma-with-db-2.4.1, coreutils-full, cpio, cscli, curl, dbus, dbus-broker, diffutils, direnv, dosfstools, e2fsprogs, eza, fail2ban, ffmpeg, findutils, flac, fontconfig, fwupd, gawk, git, glibc, glibc-locales, glow, gnugrep, gnused, gnutar, grub, gzip, helix, hicolor-icon-theme, hostname-debian, iproute2, ipset, iptables, iputils, jq, kbd, kexec-tools, kmod, lazygit, less, libcap, libressl, linux-pam, lvm2, man-db, mkpasswd, nano, ncurses, neovim, nh, nix, nix-bash-completions, nix-index-with-full-db-0.1.11, nix-info, nixfmt, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, openssh, patch, polkit, procps, psmisc, rsync, run0-sudo-shim, shadow, shared-mime-info, smartmontools, sops, sound-theme-freedesktop, systemd, tailscale, texinfo-interactive, time, tldr, tmux, topgrade, trippy, udisks, util-linux, wget, which, wireguard-tools, xz, zfs-prune-snapshots, zoxide, zstd
+
+### Containers
+
+_none_
+
+### Storage (ZFS / network filesystems)
+
+_none_
+
+### Firewall
+
+- (all interfaces): TCP 80,443 / UDP 51820
+- plus custom `networking.firewall.extraCommands` iptables rules -- see the host's configuration.nix, not captured here
+
+### Scheduled jobs (systemd timers)
+
+- `fstrim`: weekly
+- `fwupd-refresh`: -
+- `health-check`: *:0/15
+- `logrotate`: hourly
+- `nh-clean`: daily
+
+### Users
+
+Human:
+_none_
+
+System (excludes nixbld*/nobody; may include accounts a service
+module auto-creates, not just ones this repo hand-declares):
+`anubis`, `crowdsec`, `fwupd-refresh`, `health-check`, `nscd`, `sshd`, `systemd-oom`, `vps-deploy`
+
+### Secrets in use
+
+`discord_webhook`, `git_email`, `git_username`, `tailscale_authkey_vps`, `vps_wireguard_private_key`, `wireguard_vps_homelab_psk`
+<!-- inventory:end -->
