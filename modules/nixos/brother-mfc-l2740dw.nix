@@ -37,24 +37,13 @@ _: {
         };
       };
 
-      # WS-Discovery's probe/reply doesn't fit conntrack's usual
-      # request/reply matching: the probe goes out to the 239.255.255.250
-      # multicast group from an ephemeral source port, but the printer's
-      # reply comes back as unicast from its own IP to that same ephemeral
-      # port -- a different source than the packet's original destination,
-      # so it's never RELATED/ESTABLISHED and the default-deny firewall
-      # silently drops it (confirmed with tcpdump: the printer replies
-      # every time, sane-airscan just never sees it). The reply's
-      # destination port is whatever ephemeral port sane-airscan happened
-      # to bind that run, so a dport-based allow can't target a single
-      # port -- but it's still bound within the kernel's ephemeral range
-      # (32768-60999 here, `/proc/sys/net/ipv4/ip_local_port_range`), so
-      # scope to that range rather than all ports. Without this, the rule
-      # would accept any UDP from this source IP on any port, including
-      # KDE Connect's 1714-1764 range that D9 deliberately scoped to
-      # tailscale0 only on this shared profile -- a spoofed or
-      # briefly-unreserved 192.168.1.166 would otherwise re-open exactly
-      # that. Scoped to enp8s0 (torrent's LAN NIC) only, not host-wide.
+      # WSD's reply comes back unicast from the printer to whatever
+      # ephemeral port sane-airscan bound that run -- a different source
+      # than the original multicast probe's destination, so conntrack
+      # never marks it RELATED/ESTABLISHED and the default-deny firewall
+      # silently drops it (confirmed via tcpdump). dport can't target a
+      # single port, so scope to the kernel's ephemeral range instead of
+      # all UDP -- see F3 for why that matters. enp8s0 (LAN NIC) only.
       # plan: 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md#F3
       networking.firewall.extraCommands = ''
         iptables -A nixos-fw -i enp8s0 -p udp -s 192.168.1.166 --dport 32768:60999 -j nixos-fw-accept

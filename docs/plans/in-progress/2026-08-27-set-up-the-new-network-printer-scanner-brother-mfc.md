@@ -58,6 +58,7 @@ frozen: false
 - [x] Enable WSD scanning on the printer's own web console (off by default) -- see G2. User confirmed it was already enabled ("Web Services", Brother's UI name for WSD) -- discovery was still blocked by G3 (firewall), now fixed.
 - [x] Build-verify the new printer/scan config on affected hosts before switching -- verify-ladder passed (nixfmt, statix/deadnix, flake check, targeted builds for torrent/thinkpad/homelab/vps/isoimage).
 - [x] Switched torrent (this machine) and end-to-end verified: `lpstat` shows the print queue idle/default, `scanimage -L` finds `airscan:w0:Brother MFC-L2740DW series` -- see G3.
+- [x] User confirmed the scanner works from a real desktop session (Skanpage) after logging out and back in -- the session-variable gap in G3 was exactly the cause, no further NixOS-side fix needed.
 
 ## Decisions (D)
 
@@ -169,3 +170,7 @@ _security (b7d447e firewall-fix review) finished 2026-09-02 -- see F3 above._
 _security finished 2026-09-03T01:31:38Z -- see Findings above._
 
 **FIXED 2026-09-02:** Narrowed the extraCommands rule from all-UDP-ports to just the kernel's ephemeral port range (--dport 32768:60999, matching /proc/sys/net/ipv4/ip_local_port_range on torrent) so it no longer re-opens KDE Connect's 1714-1764 range (or anything else below the ephemeral range) for a spoofed/claimed 192.168.1.166. Re-verified live: scanimage -L still finds the scanner after the switch.
+
+_docs-updater finished 2026-09-02 -- verified `modules/nixos/brother-mfc-l2740dw.nix`'s firewall comment matches the shipped ephemeral-range-scoped rule (no stale "all UDP ports" language remained). Trimmed that comment from 18 lines of prose (duplicating F3/G3 almost verbatim) down to a short mechanics summary plus the existing `#F3` citation, per `docs/style-guide.md`'s "inline comments are mechanics/labeling only" rule -- no new finding needed since the full rationale already lives in F3 above. `modules/profiles/PC.nix`'s and `modules/flake/hosts.nix`'s comments pointing at this module are accurate and already appropriately terse. `docs/accepted-risks.md` D9 needs no update -- it covers the original avahi/KDE-Connect/Steam-remote-play audit; this task's firewall exception is a separate, already-fixed, narrowly-scoped rule tracked entirely in this plan (G3/F3), not a fleet-wide accepted risk. No other doc under `docs/` (hardening.md, architecture.md, AGENTS.md's docs table) references this printer/firewall change or needs updating._
+
+_docs-updater finished 2026-09-03T01:50:10Z -- see Findings above._
