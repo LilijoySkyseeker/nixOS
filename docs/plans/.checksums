@@ -23,6 +23,7 @@ f9768a80b0ae9ea792c67ffe34c6446aeac7c642d09e6c2eeb48dff08ff65f10  docs/plans/don
 805b6c9d8a3c11acf2e6eec484a704a1e0587e90e4b7bd5e35b2151b9fb275dd  docs/plans/done/2026-08-27-establish-the-workflow-and-plan-file-system.md
 1392d214707b7c8556b859324393fbd5120e21c8c57b58f7b155bd52bf99a4be  docs/plans/done/2026-08-27-git-reset-checkout-do-not-revert-a-path-with-no-he.md
 3bdba29aac7762e831cb1ff4cb77251975a88348c460897f898db1e70837cc42  docs/plans/done/2026-08-27-hardcode-pull-before-branching-as-a-hook.md
+59395b0b243c435b08b1c593d47b8d6def0858d5de6e2e81ca962d0a1e56ce5a  docs/plans/done/2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md
 8094958912405c336a72f3305818afdd71c3c417ee998f7455a88034590bd623  docs/plans/done/2026-08-28-fix-plan-gate-ci-bootstrap-failure-on-its-own-introducing-pr.md
 34e832750e5b9b04da3172f0b8ef3d56bf3be225b071257064b38e235d34e00e  docs/plans/done/2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md
 7304c16c406bce8014b168f474a6fc38999ede54218e0f73c8ee05bce309d31b  docs/plans/done/2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md
