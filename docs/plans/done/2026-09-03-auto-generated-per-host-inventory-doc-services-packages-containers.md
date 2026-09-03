@@ -1,8 +1,8 @@
 ---
 slug: auto-generated-per-host-inventory-doc-services-packages-containers
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Auto-generated per-host inventory doc (services, packages, containers, storage, firewall, timers, users, secrets)
