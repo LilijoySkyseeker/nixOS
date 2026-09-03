@@ -39,3 +39,49 @@ If `isoimage` is ever genuinely meant to join the tailnet, that is a
 config change first — give it `profile-default` and sops-nix — and a new
 key second, **non-reusable, pre-authorized and tagged**. Do not revive
 the old one, and do not re-add the tag ahead of the config.
+
+<!-- inventory:start -->
+## Host Inventory
+
+_Auto-generated from `nixosConfigurations.isoimage`. Regenerate with
+`scripts/doc-host.sh isoimage` -- do not hand-edit between the markers._
+
+### Services (enabled)
+
+copyparty, dbus, fstrim, getty, logind, lvm, mingetty, nixosManual, nscd, openssh, sshd, timesyncd, udev
+
+### Packages
+
+acl, attr, backblaze-b2, bash-interactive, bcache-tools, bind, btop, btrfs-progs, bzip2, ccrypt, cifs-utils, copyparty, copyparty-hash, coreutils-full, cpio, cryptsetup, curl, dbus, dbus-broker, ddrescue, diffutils, disko, dmidecode, dosfstools, e2fsprogs, efibootmgr, efivar, exfatprogs, f2fs-tools, findutils, fuse, gawk, git, glibc, glibc-locales, gnugrep, gnused, gnutar, gptfdisk, grub, gzip, hdparm, hostname-debian, inetutils, iproute2, iptables, iputils, jq, kbd, kexec-tools, kmod, less, libcap, libressl, linux-pam, lm-sensors, lvm2, man-db, mdadm, mkpasswd, modemmanager, ms-sys, mtools, nano, ncurses, neovim, networkmanager, nix, nix-bash-completions, nix-info, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, nmap, ntfs3g, nvme-cli, openresolv, openssh, parted, patch, pciutils, polkit, procps, rclone, restic, rsync, screen, sdparm, shadow, smartmontools, socat, sshfs-fuse, sudo, syslinux, systemd, tcpdump, testdisk, time, tmux, unzip, usbutils, util-linux, vim, w3m, which, xfsprogs, xz, zfs, zip, zrepl, zstd
+
+### Containers
+
+_none_
+
+### Storage (ZFS / network filesystems)
+
+_none_
+
+### Firewall
+
+- (all interfaces): TCP 22,3923 / UDP -
+- plus custom `networking.firewall.extraCommands` iptables rules -- see the host's configuration.nix, not captured here
+
+### Scheduled jobs (systemd timers)
+
+- `fstrim`: weekly
+- `zpool-trim`: weekly
+
+### Users
+
+Human:
+`nixos`
+
+System (excludes nixbld*/nobody; may include accounts a service
+module auto-creates, not just ones this repo hand-declares):
+`copyparty`, `nm-iodine`, `nscd`, `sshd`, `systemd-oom`
+
+### Secrets in use
+
+_none_
+<!-- inventory:end -->

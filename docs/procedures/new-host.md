@@ -36,6 +36,11 @@ shape; the vps README has the gotchas for a specific real deploy
    build their own closure). Pass DigitalOcean's `--kexec-extra-flags
    -c` (see gotchas below) and any other `nixos-anywhere` flags after
    a `--`. See `hosts/vps/README.md` for a worked example.
+5. `scripts/doc-host.sh <name>` populates the README's machine-generated
+   "Host Inventory" block (services, packages, containers, storage,
+   firewall, timers, users, secrets in use) from the host's evaluated
+   config. Re-run it for any host whose config changed enough to affect
+   that block — it isn't kept in sync automatically.
 
 ## Gotchas seen in practice
 
