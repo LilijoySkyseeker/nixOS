@@ -1,8 +1,8 @@
 ---
 slug: update-flake-inputs
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # update flake inputs
