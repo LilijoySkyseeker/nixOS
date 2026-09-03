@@ -95,6 +95,18 @@ minor cosmetic nit caught while verifying (F5's own grant should have been
 `group:multimedia:r-x`/`r--`, everything else in the tree still shows no
 multimedia entry at all, all four units still healthy.
 
+**2026-09-03, D4 follow-up: user hit a real access-denied from torrent,
+fixed and reverified with a real `ls` over NFS, not just `getfacl`.**
+The `library/` grant alone wasn't reachable -- `mediaLocation` itself had
+no traversal grant, so `cd`/`ls` into `/storage/immich` failed before
+ever reaching `library/`. Two-step fix: execute-only traversal first,
+then upgraded to read so browsing the folder itself works and reveals
+sibling directory names (not their contents). Retested live, this
+session, directly on `torrent` (not just via SSH+getfacl on homelab):
+`immich/` and `immich/library/` (recursively) now browsable, `backups/`/
+`thumbs/`/`encoded-video/`/`upload/`/`profile/` all still correctly
+denied.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -223,6 +235,33 @@ bit that then propagates into this new grant's own `X`-conditional
 logic. Fixed, redeployed, reverified -- purely cosmetic (an executable
 bit on a jpg does nothing), and only affects files already touched
 before the fix; new uploads get the correct mode going forward.
+
+**FOLLOW-UP BUG, caught live by the user 2026-09-03:** the initial D4
+grant covered `library/` but not `mediaLocation` itself -- F5's re-lock
+rule strips every group entry from `mediaLocation`, including the
+directory that has to be traversed *through* to reach `library/`, and
+D4's own grant never touched that parent. POSIX requires `+x` on every
+directory in a path, not just the leaf, so this was a real, reproducible
+access-denied on `torrent` (`ls: cannot open directory
+'/home/lilijoy/storage/immich/': Permission denied`), confirmed live in
+the same session that deployed the original D4 fix -- `getfacl`-only
+verification on `library/` alone wasn't enough to catch it. Fixed in two
+steps, both verified with real `ls` from `torrent` over the actual NFS
+mount (not just `getfacl` on homelab):
+  1. added `a+ mediaLocation - - - - group:multimedia:--x` (execute-only,
+     non-recursive) so traversal into a *known* path
+     (`mediaLocation/library`) works;
+  2. that alone left `ls mediaLocation` itself denied (execute lets you
+     `cd` into a known child, not list what's there) -- upgraded to
+     `r-X` so `ls`/browsing the immich folder itself works and reveals
+     the sibling directory *names* (`backups`, `thumbs`, `upload`, ...),
+     which is the natural way anyone would actually go looking for
+     `library/`. Their *contents* stay unreadable regardless -- they have
+     no grant of their own, confirmed live (`ls backups/`, `ls thumbs/`
+     both still denied after this change).
+End state, verified via real `ls` from `torrent`: `immich/` browsable,
+`immich/library/` (and everything under it) fully browsable, `backups/`/
+`thumbs/`/`encoded-video/`/`upload/`/`profile/` all still denied.
 
 ## Gotchas (G)
 

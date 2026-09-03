@@ -85,6 +85,20 @@ in
         # library grant below is itself X-conditional and would otherwise
         # inherit an execute bit this rule set on every leaf file.
         "A ${config.services.immich.mediaLocation} - - - - user:immich:rwX"
+        # mediaLocation itself (the F5 rule above) has no multimedia entry
+        # at all -- traversal into library/ still fails without this, since
+        # POSIX requires +x on every directory in the path, not just the
+        # leaf. r-X, not --x: execute-only got traversal working (you could
+        # already reach mediaLocation/library directly if you typed the
+        # exact path) but `ls` on mediaLocation itself still needs read to
+        # list its children -- caught live, same session, right after the
+        # first fix: torrent could reach library/ by exact path but still
+        # got denied just cd-ing into mediaLocation first, which is how
+        # anyone would actually go looking for it. Read here only reveals
+        # the sibling directory *names* (backups, thumbs, upload, ...),
+        # not their contents -- those still have no grant of their own and
+        # stay unreadable even once you can see they exist.
+        "a+ ${config.services.immich.mediaLocation} - - - - group:multimedia:r-X"
         "A+ ${config.services.immich.mediaLocation}/library - - - - group:multimedia:r-X"
       ];
 
