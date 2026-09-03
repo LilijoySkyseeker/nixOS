@@ -36,5 +36,21 @@ _: {
           extraBackends = [ pkgs-unstable.sane-airscan ];
         };
       };
+
+      # WS-Discovery's probe/reply doesn't fit conntrack's usual
+      # request/reply matching: the probe goes out to the 239.255.255.250
+      # multicast group from an ephemeral source port, but the printer's
+      # reply comes back as unicast from its own IP to that same ephemeral
+      # port -- a different source than the packet's original destination,
+      # so it's never RELATED/ESTABLISHED and the default-deny firewall
+      # silently drops it (confirmed with tcpdump: the printer replies
+      # every time, sane-airscan just never sees it). The reply's
+      # destination port is whatever ephemeral port sane-airscan happened
+      # to bind that run, so a dport-based allow can't target it -- allow
+      # by the printer's own source IP instead, scoped to enp8s0 (torrent's
+      # LAN NIC), not host-wide.
+      networking.firewall.extraCommands = ''
+        iptables -A nixos-fw -i enp8s0 -p udp -s 192.168.1.166 -j nixos-fw-accept
+      '';
     };
 }

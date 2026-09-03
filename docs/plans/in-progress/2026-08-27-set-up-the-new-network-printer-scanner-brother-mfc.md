@@ -55,8 +55,9 @@ frozen: false
 - [ ] If driverless printing fails in practice, fall back to brlaser (confirmed to list MFC-L2740DW upstream) -- not needed unless G1 bites.
 - [x] Scanning: declared hardware.sane.enable + extraBackends = [ sane-airscan ] (handles WSD, which is what this model actually speaks, not eSCL) -- driverless, no Brother blob.
 - [x] Moved the printer queue + hardware.sane out of the shared profile-pc into nixosModules."brother-mfc-l2740dw" (modules/nixos/brother-mfc-l2740dw.nix), wired into torrent only -- see F1/F2.
-- [ ] Enable WSD scanning on the printer's own web console (off by default) -- see G2. Can't be done from this repo; needs the printer's IP in a browser.
+- [x] Enable WSD scanning on the printer's own web console (off by default) -- see G2. User confirmed it was already enabled ("Web Services", Brother's UI name for WSD) -- discovery was still blocked by G3 (firewall), now fixed.
 - [x] Build-verify the new printer/scan config on affected hosts before switching -- verify-ladder passed (nixfmt, statix/deadnix, flake check, targeted builds for torrent/thinkpad/homelab/vps/isoimage).
+- [x] Switched torrent (this machine) and end-to-end verified: `lpstat` shows the print queue idle/default, `scanimage -L` finds `airscan:w0:Brother MFC-L2740DW series` -- see G3.
 
 ## Decisions (D)
 
@@ -82,11 +83,35 @@ Kept the original driverless-first, no-unfree-blob approach for both.
 
 ## Gotchas (G)
 
+### G3 -- WSD's multicast-probe/unicast-reply pattern gets silently dropped by the default-deny firewall
+Confirmed live on torrent: `airscan-discover` found nothing even with WSD
+enabled on the printer (G2) and the printer physically reachable (ping OK).
+`tcpdump` showed the printer (192.168.1.166) replying to every WS-Discovery
+probe -- the firewall was silently dropping the replies. Cause: the probe
+goes out to the 239.255.255.250 multicast group from an ephemeral port, but
+the reply comes back as *unicast* from the printer's own IP -- a different
+source than the original packet's destination, so conntrack never marks it
+RELATED/ESTABLISHED. Fixed with a source-IP-scoped `networking.firewall.
+extraCommands` rule (`-s 192.168.1.166`, `-i enp8s0` only) in
+`modules/nixos/brother-mfc-l2740dw.nix` -- not a dport-based
+`allowedUDPPorts`, since the reply's destination port is whatever ephemeral
+port `sane-airscan` bound that run, not a fixed one.
+
+Separately: `scanimage -L` run directly (not in a real login session) will
+show nothing even once the above is fixed -- `SANE_CONFIG_DIR`/
+`LD_LIBRARY_PATH` are session variables set by the `hardware.sane` module
+that only apply in an actual login session, not a bare shell. Not a bug;
+confirmed by setting them manually (`SANE_CONFIG_DIR=/etc/sane-config
+LD_LIBRARY_PATH=/etc/sane-libs scanimage -L`), which found
+`airscan:w0:Brother MFC-L2740DW series`.
+
 ### G2 -- WSD scanning must be enabled on the printer itself
 The MFC-L2740DW ships with WSD scan-to-PC off by default on some Brother
 firmware. Before `sane-airscan`/`scanimage -L` will find it, enable WSD
 scanning via the printer's own web console (its IP in a browser), not
-just the NixOS side.
+just the NixOS side. Confirmed already enabled on the user's unit (Brother
+labels the toggle "Web Services" in Web Based Management's Protocol page,
+not literally "WSD").
 
 ### G1 -- driverless queues added via the web UI/autodetection can silently fail to print
 Known CUPS wrinkle: use `lpadmin -m everywhere` instead. If pages come out blank or jobs vanish, that's a queue-creation problem, not a network one -- check this first.
