@@ -46,8 +46,27 @@ in
       # rule (same generated file, mkAfter) or the next boot's recursive
       # replace-pass wipes this entry back out.
       # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#G4
+      #
+      # SECURITY-LOAD-BEARING (F5, caught by post-deploy security review):
+      # the existing `A /storage - - - - group:multimedia:rwx` rule above
+      # is recursive and re-applies on *every* boot/switch. It has no
+      # effect on mediaLocation only by accident of file-sort ordering on
+      # the deploy that first created it (00-nixos.conf runs before this
+      # module's `d` rule, so /storage/immich didn't exist yet when it
+      # ran) -- the very next unrelated switch or reboot would recurse
+      # into mediaLocation and grant the whole multimedia group read/write
+      # ACL access to every photo Immich stores there, silently defeating
+      # the 0700 immich:immich confidentiality D1(b)/F3 both relied on.
+      # lilijoy's own account already holds that gid via the NFS mounts in
+      # nfs-homelab-mounts.nix, so this needed no exploit, just normal use.
+      # This second rule re-locks mediaLocation on every single boot/switch
+      # too, recursively replacing any ACL entries the broad rule just set
+      # underneath it with only immich's own -- ordered after both prior
+      # rules via the same mkAfter list, so it always runs last and wins.
+      # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#F5
       systemd.tmpfiles.rules = lib.mkAfter [
         "a+ /storage - - - - user:immich:--x"
+        "A ${config.services.immich.mediaLocation} - - - - user:immich:rwx"
       ];
 
       # no wg0 rule here, unlike jellyfin -- this is the whole point:

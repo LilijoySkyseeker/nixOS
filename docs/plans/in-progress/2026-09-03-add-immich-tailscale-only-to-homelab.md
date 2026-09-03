@@ -63,6 +63,27 @@ new traversal grant alongside the existing multimedia one, all four units
 `curl http://<tailscale-ip>:2283/api/server/ping` returns 200 from
 homelab itself, `systemctl --failed` empty. v1 is live and working.
 
+**2026-09-03, rerun `/simplify` + `security` on the G4 fix commit, caught and fixed a real
+confidentiality bug before it could bite (F5).** 4 parallel review agents
+(reuse/simplification/efficiency/altitude) on the G4 diff all came back
+clean. `security` found F5 (HIGH, CONFIRMED): the pre-existing recursive
+`A /storage ... group:multimedia:rwx` rule re-applies on every boot/switch
+and, now that G4 makes `/storage/immich` actually exist and get populated,
+the very next unrelated reboot or switch would have recursively granted
+the whole `multimedia` group read/write ACL access to every photo Immich
+stores -- silently defeating the 0700 confidentiality boundary D1(b)/F3
+both relied on, with no exploit needed since lilijoy's own account already
+holds that gid via the NFS mounts. It hadn't happened yet only by luck of
+file-sort ordering on the deploy that created the directory. Fixed with a
+second tmpfiles rule that re-locks `mediaLocation` immediately after the
+broad rule, every boot/switch, recursively. Verified live, not just by
+ordering theory: forced a full `systemd-tmpfiles --create` pass on homelab
+(equivalent to a real reboot) and confirmed via `getfacl` that
+`/storage/immich` retained `group::---` with only `user:immich:rwx` --
+no `group:multimedia` entry survived -- while `/storage` itself still
+correctly shows both its normal grants. Deployed before any real exposure
+window opened.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -75,6 +96,7 @@ homelab itself, `systemctl --failed` empty. v1 is live and working.
 - [x] `/simplify` run — 4 agents (reuse/simplification/efficiency/altitude), all clean, no fixes needed
 - [x] `security` subagent run — F3 (NFS AUTH_SYS trust boundary, inherited not introduced) accepted, F4 (persistence entry missing explicit ownership) fixed
 - [x] deployed live to homelab (`nixos-rebuild switch --target-host`) — caught and fixed G4 (mediaLocation creation + /storage ACL traversal), verified working end-to-end
+- [x] rerun `/simplify` + `security` on the G4 fix commit — 4/4 simplify clean, security caught F5 (HIGH), fixed and verified live with a forced boot-simulating tmpfiles pass
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -364,6 +386,8 @@ Discourse recipe ([discourse.nixos.org/t/immich-and-cuda-accelerated-machine-lea
 
 **ACCEPTED 2026-09-03:** NFS sec=sys/AUTH_SYS lets root on an already-authorized client (torrent/thinkpad) declare an arbitrary uid, which could collide with immich's dynamically-allocated system uid and read through the 0700 mediaLocation directory. Not a new gap Immich introduces -- modules/nixos/nfs-homelab-mounts.nix already documents this exact trust boundary for the whole /storage export (root_squash only remaps uid 0, not other uids), and it applies equally to jellyfin's media today. Fixing it would mean reworking the fleet's NFS auth model (e.g. krb5) -- out of scope for adding one service, and every device that could exploit this already holds this fleet's admin SSH keys (docs/procedures/remote-access.md), which is already a bigger blast radius. Accepted as inherited from the existing NFS trust model, not introduced by this change.
 
+**NOTE 2026-09-03:** this acceptance's premise ("does stop ordinary multimedia-gid access", line 339-340 above) briefly did NOT hold in practice -- see F5, found by the same security review pass, which showed the pre-existing recursive `/storage` ACL rule would have granted the multimedia group direct read/write onto mediaLocation on the next boot, no uid-impersonation needed at all. F5 is now fixed and verified live (forced tmpfiles pass + getfacl confirmed no group:multimedia entry survives). With F5 fixed, this finding's original premise holds again: what remains is genuinely only the narrower uid-impersonation path described above, not ordinary group access.
+
 ### F4 -- `/var/lib/postgresql` persistence entry has no explicit ownership, unlike every other persistence entry in this repo
 
 - **File:** `modules/services/immich.nix:35` (`"/var/lib/postgresql"` as
@@ -409,6 +433,115 @@ Discourse recipe ([discourse.nixos.org/t/immich-and-cuda-accelerated-machine-lea
 
 
 **FIXED 2026-09-03:** modules/services/immich.nix's persistence entry for /var/lib/postgresql changed from a bare string (impermanence default root:root/0755) to an explicit { directory; user = "postgres"; group = "postgres"; } entry, matching jellyfin.nix's convention of always setting ownership explicitly rather than relying on postgres's own StateDirectory re-chown to paper over it. Verified postgres's default OS user/group is postgres/postgres in the pinned nixpkgs-stable services.postgresql module. nixos-rebuild build --flake .#homelab re-verified clean after the fix.
+
+### F5 -- the pre-existing recursive `A /storage ... group:multimedia:rwx` tmpfiles rule now reaches into, and overwrites the ACL of, every file G4's fix creates under `/storage/immich`, defeating the 0700 confidentiality boundary D1(b)/F3 relied on
+
+- **File:** `hosts/homelab/configuration.nix:183` (`"A /storage - - - - group:multimedia:rwx"`,
+  unmodified by this diff, pre-existing since the 2026-08-28 `/srv` fix) interacting
+  with `modules/services/immich.nix:33-37` (the new `d` rule that, per G4, now
+  actually creates and lets Immich populate `/storage/immich` with real photo/video
+  files -- before this diff's fix there was nothing under that path for the `A`
+  rule to reach)
+- **Severity:** HIGH
+- **Confidence:** CONFIRMED -- read the exact pinned nixpkgs-stable systemd source
+  homelab actually runs (`nixpkgs-stable` = rev `a3116115851d68b8952a2a4221cc25a84e56b532`,
+  confirmed as homelab's input via `modules/flake/hosts.nix:62`,
+  `inputs.nixpkgs-stable.lib.nixosSystem`), `src/tmpfiles/tmpfiles.c`:
+  - `tmpfiles.d(5)`'s own text: bare `a`/`A` (no `+` suffix) *sets* the ACL rather
+    than adding to it; only `a+`/`A+` add to the existing set.
+  - `path_set_acl()` (`tmpfiles.c:~1358-1381`): when `modify` (=`item->append_or_force`,
+    false for bare `A`) is false, it computes the target ACL purely from the rule's
+    own argument (`acl_dup(acl)`) instead of merging with the file's current on-disk
+    ACL (`acls_for_file()`, only called in the `modify` branch) -- i.e. bare `A`
+    **replaces** whatever ACL a file already has with [base entries computed from
+    that file's own mode] + [the rule's named entry] + [a recomputed mask], for
+    every file it touches.
+  - `item_do()` (`tmpfiles.c:~2492`, confirmed identical in both the pinned
+    nixpkgs-stable and nixos-unstable systemd sources) recurses into every
+    directory entry via `FOREACH_DIRENT_ALL` + a recursive `item_do()` call --
+    this is a genuine full filesystem walk, not just glob expansion -- and
+    `RECURSIVE_SET_ACL` (`A`) drives this walk via `fd_set_acls()`, which applies
+    to every **regular file** too (only symlinks are skipped, `tmpfiles.c:1462`).
+  - The `A /storage` line has no `!` prefix, so per `tmpfiles.d(5)` it is "safe to
+    execute at any time" and runs both at every boot (`systemd-tmpfiles-setup.service
+    --boot`) and at every `nixos-rebuild switch` (the tmpfiles.nix module's own
+    `systemd-tmpfiles-resetup.service`, wired into `switch-to-configuration`,
+    invokes `systemd-tmpfiles --create --remove --exclude-prefix=/dev` with no
+    `--boot` filtering that would exclude it).
+  - `/storage`'s config-file precedence: `00-nixos.conf` (carries the `A /storage`
+    rule) sorts lexicographically before `immich.conf` (carries the new `d`
+    rule for `mediaLocation`), and `tmpfiles.d(5)` states a prefix path (`/storage`)
+    is always processed before a suffix path (`/storage/immich`) regardless of
+    which file each is declared in -- so on the very first deploy, `/storage/immich`
+    didn't exist yet when `A` ran, and there was nothing under it to touch. That is
+    no longer true from the second boot/switch onward, once the directory exists
+    and Immich has written real files into it: `A`'s recursive walk will descend
+    into `/storage/immich` and overwrite the ACL on every photo/video/thumbnail file
+    and subdirectory there with `group:multimedia:rwx` (plus a mask covering it),
+    regardless of the file's own traditional mode or its `immich:immich` ownership.
+- **Axis:** hardening (a data-confidentiality boundary this plan explicitly designed
+  around does not actually hold under the fleet's own existing tmpfiles pattern) and
+  needed-used (D1(b) and F3 were both accepted on a premise this disproves)
+- **Reachability:** no exploit or privilege escalation is required. `modules/nixos/nfs-homelab-mounts.nix`
+  already grants `lilijoy`'s own account the `multimedia` gid locally on `torrent`/`thinkpad`,
+  specifically so that account gets "group rw over the whole share" via the existing
+  NFS mount at `/home/lilijoy/storage` (that module's own comment, verbatim). Once
+  the recursive `A /storage` rule re-walks the tree on homelab's *next* boot or
+  `nixos-rebuild switch` (routine, not something that needs to be triggered
+  specially), that same already-mounted, already-authorized NFS share on
+  `torrent`/`thinkpad` will show read+write access into every file under
+  `/storage/immich` too -- Immich's private photo/video library, which D1(b)
+  explicitly picked reusing `/storage` over a new isolated dataset *because* "Immich's
+  media is personal photos, a different sensitivity class than the shared movie
+  library," and which F3's own acceptance rested on the claim that "Immich's own
+  tmpfiles rule forces `/storage/immich` to 0700 immich:immich on every boot
+  regardless of the parent's 0770 mode... this is real, and does stop ordinary
+  multimedia-gid access." That claim is false against this specific rule: the 0700
+  mode set by the new `d` rule only re-applies to the top-level `/storage/immich`
+  directory itself (non-recursive), it does not, and cannot, protect the contents
+  from a *later*, separately-triggered recursive ACL rule that walks past it and
+  resets permissions on every file underneath. Any future account or NFS client that
+  comes to hold the `multimedia` gid gets the same reach, with no additional step.
+- **Rule:** n/a -- not a specific `docs/hardening.md` line item, but it directly
+  falsifies the "does stop ordinary multimedia-gid access" premise F3 was accepted
+  on, and is exactly the "verify config actually takes effect, not by reading the
+  file you just wrote" failure mode rule 9 warns about: G4's own live verification
+  ran `getfacl /storage` (the top-level directory, right after the very first
+  deploy, before the recursive rule had anything of Immich's to reach) and
+  concluded the ACL grant was correctly scoped -- it did not check `/storage/immich`
+  itself, and could not have caught this on that first run regardless, since the
+  exposure only activates from the *second* boot/switch onward.
+- **Finding:** the `0700 immich:immich` mode G4 added for `mediaLocation` is not the
+  hard confidentiality boundary D1(b) and F3 both described it as. The fleet's own
+  pre-existing, unmodified `A /storage - - - - group:multimedia:rwx` rule
+  (`hosts/homelab/configuration.nix:183`) recursively re-grants the `multimedia`
+  group read+write ACL access to every file anywhere under `/storage`, including
+  `/storage/immich`, on every subsequent boot and switch -- something that was
+  inert before this diff (nothing existed under `/storage/immich` for it to reach)
+  and becomes live and real the moment Immich actually stores photos there, which
+  is the entire point of this plan.
+- **Fix risk:** real fixes change reachability for the existing, working jellyfin
+  NFS share and need testing against `torrent`/`thinkpad`'s real mounts before
+  deploying, not just building -- this is heavier than a follow-up line edit:
+  - Moving Immich's `mediaLocation` off the NFS-exported dataset entirely (D1(a),
+    a new non-exported `zdata/storage/immich` dataset) removes the interaction
+    outright, at the cost of the disko/zrepl/restic wiring D1(b) was chosen to avoid.
+  - Excluding `/storage/immich` from the recursive walk (e.g. splitting `/storage`'s
+    `A` rule to stop before `immich`, or narrowing it to a non-recursive `a` plus
+    per-subtree recursive rules for the paths that actually need it) needs auditing
+    what currently depends on the *existing* recursive reach into every other
+    subtree of `/storage` (jellyfin's own library) before narrowing it, and needs
+    verification that `systemd-tmpfiles`' path-based rule matching can actually
+    express "recurse into `/storage` except this one subdirectory" (it may not,
+    without exclude-prefix support at the rule level).
+  - Either way, this needs to be checked against a live filesystem state (`getfacl`
+    run recursively, or specifically against files known to exist under
+    `/storage/immich`, *after* a second boot/switch, not just the first) rather than
+    trusted from the eval-level reasoning that predicted it originally.
+
+
+
+**FIXED 2026-09-03:** Added a second tmpfiles rule to modules/services/immich.nix: 'A ${mediaLocation} - - - - user:immich:rwx' (recursive replace), ordered via the same mkAfter list as the existing traverse grant, so it always runs immediately after the broad /storage rule on every boot/switch and strips any group:multimedia ACL entry the broad rule just applied underneath mediaLocation. Verified live on homelab, not just by ordering theory: forced a full systemd-tmpfiles --create pass (equivalent to a real boot) and confirmed via getfacl that /storage/immich retained group::--- with only user:immich:rwx -- no group:multimedia entry survived -- while the parent /storage still correctly shows both its normal grants. Deployed and confirmed before any real exposure window (the directory didn't yet exist when the broad rule ran on the deploy that created it, so nothing had actually leaked).
 
 ## Checked and clean (security review, 2026-09-03)
 
@@ -484,3 +617,80 @@ in this plan) -- reviewed here only to confirm this diff's actual code
 matches what those decisions describe, not to re-argue the decisions.
 
 _docs-updater finished 2026-09-03T20:59:01Z -- see Findings above._
+## Checked and clean (security review, 2026-09-03, G4 bugfix diff)
+
+Reviewed `git diff HEAD~1..HEAD` (the plan-file update plus
+`modules/services/immich.nix`'s G4 fix: the `d` tmpfiles rule creating
+`mediaLocation`, and the `a+`/`mkAfter` ACL grant into `/storage`) against
+`docs/hardening.md` and the exact pinned nixpkgs-stable source (rev
+`a3116115851d68b8952a2a4221cc25a84e56b532`, confirmed as homelab's actual
+input via `modules/flake/hosts.nix:62`) for both the `systemd.tmpfiles`
+NixOS module (`nixos/modules/system/boot/systemd/tmpfiles.nix`) and
+systemd's own `src/tmpfiles/tmpfiles.c` and `tmpfiles.d(5)` semantics, plus
+`lib/modules.nix`'s `mkOrder`/`mkAfter`/`mkBefore` priority mechanism.
+Confirmed, beyond F5 above:
+
+- **The `lib.mkAfter` ordering claim in G4's own comment is correct and
+  durable across every future `nixos-rebuild switch`, not just this boot.**
+  `lib/modules.nix:1502-1509` (pinned nixpkgs-stable): `mkBefore` = priority
+  500, plain list contributions = `defaultOrderPriority` = 1000, `mkAfter`
+  = priority 1500, sorted ascending. Both the existing `A /storage`
+  rule (plain list literal, priority 1000) and the new `a+` grant
+  (`lib.mkAfter`, priority 1500) land in the exact same generated file
+  (`systemd.tmpfiles.nix:340`, `${concatStringsSep "\n" cfg.rules}`
+  writes `cfg.rules` verbatim, in its final merged/sorted order, straight
+  to `00-nixos.conf`) -- this ordering is a pure function of the module
+  set at eval time, recomputed identically on every `nixos-rebuild`, not
+  something that can drift boot-to-boot or degrade after the first switch.
+- **`--x` (execute-only) on the new `/storage` ACL grant is correctly
+  scoped and does not let immich read or list jellyfin's media, confirmed
+  against `tmpfiles.d(5)` and `path_set_acl()`/`acls_for_file()`
+  (`tmpfiles.c`).** POSIX execute-only on a directory grants traversal
+  ("search") only, not directory listing (needs `r`) or file content
+  access (needs `r` on the target file itself, which immich's grant does
+  not touch and which jellyfin's own files' `multimedia`-group-only modes
+  still deny to `immich`, a non-member). The `a+` (append) semantics
+  recompute the ACL mask as `calc_acl_mask_if_needed()`, but only ever as
+  the union of existing entries -- since `/storage`'s pre-existing mask is
+  already `rwx` (from the pre-existing `group:multimedia:rwx` entry),
+  adding `user:immich:--x` (⊆ rwx) cannot widen the mask further and does
+  not change the effective permission of the existing `multimedia` grant
+  either. No unintended widening in this direction.
+- **No path found for immich (or a compromised immich-server process) to
+  reach beyond its own `/storage/immich` subtree into jellyfin's actual
+  media via this new grant specifically** -- the grant is non-recursive
+  and touches only `/storage` itself, and jellyfin's files/subdirectories
+  retain their own `root:multimedia` ownership and modes, which `immich`
+  (not a `multimedia` member) still cannot read regardless of being able
+  to traverse the parent directory.
+- **F4's postgres persistence-entry fix is unaffected by this diff** --
+  the G4 diff touches only `mediaLocation`/`/storage` ACL handling, no
+  change to `environment.persistence.${vars.persistRoot}.directories`.
+- **No new secrets, no new firewall rule, no new `oci-containers`, no new
+  `users.users.*.extraGroups` grant** in this diff -- the only privilege
+  change is the tmpfiles ACL line, unit-scoped by construction (a
+  filesystem ACL grant to a named user, not a group membership on the
+  `immich` service account itself), consistent with hardening.md rule 6's
+  spirit even though tmpfiles ACL grants aren't literally
+  `SupplementaryGroups`.
+- **`systemd.tmpfiles.settings.immich.${mediaLocation}.d` merges cleanly
+  with the upstream module's own `.e` rule for the same path** (confirmed
+  the pinned nixpkgs-stable `services.immich` module declares its own
+  `mediaLocation` rule under the same `systemd.tmpfiles.settings.immich`
+  name, same path) -- `mapAttrsToList` over the per-path `types` attrset
+  iterates keys in sorted order, so the generated `immich.conf` always
+  emits the new `d` (create) line before upstream's `e` (adjust-if-exists)
+  line for the same path; `e` becomes a harmless no-op once `d` has
+  already created the directory with matching mode/ownership. Not a
+  conflict.
+
+F5 above is the one substantive finding from this pass: it is not new code
+introduced by this diff misbehaving in isolation, but this diff (by
+finally making `/storage/immich` a real, populated path) is what turns a
+pre-existing, previously-inert rule elsewhere in the fleet
+(`hosts/homelab/configuration.nix:183`) into a live exposure of the exact
+data class D1(b) and F3 both assumed was protected. Recommend F3 be
+revisited/amended alongside F5, since F5 disproves a specific factual
+claim F3's acceptance rested on.
+
+_security finished 2026-09-03T22:03:20Z -- see Findings above._
