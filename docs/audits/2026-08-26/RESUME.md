@@ -17,11 +17,22 @@ session needs is here or linked from here.
 > (`0789429`) and closed F-P7-06 / wave 2 item 2.6 entirely. The
 > fourteenth session deployed that hardening (to homelab, not vps — see
 > below) plus vps's own small pending backlog. **The fifteenth session
-> (this one) VM-verified item 4, `userns-remap`** — new module
+> VM-verified item 4, `userns-remap`** — new module
 > `modules/nixos/docker-userns-remap.nix`, new test
 > `tests/docker-userns-remap.nix`, fully green, build-verified into
 > homelab, **not deployed anywhere** — see "What happened in the
-> fifteenth session" below.
+> fifteenth session" below. **That same session also caught and fixed a
+> process gap**: the `userns-remap` plan was closed and committed
+> without the workflow skill's required `security` subagent pass. Since
+> a closed (`done/`) plan cannot be edited — ever, by the plan skill's
+> own hard rule — the follow-up review and its 3 fixes (1 MEDIUM: a
+> subuid-range collision with NixOS's own default allocator; 2 LOW:
+> unscoped capabilities, a migration failure that didn't block
+> `docker.service`) live in their own plan,
+> `2026-09-03-security-review-of-docker-userns-remap.md`, also closed.
+> **If you skip a required subagent pass on a plan you're about to
+> close, do the pass before closing, or open a follow-up plan
+> immediately — never write findings into an already-frozen file.**
 >
 > **`push-deploy-vps`'s hardening is now live, and it's on homelab, not
 > vps.** `myPushDeploy.enable = true` (with `hostAttr = "vps"`) is set in
@@ -1336,6 +1347,32 @@ rolling update) and both `factoriotools/factorio:2.1.14` and
 activation, since Docker's storage path changes per remap user. That is
 a separate, explicit, still-open user decision — this session only
 VM-verified the mechanism.
+
+**Correction, same session: the required `security` subagent pass was
+skipped closing this plan, caught by the user afterward.** The plan
+above was already `plan-move`d to `done/` and committed (`97baeaf`)
+before the review ran — since a `done/` plan cannot be edited, ever, the
+review and its fixes live in a new plan instead,
+`2026-09-03-security-review-of-docker-userns-remap.md`, created
+*before* the review's result came back specifically so there was
+nowhere else to write findings. 3 CONFIRMED findings (1 MEDIUM, 2 LOW),
+all fixed: `subIdStart`'s default (`100000` above) collided with
+NixOS's own built-in `autoSubUidGidRange` pool start, invisible to its
+own collision check — moved to `10000000` (every `100845`/`100000` uid
+figure above is stale by that same delta, now `10000845`/`10000000`);
+the migration unit's `CapabilityBoundingSet` was unrestricted, scoped
+to `CAP_CHOWN`/`CAP_FOWNER`/`CAP_DAC_OVERRIDE`/`CAP_DAC_READ_SEARCH`;
+and a failed migration didn't block `docker.service` (`wantedBy` above
+is now `requiredBy` — fail-closed, the user's explicit choice when
+asked, since this is exactly the kind of trade-off decision that
+shouldn't be assumed). The fail-closed fix is proven empirically, not
+just configured: a new VM node forces a real migration failure and
+asserts `docker.service` never reaches `ActiveState=active`.
+`tests/docker-userns-remap.nix` is now 9 subtests (was 8 above), still
+green. **Lesson for next time**: if a required subagent pass gets
+skipped and caught only after a plan is already closed, open the
+follow-up plan *before* the pass returns, not after — there is no
+window where findings have anywhere valid to land otherwise.
 
 ## What is left
 

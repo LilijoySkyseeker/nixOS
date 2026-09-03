@@ -275,6 +275,27 @@ host — the point is to exercise the module, not to rebuild a host.
   value still equal what it should) rather than trying to reset by
   writing to `/etc` again.
 
+- **NixOS never writes `/etc/docker/daemon.json`.** `docker.nix` renders
+  `virtualisation.docker.daemon.settings` via `settingsFormat.generate`
+  and passes that store path straight to `dockerd --config-file=...` on
+  the unit's own `ExecStart` — there is no `/etc/docker` anywhere.
+  Asserting `cat /etc/docker/daemon.json` in a test fails with "No such
+  file or directory" even when the setting is genuinely live. Use
+  `docker info --format '{{.SecurityOptions}}'` (or another
+  `docker info`/`docker inspect` field) instead — dockerd's own
+  live-effective-config view, which doesn't care where the config came
+  from. (`2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`, G8.)
+- **`nix build ... | tee log.txt` can report exit 0 while the real
+  command failed.** The pipeline's exit status is `tee`'s, always 0 —
+  the exact same `if cmd | tail` trap `docs/audits/2026-08-26/RESUME.md`'s
+  "Rules and traps" already names for `tail`, just with `tee`. Bit
+  hardest right after adding a brand-new test/module file: the actual
+  error was "Path '...' is not tracked by Git" (flakes only see
+  git-tracked files), silently swallowed by the pipe. Redirect with `>`
+  and check `$?` separately when the exit code itself matters, or
+  `git add` before building so the failure mode doesn't come up at all.
+  (Same plan file, G7.)
+
 ## What these still don't cover
 
 A VM test proves the mechanism, not the deployment. It cannot see the
