@@ -495,6 +495,23 @@ changes that touch at least one non-doc file (code, config, scripts),
 mirroring how `docs-updater`/`security` are already condition-gated
 rather than blanket-mandated.
 
+**2026-09-03 addendum, user request:** hit a second, distinct case
+(`2026-09-03-update-flake-inputs.md`) — a diff of `flake.lock` (generated,
+never hand-edited) plus three opaque keyboard-firmware JSON blobs
+(`files/*.vil`), no doc files at all. The doc-only-vs-not split proposed
+above wouldn't have excused this one either: `flake.lock` and the `.vil`
+files are non-doc, but neither is hand-written code with any
+reuse/simplification/efficiency/altitude surface for `/simplify`'s four
+review angles to act on. `/simplify` was skipped here by judgment call
+with a stated rationale instead of actually invoked, which is exactly the
+kind of silent, per-session judgment call this system's own tenet
+("hardcode with scripts, not agent judgment") argues against. Refines the
+proposed fix above: the gate `/simplify` needs isn't "touches a non-doc
+file" but "touches at least one file of reviewable, hand-authored
+source" — i.e. usecase-scoped like `docs-updater`/`security` already are,
+not a doc/non-doc binary. Generated artifacts (lockfiles, compiled/binary-
+ish config blobs) should sit outside the gate the same way pure docs do.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
 
