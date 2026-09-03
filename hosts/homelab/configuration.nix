@@ -129,6 +129,19 @@
   # oci containers
   virtualisation.oci-containers.backend = "docker";
 
+  # F-P4-07 / RESUME.md item 4: container uid 0 was host uid 0 on every
+  # bind mount (verified — daemon settings held only userland-proxy).
+  # VM-tested in tests/docker-userns-remap.nix before this was ever
+  # deployed anywhere; see
+  # 2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md.
+  # The actual migrations (path + pre-remap uid/gid) are declared in
+  # modules/services/factorio.nix and minecraft.nix, next to the paths
+  # they protect — same reasoning as those files' own tmpfiles `z`
+  # rules: an image bump that changes the baked-in uid should be a
+  # silent no-op findable by rereading one file, not a mismatch between
+  # here and there.
+  myDockerUserns.enable = true;
+
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 

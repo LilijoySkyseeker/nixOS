@@ -27,6 +27,11 @@
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
       };
 
+      checks.docker-userns-remap = import ../../tests/docker-userns-remap.nix {
+        pkgs = config.flake.pkgsUnstable;
+        dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
+      };
+
       checks.deploy-guards = import ../../tests/deploy-guards.nix {
         pkgs = config.flake.pkgsUnstable;
         deployGuardsScript = config.flake.deployGuardsScript;

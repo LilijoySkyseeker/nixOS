@@ -4,9 +4,9 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the fourteenth session.**
+**Last updated: 2026-09-03, end of the fifteenth session.**
 
-> ## START HERE — state as of the fourteenth session
+> ## START HERE — state as of the fifteenth session
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
@@ -15,11 +15,13 @@ session needs is here or linked from here.
 > the `.zfs`-traversal fix, the disko unification) is on `master` now.
 > The thirteenth session got `tests/push-deploy-sandbox.nix` fully green
 > (`0789429`) and closed F-P7-06 / wave 2 item 2.6 entirely. The
-> fourteenth session (this one) re-confirmed the VM test with a forced
-> fresh rebuild (not a cache hit) and **deployed the hardening to
-> homelab** — see below, "What happened in the fourteenth session", for
-> the full detail including a real correction to how the twelfth/
-> thirteenth sessions described this item.
+> fourteenth session deployed that hardening (to homelab, not vps — see
+> below) plus vps's own small pending backlog. **The fifteenth session
+> (this one) VM-verified item 4, `userns-remap`** — new module
+> `modules/nixos/docker-userns-remap.nix`, new test
+> `tests/docker-userns-remap.nix`, fully green, build-verified into
+> homelab, **not deployed anywhere** — see "What happened in the
+> fifteenth session" below.
 >
 > **`push-deploy-vps`'s hardening is now live, and it's on homelab, not
 > vps.** `myPushDeploy.enable = true` (with `hostAttr = "vps"`) is set in
@@ -1226,6 +1228,115 @@ new build; `tmp.mount` active as tmpfs; public site
 **All four hosts (homelab, vps, torrent, thinkpad) are now on this
 branch's exact HEAD** — nothing left build-verified-only fleet-wide.
 
+## What happened in the fifteenth session (2026-09-03)
+
+Picked up item 4, `userns-remap` (`F-P4-07`) — the last agent-doable item
+flagged as needing its own VM test rather than a plain build-verify,
+since it re-maps *existing* volume ownership and getting it wrong would
+strand the two live game servers' own data. Full detail, all nine
+gotchas, in
+`2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`;
+summary here.
+
+**Research before writing anything**, per this repo's own "check source,
+not assumption" rule: read NixOS's pinned stable nixpkgs `docker.nix`
+directly (rev `e4bae1bd10c9c57b2cf517953ab70060a828ee6f`, fetched via
+`nix flake prefetch`) — `daemon.settings` is a bare freeform passthrough,
+no special `userns-remap` handling at all, so `"default"`
+auto-provisioning (which relies on Docker itself writing
+`/etc/subuid`/`/etc/subgid` at daemon startup) is unreliable on this
+repo's `mutableUsers = false` hosts, where those files are regenerated
+declaratively on every switch. Fetched Docker's own
+`docs.docker.com/engine/security/userns-remap/` too, which confirmed
+four load-bearing facts none of which were previously written down
+anywhere in this repo: storage moves to `/var/lib/docker/<uid>.<gid>/`
+per remap user (masks existing pulled images — both game images need
+re-pulling on first activation); bind-mount ownership is **never**
+auto-adjusted by Docker itself; the setting is **not live-reloadable**
+(forces a full `dockerd` restart); and it's daemon-wide. Also read the
+real, live ownership off homelab directly (`stat`, not assumed):
+`/srv/factorio/main` is uniformly `845:845`, `/srv/minecraft/vanilla-plus`
+uniformly `1000:1000` — exactly the image-baked uids the module's
+migration needs to handle.
+
+**New reusable module: `modules/nixos/docker-userns-remap.nix`**
+(`myDockerUserns`). Declares a `dockremap` user with a fixed, declarative
+subuid/subgid range (`subIdStart`/`subIdCount`, default
+`100000`/`65536`) rather than trusting Docker's own auto-provisioning;
+sets `virtualisation.docker.daemon.settings.userns-remap = "dockremap"`;
+and a `migrations` list (`path`/`uid`/`gid` triples) drives a oneshot
+`docker-userns-remap-migrate.service` that runs `chown --from=<uid>:<gid>
+-R <uid+subIdStart>:<gid+subIdStart>` per entry — `--from` scopes the
+chown to files still at the old ownership, which is both surgical (never
+touches anything else already migrated or unrelated) and naturally
+idempotent. A `/simplify` pass (see the plan's G10) added a per-path
+completion marker in a `StateDirectory` (deliberately outside the
+migrated tree — a marker inside it would be owned by real host root,
+unreachable by the container's own remapped namespace, and factorio's
+entrypoint does its own whole-volume `chown -R` at every start) so a
+migrated tree is skipped outright on later boots rather than re-walked.
+Ordered `before`/`wantedBy` `docker.service` rather than tied to any
+specific container's unit name — every `docker-<name>.service` nixpkgs
+generates already carries `After = docker.service`, confirmed by reading
+`oci-containers.nix` directly, so this transitively runs before any
+container touches its bind mount without the module needing to know
+container names at all.
+
+**Wired into homelab**: `hosts/homelab/configuration.nix` sets only
+`myDockerUserns.enable = true` — the two real migrations
+(`/srv/factorio/main` at `845:845`, `/srv/minecraft/vanilla-plus` at
+`1000:1000`) live in `factorio.nix`/`minecraft.nix` themselves (also a
+`/simplify` fix, G10: the host file originally hardcoded both, which an
+altitude review caught as contradicting those same files' own stated
+rule for their neighboring tmpfiles line — "declared here, next to the
+path it protects... an image bump cannot lock the container out").
+Build-verified on all five `nixosConfigurations`.
+
+**`tests/docker-userns-remap.nix` fully green after five real,
+distinct bugs** (plus the marker mechanism above adding an 8th subtest),
+each found by iterating against an actual failure —
+`nix build .#checks.x86_64-linux.docker-userns-remap -L` passes all 8
+subtests. Two nodes, matching `push-deploy-sandbox.nix`'s
+positive/negative-control shape rather than a live toggle (Docker's own
+docs rule out a live toggle — see above): `remapped`
+(`myDockerUserns.enable = true`) and `plain` (identical container and
+pre-seeded bind-mount data, remap never enabled). A purely-Nix-built
+`pkgs.dockerTools.buildImage` probe image, no network needed. Proves,
+against real dockerd and a real running container: the subuid range and
+dockerd's own `userns` security option both render; a pre-seeded tree
+(standing in for the real game data) actually migrates to
+`100845:100845`; the container's own PID 1, read from the *host's*
+`/proc` via its real PID, is uid `100000` — not `0`; the container reads
+its migrated pre-existing data and writes new data into the same
+directory; a second migration run is a genuine no-op; and `plain`
+confirms both the original vulnerability (container root really is host
+uid 0) and that unmigrated data stays exactly as it was.
+
+The five bugs, none of them in the final module's actual design: a
+`tee`'d build reported exit 0 while the real error was "file not tracked
+by Git" — the same `if cmd | tail` exit-code trap this file's own "Rules
+and traps" already names, just with `tee`; a wrong assumption that NixOS
+writes `/etc/docker/daemon.json` (it doesn't — `docker.nix` passes
+`--config-file=<store path>` straight to `dockerd`'s `ExecStart`, fixed
+by asserting against `docker info --format '{{.SecurityOptions}}'`
+instead, dockerd's own live view); a ruff lint failure on the test
+script itself (an f-string with no placeholders); and a wrong expected
+uid in the test's own assertion (`100845` instead of the correct
+`100000` — the probe's PID 1 is the container's own root process, which
+never drops privileges, so it maps to `0 + subIdStart`, not
+`845 + subIdStart`; `845` is only the *bind-mount data*'s uid, an
+easy but real thing to conflate).
+
+**Not deployed anywhere.** Worth flagging plainly before anyone says
+yes, since it's genuinely more disruptive than this audit's other
+build-verified-and-waiting items: enabling `userns-remap` forces a full
+`dockerd` restart (both game containers go down, not a graceful
+rolling update) and both `factoriotools/factorio:2.1.14` and
+`itzg/minecraft-server` will need to re-pull from the internet on first
+activation, since Docker's storage path changes per remap user. That is
+a separate, explicit, still-open user decision — this session only
+VM-verified the mechanism.
+
 ## What is left
 
 ### Rotation — done
@@ -1320,8 +1431,35 @@ outstanding.**
    Needs either a load-representative window or a user decision on a
    generous blast-radius bound. **That is the open question, and it is
    the user's.**
-4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
-   mount. Re-maps existing volume ownership, so it needs its own VM test.
+4. ~~**`userns-remap` unset**~~ — **VM test fully green, 2026-09-03
+   (fifteenth session).** `nix build .#checks.x86_64-linux.docker-userns-remap -L`
+   passes all 8 subtests: a real `dockremap` subuid range and dockerd's
+   own `userns` security option both render; a pre-seeded bind-mount
+   tree (standing in for `/srv/factorio/main`'s real `845:845`) migrates
+   to `100845:100845`; the running container's PID 1 is confirmed, read
+   from the *host's* `/proc`, to be uid `100000` — not `0`; the
+   container reads its migrated pre-existing data and writes new data
+   into the same directory; a second migration run changes nothing
+   (idempotent); and a `plain` negative-control node (identical
+   container and pre-seeded data, remap never enabled) confirms both the
+   original vulnerability (container root really is host uid 0) and that
+   its own pre-seeded ownership is untouched. New reusable module,
+   `modules/nixos/docker-userns-remap.nix` (`myDockerUserns`), wired into
+   homelab for both game containers, build-verified on all five
+   `nixosConfigurations`. Full detail — five real bugs found by iterating
+   against actual failures (two were test-script mistakes, not design
+   mistakes), plus a `/simplify` pass that added a completion marker
+   (skip the recursive chown once migrated) and moved each migration
+   declaration into its owning service module next to the tmpfiles rule
+   it was disconnected from — in
+   `2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`.
+   **Not deployed anywhere.** Worth flagging before anyone says yes:
+   enabling this is disruptive, not a quiet config flip — Docker's own
+   docs confirm `userns-remap` is not live-reloadable (forces a full
+   `dockerd` restart) and changes Docker's storage path per remap user,
+   so both game containers will re-pull their images from the internet
+   on first activation. That is a separate, explicit, still-open user
+   decision.
 5. ~~**Deploy `torrent` and `thinkpad`**~~ — **done 2026-09-01**, as part
    of the ninth session's zrepl-key rotation; see above. ~~vps still
    carries a stale DNAT rule for the deleted 34198~~ — **vps deployed

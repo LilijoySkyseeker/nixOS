@@ -62,6 +62,18 @@ in
       # stops the next disclosure rather than retracting past ones.
       systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
 
+      # F-P4-07 / RESUME.md item 4: myDockerUserns's ownership migration
+      # for docker userns-remap. See the equivalent block in factorio.nix
+      # for the full reasoning; applies unchanged here with itzg's
+      # baked-in uid 1000.
+      myDockerUserns.migrations = [
+        {
+          path = "/srv/minecraft/vanilla-plus";
+          uid = 1000;
+          gid = 1000;
+        }
+      ];
+
       # mc server
       virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
         autoStart = true;
