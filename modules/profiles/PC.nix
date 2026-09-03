@@ -117,6 +117,12 @@ in
       #qmk, allow udev rules
       hardware.keyboard.qmk.enable = true;
 
+      # kde: keyboard > keyboard > key bindings > function keys > "use
+      # f13-f24 as usual function keys" -- system-wide xkb option, not
+      # kde/kxkbrc-specific, so applies at login and on any tty too
+      # plan: 2026-09-01-declare-f13-f24-as-usual-function-keys-via-xkb-on-pc-hosts.md#G1
+      services.xserver.xkb.options = "terminate:ctrl_alt_bksp,fkeys:basic_13-24";
+
       #flatpak
       # gid pinned off its dynamically-allocated default (which lands on 999)
       # to keep 999 free for the "multimedia" group — see
@@ -304,18 +310,13 @@ in
 
       # Enable CUPS to print documents.
       #
-      # PLACEHOLDER STATE, 2026-08-27. The USB Brother this was built for
-      # is gone, so `drivers = [ brlaser ]` went with it — it was driving
-      # nothing. The replacement is a networked Brother MFC-L2740DW that
-      # does not have a static address yet, so there is deliberately no
-      # printer declared here: CUPS runs and prints to nothing until
-      # 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md is worked through.
-      #
-      # When adding it, prefer a driverless IPP queue pointed at the
-      # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)
-      # over a vendor driver. That keeps `drivers` empty and, critically,
-      # does not reintroduce mDNS: the usual `._ipp._tcp.local` URI
-      # resolves via avahi, and avahi is intentionally gone (below).
+      # Base only -- shared by both PC hosts. The actual printer queue and
+      # scanning are declared in nixosModules."brother-mfc-l2740dw" and
+      # wired into torrent only (modules/flake/hosts.nix), not here: both
+      # ensurePrinters' deviceUri and sane-airscan's WSD discovery are
+      # network-supplied-identity risks D9 was written to avoid on a
+      # roaming laptop.
+      # plan: 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md#F1
       services.printing = {
         enable = true;
         drivers = [ ];

@@ -58,34 +58,29 @@ Known issues and incident history per host live in each host's own
 
 ## Interesting stuff
 
-- **Impermanence on `homelab`.** Root is wiped on every boot — every
-  piece of state that survives is explicitly declared, not just
-  whatever happened to be lying around.
-- **Public edge, private origin.** `vps` fronts everything public
-  (Caddy, crowdsec, Anubis proof-of-work against bots) and tunnels
-  back to `homelab` over WireGuard. `homelab` itself is never directly
-  reachable from the internet.
-- **Zero-downtime remote deploys.** `homelab` builds and pushes
-  `vps`'s closure over the tailnet — the VPS never compiles its own
-  config, so a small droplet never has to risk OOMing mid-deploy.
-- **Bare-metal to booted, unattended.** `nixos-anywhere` + `disko` take
-  a fresh machine from a rescue/kexec environment straight to a
-  running, secrets-decrypting NixOS install, partitioning included.
-- **Secrets committed straight into the repo, safely.** `sops-nix`
-  keys every secret to a specific set of hosts by age key, so
-  `secrets/secrets.yaml` lives in git like any other file — encrypted,
-  checked into history, unreadable without a host's own key — with no
-  shared master password and no plaintext ever touching disk outside
-  the host decrypting it at boot.
-- **Two nixpkgs channels running side by side.** Desktops track
-  bleeding-edge `nixpkgs-unstable`; `homelab` — running ZFS and
-  long-lived game servers — is deliberately pinned to
-  `nixpkgs-stable`, on purpose, in the same flake.
-- **Self-monitoring.** `homelab` runs periodic ZFS/SMART/systemd health
-  checks and pages a Discord webhook the moment something looks wrong,
-  instead of finding out about a failing disk or a dead service days
-  later.
-- **Nothing is imperative.** Every machine, from partitioning to the
-  services running on it, is described in Nix and reproduced from the
-  flake — there's no host with hand-run setup steps that only exist in
-  someone's memory.
+- Root on `homelab` is wiped on every boot. Every piece of state that
+  survives is explicitly declared, not just whatever happened to be
+  lying around.
+- `vps` fronts everything public (Caddy, crowdsec, Anubis proof-of-work
+  against bots) and tunnels back to `homelab` over WireGuard, which is
+  never directly reachable from the internet itself.
+- `homelab` builds and pushes `vps`'s closure over the tailnet. The
+  VPS never compiles its own config, so a small droplet never has to
+  risk OOMing mid-deploy.
+- `nixos-anywhere` + `disko` take a fresh machine from a rescue/kexec
+  environment straight to a running, secrets-decrypting NixOS install,
+  partitioning included.
+- `sops-nix` keys every secret to a specific set of hosts by age key,
+  so `secrets/secrets.yaml` lives in git like any other file:
+  encrypted, checked into history, unreadable without a host's own
+  key. No shared master password, and no plaintext ever touches disk
+  outside the host decrypting it at boot.
+- Desktops track bleeding-edge `nixpkgs-unstable`. `homelab`, running
+  ZFS and long-lived game servers, is pinned to `nixpkgs-stable`
+  instead, in the same flake.
+- `homelab` runs periodic ZFS/SMART/systemd health checks and pages a
+  Discord webhook the moment something looks wrong, instead of finding
+  out about a failing disk or a dead service days later.
+- Every machine, from partitioning to the services running on it, is
+  described in Nix and reproduced from the flake. No host has hand-run
+  setup steps that only exist in someone's memory.
