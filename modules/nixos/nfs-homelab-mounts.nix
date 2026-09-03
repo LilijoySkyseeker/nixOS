@@ -43,18 +43,7 @@ in
             # the whole share, so nothing else is in the way.
             "nosuid" # no setuid/setgid on execution from the share
             "nodev" # no device nodes honoured from the share
-
-            # noexec was considered and declined. This is a media/file
-            # share and someone will eventually want to run something off
-            # it; the failure mode if that happens is a confusing
-            # "Permission denied" on a file that looks executable. Note
-            # the +x bit is already set indiscriminately across the share
-            # (a permissive-umask artifact on media files), so it carries
-            # no signal either way. A scan of both shares found no
-            # setuid/setgid regular files and no device nodes, so nosuid
-            # and nodev cost nothing today; noexec stays available as a
-            # cheap tightening if the share is ever declared
-            # data-only.
+            "noexec" # plan: 2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md#D1
           ];
         in
         {
