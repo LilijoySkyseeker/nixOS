@@ -31,4 +31,5 @@ f4a3e6910dee6a416fcb38ef0d87f7b11fbfeaf867fbfc8912d76cf21f6d821d  docs/plans/don
 52613496283a680752fa4a36fb7dcb92ace68179d6514196b97f9f798cb46d6b  docs/plans/done/2026-08-31-sval-main-renumber-layers-2-3-13-to-12-13-14.md
 b24d9fc52789596d2018b3ee05475f6dfec936e94c0265f6bbb739a3de082699  docs/plans/done/2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md
 a44c6228d16ea8eab0cd5b8a72ce0438008adfa3438663763074a146d7e0c213  docs/plans/done/2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md
+491d38911ab8d4b1f705c134c6e92956b7b3e251fb26849ca558d9563b2f016c  docs/plans/done/2026-09-03-security-review-of-docker-userns-remap.md
 22472f3a69c7a36ad543b3c79e32dd9c9701787bd575dac1184f849d8decee09  docs/plans/done/2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md

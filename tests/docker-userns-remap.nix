@@ -62,41 +62,67 @@ in
 pkgs.testers.runNixOSTest {
   name = "docker-userns-remap";
 
-  nodes.remapped = _: {
-    imports = [ dockerUsernsModule ];
-    virtualisation = {
-      docker.enable = true;
-      oci-containers = {
-        backend = "docker";
-        containers.probe = probeContainer;
+  nodes = {
+    remapped = _: {
+      imports = [ dockerUsernsModule ];
+      virtualisation = {
+        docker.enable = true;
+        oci-containers = {
+          backend = "docker";
+          containers.probe = probeContainer;
+        };
+      };
+      systemd.tmpfiles.rules = preSeed;
+      myDockerUserns = {
+        enable = true;
+        migrations = [
+          {
+            path = "/srv/test-app";
+            uid = 845;
+            gid = 845;
+          }
+        ];
       };
     };
-    systemd.tmpfiles.rules = preSeed;
-    myDockerUserns = {
-      enable = true;
-      migrations = [
-        {
-          path = "/srv/test-app";
-          uid = 845;
-          gid = 845;
-        }
-      ];
-    };
-  };
 
-  # Negative control: same container, same pre-seeded data, no remap at
-  # all -- this is the vulnerability F-P4-07 describes, kept live in the
-  # test so a regression that silently stops applying the remap shows up
-  # as "the two nodes look the same" rather than nothing.
-  nodes.plain = _: {
-    virtualisation = {
-      docker.enable = true;
-      oci-containers = {
-        backend = "docker";
-        containers.probe = probeContainer;
+    # Negative control: same container, same pre-seeded data, no remap
+    # at all -- this is the vulnerability F-P4-07 describes, kept live
+    # in the test so a regression that silently stops applying the
+    # remap shows up as "the two nodes look the same" rather than
+    # nothing.
+    plain = _: {
+      virtualisation = {
+        docker.enable = true;
+        oci-containers = {
+          backend = "docker";
+          containers.probe = probeContainer;
+        };
       };
+      systemd.tmpfiles.rules = preSeed;
     };
-    systemd.tmpfiles.rules = preSeed;
+
+    # Proves the fail-closed wiring (requiredBy, not wantedBy) actually
+    # holds: a real failure in the migration unit, not just a config
+    # assertion, should refuse to let docker.service start at all
+    # rather than silently proceeding against unmigrated data.
+    brokenMigration =
+      { lib, ... }:
+      {
+        imports = [ dockerUsernsModule ];
+        virtualisation.docker.enable = true;
+        systemd.tmpfiles.rules = preSeed;
+        myDockerUserns = {
+          enable = true;
+          migrations = [
+            {
+              path = "/srv/test-app";
+              uid = 845;
+              gid = 845;
+            }
+          ];
+        };
+        systemd.services.docker-userns-remap-migrate.script = lib.mkForce "exit 1";
+      };
   };
 
   testScript = ''
@@ -112,7 +138,7 @@ pkgs.testers.runNixOSTest {
 
     with subtest("remapped: dockremap's subuid range actually rendered"):
         subuid = remapped.succeed("cat /etc/subuid")
-        assert "dockremap:100000:65536" in subuid, f"subuid not set: {subuid!r}"
+        assert "dockremap:10000000:65536" in subuid, f"subuid not set: {subuid!r}"
         # NixOS passes the rendered daemon.json to dockerd via
         # --config-file=<store path> on the unit's own ExecStart, not
         # /etc/docker/daemon.json -- confirmed by reading docker.nix
@@ -125,7 +151,7 @@ pkgs.testers.runNixOSTest {
 
     with subtest("remapped: the pre-existing tree was actually migrated"):
         owner = remapped.succeed("stat -c %u:%g /srv/test-app/pre-existing").strip()
-        assert owner == "100845:100845", f"migration did not run: {owner!r}"
+        assert owner == "10000845:10000845", f"migration did not run: {owner!r}"
 
     with subtest("remapped: container root is NOT host uid 0"):
         # The probe's PID 1 is the /bin/sh entrypoint itself, which never
@@ -133,7 +159,7 @@ pkgs.testers.runNixOSTest {
         # uid 0 + subIdStart, not the 845 the *bind-mount data* uses.
         uid = host_uid_of_container(remapped)
         assert uid != "0", "container root is still host uid 0 -- remap not in effect"
-        assert uid == "100000", f"expected the mapped uid 100000, got {uid!r}"
+        assert uid == "10000000", f"expected the mapped uid 10000000, got {uid!r}"
 
     with subtest("remapped: the container can read migrated data and write new data"):
         marker = remapped.succeed("cat /srv/test-app/probe-marker")
@@ -148,7 +174,7 @@ pkgs.testers.runNixOSTest {
     with subtest("remapped: the migration is idempotent on a second run"):
         remapped.succeed("systemctl restart docker-userns-remap-migrate.service")
         owner = remapped.succeed("stat -c %u:%g /srv/test-app/pre-existing").strip()
-        assert owner == "100845:100845", f"second run changed ownership: {owner!r}"
+        assert owner == "10000845:10000845", f"second run changed ownership: {owner!r}"
 
     with subtest("plain (negative control): container root IS host uid 0"):
         uid = host_uid_of_container(plain)
@@ -158,5 +184,15 @@ pkgs.testers.runNixOSTest {
     with subtest("plain (negative control): pre-existing ownership is untouched"):
         owner = plain.succeed("stat -c %u:%g /srv/test-app/pre-existing").strip()
         assert owner == "845:845", f"expected untouched 845:845, got {owner!r}"
+
+    with subtest("brokenMigration: a real migration failure actually blocks docker.service (fail-closed, requiredBy not wantedBy)"):
+        brokenMigration.wait_for_unit("multi-user.target")
+        migrate_state = brokenMigration.succeed(
+            "systemctl is-failed docker-userns-remap-migrate.service"
+        ).strip()
+        assert migrate_state == "failed", f"expected the forced failure to register: {migrate_state!r}"
+        docker_active = brokenMigration.get_unit_info("docker.service")["ActiveState"]
+        assert docker_active != "active", \
+            f"docker.service started despite its required migration failing: {docker_active!r}"
   '';
 }

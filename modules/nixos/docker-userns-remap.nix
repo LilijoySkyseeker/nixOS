@@ -15,7 +15,7 @@ _: {
 
         subIdStart = lib.mkOption {
           type = lib.types.ints.positive;
-          default = 100000;
+          default = 10000000;
           description = ''
             Start of the subordinate uid/gid range assigned to the
             `dockremap` user (applied identically to both id spaces).
@@ -28,6 +28,18 @@ _: {
             host, where NixOS regenerates those files declaratively from
             `users.users.<n>.subUidRanges`/`subGidRanges` on every
             switch, clobbering whatever Docker itself wrote.
+
+            Deliberately *not* `100000`, Docker's own doc example: that
+            is byte-identical to the start of NixOS's own
+            `autoSubUidGidRange` pool (`nixos/modules/config/
+            update-users-groups.pl`'s `allocSubUid`, `min = 100000,
+            delta = 65536`), which any `isNormalUser` account without
+            its own explicit `subUidRanges` gets assigned into --
+            silently, since the auto-allocator's collision check never
+            sees manually-declared ranges like this one. `10000000`
+            sits clear of that pool for any realistic number of human
+            accounts (the pool would need >150 auto-allocated accounts
+            on one host to reach this far).
           '';
         };
 
@@ -98,14 +110,24 @@ _: {
         virtualisation.docker.daemon.settings.userns-remap = "dockremap";
 
         # Ordered before docker.service (and pulled in by it via
-        # wantedBy) rather than tied to any specific container unit --
+        # requiredBy) rather than tied to any specific container unit --
         # every docker-<name>.service already carries `After = [
         # "docker.service" ]` (nixpkgs' oci-containers.nix), so this
         # transitively runs before any container touches its bind mount,
         # without this module needing to know container names.
+        #
+        # requiredBy, not wantedBy: `Wants=` doesn't propagate failure,
+        # so a failed migration would silently let docker.service (and
+        # both game containers) start anyway, against unmigrated
+        # (wrong-owner) data -- a quiet permission failure instead of a
+        # loud one. `Requires=` fails the whole start transaction if
+        # this unit fails, which is the fail-closed behavior a
+        # security-relevant remap wants: a visible outage is easier to
+        # notice and fix than a game server silently unable to read its
+        # own save data.
         systemd.services.docker-userns-remap-migrate = {
           description = "Migrate bind-mount ownership for docker userns-remap (myDockerUserns)";
-          wantedBy = [ "docker.service" ];
+          requiredBy = [ "docker.service" ];
           before = [ "docker.service" ];
           after = [ "local-fs.target" ];
           path = [ pkgs.coreutils ];
@@ -133,6 +155,21 @@ _: {
             # namespace permission over. StateDirectory keeps them
             # somewhere the container's bind mount never sees.
             StateDirectory = "docker-userns-remap-migrate";
+            # Narrower than full root, matching this repo's own pattern
+            # for other root-necessary units (health-alerts.nix's
+            # CAP_SYS_RAWIO-only smartctl unit, vps's CAP_NET_ADMIN-only
+            # unit): CAP_CHOWN to actually change ownership regardless of
+            # current owner, CAP_FOWNER for owner-gated metadata ops on
+            # files this unit doesn't own, CAP_DAC_OVERRIDE/
+            # CAP_DAC_READ_SEARCH to traverse into the migrated trees at
+            # all -- factorio.nix/minecraft.nix's directories are mode
+            # 0700 owned by 845/1000, not this unit's own uid.
+            CapabilityBoundingSet = [
+              "CAP_CHOWN"
+              "CAP_FOWNER"
+              "CAP_DAC_OVERRIDE"
+              "CAP_DAC_READ_SEARCH"
+            ];
           };
           # A per-path marker skips the recursive chown -R (and the
           # stat-every-file walk it implies) on every boot after the one

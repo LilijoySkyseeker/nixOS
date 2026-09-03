@@ -1453,7 +1453,19 @@ outstanding.**
    declaration into its owning service module next to the tmpfiles rule
    it was disconnected from — in
    `2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`.
-   **Not deployed anywhere.** Worth flagging before anyone says yes:
+   **A required `security` subagent pass was skipped closing that plan
+   (caught after the fact) — done separately in
+   `2026-09-03-security-review-of-docker-userns-remap.md`, since a
+   `done/` plan cannot be edited.** 3 CONFIRMED findings (1 MEDIUM, 2
+   LOW), all fixed and re-VM-verified (9 subtests now): `dockremap`'s
+   subuid range collided with NixOS's own default auto-allocation start
+   (`subIdStart` moved to `10000000`); the migration unit's
+   `CapabilityBoundingSet` was unrestricted (scoped to `CAP_CHOWN`/
+   `CAP_FOWNER`/`CAP_DAC_OVERRIDE`/`CAP_DAC_READ_SEARCH`); a failed
+   migration didn't block `docker.service` (`requiredBy` now, not
+   `wantedBy` — fail-closed, user's explicit choice, empirically proven
+   with a VM node that forces a real failure). **Not deployed anywhere.**
+   Worth flagging before anyone says yes:
    enabling this is disruptive, not a quiet config flip — Docker's own
    docs confirm `userns-remap` is not live-reloadable (forces a full
    `dockerd` restart) and changes Docker's storage path per remap user,
