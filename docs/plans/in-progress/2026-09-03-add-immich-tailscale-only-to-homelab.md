@@ -50,6 +50,19 @@ matching jellyfin.nix's convention. Only remaining open item is the D2
 follow-up (a path to share outside the tailnet), which is deliberately
 deferred until v1 has been live for a while.
 
+**2026-09-03, deployed and verified live on homelab.** First real
+`nixos-rebuild switch --target-host root@homelab` (not just build-tested)
+caught a real bug the build/eval-only ladder couldn't have: `immich-server`
+crash-looped on `EACCES` because the overridden `mediaLocation` was never
+actually created, and `/storage`'s own ACL denied the immich user
+traversal into it regardless (G4). Both fixed in
+`modules/services/immich.nix`, rebuilt, redeployed. Verified live: `/storage/
+immich` exists with correct 0700 ownership, `getfacl /storage` shows the
+new traversal grant alongside the existing multimedia one, all four units
+(postgresql, redis-immich, immich-server, immich-machine-learning) active,
+`curl http://<tailscale-ip>:2283/api/server/ping` returns 200 from
+homelab itself, `systemctl --failed` empty. v1 is live and working.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -61,6 +74,7 @@ deferred until v1 has been live for a while.
 - [x] `nixos-rebuild build --flake .#homelab` passes (also full verify-ladder: nixfmt, flake check, statix/deadnix, all 5 hosts)
 - [x] `/simplify` run — 4 agents (reuse/simplification/efficiency/altitude), all clean, no fixes needed
 - [x] `security` subagent run — F3 (NFS AUTH_SYS trust boundary, inherited not introduced) accepted, F4 (persistence entry missing explicit ownership) fixed
+- [x] deployed live to homelab (`nixos-rebuild switch --target-host`) — caught and fixed G4 (mediaLocation creation + /storage ACL traversal), verified working end-to-end
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -191,6 +205,38 @@ firewall with `networking.firewall.interfaces.tailscale0.allowedTCPPorts
 = [ 2283 ]` — exactly jellyfin's pattern in `modules/services/jellyfin.nix`,
 minus jellyfin's extra `wg0` rule (that's the whole point: no vps/Anubis
 public path for Immich).
+
+### G4 -- caught live on first real deploy: mediaLocation override needs its own create rule + an ACL grant into /storage
+Deployed to `homelab` (`nixos-rebuild switch --target-host root@homelab`,
+not just build-tested) and `immich-server` crash-looped on
+`EACCES: permission denied, mkdir '/storage/immich/encoded-video'`.
+Two real bugs, both now fixed in `modules/services/immich.nix`:
+  - The upstream `services.immich` module's own tmpfiles rule for
+    `mediaLocation` is type `e` ("adjust mode if it already exists") —
+    a no-op for anything but its own default `/var/lib/immich`, which
+    only exists because systemd's `StateDirectory=` creates it for free.
+    Overriding `mediaLocation` (per D1) means nothing ever creates the
+    directory. Fixed by merging a `d` rule into the same `systemd.
+    tmpfiles.settings.immich` group the upstream module already
+    declares for that exact path.
+  - `/storage` itself is `drwxrws--- root:multimedia`
+    (`hosts/homelab/configuration.nix`), `other::---` — immich is in
+    neither, so it couldn't traverse into its own mediaLocation even
+    once the directory existed. Fixed with a non-recursive, *additive*
+    ACL grant (`a+ /storage - - - - user:immich:--x`, execute-only —
+    traversal only, no read/list access into jellyfin's actual media)
+    via `lib.mkAfter` on `systemd.tmpfiles.rules`, ordered after the
+    existing recursive-replace `A /storage ... group:multimedia:rwx`
+    rule (same generated `00-nixos.conf`) so it isn't wiped by that
+    rule's own replace-pass on the next boot.
+  Verified after redeploy: `/storage/immich` exists as `drwx------
+  immich:immich`, `getfacl /storage` shows both the existing
+  `group:multimedia:rwx` and the new `user:immich:--x` entries,
+  `immich-server` started clean with no further crash-loop, `curl
+  http://<tailscale-ip>:2283/api/server/ping` returns `200` from
+  homelab itself, all four units (postgresql, redis-immich,
+  immich-server, immich-machine-learning) active, `systemctl --failed`
+  empty fleet-wide.
 
 ## Findings (F)
 
