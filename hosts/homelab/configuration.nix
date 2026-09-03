@@ -142,7 +142,9 @@
   };
   services.xserver.videoDrivers = [ "nvidia" ];
   hardware.nvidia = {
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # nvidiaPackages.stable (production) dropped Pascal support upstream --
+    # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
+    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
     # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
     open = false;
     modesetting.enable = true;
