@@ -361,14 +361,14 @@ neither has an acceptance write-up to draft. Leave §2 at D1–D14.
 
 | # | Decision | Bears on | Done? |
 |---|---|---|---|
-| D1 | Rotate which credentials, and how far back? | C1 / N2 — the answer is probably "all ten in `F-P8-02`" | [ ] |
-| D2 | Accept unsigned unattended `origin/master`, or add signature verification? | H1; if accepting, write it into [`docs/accepted-risks.md`](../../accepted-risks.md) §1 as AR-7 | [ ] |
-| D3 | Check GitHub branch protection | H1; with no CI, the only remaining control on fleet root | [ ] |
+| ~~D1~~ | Rotate which credentials, and how far back? | C1 / N2 | [x] **Answered and done**: all ten in `F-P8-02`, closed 2026-09-01. |
+| D2 | Accept unsigned unattended `origin/master`, or add signature verification? | H1; if accepting, write it into [`docs/accepted-risks.md`](../../accepted-risks.md) §1 (note: **not** AR-7 — that slot is now D14's; use the next free number). Compounds with D11 (`D11-analysis.md`) and cross-referenced as D5 in `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`, unresolved there too. | [ ] |
+| ~~D3~~ | Check GitHub branch protection | H1; with no CI, the only remaining control on fleet root | [x] **Answered 2026-08-27**: no protection existed; a ruleset now blocks force-push/delete, no bypass actors. Signed commits deliberately deferred — that's D2. |
 | D4 | Buy immutability: append-only B2 key + Object Lock? | C3 — the single highest-value change for asset #1 | [ ] |
-| D5 | FDE on the laptops? The plan exists on an unmerged branch | H7 | [ ] |
+| D5 | FDE on the laptops? The plan exists on an unmerged branch | H7 | [ ] Tracked in `2026-08-25-stale-branches-and-distributed-builders-follow-up.md` (its own D2): `worktree-fde-secureboot-plan` (19 commits, FDE+Secure Boot+TPM2, predates the dendritic restructuring — reviving is a re-derivation, not a rebase). Also contains a LUKS-recovery-passphrase escrow scheme needing the user's own sign-off. |
 | D6 | Narrow the tailnet ACL, or accept all-or-nothing and document why? | §3 ACL cluster; either way, fix the vps `trustedInterfaces` half | [ ] |
-| D7 | Intrusion detection on homelab, or accept? | H8 — evidence says the boundary is not what was assumed | [ ] |
-| D8 | Is the recovery ISO's unauthenticated root-filesystem access intended? | H6 — needs a written justification either way | [ ] |
+| ~~D7~~ | Intrusion detection on homelab, or accept? | H8 — evidence says the boundary is not what was assumed | [x] **Answered 2026-09-03: implement, full IDS, not accept.** Tracked as its own todo plan: `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`. Note P3's own caveat carried into that plan: conventional log-based IDS is a poor fit here (tailnet-only sshd, unparseable game-server log formats) — mechanism still needs picking. |
+| ~~D8~~ | Is the recovery ISO's unauthenticated root-filesystem access intended? | H6 — needs a written justification either way | [x] **Answered and done 2026-09-03**: yes, intended — not meant to be secure, meant to make recovery (of these hosts or a third party's) as easy as possible. Written up as `accepted-risks.md` AR-8. |
 
 ### Decisions blocking specific remediation work
 
@@ -507,15 +507,19 @@ neither has an acceptance write-up to draft. Leave §2 at D1–D14.
       version calculation instead of letting it hold the server back),
       and per-project version pins. *(F-P4-03, F-P4-13)*
 
-- [ ] **D12 — should the NFS shares be `noexec` too?** Low stakes, and
-      only worth answering if the answer is easy. Wave 2 item 2.5 added
+- [x] **D12 — should the NFS shares be `noexec` too?** **ANSWERED AND
+      DONE 2026-09-03: yes, `noexec`.** Wave 2 item 2.5 had added
       `nosuid` and `nodev` to `/home/lilijoy/storage{,-bulk}` and
       declined `noexec` on `F-P6-05`'s reasoning that a media share will
-      eventually have something run off it. A scan found nothing that is
-      actually a program there today, so if you never intend to run
-      anything from those shares, `noexec` is one word and closes the
-      last execution path from a homelab-controlled filesystem onto both
-      laptops. *(F-P6-05)*
+      eventually have something run off it — the user reversed that,
+      closing the last execution path from a homelab-controlled
+      filesystem onto both laptops. Added to
+      `modules/nixos/nfs-homelab-mounts.nix`'s shared `mountOpts`,
+      build-verified on `thinkpad`/`torrent`, security-subagent pass
+      clean (1 INFO finding, this doc-sync — since fixed). Tracked in
+      `2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md`.
+      `accepted-risks.md` AR-6 marked superseded. **Not deployed.**
+      *(F-P6-05)*
 
 - [x] **D15 — what `--memory` ceiling should the game containers get?**
       **ANSWERED AND DONE 2026-08-27: "no container may exceed 50% of the

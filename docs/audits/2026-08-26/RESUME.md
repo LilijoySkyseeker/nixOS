@@ -4,9 +4,32 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-03, end of the fifteenth session.**
+**Last updated: 2026-09-03, end of the sixteenth session.**
 
-> ## START HERE — state as of the fifteenth session
+> ## START HERE — state as of the sixteenth session
+>
+> **Sixteenth session (2026-09-03)** worked the batch of D-decisions the
+> user gave directly: **D1 closed** (rotation already done); **D2, D4,
+> D6 explained in detail, still open, not superseded** (D2 cross-refs
+> `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`'s own
+> D5 and `D11-analysis.md`); **D5 cross-referenced** to the existing
+> `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+> (no new plan needed); **D7 answered → implement**, new todo plan
+> `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+> not started; **D8 answered → accept**, written up as `accepted-risks.md`
+> AR-8 — **first draft was wrong and the user caught it** (claimed the
+> recovery ISO "leaks admin SSH keys"; they're public keys, not a leak —
+> fixed to correctly blame the real, separate LOW issue instead, an
+> unverified ISO artefact); **D12 answered → fix**, `noexec` added to
+> `modules/nixos/nfs-homelab-mounts.nix`, build-verified on
+> `thinkpad`/`torrent`, **security subagent pass run before closing this
+> time** (fifteenth session's own lesson, applied not skipped) — one
+> INFO doc-sync finding, fixed, plan closed to `done/`, **not deployed**;
+> **D16 raised for review, still open**, plus a new wrinkle: fleet-wide
+> `scheduleEnable = false` means these thresholds currently validate
+> "was this host manually switched recently," not "did a scheduled
+> deploy silently stop," which is what they were sized for. Full detail:
+> "What happened in the sixteenth session" below.
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
 > `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
@@ -1374,6 +1397,115 @@ skipped and caught only after a plan is already closed, open the
 follow-up plan *before* the pass returns, not after — there is no
 window where findings have anywhere valid to land otherwise.
 
+## What happened in the sixteenth session (2026-09-03)
+
+Worked through the batch of D-decisions the user gave directly in chat:
+D1, D2, D4, D5, D6, D7, D8, D12, D16. Used Claude's own task-tracking
+tool to go one at a time, per the user's ask.
+
+**D1 — closed.** Rotation is fully done (10/10 + 2 not-required, closed
+2026-09-01), so the old exposed credentials no longer authenticate to
+anything. `~~D1~~` struck in both `user-actions.md` and
+`accepted-risks.md` §2. Also fixed **D3**'s stale checkbox while there —
+it was already answered 2026-08-27 (branch-protection ruleset) but the
+decision table in `user-actions.md` had never been updated to match.
+
+**D2 — explained, not superseded.** Walked through H1 in detail (three
+unattended paths trust `origin/master` with zero authenticity check;
+laptops authenticate with the interactive user's own push-capable key;
+homelab re-TOFUs `github.com`/vps host keys every boot). Checked for
+supersession: not superseded by anything done, but cross-referenced —
+`2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` lists
+signature verification as its own design question D5, tied to this D2,
+unresolved there too; `D11-analysis.md` notes D2 compounds with D11.
+Noted in `user-actions.md`: if D2 is later accepted, its accepted-risk
+slot is **not** AR-7 (that's D14's) — needs the next free number.
+
+**D4 — explained in detail, not implemented.** Append-only B2 key +
+Object Lock: two independent defenses (compromised host vs. compromised
+B2 account), plus the real design wrinkle that Object Lock is in tension
+with restic's current aggressive prune (`--keep-daily 2`,
+`daysFromHidingToDeleting=1`) — pruning would need to move to a separate
+non-append-only pass, or storage grows during the lock window. Still the
+user's call; no plan created yet.
+
+**D5 — cross-referenced, no new plan needed.** Found it already fully
+tracked: `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+carries the exact `worktree-fde-secureboot-plan` branch (19 commits,
+FDE+Secure Boot+TPM2, predates the dendritic restructuring) as its own
+D2 (revive/rebase/abandon). Noted the cross-reference in
+`user-actions.md` rather than duplicating the plan.
+
+**D6 — explained in detail.** Flat tailnet ACL (`"ip": ["*"]`
+everywhere) bounded on three hosts by per-interface firewall rules but
+**unbounded on vps**, which sets `trustedInterfaces = ["tailscale0"]` —
+no packet filter at all on that interface. Live drift noted: an untagged
+Android phone is a tailnet member covered by `autogroup:member`, absent
+from the repo. homelab's subnet route + exit node turn any single
+compromised tailnet device into a LAN + egress pivot. Flagged that
+fixing vps's `trustedInterfaces` is required either way, independent of
+whether the ACL itself gets narrowed or the flat model gets accepted.
+
+**D7 — answered (implement, not accept) and given a todo plan.** New
+`2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+not started. Carries forward P3's own audit-time caveat that
+conventional log-based IDS is a poor fit here (sshd tailnet-only,
+game-server log formats have no CrowdSec parsers) — mechanism still
+needs picking; candidates recorded (network-layer anomaly detection,
+real CrowdSec parsers for the actual formats, file-integrity monitoring,
+scoped auth-anomaly detection) plus the requirement to wire into
+`myHealthAlerts` so a real detection isn't a repeat of C3's
+detector-that-alerts-nowhere failure mode. `accepted-risks.md` §2's D7
+row struck (not accepted, implementing).
+
+**D8 — answered (accept) and written up as AR-8, then corrected.**
+User's reasoning: the recovery ISO is not meant to be secure, it is
+meant to make recovery of these hosts, or a third party's, as easy as
+possible. Written into `accepted-risks.md` as AR-8. **First draft was
+wrong and the user caught it**: it claimed the ISO "bakes in the fleet's
+admin SSH keys" as part of the exposure, phrased as if that were a leak.
+Checked `hosts/isoimage/configuration.nix:98` — what's baked in is
+`vars.publicSshKeys`, literally SSH *public* keys, already plaintext
+elsewhere in this public repo. Nothing is leaked; that's just how the
+admin SSHes into the booted rescue environment as root. Fixed AR-8 to
+say so and to correctly attribute the real, separate, LOW-rated issue
+(`F-P5-10`/`L-03`): the built ISO artefact sits unverified in
+user-writable `~/Downloads` with no checksum, and because the flake is
+public/pinned an attacker could plausibly build a matching or swapped
+ISO — an integrity/tampering concern, not a confidentiality one. **Worth
+remembering for future write-ups in this file: don't restate a finding's
+language without checking the underlying mechanism yourself.**
+
+**D12 — answered (noexec) and fully implemented, deployed nowhere.**
+Added `noexec` to `modules/nixos/nfs-homelab-mounts.nix`'s shared
+`mountOpts` (alongside the existing `nosuid`/`nodev`), replacing the long
+inline "noexec declined" comment with a one-line plan citation per
+`style-guide.md`'s "why belongs in the plan file" rule. Went through a
+real plan file,
+`2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md`:
+build-verified clean on `thinkpad` and `torrent` (confirmed via `$?`
+directly, not through a `tail`-piped command, to avoid the exit-code
+trap this file already warns about), then ran the required `security`
+subagent pass **before** closing the plan — the fifteenth session's own
+lesson, applied this time instead of skipped. One INFO finding came
+back: the module change closed D12, but `accepted-risks.md` (AR-6 and
+its D12 row) and `user-actions.md`'s D12 checkbox still described the
+shares as executable and the decision as open — a doc-sync gap, not a
+security defect. Fixed: AR-6 marked superseded (risk no longer accepted,
+fixed instead), both D12 rows updated to the same `~~D#~~ **Answered**`
+convention already used for sibling decisions. Plan moved to `done/`
+only after the fix and the re-check, not before. **Not deployed
+anywhere** — build-verified only, per standing policy.
+
+**D16 — raised for review, not yet decided.** Laid out all four hosts'
+thresholds (homelab/vps/torrent 504h, thinkpad 720h) and flagged a
+wrinkle worth deciding alongside the numbers: `scheduleEnable = false`
+fleet-wide means there is currently no timer running for these
+thresholds to actually validate against — they're presently watching
+"has anyone manually switched this host in N weeks," not "did a
+scheduled deploy silently stop firing," which was the original intent.
+**Still open, waiting on the user.**
+
 ## What is left
 
 ### Rotation — done
@@ -1526,10 +1658,44 @@ rotate the ten credentials from `F-P8-02`.~~ **Also stale, same
 correction:** rotation closed 2026-09-01, see "Rotation — done" above —
 this line was contradicting that section in the same file.
 
-Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
+~~Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
 `--memory` ceiling — blocks half of the resource-ceilings item) and
 **D16** (confirm the new deploy-staleness thresholds; not blocking),
-both added in the fourth session. ~~D11 is time-critical.~~ **Not
+both added in the fourth session.~~ **Updated 2026-09-03 (sixteenth
+session)** — see "What happened in the sixteenth session" above for full
+detail on each:
+- **D1** — closed (rotation done, credentials dead).
+- **D2** — still open; explained in detail, not superseded, cross-referenced
+  from `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`'s
+  own D5 and from `D11-analysis.md`.
+- **D4** — still open; explained in detail (append-only B2 key + Object
+  Lock, with the prune-strategy tension flagged). No plan yet.
+- **D5** — still open; already tracked in
+  `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+  (its own D2) — no new plan needed, just cross-referenced.
+- **D6** — still open; explained in detail (flat ACL, vps's unbounded
+  `trustedInterfaces`, the untagged phone, homelab's pivot risk).
+- **D7** — **answered: implement.** New todo plan,
+  `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+  not started — mechanism still needs picking per P3's own log-format
+  caveat.
+- **D8** — **answered: accept.** `accepted-risks.md` AR-8, corrected
+  after the user caught an inaccurate "admin keys leaked" claim in the
+  first draft (they're public keys — real issue is the unverified ISO
+  artefact, not a credential leak).
+- **D12** — **answered: fix, not accept.** `noexec` added and
+  build-verified on `thinkpad`/`torrent`, security-subagent pass clean,
+  plan closed to `done/`. `accepted-risks.md` AR-6 marked superseded.
+  **Not deployed.**
+- **D15** — the `--memory` half was already answered and done before
+  this session (50%/`7g` cap); only `--cpus` remains, still the user's
+  to size — see item 3 below, unchanged by this session.
+- **D16** — raised for review with the user; **still open**, plus a new
+  wrinkle surfaced: `scheduleEnable = false` fleet-wide means these
+  thresholds aren't currently validating against the timer cadence they
+  were sized for.
+
+~~D11 is time-critical.~~ **Not
 time-critical** — same stale-timer correction above; D11 itself (the
 `flake-update-test` auto-merge re-evaluation) is still genuinely
 unanswered, just not on a clock. ~~Also the factorio account token is
