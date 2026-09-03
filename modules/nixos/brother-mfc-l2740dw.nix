@@ -46,11 +46,18 @@ _: {
       # silently drops it (confirmed with tcpdump: the printer replies
       # every time, sane-airscan just never sees it). The reply's
       # destination port is whatever ephemeral port sane-airscan happened
-      # to bind that run, so a dport-based allow can't target it -- allow
-      # by the printer's own source IP instead, scoped to enp8s0 (torrent's
-      # LAN NIC), not host-wide.
+      # to bind that run, so a dport-based allow can't target a single
+      # port -- but it's still bound within the kernel's ephemeral range
+      # (32768-60999 here, `/proc/sys/net/ipv4/ip_local_port_range`), so
+      # scope to that range rather than all ports. Without this, the rule
+      # would accept any UDP from this source IP on any port, including
+      # KDE Connect's 1714-1764 range that D9 deliberately scoped to
+      # tailscale0 only on this shared profile -- a spoofed or
+      # briefly-unreserved 192.168.1.166 would otherwise re-open exactly
+      # that. Scoped to enp8s0 (torrent's LAN NIC) only, not host-wide.
+      # plan: 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md#F3
       networking.firewall.extraCommands = ''
-        iptables -A nixos-fw -i enp8s0 -p udp -s 192.168.1.166 -j nixos-fw-accept
+        iptables -A nixos-fw -i enp8s0 -p udp -s 192.168.1.166 --dport 32768:60999 -j nixos-fw-accept
       '';
     };
 }
