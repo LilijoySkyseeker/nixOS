@@ -131,6 +131,9 @@ across every host into one array and removing them all in a single
 re-deriving a weaker version of it.
 - **File:** `scripts/doc-host.sh:178-179`
 
+
+**FIXED 2026-09-03:** trap-based cleanup applied in scripts/doc-host.sh (tmpfiles array + single trap ... EXIT), replacing the hand-rolled per-branch rm -f calls
+
 ### F2 -- docs-updater pass, 2026-09-03
 Verified `scripts/doc-host.sh`'s header/inline comments against its actual
 behavior (usage, marker-block idempotency, jq/nix requirement) -- all
@@ -150,6 +153,9 @@ are purely hand-written; added a pointer to `scripts/doc-host.sh`
 instead (see below) since none existed before this task.
 
 _docs-updater finished 2026-09-03T21:28:09Z -- see Findings above._
+
+
+**FIXED 2026-09-03:** docs-updater's own pass summary -- citation-form fixes and comment trims it made are already reflected in scripts/doc-host.sh; nothing further to action
 
 ### F3 -- `fetch_services()` splices nix's own error-derived option name into evaluated Nix source unescaped
 - **File:** `scripts/doc-host.sh:134,140` (`fetch_services()`)
