@@ -84,9 +84,33 @@ exactly one: `sops.secrets.vps_caddy_env` (`F-P2-13`, `F-P8-18`), which
 sops decrypted into `/run/secrets` on every vps activation for no
 reader. That declaration is deleted. Removing the declaration *before*
 the `secrets.yaml` key is the safe order: an undeclared key is inert,
-whereas a declaration whose key is missing fails activation. Verified in
-the rendered manifest, not just the build — vps's sops manifest now
-lists **six** secrets where it listed seven.
+whereas a declaration whose key is missing fails. Verified in the
+rendered manifest, not just the build — vps's sops manifest now lists
+**six** secrets where it listed seven.
+
+**Correction, 2026-08-27: it fails the *build*, not activation** — which
+is better than this said, and worth knowing precisely, because it changes
+what the ordering rule is protecting against. Observed while renaming the
+Discord webhook key:
+
+```
+sops-install-secrets: manifest is not valid: secret discord_webhook in
+/nix/store/…-secrets.yaml is not valid: the key 'discord_webhook' cannot be found
+```
+
+`sops-install-secrets` validates the manifest at build time, so a
+declaration without its key cannot produce a system closure at all and
+therefore can never reach a host. The ordering rule still holds, but the
+consequence of breaking it is a failed build on the deployer, not a
+broken activation on the target.
+
+A related consequence, also confirmed then: because `secrets/secrets.yaml`
+is version-controlled and a built system pins an **immutable store copy**
+of it, removing a key from git cannot affect a host that has not rebuilt,
+and every commit is a self-consistent snapshot of keys *and* their
+declarations. So a rename can remove the old key and its references in one
+commit safely — there is no need to leave orphaned keys behind for
+not-yet-deployed hosts.
 
 **Note on 1.9 — what it does and does not buy.** `myHealthAlerts` is now
 enabled on torrent and thinkpad, and `health-alerts` added to both

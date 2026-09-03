@@ -162,25 +162,39 @@
   };
 
   # directory permissions
+  #
+  # /srv is deliberately NOT managed here any more. It used to carry
+  # `d /srv 0770 root root -`, added to close a real finding: factorio's
+  # token/password and jellyfin's config sit under /srv and were
+  # world-readable. That rule broke jellyfin on 2026-08-28. /srv is a
+  # shared parent for three services running as three different non-root
+  # users, and 0770 root:root denies every one of them the `x` bit they
+  # need to traverse into their own data -- it is not a stricter version of
+  # correct, it is non-functional. It also fought two other systems that
+  # both assert 0755 (systemd's own home.conf, and impermanence's
+  # create-directories) and won only by sorting first, so whether it
+  # applied at all depended on boot vs switch.
+  #
+  # The exposure it was reaching for is real, but it lives one level down
+  # and is fixed there instead -- see the leaf modes below. /srv itself is
+  # a namespace, not a secret. See
+  # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
   systemd.tmpfiles.rules = [
-    # Fields are: type path mode user group age [argument]. This previously
-    # read "d /srv 0770 - root root -", which puts "-" in the user field and
-    # shifts everything right, landing "root" in the *age* field --
-    # systemd-tmpfiles rejects the whole line with "Invalid age 'root'" and
-    # carries on, so /srv was silently left at its default 0755 for the
-    # entire life of this config. That matters because /srv holds factorio's
-    # server directories (which contain the account token and game password)
-    # and jellyfin's config, so they were world-readable throughout.
-    "d /srv 0770 root root -"
     "A /storage - - - - group:multimedia:rwx"
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
+
+  # The confidentiality rules for the game-server state directories are
+  # NOT here. They live in modules/services/{factorio,minecraft}.nix, next
+  # to the paths they protect -- a `z` rule silently becomes a no-op if its
+  # path is renamed, so keeping mode and path apart reintroduces exactly
+  # the silent-failure shape this whole change exists to remove.
 
   # sops
   sops.secrets = {
     homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
-    homelab_discord_webhook = {
+    discord_webhook = {
       owner = "health-check";
       group = "health-check";
     };
@@ -199,26 +213,37 @@
         b2-hard-delete = "false";
       };
       rcloneConfigFile = config.sops.secrets.homelab_backblaze_rclone_config.path;
-      # mount all the most recent backups in a temp folder for restic to trawl
+      # Mount the most recent snapshot of each dataset under $RUNTIME_DIRECTORY
+      # (systemd-managed, 0700, created fresh by this unit) rather than a
+      # hand-rolled /tmp/restic: /tmp is world-traversable for the run's
+      # whole multi-day duration, and mkdir -p on a path an unprivileged
+      # process pre-planted as a symlink would follow it — systemd's
+      # RuntimeDirectory creation refuses that (docs/audits/2026-08-26/findings-tail.md L-02).
       backupPrepareCommand = ''
         datasets="zroot/local/state zdata/storage/storage"
 
         for dataset in $datasets; do
-          snapshot=$(zfs list -H  -t snapshot -o name -s name -r $dataset | tail -n 1)
+          snapshot=$(zfs list -H -t snapshot -o name -s creation -r $dataset | tail -n 1)
           if [[ -n "$snapshot" ]]; then
-            mkdir -p /tmp/restic/$snapshot
-            mount -t zfs $snapshot /tmp/restic/$snapshot
+            mkdir -p "$RUNTIME_DIRECTORY/$snapshot"
+            mount -t zfs "$snapshot" "$RUNTIME_DIRECTORY/$snapshot"
           fi
         done
         echo "### Mounted Snapshots ###"
       '';
       backupCleanupCommand = ''
-        zfs list  -t snapshot -H -o name | xargs -I {} umount -t zfs {} 2> /dev/null
+        # Unmount only what this run mounted under $RUNTIME_DIRECTORY, not
+        # every snapshot on the system (the previous version piped every
+        # zfs snapshot name — including zbackup's replicated ones — into
+        # umount). cut, not awk: this unit's `path` carries no gawk.
+        grep " on $RUNTIME_DIRECTORY/" /proc/mounts \
+          | cut -d' ' -f2 \
+          | tac \
+          | xargs -r -I{} umount -t zfs {}
         echo "### Unmounted Snapshots ###"
-          rm -rf /tmp/restic
       '';
       user = "root";
-      paths = [ "/tmp/restic" ];
+      paths = [ "/run/restic-backups-backblazeWeekly" ];
       timerConfig = {
         OnCalendar = "Fri 03:00:00";
         # Persistent=false (default) is deliberate: after a long outage this
@@ -257,6 +282,11 @@
       PrivateTmp = lib.mkForce false;
       TimeoutStartSec = "1w";
       StateDirectory = "restic-backups-backblazeWeekly";
+      # 0700: the mounted snapshots hold the whole persisted-state and
+      # media trees for up to a week; nothing but root should be able to
+      # traverse into them (findings-tail.md L-02).
+      RuntimeDirectory = "restic-backups-backblazeWeekly";
+      RuntimeDirectoryMode = "0700";
       # backblaze bucket config
       ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # time since last success timer for alerting
@@ -296,7 +326,15 @@
   # snapshot is taken -- which matters here because zbackup sits behind a
   # USB link (USB 2.0 and heavily contended until the 2026-08-23 cable
   # change moved it to USB 3.0; see hosts/homelab/README.md).
-  sops.secrets.homelab_zrepl_key = { };
+  # go-netssh shells out to the system ssh binary per connection attempt,
+  # which reads -i's target fresh each time -- unlike wireguard's
+  # RemainAfterExit oneshot, this is plausibly a per-invocation reader
+  # already. Not verified either way (SYS-11's rule: check which kind you
+  # have, don't assume), and restartUnits costs nothing here -- a zrepl
+  # pull that gets killed mid-run simply retries on the next interval, per
+  # rotation-runbook.md item 9 -- so set it rather than rely on the
+  # per-invocation read actually being true.
+  sops.secrets.homelab_zrepl_key.restartUnits = [ "zrepl.service" ];
 
   # zrepl's ssh+stdinserver client (go-netssh, shelling out to system ssh)
   # has no interactive TTY to prompt on an unrecognized host key, so the
@@ -445,7 +483,7 @@
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
-    webhookUrlFile = config.sops.secrets.homelab_discord_webhook.path;
+    webhookUrlFile = config.sops.secrets.discord_webhook.path;
     interval = "*:0/15";
     # Paths carry the full source dataset path because zrepl extends
     # root_fs with it (see myZrepl above) — these are NOT the old syncoid
@@ -471,12 +509,35 @@
       "zbackup/backup/thinkpad/zroot/local/home" = 336;
       "zbackup/backup/thinkpad/zroot/local/root" = 336;
     };
-    # offsite restic backup runs weekly (Fri 03:00) and can now take up to
-    # TimeoutStartSec=1w to finish a single run, so 192h (8 days) would give
-    # zero slack; 336h = 14 days gives a full week of slack past a
-    # worst-case 1-week run before alerting on a missed/stuck run.
+    # Offsite restic backup runs weekly (Fri 03:00).
+    #
+    # 312h = 13 days, lowered from 336h on 2026-08-28. 336h was sized
+    # against TimeoutStartSec=1w, reasoning that a worst-case 1-week run
+    # needed a full week of slack on top of the 1-week schedule. That is
+    # exactly the problem: 168h schedule + 168h worst-case run = 336h, so
+    # the threshold landed on the same instant as the next scheduled run.
+    # A run that succeeded then refreshed this marker at almost precisely
+    # the moment the alarm came due, and a fortnight with no offsite
+    # backup could pass without ever paging. Nearly happened for real --
+    # the 2026-08-21 run was the last success, the 2026-08-28 run was
+    # killed mid-flight, and the alarm was due 2026-09-04, the same day as
+    # the next attempt.
+    #
+    # Dropping a single day breaks that coincidence: the alarm now fires
+    # 24h *before* the run that would otherwise mask it, so a missed run
+    # is reported rather than papered over.
+    #
+    # The 1-week worst case it was protecting against is theoretical --
+    # it comes from the timeout, not from behaviour. Measured runs:
+    # 2d16h for the initial 522.8 GB full upload (2026-08-18 -> 08-21),
+    # and 8h28m for an incremental before a deploy killed it. At 312h a
+    # run may take 144h (6 days) before false-alarming, still more than
+    # double the longest real run.
+    #
+    # If a run ever legitimately approaches a week, raise this again --
+    # but raise the *schedule* too, or the coincidence comes back.
     staleMarkerFiles = {
-      "/var/lib/restic-backups-backblazeWeekly/last-success" = 336;
+      "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
       # F-P7-09's skipped-deploy half. A *failed* auto-switch already pages
       # via the failed-units check (confirmed working: the 2026-08-27 03:00
       # read-only-git-config failure did enter systemctl --failed). A
@@ -572,17 +633,27 @@
   # wireguard: dial out to the vps (hosts/vps) so it can act as a public
   # tunnel endpoint for us despite being behind CGNAT — homelab always
   # initiates, nothing needs to be reachable inbound at home.
-  sops.secrets.homelab_wireguard_private_key = { };
+  # restartUnits is load-bearing, not tidiness. wireguard-wg0.service is
+  # Type=oneshot + RemainAfterExit=true: it reads privateKeyFile once when
+  # the link is created and never re-runs, so rotating the key in sops
+  # leaves the interface running the OLD key indefinitely. Hit for real
+  # during the 2026-08-27 rotation (items 5-7): activation logged
+  # "modifying secrets: homelab_wireguard_private_key", the peer unit
+  # restarted because its name is derived from the peer's public key, and
+  # `wg show` still reported the previous interface key — the interface
+  # unit had last started the day before. The peer units carry the PSK and
+  # are Requires=/WantedBy= this unit, so cycling it cycles them too.
+  sops.secrets.homelab_wireguard_private_key.restartUnits = [ "wireguard-wg0.service" ];
   # same PSK file content as vps's wireguard_vps_homelab_psk — see
   # hosts/vps/configuration.nix's peer entry.
-  sops.secrets.wireguard_vps_homelab_psk = { };
+  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "wireguard-wg0.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
     peers = [
       {
         # vps
-        publicKey = "DIYtQyvp/KWNg1rVMjMM8FxfkvMRp5iNEt8iYOonKmA=";
+        publicKey = "ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=";
         presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         # IPv4 literal, not vps's IPv6 address — confirmed live this
         # tunnel silently died for hours despite persistentKeepalive:
@@ -602,6 +673,27 @@
       }
     ];
   };
+
+  # /nix/state's .zfs/snapshot directory was world-traversable (0777),
+  # letting any local uid read old snapshot contents at whatever
+  # permissions they had at snapshot time -- proven live, and how the
+  # factorio credentials leaked. `snapdir=disabled` closes it entirely
+  # (verified: even root gets ENOENT on the exact path that used to
+  # succeed for uid 65534) and, unlike a raw chmod on `.zfs`, is real
+  # dataset metadata that survives a mount cycle rather than resetting.
+  # Servers only -- see
+  # `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`#D1
+  # for why the PCs are deliberately excluded and the caveat that this
+  # needs a mount cycle (not just a switch) to fully close access already
+  # cached before the property changes.
+  myZfsDatasetProperties."zroot/local/state".snapdir = "disabled";
+
+  # Each pool root dataset's own properties, self-healed live too now,
+  # not just at disko install. plan:
+  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G2
+  myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
+  myZfsDatasetProperties."zdata" = vars.zfsRootFsOptions;
+  myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;
 
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;

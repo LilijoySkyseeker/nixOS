@@ -23,6 +23,7 @@ encrypted with sops-nix.
 | `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
 | `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). Opens with **eleven standing rules** harvested from the 2026-08-26 audit — secrets, network exposure, privilege, backups, verification, containers, observability. Read those before adding a service or opening a port. |
 | `docs/skills/security-audit/` | The method for running a full fleet security + dead-config audit: threat model, parallel part audits, consolidation, remediation waves, doc harvest. Symlinked to `.claude/skills/security-audit`, so it is also invocable as a skill. Carries the worked examples from the 2026-08-26 run; `reference/lessons.md` is the traps list, worth reading before any audit-shaped work. |
+| `docs/skills/human-style-writing/` | A checklist for editing text to remove LLM-writing tells (stock phrases, promotional tone, formulaic structure/formatting), distilled from Wikipedia's "Signs of AI writing" essay. Symlinked to `.claude/skills/human-style-writing`. Manual-only — the user invokes it by hand when polishing specific prose; it is not part of the workflow gate and agents should not self-invoke it while writing code, commits, docs, or plans. |
 | `docs/threat-model.md` | The standing threat model — adversaries, trust boundaries, severity rubric. A stable pointer at the current model (the copy inside the dated audit the part reports cite), plus how to supersede it. Read it before deciding whether exposing something is acceptable. |
 | `docs/accepted-risks.md` | Risks audited and knowingly **not** fixed, with reasoning — so a later pass can tell "decided against" from "never noticed". Also lists what cannot be accepted yet because a decision is open. |
 | `docs/audits/` | Point-in-time security audits, one dated directory each. Findings that become standing rules move to `docs/hardening.md`; risks left in place move to `docs/accepted-risks.md`. `2026-08-26/RESUME.md` is written to be picked up cold. |
@@ -63,6 +64,31 @@ just run commands locally. `torrent` and `thinkpad` both set
 root SSH from anywhere, by design; `thinkpad` may also simply be offline
 (it's a laptop). Full key model and per-host detail:
 `docs/procedures/remote-access.md`.
+
+## Missing tooling is a bug, not an obstacle to route around
+
+If a tool you need for debugging isn't there, **add it declaratively** —
+don't work around it with raw `/nix/store/...` paths.
+
+**`modules/flake/debug-tools.nix` is the single source of truth**, shared
+by the devshell *and* every host (via `profiles/default.nix`, which
+`profile-pc` also imports). Add a tool there once and it lands in both
+places, so the two can never drift into "I have it locally but not on the
+host I'm debugging". Always resolved against **unstable**, including on
+homelab, which is otherwise stable-pinned — debug tooling should behave
+identically everywhere.
+
+Only put dev-machine-only tooling (`nixfmt`, `statix`, `gh`, `sops`,
+`nixos-anywhere`) directly in `devshell.nix`. Keep the shared list short:
+it lands on every host including the public-facing one, so add on demand,
+not speculatively.
+
+Working around a missing tool with a store path is slow, easy to get
+wrong, and has produced a **false negative** here — an `ipset list` that
+printed nothing and looked like "the sets are gone" when the command
+simply wasn't on `PATH`. Note the same trap with an unprivileged
+`ip6tables -S`, which returns what looks like an empty chain when it is
+really permission denied.
 
 ## The two rules that matter most
 

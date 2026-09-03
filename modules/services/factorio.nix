@@ -121,6 +121,37 @@ in
         { directory = "/srv/factorio/main"; }
       ];
 
+      # Deny non-owner access to the state directory. This is where
+      # server-settings.json lives, which carries the factorio.com account
+      # token and the game password.
+      #
+      # Declared here, next to the path it protects, rather than in the
+      # host file: `z` silently becomes a no-op if the path is ever renamed
+      # or moved, which is the same failure shape as the `Invalid age
+      # 'root'` bug that left /srv unprotected for the life of that config.
+      # Keeping mode and path in one place means a rename breaks both
+      # together or neither.
+      #
+      # 0700, not 0750: the group bit would grant nothing. The owning uid
+      # comes from the container image (factoriotools/factorio), not from
+      # this repo -- PUID/PGID are not pinned -- so depending on a group we
+      # do not control is exactly the fragility this avoids. `getent group
+      # 845` is empty and mutableUsers = false.
+      #
+      # Mode only, user/group left `-`, so an image bump that changes the
+      # uid cannot lock the container out of its own data. tmpfiles.d(5)
+      # specifies that a `z` line with `-` for user and group adjusts the
+      # mode without chowning.
+      #
+      # NOT retroactive, and not a substitute for rotation. `z` is
+      # non-recursive, so files inside keep their own modes, and ZFS
+      # snapshots of this directory already hold copies at the old
+      # permissions -- see F1/F2 in
+      # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
+      # The factorio credentials are disclosed and must be rotated at
+      # factorio.com (F-P4-04); this only stops the next disclosure.
+      systemd.tmpfiles.settings."10-factorio-state"."/srv/factorio/main".z.mode = "0700";
+
       # server-settings.json was previously hand-edited directly on the
       # host — not sops-managed, not declarative, and not reproducible.
       # The factoriotools image doesn't support injecting these via env
@@ -132,9 +163,29 @@ in
       # `game_password`, `token` (a factorio.com account auth token,
       # equally sensitive), and `username` are secrets; `name`/
       # `description`/`tags`/`non_blocking_saving` aren't.
-      sops.secrets.factorio_game_password = { };
-      sops.secrets.factorio_token = { };
-      sops.secrets.factorio_username = { };
+      # restartUnits is load-bearing, not tidiness. These values are not
+      # read at request time -- they are baked into server-settings.json by
+      # the preStart patch below, which runs only when the container
+      # starts. sops-nix rewriting /run/secrets underneath a running
+      # container changes nothing the server is actually using, so without
+      # this the rotation is inert and the *revoked* credentials stay live
+      # until something else happens to restart the unit.
+      #
+      # Observed for real during rotation item 12 on 2026-08-28: activation
+      # logged "modifying secrets: factorio_game_password, factorio_token"
+      # and finished clean, while the container was still running from
+      # 11:51:43 and server-settings.json still carried its 11:51:43
+      # contents -- i.e. the old token, which had already been invalidated
+      # at factorio.com. Exactly the failure shape as the WireGuard
+      # interface in 61f55cb: a clean activation log is not evidence that a
+      # rotated secret reached its consumer.
+      sops.secrets.factorio_game_password.restartUnits = [ "docker-factorio-main.service" ];
+      sops.secrets.factorio_token.restartUnits = [ "docker-factorio-main.service" ];
+      # username is not a credential and is not rotated, but it lands in
+      # the same generated file, so it gets the same treatment for
+      # consistency -- a changed username with a stale file would be just
+      # as confusing to debug.
+      sops.secrets.factorio_username.restartUnits = [ "docker-factorio-main.service" ];
       systemd.services.docker-factorio-main.preStart = mkServerSettingsPatch {
         directory = "/srv/factorio/main";
         name = "GC Space Age!!";

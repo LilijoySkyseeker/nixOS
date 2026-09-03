@@ -4,7 +4,89 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-08-27, end of the fourth session.**
+**Last updated: 2026-09-01, end of the eleventh session.**
+
+> ## START HERE — state as of the eleventh session
+>
+> **Branch:** `worktree-worktree-security-audit-plan`, worktree
+> `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
+> `origin/master` as of the sixth session (no conflicts). Ahead of master
+> by the fifth through eleventh sessions' commits — **open a PR when it is
+> time to land them.** All five `nixosConfigurations` build. The eighth
+> session fixed two LOW findings from the tail (L-01 anubis egress on
+> vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
+> hosts to this branch and closed out credential rotation; the tenth
+> corrected the restic staleness prediction and closed D1 of the
+> `.zfs`-traversal plan (`snapdir=disabled` on homelab); the eleventh
+> unified `myZfsDatasetProperties` and `disko.nix` — see "What happened in
+> the eleventh session" below. The L-01/L-02, D1, and unification fixes
+> are all build-verified only, not deployed to any host yet.
+>
+> **NEXT UP:** nothing queued. Item 0 of "Agent-doable, unblocked" below
+> (the disko unification) is now done — see the eleventh session. The
+> remaining agent-doable items are 1 (`push-deploy-vps` sandboxing) and 4
+> (`userns-remap`), both deferred on purpose pending a real-target VM
+> test; everything else needs either a user decision or a live host.
+>
+> **`TODO.md` no longer exists.** Master retired it for the plan-file
+> system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
+> and `workflow` skills. Plans are cited by **bare filename**, and
+> filenames are **date-first** (`2026-08-28-<slug>.md`). Older text in
+> this file still says `TODO.md`; read that as "the plan files".
+>
+> **Credential rotation is done.** **10 done, 2 not required** — see
+> [`rotation-runbook.md`](rotation-runbook.md) for the table. Item 9
+> (`homelab_zrepl_key`), the last one, closed 2026-09-01 once the user had
+> physical access to both laptops. Two extra items were added and
+> completed during the audit: **11** (`tailscale_authkey_isoimage`,
+> revoked) and **12** (factorio credentials, proven disclosed and
+> rotated). **Fully closed 2026-09-01** — the stale `/tmp/homelab_zrepl_key`
+> on torrent has been deleted too. Nothing outstanding from rotation.
+>
+> **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
+> switched to this branch as of the ninth session (including the restic
+> `312h` threshold, `c6116ca`), zero failed units, WireGuard tunnel and
+> zrepl replication both healthy on rotated keys. **L-01/L-02 (eighth
+> session) and D1's `snapdir=disabled` fix (tenth session) are the only
+> build/VM-verified-but-undeployed changes left** — none need a host
+> switch to be true statements, only to take effect.
+>
+> **All scheduled deploys remain OFF fleet-wide** (`scheduleEnable =
+> false`). Manual deploys are the only path anything takes. That is not
+> merely a state note — it is why a deploy killed the weekly backup this
+> session (see below).
+>
+> ### The three things most worth knowing before you touch anything
+>
+> 1. **A clean activation log is not evidence a rotated secret reached its
+>    consumer.** Hit three times: the WireGuard interface (`61f55cb`), the
+>    factorio container (`3dd1aa4`), and earlier the Discord webhook. Each
+>    logged `modifying secrets: …` with zero failed units while the
+>    service kept using the old value. The fix is `restartUnits`; the
+>    *lesson* is that verification means exercising the credential.
+>    Item 10 (restic) was the one case where no restart was needed — and
+>    that was checked, not assumed.
+> 2. ~~**The offsite backup has not succeeded since 2026-08-21**… **Expect
+>    the staleness alarm to page ~2026-09-03**.~~ **Resolved: the user ran
+>    a manual backup that completed cleanly** (started 22:50 on
+>    2026-08-29, off-schedule, confirming manual; finished 9h56m later,
+>    `no errors were found`, exit 0). `last-success` is now 2026-08-30
+>    08:46 — the alarm will not fire at 312h from that mark until
+>    ~2026-09-12, past the next scheduled run. D3's revisit condition in
+>    `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+>    was met.
+> 3. ~~**The factorio credentials were proven readable by any local uid**
+>    through `/nix/state/.zfs`… The *mechanism* is not fixed…~~
+>    **Mechanism fixed 2026-09-01, servers only, not yet deployed.**
+>    `snapdir=disabled` on `zroot/local/state` closes it on homelab; PCs
+>    (`zroot/local/home` on torrent/thinkpad) deliberately excluded, see
+>    `2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
+>    Full detail: `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
+>
+> **The user works rotation items interactively.** Do not batch them. Each
+> is "user does the provider + sops half, agent does the repo + deploy +
+> verify half", and the verification is the point — it has now caught five
+> real problems.
 
 ---
 
@@ -67,8 +149,21 @@ file.
   `.claude/worktrees/worktree-security-audit-plan` — enter that rather
   than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
-- **Plan of record:** the 2026-08-26 entry at the top of `TODO.md`
-- **homelab and vps are deployed** (2026-08-27). homelab was switched
+- **Plan of record:** ~~the 2026-08-26 entry at the top of `TODO.md`~~ —
+  now `docs/plans/in-progress/2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md`
+  (TODO.md retired 2026-08-28)
+- **homelab is on gen 358** as of the sixth session (2026-08-28), vps
+  redeployed the same day; the lines below record earlier sessions' state
+  and are kept for the sequence. **Updated further in the ninth session
+  (2026-09-01): torrent and thinkpad are both now switched to this branch
+  too** — see "What happened in the ninth session". `torrent`'s "never
+  switched" claim two lines below turned out to already be stale before
+  this session even started (torrent was independently switched to
+  something very close to this branch's HEAD on 2026-08-27, outside the
+  audit's own session log) — corrected there rather than silently.
+- ~~**homelab is on gen 350 and vps on gen 7** as of the fifth session;~~
+  the line below records the fourth session's state and is kept for the
+  sequence. homelab and vps are deployed (2026-08-27). homelab was switched
   twice — the audit's first switch, then again for the fourth session's
   work (**generation 346**). vps followed (**generation 4**).
   `torrent` and `thinkpad` remain **build-verified only, never
@@ -151,7 +246,12 @@ Nine commits. Six of the fourteen decisions were answered by the user.
   `alpha` while the version resolved at `release`.
 - **D11 — deliberately NOT answered.** The user asked for a
   re-evaluation and replan with a benefits/risk analysis instead; that is
-  now a `TODO.md` entry. **It fires Wed Sep 2.**
+  now `docs/plans/todo/2026-08-27-re-evaluate-and-replan-flake-update-test-s-executi.md`.
+  ~~**It fires Wed Sep 2.**~~ — **it does not fire.** That clock assumed
+  the schedules were armed; `scheduleEnable = false` fleet-wide means
+  `flake-update-test` has no timer. Corrected 2026-08-28; nothing is on a
+  clock any more except the backup staleness page (~2026-09-03), which is
+  expected and covered above.
 
 ### The deploy outage (`929efa3`) — the most important find
 
@@ -367,10 +467,495 @@ tailscale module sets the former.
 
 ---
 
+## What happened in the fifth session (2026-08-27)
+
+**The branch was merged** (PR #24) after syncing `origin/master` in; the
+only conflict was `TODO.md`, resolved by keeping both sides' new entries
+and dropping master's older copy of the audit entry, which this branch
+had already superseded. homelab and vps built to byte-identical store
+paths across the merge, proving it changed nothing deployed.
+
+**Scheduled deploys were turned off fleet-wide**, on instruction, while
+the pipeline is rebuilt. New `scheduleEnable` option on all three deploy
+modules; **not** `enable = false`, because that would also delete
+`auto-switch-now`, `pull-deploy` and `push-deploy-vps` as *units*, and
+those are the manual deploy paths. Timers are *removed* rather than
+un-wanted, so a switch actually stops a running one — confirmed in the
+switch log (`stopping the following units: auto-switch.timer, …`).
+
+**Credential rotation started.** Items 1 (`cloudflare_octodns_token`) and
+2 (`discord_webhook`) are done and verified live. Item 2 also
+**consolidated two sops keys into one**: `homelab_discord_webhook` (read
+by homelab, torrent *and* thinkpad) and `vps_discord_webhook` held the
+same URL, so the host prefix described nothing. All four hosts now read
+one unprefixed `discord_webhook`.
+
+**Debug tooling is now shared.** `modules/flake/debug-tools.nix` is a
+single list consumed by both the devshell and every host (via
+`profiles/default.nix`), always resolved against **unstable** so tools
+behave identically fleet-wide. Currently `jq` and `ipset`. Add a tool
+there once and it lands everywhere.
+
+### Things this session got wrong, and what corrected them
+
+Worth reading — the pattern is that the *verification step* caught all of
+them, not the reasoning:
+
+- **The rotated Discord webhook was pasted as a bare URL**, but
+  `myHealthAlerts` uses `curl -K`, which is config-file mode and needs
+  `url = "https://…"`. It fails **silently**, because `notify` only runs
+  when something is already wrong and discards curl's output and exit
+  status. Filed in `TODO.md`: nothing ever verifies the alert sink works.
+- **"Keep the old sops keys until the laptops are deployed" was wrong.**
+  The user challenged it. `secrets/secrets.yaml` is version-controlled
+  and a built system pins an **immutable store copy**, so removing a key
+  cannot affect a host that has not rebuilt, and every commit is a
+  self-consistent snapshot. Also moot: neither laptop reads it, since
+  `myHealthAlerts` was never deployed there.
+- **A missing key fails the *build*, not activation** —
+  `sops-install-secrets` validates the manifest at build time. Better
+  than documented; `remediation.md` corrected.
+- **Rotating the two Tailscale auth keys was unnecessary**, and the
+  advice given for it was actively harmful — it said to mint *reusable*
+  replacements, which would have turned a spent single-use credential
+  into a standing one. See items 3/4 in the runbook.
+
+## What happened in the sixth session (2026-08-28)
+
+Rotation went from "1 and 2 done" to essentially complete, and threw off
+four separate findings on the way. The pattern worth carrying forward is
+that **every one of them was found by verifying, not by building.**
+
+**Rotation completed:** 5–7 (WireGuard set), 8 (`homelab_vps_deploy_key`),
+10 (restic password), 11 (`tailscale_authkey_isoimage`, revoked not
+replaced), 12 (factorio credentials, added this session). 9 deferred.
+
+**Findings, each with its own plan file:**
+
+- **Rotated secrets do not reach running consumers.** WireGuard's
+  interface is a `RemainAfterExit` oneshot that reads `privateKeyFile`
+  once at link creation; the factorio container bakes its credentials into
+  `server-settings.json` at start. Both reported success while still using
+  the old value. Fixed with `restartUnits` (`61f55cb`, `3dd1aa4`). Note
+  `restartUnits` fires on *content change*, so it cannot repair the state
+  that exposes it — each needed one manual restart.
+- **`/srv` at 0770 root:root broke jellyfin** and masked rather than fixed
+  the exposure it was added for. Now
+  `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`.
+- **The factorio credentials were provably disclosed** through
+  `/nix/state/.zfs` (0777) across 57 snapshots, read live as uid 65534.
+  Mechanism split into
+  `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`.
+- **A manual deploy killed an 8h28m / 66 GB backup run** and left the
+  repository locked for a week.
+  `2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`, with
+  the design lesson carried to the pipeline plan as **D6**.
+
+**Two corrections to earlier audit claims**, both of which would have led
+to wrong action: the stray zrepl key is on **torrent**, not homelab, and
+was cited as `F-P8-06` when it is `F-P7-02`; and restic does **not** push
+the laptop replicas offsite (it mounts only `zroot/local/state` and
+`zdata/storage/storage`).
+
+**A guard fired correctly and looked like success.** `push-deploy-vps`
+refused to run because `/etc/nixos` was not on master, logged
+`skipping this scheduled run`, and exited **0**. That is `F-P7-09`'s
+shape observed live. Item 8 was verified by authenticating directly
+instead — see the runbook item for the technique.
+
+## What happened in the seventh session (2026-08-28)
+
+Two things, neither deployed anywhere.
+
+**`findings-tail.md` reviewed against current repo state.** Sessions 3-6
+fixed several things that consolidation still described as open; a fork
+verified each citation against the live repo rather than trusting the
+doc, and annotated seven stale entries in place (strikethrough/bracketed
+correction, per this file's own "correct the record" rule): the `/srv`
+tmpfiles row (fixed, then broke jellyfin, then redesigned — see below),
+`factorio-new`'s floating tag (moot, the container is gone), the
+container resource-ceiling bullet in SYS-07 (`--memory`/`--pids-limit`
+now set), SYS-11's `restartUnits` gap (closed for the wireguard trio and
+factorio secrets, the two the audit actually named), PROMO-03 (first leg
+fixed differently than suggested), and the `safe.directory` row in the
+§5.1 table (superseded by the `git()` wrapper from the deploy-outage
+fix). Left alone, confirmed still accurate: the sshd `extraConfig`→
+`settings.*` migration (SYS-02) and waydroid's `trustedInterfaces` grant
+(SYS-03) — neither has been touched. One item flagged but not annotated:
+whether the ISO-staleness finding (L-03) is still live depends on
+torrent/thinkpad's deploy state, which needed SSH access to confirm and
+wasn't checked. Commit `4e2278c`.
+
+**`boot.tmp.useTmpfs = true` landed fleet-wide**, closing D1 of
+`2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md` (agreed
+2026-08-27, not yet written before this session). One line in
+`modules/profiles/default.nix`, which every host imports including vps.
+All five `nixosConfigurations` build; the rendered `tmp.mount` was read
+back (not just built) on torrent and vps, confirming `Type=tmpfs`,
+`size=50%`, `nosuid`, `nodev`.
+
+The `security` subagent's review raised a MEDIUM finding — that
+nix-daemon's build scratch space would now compete with tmpfs `/tmp` for
+RAM — which **checking the pinned Nix docs against live state refuted**:
+Nix 2.34.8 defaults `build-dir` to `$NIX_STATE_DIR/builds`
+(`/nix/var/nix/builds`, confirmed to exist, on `/nix` not `/tmp`), not
+`$TMPDIR` as older Nix versions did, and `nix-daemon.service`'s rendered
+environment sets no `TMPDIR`. Downgraded to INFO in the plan with that
+evidence rather than accepting the PLAUSIBLE claim at face value — the
+same "check the source, don't assume" discipline this file's obligations
+section already asks for. One real residual from that review, LOW and
+still open: homelab's restic backup mounts a ZFS snapshot under
+`/tmp/restic/$snap`, and nobody has verified that mount-stacking onto the
+new tmpfs still works — deliberately not tested live, since a careless
+check risks kicking off part of the multi-day backup. Tracked as a
+Progress item to check at homelab's next real deploy. Commit `193bbc0`.
+
+**Not deployed anywhere.** Both changes are build-verified only; they
+take effect at each host's next switch, whenever the user chooses to
+deploy.
+
+## What happened in the eighth session (2026-09-01)
+
+Credential rotation is done except the genuinely-blocked item 9 (see
+above, unchanged). This session worked the tail instead: two agent-doable
+LOW findings from `findings-tail.md`, both fully fixed and verified
+without touching a real host.
+
+**L-01 — caddy's admin API reachable from anubis on vps, fixed and
+VM-tested.** `hosts/vps/configuration.nix` now sets
+`systemd.services.anubis-jellyfin.serviceConfig = { IPAddressDeny = "any";
+IPAddressAllow = [ "10.100.0.2/32" ]; }`. Build-verified on the rendered
+unit. Then VM-tested for real, per the finding's own instruction ("needs
+a VM test with a real request through caddy, not a unit start"): new
+`tests/anubis-admin-egress.nix`
+(`checks.anubis-admin-egress`) boots caddy + anubis + a stand-in backend
+on a dummy interface at the same address anubis's real `TARGET` uses, and
+proves — not just asserts — five things: the restriction renders live;
+a real request through caddy's unix-socket reverse proxy still reaches
+the backend; a probe shell **migrated into anubis-jellyfin.service's own
+cgroup** (`echo $$ > /sys/fs/cgroup<ControlGroup>/cgroup.procs`, the
+direct way to exercise a cgroup-attached BPF egress filter rather than
+trust the rendered directive) cannot reach a real caddy admin API on
+`127.0.0.1:2019`; the same cgroup can still reach the real backend
+(ruling out "the probe technique itself is broken"); and clearing the
+restriction live with `systemctl set-property` makes the same probe
+succeed again, proving causation the same way `docker-publish-guard.nix`
+does for the firewall guard. `nix build .#checks.x86_64-linux.anubis-admin-egress`
+passes all five subtests.
+
+**L-02 — restic's `/tmp` snapshot mounts, fixed.** The finding said the
+unit "already has `RuntimeDirectory`" — checked against the file and that
+was wrong; it had `StateDirectory` (persistent `/var/lib/…`, used for the
+`last-success` marker), which was never going to help. Corrected in place
+in `findings-tail.md`. The actual fix, in
+`hosts/homelab/configuration.nix`: added a real
+`RuntimeDirectory = "restic-backups-backblazeWeekly"` at `0700` (closes
+both halves the finding named — the symlink-plant risk on a hand-rolled
+`mkdir -p /tmp/restic`, and the world-traversable `/tmp` exposure for a
+mount that can sit for a week); `backupPrepareCommand` mounts under
+`$RUNTIME_DIRECTORY` and now sorts snapshots by `-s creation` instead of
+by name (the finding's "fragile if the naming scheme ever changes" nit);
+`backupCleanupCommand` now unmounts only what this run actually mounted,
+read from `/proc/mounts`, instead of piping every snapshot on the system
+— including `zbackup`'s replicated ones — into `umount`. `awk` was the
+first draft's cleanup tool; the unit's own `path` list carries no `gawk`,
+caught by reading the rendered script rather than assumed, so it uses
+`grep`+`cut` instead. Verified by reading the rendered
+`…/bin/restic-backups-backblazeWeekly-pre-start` and `-post-stop` scripts
+out of `nixos-rebuild build`'s `./result`, the audit's own "verify the
+fix, not the build" technique — deliberately **not** exercised with a
+real restic run, since
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md`
+already decided not to risk kicking off part of a multi-day backup this
+way.
+
+**Also folded in**: `2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md`'s
+F1 checkbox (rotate the factorio.com token/password) was still unticked
+even though `rotation-runbook.md` item 12 had recorded it done since the
+sixth session — synced, no new action taken.
+
+**What was looked at and deliberately left alone**: the rest of the tail
+(L-03 through L-15, SYS-01 through SYS-12, the promotion candidates, and
+the needed/used rollup) — most of it is either a user-only decision, a
+provider-side action, or genuinely needs a live host to observe (e.g.
+L-04's "check thinkpad for an existing `authorized_keys` file first" —
+no SSH access to thinkpad). The four 2026-08-28 plan files' own open
+items (the `.zfs`-traversal mechanism decision, the manual-deploy-vs-restic
+D1/D2, the `~/.cache`/`Downloads` dataset split, restic's own F2 live
+test) are untouched, per their own status — they were already correctly
+blocked, not overlooked. `nix flake check --no-build` was run once for a
+broad sanity pass; it fails on `checks.zrepl-replication` for an
+unrelated, already-tracked reason
+(`2026-08-28-nix-flake-check-fails-on-zrepl-replication-test-pk.md`), not
+on anything this session touched — confirmed by building and VM-testing
+this session's own two checks individually, both clean.
+
+**Not deployed anywhere.** Both fixes are build/VM-test-verified only.
+
+## What happened in the ninth session (2026-09-01)
+
+**Rotation item 9 (`homelab_zrepl_key`) closed — the last rotation item.**
+The blocker in the eighth session's "What is left" (below, now corrected)
+was cleared simply: the user had physical access to both laptops.
+
+- **First correction: torrent was not actually behind by 40 commits.**
+  Before touching anything, live checks (`avahi-daemon` absent, all deploy
+  timers reporting 0, and an `nvd diff` against the running system showing
+  only `ipset`/`jq`-docs/`tmp.mount` as new) showed torrent's generation
+  122 (switched 2026-08-27 21:26, outside this audit's own sessions) was
+  already nearly at this branch's HEAD. `RESUME.md`'s repeated "torrent
+  has never been switched" claim was stale, not current — corrected here
+  rather than carried forward again. The switch itself needed no reboot
+  (no kernel change) and was a small diff, not the fourth session's feared
+  "first-ever, carries all of wave 1" jump.
+- **Both laptops deployed to this branch.** torrent switched locally
+  (small diff, confirmed above); thinkpad switched at its own console by
+  the user, since it has no remote shell — I could not verify it directly
+  the way I did torrent.
+- **New keypair generated by the user**; private half re-encrypted into
+  `secrets/secrets.yaml`, public half (`homelab-zrepl-puller`) placed in
+  `modules/flake/vars.nix`, replacing `homelab-zrepl-pull`.
+- **`sops.secrets.homelab_zrepl_key` given `restartUnits = [
+  "zrepl.service" ]`** (`hosts/homelab/configuration.nix`) — this secret
+  had none, unlike the WireGuard/factorio pair `SYS-11` already closed.
+  Go-netssh shells out to the system `ssh` binary per pull attempt, which
+  plausibly makes it a per-invocation reader already (unlike WireGuard's
+  `RemainAfterExit` oneshot) — not verified either way, and a killed pull
+  just retries, so `restartUnits` was added rather than trusting the
+  assumption.
+- **Build-verified all three hosts before any switch**, including reading
+  the rendered `authorized_keys.d/root` on torrent/thinkpad (new key
+  present, forced command intact) and the sops manifest on homelab
+  (`restartUnits` present, correct `sopsFileHash`) out of `./result` —
+  same "verify the fix, not the build" discipline as the rest of this
+  audit.
+- **Deployed laptops first, then homelab**, per the runbook's fail-safe
+  order. All manual `switch`, not the disabled `boot`-mode auto-deploy, so
+  the "needs a reboot" caveat in the runbook's original item 9 text did
+  not apply — the key took effect immediately. Zero failed units on all
+  three.
+- **Verified by exercising the credential.** Homelab's activation log did
+  show `modifying secret: homelab_zrepl_key` and `zrepl.service`
+  restarting — exactly the shape that fooled three earlier rotations in
+  this audit into a false "done" — so it was not trusted alone. Forced a
+  pull with `zrepl signal wakeup torrent`/`wakeup thinkpad` and watched
+  `zbackup`'s replicas directly: both picked up a fresh snapshot
+  (`@zrepl_20260901_175824_000` / `…175816_000`) matching each source
+  host's own latest local snapshot, within about two minutes.
+- **Also landed**: `glow` added to `modules/profiles/default.nix` (fleet
+  default profile) for reading markdown docs, build-verified on all five
+  `nixosConfigurations`, deployed as part of the same torrent/homelab
+  switches above (thinkpad has it build-verified, not yet confirmed live).
+
+**Two commits landed this session** (a third, the `glow` addition, was
+authored directly; `secrets/secrets.yaml` changes were committed by the
+user on request, since the harness's own classifier — independent of
+`AGENTS.md`'s "I never edit or decrypt secrets" rule — blocked the agent
+from doing it directly): `4561889` (glow) and `3aa78a8` (zrepl key
+rotation). Pushed.
+
+**Cleanup done 2026-09-01:** `/tmp/homelab_zrepl_key` and its `.pub`
+deleted on torrent, after the new key. Item 9 is fully closed — nothing
+outstanding from rotation. See `rotation-runbook.md` item 9's closure note
+for the full detail.
+
+## What happened in the tenth session (2026-09-01)
+
+**Restic's staleness prediction was corrected.** The user ran a manual
+backup (2026-08-29 22:50 → 2026-08-30 08:46, `no errors were found`, exit
+0) that this file and
+`2026-08-28-a-manual-deploy-kills-the-in-flight-weekly-restic-.md` had
+both predicted would page ~2026-09-03. It won't — `last-success` is now
+2026-08-30, and the alarm at 312h isn't due until ~2026-09-12. Corrected
+in place in both files rather than left to mislead the next reader.
+
+**D1 of `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`
+answered and implemented** — the mechanism behind the factorio
+disclosure, not just that one credential. The user asked for research
+and empirical testing before any decision, not a guess:
+
+- A first pass (forked, then redirected to test on homelab directly)
+  found `chmod 0700` on `.zfs` works but does not persist — the control
+  directory is synthesized fresh on every mount, so it silently resets to
+  0777 on the next unmount/mount or reboot. Would have needed a custom
+  reapply-on-mount unit to mean anything.
+- Web research plus direct empirical testing on homelab (throwaway
+  datasets, destroyed after, never touching real data) found
+  `snapdir=disabled` instead: real dataset metadata, survives a full
+  unmount/mount cycle with the block intact, blocks **all** access
+  including root's own (`ENOENT`, not a permission check) on a dataset
+  never previously touched. One real caveat, also verified empirically
+  rather than assumed: an already-cached automount from *before* the
+  property changes stays reachable until that dataset's next
+  unmount/mount or reboot — flipping the property alone doesn't
+  retroactively close it. No regression to restic, confirmed directly:
+  its offsite backup mounts snapshots by explicit name
+  (`mount -t zfs <snap> <target>`), a mechanism entirely separate from
+  `.zfs`, unaffected by `snapdir` either way.
+- Applied to `zroot/local/state` on homelab only. New reusable module
+  `modules/nixos/zfs-dataset-properties.nix` (`myZfsDatasetProperties`)
+  is the actual deliverable requested alongside the fix — a single place
+  for declarative ZFS dataset properties across current and future
+  hosts, self-healing every boot/switch via a `zfs-mount.service`-hooked
+  oneshot, rather than one-off `zfs set` commands that drift out of sync
+  host to host. **PCs deliberately excluded** — the user browses backups
+  via `.zfs/snapshot` on torrent/thinkpad directly, and `disabled` would
+  remove that outright. Carried to
+  `2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`
+  as its own backlog plan (D1 there, undecided) rather than left
+  unresolved in the closed plan.
+- VM-tested (`tests/zfs-dataset-properties.nix`): sandbox baseline, the
+  property actually reaching the dataset, the opt-in-only scope (a second
+  unconfigured dataset stays untouched), the block itself, and the
+  documented remount caveat — all asserted against a real pool, following
+  this repo's "verify the fix, not the build" rule the same way every
+  other VM test in `tests/` does.
+
+**Not deployed anywhere.** Build-verified on all five
+`nixosConfigurations`; torrent/thinkpad/vps are byte-identical to before
+(the module is opt-in and only homelab sets it). Commit `47c4f89`, pushed.
+
+**Disko consolidation done, same session, on explicit go-ahead.** The
+repeated `rootFsOptions` block (byte-identical across all five zpool
+definitions — torrent's and thinkpad's `zroot`, homelab's own
+`zroot`/`zdata`/`zbackup`) and the root-SSD disk layout (identical shape
+on all three ZFS hosts, differing only in swap size) both now live once
+in `modules/flake/vars.nix` (`zfsRootFsOptions`, `mkZfsRootSsd`), matching
+the same pattern `vars.zreplPullerKey` already used. Pure refactor,
+verified by identical outcome rather than by inspection: all five
+`nixosConfigurations` build to **byte-identical store paths** before and
+after. vps has no ZFS and is untouched. Commit `718c396`, pushed. Not
+deployed anywhere — a no-op refactor has nothing to deploy differently,
+but it still rides along with each host's next real switch.
+
+## What happened in the eleventh session (2026-09-01)
+
+**Item 0 of "Agent-doable, unblocked" done** — the disko/
+`myZfsDatasetProperties` unification queued at the end of the tenth
+session. Full detail and verification steps in
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`;
+summary here.
+
+`hosts/homelab/disko.nix`'s per-dataset `options` blocks now read
+`config.myZfsDatasetProperties."<pool>/<dataset>"` instead of never
+referencing it at all — so `snapdir=disabled` on `zroot/local/state`
+(closed in the tenth session, live-reapply only) now also seeds at
+`disko-install`/`nixos-anywhere` creation time, meaning a *fresh* install
+of homelab gets the property from that dataset's very first mount, with
+**no** "already-cached automount" window at all (that window is specific
+to an already-installed host picking the property up live, see the
+`.zfs`-traversal plan's G1/D1).
+
+**Extended further, same session, on explicit ask.** Mid-session the user
+asked what else was safe to fold into the same mechanism. Answer worked
+out and confirmed: any real ZFS *property* (`zfs`/`zpool` `get`/`set`) is
+always safe to reapply idempotently; *structure* (partitioning, `zpool
+create`/vdev topology, `ashift` — fixed permanently at vdev creation
+despite living in `options.ashift`) is one-shot and must stay disko-only.
+`vars.zfsRootFsOptions` (the tenth session's own consolidation — `acltype`,
+`xattr`, `atime`, `mountpoint`, `canmount`, `compression`, `devices`,
+`sync`, `com.sun:auto-snapshot`) is entirely real properties, so it got
+the same treatment for **homelab only**:
+`hosts/homelab/configuration.nix` sets
+`myZfsDatasetProperties."zroot"/"zdata"/"zbackup" = vars.zfsRootFsOptions;`
+and `hosts/homelab/disko.nix`'s three `rootFsOptions` now read that
+option instead of `vars.zfsRootFsOptions` directly. `vars.zfsRootFsOptions`
+itself is untouched and stays the one literal source — torrent/thinkpad's
+`disko.nix` still reads it directly, unaffected, since neither imports
+`zfs-dataset-properties` (the PC exclusion is about `snapdir`/backup
+browsing specifically, not revisited here).
+
+**Verified, not just built**, per this audit's standing rule:
+- `nix build .#nixosConfigurations.homelab.config.system.build.diskoScript`
+  rendered to the identical store path before and after the
+  `rootFsOptions` change — proof the install-time behavior for
+  `zroot`/`zdata`/`zbackup` creation is byte-for-byte unchanged, a pure
+  refactor for what disko already did.
+- The rendered live-oneshot script
+  (`…/bin/zfs-dataset-properties-start`, read out of `nixos-rebuild
+  build`'s closure, not assumed from the unit file per this file's own
+  "grep the payload, not the wrapper" rule) now has 27 new `zfs set`
+  lines (nine properties × three pools) ahead of the pre-existing
+  `snapdir=disabled` line.
+- All five `nixosConfigurations` build; torrent/thinkpad/vps/isoimage
+  render to the exact same store paths as before this session's edits —
+  only `hosts/homelab/configuration.nix` and `hosts/homelab/disko.nix`
+  were touched, confirmed by outcome, not just by diff.
+
+**Extended a third time, same session, to torrent and thinkpad.** On
+further explicit ask, the two remaining ZFS hosts got the identical
+treatment, and the per-host `zfsProps` helper (previously a 3-line local
+`let` binding duplicated wherever it was needed) was generalized into
+`vars.zfsProps` (`modules/flake/vars.nix`) — one definition, each host's
+`disko.nix` binds `zfsProps = vars.zfsProps config;` once. Both hosts now
+import `nixosModules."zfs-dataset-properties"` (`modules/flake/hosts.nix`)
+and set `myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;` in their
+own `configuration.nix`. Importing the module is inert on its own — it
+only acts on keys actually set, so thinkpad's own `local/state` dataset
+(structurally identical to homelab's, sitting right next to the shared
+`zfsProps` wiring) still gets no `snapdir` value, exactly preserving the
+PC exclusion from the `.zfs`-traversal plan's D1.
+
+Verified the same way as the first two rounds, not by trusting the build:
+homelab's disko script still renders to the identical store path from the
+`rootFsOptions` check above (the helper's *definition* moved, not its
+*output*); torrent's and thinkpad's rendered disko scripts were read
+directly and their `zpool create` commands carry the identical nine `-O`
+flags disko always applied (matching `vars.zfsRootFsOptions` verbatim,
+verified value-by-value, not just "it built"), with every other dataset's
+`options` unchanged from before; both hosts' rendered live-oneshot scripts
+are byte-identical to each other and apply exactly those same nine
+properties to `zroot` and nothing else, confirmed by reading the actual
+payload script out of each host's build (via a distinct `--out-link` per
+host, since building both via the shared default `./result` link would
+clobber one with the other). `nixfmt --check` clean on every file this
+session touched; the `statix`/`deadnix` warnings present are all
+pre-existing, on lines this session never edited.
+
+Plan moved to `docs/plans/done/` — D1 answered, every Progress item
+checked, nothing left open.
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`
+citations elsewhere are unaffected (bare-filename citations survive the
+move by design).
+
+**Not deployed anywhere.** All three rounds of this session's work are
+build-verified only.
+
 ## What is left
+
+### Rotation — done
+
+[`rotation-runbook.md`](rotation-runbook.md) has the table. **10 done, 2
+not required.** Item 9 (`homelab_zrepl_key`), the last one, closed
+2026-09-01 including cleanup — see "What happened in the ninth session"
+above and the runbook's own closure note. **Rotation has nothing
+outstanding.**
+
+### Still owed by the user
+
+- ~~Delete the **old Cloudflare token** (item 1) and the **old Discord
+  webhook** (item 2).~~ **Done 2026-08-28**, and both re-verified after
+  deletion: `octodns-sync` succeeded with the new token as the *only*
+  valid one, and the Discord webhook returned HTTP 200 from both homelab
+  and vps with its snowflake decoding to 2026-08-27 — i.e. the surviving
+  webhook is the new one. Items 1 and 2 are now complete end to end,
+  provider side included.
+- ~~Deploy homelab to pick up the **312h staleness threshold**
+  (`c6116ca`).~~ **Done 2026-09-01** — homelab was switched as part of the
+  ninth session's zrepl-key rotation, which carried this along.
+- ~~Expect the backup staleness page ~**2026-09-03**.~~ **Resolved** — a
+  manual backup completed cleanly; see the corrected note above.
+- ~~Delete `/tmp/homelab_zrepl_key` and its `.pub` on torrent.~~ **Done
+  2026-09-01**, after the new key was already verified working.
 
 ### Agent-doable, unblocked
 
+0. ~~**Unify `myZfsDatasetProperties` and `disko.nix`'s per-dataset
+   `options`**~~ — **done in the eleventh session**, and extended to
+   `vars.zfsRootFsOptions` (pool root datasets) too. See "What happened
+   in the eleventh session" above and
+   `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
+   Build-verified only, not deployed.
 1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6,
    deferred on purpose. Needs a VM test with a **real remote target**,
    because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH
@@ -407,26 +992,30 @@ tailscale module sets the former.
    the user's.**
 4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
    mount. Re-maps existing volume ownership, so it needs its own VM test.
-5. **Deploy `torrent` and `thinkpad`** if the user wants — still
-   build-verified only. ~~vps still carries a stale DNAT rule for the
-   deleted 34198~~ — **vps deployed 2026-08-27 (generation 4)**, and
-   that DNAT is gone; see the vps section below. homelab is deployed
-   (generation 346). The laptops still have armed `pull-deploy` timers,
-   which stop when they are next switched.
+5. ~~**Deploy `torrent` and `thinkpad`**~~ — **done 2026-09-01**, as part
+   of the ninth session's zrepl-key rotation; see above. ~~vps still
+   carries a stale DNAT rule for the deleted 34198~~ — **vps deployed
+   2026-08-27 (generation 4)**, and that DNAT is gone; see the vps section
+   below. All four hosts are now deployed to this branch.
 
 ### User-only
 
-`user-actions.md` is the live checklist, and its **§0 is time-critical**
-— the two timers above. Unchanged headline: **rotate the
-ten credentials from `F-P8-02`** — the largest unmitigated risk in the
-audit, and nothing an agent does moves it. The repo is public, so only
-rotation at each provider retracts anything.
+`user-actions.md` is the live checklist. ~~Its **§0 is time-critical** —
+the two timers above.~~ **Stale, corrected 2026-09-01 (eleventh
+session):** both timers were resolved in the third session (see "READ
+THIS FIRST" above — `scheduleEnable = false` fleet-wide stopped them),
+and this paragraph was never updated to match. ~~Unchanged headline:
+rotate the ten credentials from `F-P8-02`.~~ **Also stale, same
+correction:** rotation closed 2026-09-01, see "Rotation — done" above —
+this line was contradicting that section in the same file.
 
-Still open: **D1, D2, D4, D5, D6, D7, D8, D11, D12**, plus **D15**
-(container `--memory` ceiling — blocks half of the resource-ceilings
-item) and **D16** (confirm the new deploy-staleness thresholds; not
-blocking), both added in the fourth session. **D11 is time-critical.**
-Also the factorio
+Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
+`--memory` ceiling — blocks half of the resource-ceilings item) and
+**D16** (confirm the new deploy-staleness thresholds; not blocking),
+both added in the fourth session. ~~D11 is time-critical.~~ **Not
+time-critical** — same stale-timer correction above; D11 itself (the
+`flake-update-test` auto-merge re-evaluation) is still genuinely
+unanswered, just not on a clock. Also the factorio
 account token is still exposed in ZFS snapshots and restic backups taken
 before `/srv/factorio/new` was deleted, and is the **same** credential
 `factorio-main` uses.
@@ -460,9 +1049,16 @@ expensive.
   `accepted-risks.md` §2 — that section is for risks that could be
   accepted, not for sizing and threshold choices.
 
-- **Log the plan and its state in [`TODO.md`](../../../TODO.md)**, not
-  only in this file. It is the repo-root entry point a session reaches
-  for before assuming a described feature is deployed.
+- **Log the plan and its state in a plan file**, not only in this file.
+  `TODO.md` was **retired on master 2026-08-28** in favour of
+  `docs/plans/{todo,in-progress,done,rejected}/` — load the `plan` skill
+  for the scripts and the append-only rules, and the `workflow` skill for
+  when a change needs a plan at all. Two things that bite: plans are
+  cited by **bare filename with no folder path** (so a citation survives
+  the file moving between folders, and a stale one fails *silently*
+  rather than loudly), and filenames are **date-first**
+  (`2026-08-28-<slug>.md`). Never hand-`mv` a plan or hand-write its
+  frontmatter; use the scripts.
 
 - **Correct the record when evidence contradicts it, in place.** Three
   claims in these docs turned out to be wrong when someone finally read
@@ -530,6 +1126,68 @@ expensive.
   harness refuses the command. `nixos-rebuild build` plus reading the
   rendered unit out of `./result` gets the same answer, and is what the
   "verify the fix, not the build" rule wanted anyway.
+- **A command that prints nothing may not be on `PATH`.** `ipset list`
+  returned empty on vps and read as "the sets are gone"; they were fine,
+  `ipset` just was not on root's interactive `PATH`. `jq` likewise.
+  **Both are now installed fleet-wide** via
+  `modules/flake/debug-tools.nix` — if something else is missing, add it
+  there rather than reaching for a `/nix/store` path (see `AGENTS.md`).
+  `iptables`, `ip6tables` and `ss` were on `PATH` all along.
+- **Do not put backticks inside `git commit -m "…"`.** Bash runs them as
+  command substitution and silently eats the word — it removed `inputs`
+  from one commit message this session. Use a message file, or no
+  backticks.
+- **`nix eval` and heredocs to paths outside the worktree are refused**
+  by the harness in this session type. `nixos-rebuild build` plus reading
+  `./result`, and `python3 - <<EOF` writing *inside* the worktree, both
+  work.
+- **The user pushes back, and is usually right.** Three corrections this
+  session (the sops-key ordering, the Tailscale keys, unstable for debug
+  tooling) came from being challenged, and each time the challenge was
+  correct. Check the claim against the repo before defending it.
+**Traps added in the sixth session:**
+
+- **A rotated secret does not reach a running consumer.** Three services
+  reported a clean activation (`modifying secrets: …`, zero failed units)
+  while still using the old value: WireGuard's `wg0` interface (a
+  `RemainAfterExit` oneshot that reads `privateKeyFile` only at link
+  creation), the factorio container (bakes credentials into
+  `server-settings.json` at start), and earlier the Discord webhook. Use
+  `restartUnits` — and note it fires on *content change*, so adding it
+  cannot repair the state that revealed the problem; that needs one
+  manual restart. Restic was the exception: its wrapper reads
+  `passwordFile` per invocation. **Check which kind you have; do not
+  assume either way.**
+- **A systemd exit code 0 can mean "skipped".** `push-deploy-vps` hit its
+  branch guard, logged `Not on master … skipping this scheduled run`, and
+  reported `Result=success ExecMainStatus=0`. The credential it was meant
+  to test was never used. Read the log, not the status — and prefer
+  exercising the credential directly.
+- **`myPushDeploy.flakeDir = "/etc/nixos"` makes a live host's working
+  checkout an input to deploying a *different* host.** Whatever branch
+  someone last used on homelab is what vps gets. This caused a real
+  revert: homelab was deployed from a branch without the WireGuard
+  rotation, which broke the tunnel and put back a Cloudflare token that
+  had been deleted at the provider.
+- **`protectedUnits` guards `auto-switch` only.** A manual
+  `nixos-rebuild switch` consults nothing and will kill a running restic
+  backup — losing the whole run, since restic has no resume, and leaving
+  a lock that silently blocks the next *exclusive* operation while reads
+  keep working. With schedules off fleet-wide, manual is the only path.
+- **Non-exclusive locks make a broken repository look healthy.**
+  `restic snapshots` and `key list` succeeded against a repo that had
+  been locked for a week with a failed backup. "The credential works" and
+  "the service works" are different claims.
+- **`/nix/state/.zfs` is 0777 and `snapdir=hidden` is not a boundary** —
+  it hides the directory from `readdir` but does not block traversal by
+  path. Any local uid can read any snapshot's contents at the permissions
+  they had when taken.
+- **The harness refuses more shapes than the fifth session recorded**:
+  `nix eval` piped into anything, multi-step compound commands it cannot
+  prove stay inside the worktree, and heredocs writing outside it. Break
+  them into plain separate commands, or use the Read/Edit tools — those
+  are not subject to the same check.
+
 - **When verifying a rendered unit, grep the payload, not the wrapper.**
   A `.service` file usually only holds
   `ExecStart=/nix/store/…-unit-script-<name>-start/bin/<name>-start`, and

@@ -17,6 +17,11 @@
         zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
       };
 
+      checks.zfs-dataset-properties = import ../../tests/zfs-dataset-properties.nix {
+        pkgs = config.flake.pkgsUnstable;
+        zfsDatasetPropertiesModule = config.flake.modules.nixos."zfs-dataset-properties";
+      };
+
       checks.docker-publish-guard = import ../../tests/docker-publish-guard.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
@@ -30,6 +35,10 @@
       checks.deploy-chain = import ../../tests/deploy-chain.nix {
         pkgs = config.flake.pkgsUnstable;
         autoUpdateModule = config.flake.modules.nixos."auto-update";
+      };
+
+      checks.anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
+        pkgs = config.flake.pkgsUnstable;
       };
     };
 }

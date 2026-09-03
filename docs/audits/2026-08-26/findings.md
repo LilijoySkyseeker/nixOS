@@ -38,8 +38,21 @@ torrent and thinkpad.
 
 `/tmp` is not a separate mount on torrent, so it sits on
 `zroot/local/root`, which `myZrepl` snapshots **every five minutes** and
-replicates to `zbackup`, from which restic pushes to Backblaze. **40
-snapshots** currently contain it. Deleting the file does not retract it.
+replicates to `zbackup` on homelab. **61 snapshots** on torrent contain
+it as of 2026-08-27 (verified by reading
+`/.zfs/snapshot/zrepl_20260827_231641_000/tmp/homelab_zrepl_key`), plus
+**69** in homelab's replica. Deleting the file does not retract it.
+
+> **Correction, 2026-08-27:** an earlier version of this paragraph added
+> "from which restic pushes to Backblaze". That is wrong, and the same
+> error appears in `F-P7-02`'s reachability line. restic's
+> `backupPrepareCommand` mounts exactly two datasets —
+> `zroot/local/state` and `zdata/storage/storage` — under `/tmp/restic`,
+> and `paths = [ "/tmp/restic" ]`. `zbackup/*` is never mounted, so
+> **no laptop replica reaches Backblaze**. The key is on two machines you
+> control, not offsite. This does not change the action — rotation is
+> still what retracts it — but it changes the blast radius, and the
+> offsite copy is the part that would have been genuinely beyond reach.
 
 **Do:** rotate the keypair, update `vars.zreplPullerKey` and the
 `homelab_zrepl_key` secret, redeploy both source hosts so the old public

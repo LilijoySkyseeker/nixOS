@@ -15,12 +15,22 @@
 // - autoApprovers references tag:homelab (not a user) so re-advertising
 //   the exit node / subnet route auto-approves without manual admin
 //   approval, and doesn't break if a user account is later suspended.
+// - There is deliberately NO tag:isoimage. Removed 2026-08-27 by the
+//   security audit (F-P8-19). It described a device that cannot exist:
+//   hosts/isoimage's module list omits profile-default, so
+//   services.tailscale.enable = false and config.sops is not even an
+//   option there. An ISO is a bootable artifact that can be copied
+//   anywhere and must not carry a tailnet identity — that is the design,
+//   not an oversight. The matching tailscale_authkey_isoimage secret and
+//   the never-used auth key behind it were retired at the same time.
+//   Do not re-add the tag; if isoimage is ever genuinely meant to join,
+//   that is a config change first (profile-default + sops-nix) and a new
+//   non-reusable, pre-authorized, tagged key second.
 {
     "tagOwners": {
         "tag:thinkpad": ["autogroup:admin"],
         "tag:torrent":  ["autogroup:admin"],
         "tag:homelab":  ["autogroup:admin"],
-        "tag:isoimage": ["autogroup:admin"],
         "tag:vps":      ["autogroup:admin"],
     },
 
@@ -34,8 +44,8 @@
     "grants": [
         // members and all tagged devices can reach each other
         {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
-            "dst": ["tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
+            "dst": ["tag:thinkpad", "tag:torrent", "tag:homelab"],
             "ip":  ["*"],
         },
         // vps is reachable for admin SSH by you and by all your other
@@ -43,19 +53,19 @@
         // doesn't need outbound access to anything beyond what the
         // internet grant below already covers
         {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["tag:vps"],
             "ip":  ["*"],
         },
         // let members and tagged devices use homelab as an exit node
         {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["autogroup:internet"],
             "ip":  ["*"],
         },
         // let members and tagged devices reach homelab's advertised LAN subnet
         {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab", "tag:isoimage"],
+            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["192.168.1.0/24"],
             "ip":  ["*"],
         },
