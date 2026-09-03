@@ -72,3 +72,5 @@ decision rather than assuming. Not answered yet.
 
 
 **DEFERRED 2026-09-03:** user picked CPU-only for v1 (F2's cost -- multi-hour from-source CUDA-onnxruntime build, no OpenVINO path, no binary cache, rebuild on every relevant nixpkgs bump -- outweighs building it in speculatively). Spun into its own todo plan for later.
+
+_security finished 2026-09-03T20:52:48Z -- see Findings above._

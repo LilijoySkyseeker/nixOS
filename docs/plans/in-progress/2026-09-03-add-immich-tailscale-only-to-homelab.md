@@ -30,20 +30,37 @@ once v1 is live (D2). D3 (GPU-accelerated ML) was investigated (F2) and
 is real but costly (multi-hour from-source build, Nvidia/CUDA only, no
 OpenVINO path) — deferred, CPU-only for v1, carried into
 `2026-09-03-gpu-accelerate-immich-machine-learning-cuda.md` as its own
-follow-up. All three decisions are now resolved. Next step: draft
-`modules/services/immich.nix`.
+follow-up.
+
+**2026-09-03, implementation landed.** `modules/services/immich.nix`
+drafted and registered on `homelab` in `modules/flake/hosts.nix`, mirroring
+jellyfin's shape (bind broad, restrict at the firewall to `tailscale0`
+only, no `wg0` rule). Full `verify-ladder` passes (nixfmt, `nix flake
+check`, targeted builds for all 5 hosts, no new statix/deadnix issues).
+`/simplify`'s 4 parallel review agents (reuse/simplification/efficiency/
+altitude) all came back clean, no fixes needed. `security` subagent found
+two things: F3 (NFS AUTH_SYS lets a client already holding root
+impersonate immich's uid, bypassing the 0700 mediaLocation mode) —
+accepted, since it's the same trust boundary `nfs-homelab-mounts.nix`
+already documents for the whole `/storage` export, not something this
+change introduces; and F4 (the new persistence entry for
+`/var/lib/postgresql` used impermanence's root:root/0755 default instead
+of explicit ownership) — fixed, now explicit `user`/`group = "postgres"`
+matching jellyfin.nix's convention. Only remaining open item is the D2
+follow-up (a path to share outside the tailnet), which is deliberately
+deferred until v1 has been live for a while.
 
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
 - [x] D3 decided (GPU acceleration for ML, v1 or later) — deferred to follow-up plan, CPU-only for v1
-- [ ] modules/services/immich.nix drafted (mirrors modules/services/jellyfin.nix shape)
+- [x] modules/services/immich.nix drafted (mirrors modules/services/jellyfin.nix shape)
 - ~~[ ] new zdata dataset created + wired into myZrepl/myHealthAlerts/restic (if D1 picks a new dataset)~~
   moot — D1 picked (b), no new dataset
 - ~~[ ] G1's mount-ordering race addressed before first deploy~~ moot — see G1 strikethrough
-- [ ] `nixos-rebuild build --flake .#homelab` passes
-- [ ] `/simplify` run
-- [ ] `security` subagent run (new network-exposed service, secrets-adjacent via postgres/redis wiring)
+- [x] `nixos-rebuild build --flake .#homelab` passes (also full verify-ladder: nixfmt, flake check, statix/deadnix, all 5 hosts)
+- [x] `/simplify` run — 4 agents (reuse/simplification/efficiency/altitude), all clean, no fixes needed
+- [x] `security` subagent run — F3 (NFS AUTH_SYS trust boundary, inherited not introduced) accepted, F4 (persistence entry missing explicit ownership) fixed
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -223,3 +240,180 @@ Discourse recipe ([discourse.nixos.org/t/immich-and-cuda-accelerated-machine-lea
     as a separate follow-up once real per-photo ML latency on this
     library is known to be worth a multi-hour one-time build cost. D3 is
     still open pending the user's final call on this tradeoff.
+
+### F3 -- NFS's `sec=sys` uid-trust model can undermine the 0700 `mediaLocation` boundary D1(b) relied on, for an adversary already holding root on an authorized NFS client
+
+- **File:** `modules/services/immich.nix` (mediaLocation on the shared
+  `zdata/storage/storage` dataset), `modules/services/nfs.nix:9-12` (export
+  has no `sec=` override, so it stays NFSv4's default `sec=sys`/AUTH_SYS),
+  `modules/nixos/nfs-homelab-mounts.nix` (grants `torrent`/`thinkpad` the
+  `multimedia` gid and NFS access to `/storage`)
+- **Severity:** MEDIUM
+- **Confidence:** PLAUSIBLE (architecturally sound from the nixpkgs
+  `services.nfs.server`/mount-option semantics read directly, plus
+  `services.immich`'s `isSystemUser = true` with no pinned `uid`
+  (`nixos/modules/services/web-apps/immich.nix:456-461` in the pinned
+  nixpkgs-stable source, confirmed CONFIRMED for that specific claim) — not
+  verified against a live host's actual allocated uid, and `nix eval`
+  against this worktree's `nixosConfigurations.homelab` was unavailable in
+  this sandbox to confirm the concrete number, so the exploit's exact
+  target uid is PLAUSIBLE, not demonstrated)
+- **Axis:** hardening (a network boundary trusted more than it should be)
+  and needed-used (D1(b) was accepted on the premise that the 0700 rule is
+  a hard boundary against the wider export)
+- **Reachability:** an adversary with root on `torrent` or `thinkpad` --
+  both already hold the `multimedia` gid and an NFSv4 mount of `/storage`
+  (`modules/nixos/nfs-homelab-mounts.nix`). `modules/services/nfs.nix`'s
+  export (`root_squash`, `100.64.0.0/10`) only remaps a client's uid
+  **0** to `nobody`; it does nothing to stop that same root user from
+  creating a throwaway local account at an arbitrary non-zero uid
+  (`useradd -u <N>`) and mounting/reading as that uid instead, because
+  `sec=sys` authenticates purely by the uid/gid the client *declares*,
+  with no cryptographic binding. Immich's own tmpfiles rule forces
+  `/storage/immich` to `0700 immich:immich` on every boot regardless of
+  the parent's `0770` mode (this is real, and does stop ordinary
+  `multimedia`-gid access) -- but it does not stop a client-side uid that
+  happens to collide with immich's server-side uid, which is dynamically
+  allocated (no `uid =` pinned in the nixpkgs module) from a small,
+  brute-forceable system-uid range. The plan's D1(b) framed the 0700 rule
+  as protecting Immich's photo library (a materially more sensitive data
+  class than the shared movie library that's the normal reason `/storage`
+  is exported) from the wider export; that holds against the *legitimate*
+  group-read path the plan discussed, but not against this uid-impersonation
+  path, which the plan did not examine.
+- **Rule:** n/a -- not a `docs/hardening.md` line item, but adjacent to
+  rule 5's "a rule justified by a belief about the network is a rule that
+  will silently become wrong" spirit, applied to `sec=sys`'s trust model
+  rather than an interface.
+- **Finding:** the confidentiality boundary D1(b) relied on to accept
+  reusing the NFS-exported dataset is narrower than presented: it stops
+  the `multimedia` group, not a malicious/compromised root on an already-
+  authorized client.
+- **Fix risk:** the two real fixes are heavier than this diff -- moving
+  the export to `sec=krb5` (a KDC this repo doesn't have) or implementing
+  D1(a) (isolated `zdata/storage/immich` dataset, not NFS-exported, with
+  its own disko/zrepl/restic wiring). Either changes reachability for the
+  existing `torrent`/`thinkpad` mounts and needs to be tested against
+  those real mounts before deploying, not just built.
+
+
+**ACCEPTED 2026-09-03:** NFS sec=sys/AUTH_SYS lets root on an already-authorized client (torrent/thinkpad) declare an arbitrary uid, which could collide with immich's dynamically-allocated system uid and read through the 0700 mediaLocation directory. Not a new gap Immich introduces -- modules/nixos/nfs-homelab-mounts.nix already documents this exact trust boundary for the whole /storage export (root_squash only remaps uid 0, not other uids), and it applies equally to jellyfin's media today. Fixing it would mean reworking the fleet's NFS auth model (e.g. krb5) -- out of scope for adding one service, and every device that could exploit this already holds this fleet's admin SSH keys (docs/procedures/remote-access.md), which is already a bigger blast radius. Accepted as inherited from the existing NFS trust model, not introduced by this change.
+
+### F4 -- `/var/lib/postgresql` persistence entry has no explicit ownership, unlike every other persistence entry in this repo
+
+- **File:** `modules/services/immich.nix:35` (`"/var/lib/postgresql"` as
+  a bare string, vs. `modules/services/jellyfin.nix`'s persistence
+  entries, which all specify `{ directory = ...; user = ...; group =
+  ...; }` matching the service's actual account)
+- **Severity:** INFO
+- **Confidence:** CONFIRMED -- read directly:
+  `impermanence`'s `submodule-options.nix:39-42` defaults a plain-string
+  directory entry's ownership to `user`/`group` passed in from
+  `nixos.nix:110-111`, which for `environment.persistence.<path>.directories`
+  is hardcoded `"root"`/`"root"`, mode `"0755"`. Separately, the pinned
+  nixpkgs `postgresql.nix:844-850` gives `postgresql.service` a
+  `StateDirectory = "postgresql postgresql/<version>"` when `dataDir` is
+  left at its default (as it is here, since neither `services.immich` nor
+  this diff overrides `services.postgresql.dataDir`) -- systemd's own
+  directory-management re-applies the unit's `User`/`Group` ownership to
+  `StateDirectory`-listed paths on every service start, so root:root
+  0755 from impermanence's first creation is expected to get corrected to
+  postgres:postgres before postgres ever tries to use it. Not expected to
+  break functionally today.
+- **Axis:** hardening (consistency with the repo's own established
+  pattern) / needed-used
+- **Reachability:** n/a -- no adversary path demonstrated; this is a
+  latent inconsistency, not a live exposure.
+- **Rule:** new-rule candidate -- persistence entries for a service's own
+  data directory should specify explicit `user`/`group`/`mode` matching
+  that service's account, the way `jellyfin.nix` already does, rather
+  than relying on another module's `StateDirectory` re-chown to paper
+  over impermanence's root:root/0755 default. The self-healing only
+  holds as long as `services.postgresql.dataDir` stays at its default --
+  if a future change ever pushes it onto the `ReadWritePaths` branch
+  instead (`postgresql.nix:844-846`, taken when `dataDir` is
+  non-default), the re-chown stops happening and postgres's own dataDir
+  permission check would then refuse to start against a root:root/0755
+  directory, silently, until that day.
+- **Fix risk:** low -- adding `user = "postgres"; group = "postgres";
+  mode = "0700";` (or reusing `config.services.postgresql.dataDir`'s
+  effective owner) to the persistence entry matches the existing
+  jellyfin.nix pattern. Only needs testing that impermanence's directory
+  creation doesn't race/conflict with postgresql's own `StateDirectory`
+  provisioning on a genuinely fresh (first-boot) dataset.
+
+
+**FIXED 2026-09-03:** modules/services/immich.nix's persistence entry for /var/lib/postgresql changed from a bare string (impermanence default root:root/0755) to an explicit { directory; user = "postgres"; group = "postgres"; } entry, matching jellyfin.nix's convention of always setting ownership explicitly rather than relying on postgres's own StateDirectory re-chown to paper over it. Verified postgres's default OS user/group is postgres/postgres in the pinned nixpkgs-stable services.postgresql module. nixos-rebuild build --flake .#homelab re-verified clean after the fix.
+
+## Checked and clean (security review, 2026-09-03)
+
+Reviewed `modules/services/immich.nix` and the one-line
+`modules/flake/hosts.nix` addition against `docs/hardening.md` and the
+pinned nixpkgs-stable (26.05, rev `a3116115851d68b8952a2a4221cc25a84e56b532`)
+`services.immich` module source directly
+(`nixos/modules/services/web-apps/immich.nix`), plus the
+`services.postgresql`/`services.redis` modules it drives and the
+`impermanence` module handling the new persistence entry. Confirmed
+clean, beyond what's discussed above and beyond what D1/D2/D3 already
+settle as accepted tradeoffs:
+
+- **Bind/firewall shape matches jellyfin's already-reviewed pattern
+  exactly**: `host = "0.0.0.0"` with no `openFirewall`, scoped only via
+  `networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
+  config.services.immich.port ]` (port 2283, confirmed the module's own
+  default, unmodified by this diff). No `wg0` rule, confirmed no
+  `immich`/`2283` reference anywhere in `hosts/vps/configuration.nix` --
+  the "no public path via vps's Caddy+Anubis" claim is actually true, not
+  just documented intent. `hosts/homelab/configuration.nix` has no
+  `trustedInterfaces`/`allowedTCPPortRanges` that would leak this onto
+  the LAN NIC's public IPv6 address.
+- **`modules/flake/hosts.nix`**: `nixosModules.immich` is added to
+  `homelab`'s module list only -- not `thinkpad`, `torrent`, `vps`, or
+  `isoimage`.
+- **No new secrets, confirmed at the module-assertion level**: the
+  module's own `assertions` only requires `secretsFile` when
+  `!isPostgresUnixSocket`; both `database.host` (`/run/postgresql`) and
+  `redis.host` (`config.services.redis.servers.immich.unixSocket`) are
+  left at their unix-socket defaults, and Redis's own `port = 0` disables
+  its TCP listener outright regardless of `bind`. Neither Postgres nor
+  Redis ever gets a TCP listener from this config; `services.postgresql`
+  keeps its own default `enableTCPIP = false`, unmodified.
+- **Backup coverage genuinely holds, not just per the plan's
+  reasoning**: `/var/lib/postgresql` sits on the `persistRoot` bind mount
+  (`/nix/state`, backed by `zroot/local/state`), and `mediaLocation =
+  "/storage/immich"` sits on `zdata/storage/storage` -- both datasets are
+  already in `myZrepl.local.datasets`, the weekly
+  `restic-backups-backblazeWeekly`'s `backupPrepareCommand` dataset list,
+  and `myHealthAlerts.backupStaleness`
+  (`zbackup/backup/homelab/zroot/local/state`,
+  `zbackup/backup/homelab/zdata/storage/storage`, both already present in
+  `hosts/homelab/configuration.nix` before this diff). No new
+  zrepl/restic/health-alerts wiring is needed, confirmed by reading those
+  three lists directly rather than trusting the plan's restated claim.
+- **Systemd hardening on the units this diff enables comes from
+  upstream, and is substantial**: `commonServiceConfig` in the pinned
+  module already sets `NoNewPrivileges`, `PrivateUsers`, `PrivateTmp`,
+  `ProtectHome`/`ProtectClock`/`ProtectKernelModules`/etc.,
+  `RestrictAddressFamilies`, `RestrictNamespaces`, `RestrictSUIDSGID`,
+  `UMask = "0077"`, and a `CapabilityBoundingSet = ""` for both
+  `immich-server` and `immich-machine-learning`; `postgresql.service` and
+  the `redis-immich` unit both get their own independent, comparably
+  strict hardening blocks from their own pinned modules. Nothing in this
+  diff weakens or overrides any of that -- this repo's "custom
+  `systemd.services` sandboxing" rule doesn't apply here since no unit is
+  repo-authored.
+- **Privilege**: no `users.users.*.extraGroups` grant anywhere in the
+  diff (rule 6) -- the only supplementary-group grant
+  (`immich-server`'s access to the redis socket group) is unit-scoped,
+  from the upstream module itself, gated on `cfg.redis.enable &&
+  isRedisUnixSocket`.
+- **`hosts/flake/hosts.nix` diff and `modules/services/immich.nix` diff**
+  contain no docker/OCI containers, so rule 10's per-container checklist
+  doesn't apply.
+
+Not independently re-litigated: D1's NFS/multimedia-gid exposure
+tradeoff itself (accepted, see F3 above for a narrower angle the plan
+didn't cover), D2's public-share-link loss (accepted, tracked as
+follow-up), and D3's GPU-acceleration deferral (F2, already investigated
+in this plan) -- reviewed here only to confirm this diff's actual code
+matches what those decisions describe, not to re-argue the decisions.
