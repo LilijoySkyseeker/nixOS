@@ -107,6 +107,25 @@ answered yet.
 
 **ANSWERED 2026-09-03:** user wants a path to share outside the tailnet later -- not accepted as a permanent loss. Track as expected near-term follow-up work (e.g. scoped Tailscale Funnel or a jellyfin-style Anubis proxy for just the share-link route), not just an accepted risk in docs/accepted-risks.md.
 
+**NOTE 2026-09-03 -- friendly hostname idea, relevant to this follow-up:**
+user asked whether Immich could be reached as `immich.homelab` over the
+tailnet instead of `homelab:2283`. Answer: not via Tailscale's MagicDNS
+alone (it only names devices, not per-service subdomains) -- needs (1) a
+reverse proxy on homelab doing Host-header routing on `tailscale0:80`
+(e.g. Caddy, already precedented on vps) to `localhost:2283`, plus (2)
+something to make the name resolve: either a public DNS record via the
+octodns setup already in this repo (zero new infra, but discloses the
+hostname's *existence* publicly via DNS lookup, even though the resulting
+tailscale IP stays unreachable off the tailnet), or Tailscale Split DNS
+against a self-hosted resolver (fully private, but a new component to
+run). **Decision explicitly deferred** -- landing v1 with straight
+`homelab:2283` port access for now, no proxy built. Worth revisiting
+together with D2's public-share-link follow-up, since the same reverse
+proxy would also be the natural front door for a later scoped Tailscale
+Funnel or Anubis proxy -- one piece of infra could serve both asks
+(friendly hostnames tailnet-wide, and selective public share-link
+exposure) rather than building them separately.
+
 ### D3 -- GPU-accelerated ML (face detection / CLIP smart search) at v1?
 homelab already has both an Nvidia GTX 1050 Mobile (NVENC/NVDEC, used by
 jellyfin) and an Intel HD 630 iGPU (VAAPI/QSV) passed through. Immich's ML
