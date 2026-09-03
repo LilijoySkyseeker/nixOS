@@ -84,6 +84,17 @@ no `group:multimedia` entry survived -- while `/storage` itself still
 correctly shows both its normal grants. Deployed before any real exposure
 window opened.
 
+**2026-09-03, D4: scoped read-only access restored for torrent/thinkpad.**
+User asked for the trusted desktop machines to be able to read the raw
+photos after all. Added a fourth tmpfiles rule granting `group:multimedia:
+r-X` specifically on `mediaLocation/library` (read-only, and only the
+organized originals -- not staging/thumbnails/video-encodes/DB backups),
+ordered to reapply after F5's re-lock on every boot/switch. Also fixed a
+minor cosmetic nit caught while verifying (F5's own grant should have been
+`rwX` not `rwx`). Verified live: `library/` and nested files show
+`group:multimedia:r-x`/`r--`, everything else in the tree still shows no
+multimedia entry at all, all four units still healthy.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -97,6 +108,7 @@ window opened.
 - [x] `security` subagent run — F3 (NFS AUTH_SYS trust boundary, inherited not introduced) accepted, F4 (persistence entry missing explicit ownership) fixed
 - [x] deployed live to homelab (`nixos-rebuild switch --target-host`) — caught and fixed G4 (mediaLocation creation + /storage ACL traversal), verified working end-to-end
 - [x] rerun `/simplify` + `security` on the G4 fix commit — 4/4 simplify clean, security caught F5 (HIGH), fixed and verified live with a forced boot-simulating tmpfiles pass
+- [x] D4 decided + implemented — torrent/thinkpad get scoped read-only access to mediaLocation/library, verified live
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -183,6 +195,34 @@ decision rather than assuming. Not answered yet.
 
 
 **CARRIED 2026-09-03:** see `2026-09-03-gpu-accelerate-immich-machine-learning-cuda.md`
+
+### D4 -- reopened after F5: should torrent/thinkpad get any access back into mediaLocation?
+F5's fix locked `mediaLocation` down to `immich:immich` only, no group
+access at all -- correct as a default, but the user then explicitly asked
+for `torrent`/`thinkpad` (the same NFS `multimedia`-gid mount jellyfin
+already uses) to be able to read the raw photos, clarifying these are
+trusted machines. **ANSWERED 2026-09-03:** scoped, read-only grant --
+`group:multimedia:r-X` on `mediaLocation/library` specifically (the
+organized original photos/videos), *not* the whole tree. `upload/`
+(transient staging), `thumbs/`/`encoded-video/` (generated derivatives),
+and `backups/` (Postgres dumps) stay `immich`-only. Read-only rather than
+read-write regardless of trust: Immich tracks every file's path and
+checksum in its own database, so an external write (rename/edit/delete)
+risks desyncing that and corrupting Immich's own view of the library --
+a data-integrity concern, not a confidentiality one, so "trusted
+machines" doesn't remove it. Implemented as a fourth `systemd.tmpfiles.rules`
+entry in `modules/services/immich.nix`, additive (`A+`) and ordered last
+so it re-applies after F5's re-lock strips everything, every single
+boot/switch. Verified live: `getfacl` on `library/` (and a nested photo
+file) shows `group:multimedia:r-x`; `backups/`, `thumbs/`, `upload/` all
+show no `multimedia` entry at all. Also caught and fixed a minor
+correctness nit while verifying: F5's own `user:immich:rwx` grant should
+have been `rwX` (conditional execute) rather than a hardcoded `rwx`, or
+every leaf file (including plain photos) picks up a spurious execute
+bit that then propagates into this new grant's own `X`-conditional
+logic. Fixed, redeployed, reverified -- purely cosmetic (an executable
+bit on a jpg does nothing), and only affects files already touched
+before the fix; new uploads get the correct mode going forward.
 
 ## Gotchas (G)
 

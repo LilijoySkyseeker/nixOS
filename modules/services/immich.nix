@@ -64,9 +64,28 @@ in
       # underneath it with only immich's own -- ordered after both prior
       # rules via the same mkAfter list, so it always runs last and wins.
       # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#F5
+      #
+      # torrent/thinkpad (trusted machines, same NFS multimedia-gid mount
+      # jellyfin already uses) get read-only access to library/ -- the
+      # organized original photos/videos -- but not the rest of the tree
+      # (upload/ staging, thumbs/, encoded-video/, backups/ Postgres
+      # dumps). Read-only, not read-write: Immich tracks every file's path
+      # and checksum in its own database, so an external write (rename,
+      # edit, delete) could desync that and corrupt Immich's own view of
+      # the library -- a data-integrity risk, not a trust one. Ordered
+      # last in this same list so it re-applies after F5's re-lock strips
+      # everything, every boot/switch, additive (A+) so it doesn't wipe
+      # immich's own entries set by the rule above.
+      # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#D4
       systemd.tmpfiles.rules = lib.mkAfter [
         "a+ /storage - - - - user:immich:--x"
-        "A ${config.services.immich.mediaLocation} - - - - user:immich:rwx"
+        # rwX (not rwx): X only sets execute on directories/already-
+        # executable files, so regular photo/video files don't pick up a
+        # spurious execute bit. Matters here specifically because the
+        # library grant below is itself X-conditional and would otherwise
+        # inherit an execute bit this rule set on every leaf file.
+        "A ${config.services.immich.mediaLocation} - - - - user:immich:rwX"
+        "A+ ${config.services.immich.mediaLocation}/library - - - - group:multimedia:r-X"
       ];
 
       # no wg0 rule here, unlike jellyfin -- this is the whole point:
