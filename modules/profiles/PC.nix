@@ -310,18 +310,13 @@ in
 
       # Enable CUPS to print documents.
       #
-      # PLACEHOLDER STATE, 2026-08-27. The USB Brother this was built for
-      # is gone, so `drivers = [ brlaser ]` went with it — it was driving
-      # nothing. The replacement is a networked Brother MFC-L2740DW that
-      # does not have a static address yet, so there is deliberately no
-      # printer declared here: CUPS runs and prints to nothing until
-      # 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md is worked through.
-      #
-      # When adding it, prefer a driverless IPP queue pointed at the
-      # printer's static IP (`ipp://<ip>/ipp/print`, model `everywhere`)
-      # over a vendor driver. That keeps `drivers` empty and, critically,
-      # does not reintroduce mDNS: the usual `._ipp._tcp.local` URI
-      # resolves via avahi, and avahi is intentionally gone (below).
+      # Base only -- shared by both PC hosts. The actual printer queue and
+      # scanning are declared in nixosModules."brother-mfc-l2740dw" and
+      # wired into torrent only (modules/flake/hosts.nix), not here: both
+      # ensurePrinters' deviceUri and sane-airscan's WSD discovery are
+      # network-supplied-identity risks D9 was written to avoid on a
+      # roaming laptop.
+      # plan: 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md#F1
       services.printing = {
         enable = true;
         drivers = [ ];
