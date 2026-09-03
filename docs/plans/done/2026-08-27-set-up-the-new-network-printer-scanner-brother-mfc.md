@@ -1,8 +1,8 @@
 ---
 slug: set-up-the-new-network-printer-scanner-brother-mfc
 created: 2026-08-27
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Set up the new network printer/scanner (Brother MFC-L2740DW)
@@ -46,6 +46,23 @@ frozen: false
 
       Build-verified as a placeholder on torrent and thinkpad; no
       switch. *(D9, F-P1-04, F-P5-06)*
+
+## State
+**2026-09-02, complete.** Printer and scanner both live and confirmed
+working on torrent: driverless IPP Everywhere print queue at the
+printer's static IP, and sane-airscan-backed WSD scanning. Moved out of
+the shared `profile-pc` into a torrent-only module (F1/F2) after a
+security review found the static-IP queue and WS-Discovery both to be
+network-supplied-identity risks on the roaming `thinkpad`. A second
+security pass caught the WSD firewall exception being wider than needed
+(F3, fixed by scoping to the kernel's ephemeral port range). User
+confirmed scanning works end-to-end from a real desktop session
+(Skanpage) after logging out and back in -- the `hardware.sane` module's
+session variables only apply to fresh logins, not already-running
+sessions or bare shells (G3). No unfree Brother blobs used for either
+print or scan. The one open checklist item (brlaser fallback) is a
+contingency that was never triggered -- driverless printing worked as
+planned.
 
 ## Progress
 
