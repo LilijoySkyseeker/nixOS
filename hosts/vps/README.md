@@ -107,8 +107,8 @@ After install:
   `vpsPublicIp`(`6`) and `hosts/homelab/configuration.nix`'s wireguard
   peer `endpoint`.
 - Confirm `crowdsec`, `crowdsec-firewall-bouncer`,
-  `tailscaled-autoconnect`, `caddy`, and the fail2ban jail are all
-  active before trusting the box, then exercise a real reboot — the
+  `tailscaled-autoconnect`, and `caddy` are all active before trusting
+  the box, then exercise a real reboot — the
   boot-race fixes (retry-on-failure for crowdsec/the bouncer, a longer
   `tailscaled-autoconnect` timeout) can only be confirmed against
   DigitalOcean's real network-arming delay, not a local VM.
@@ -121,11 +121,11 @@ _Auto-generated from `nixosConfigurations.vps`. Regenerate with
 
 ### Services (enabled)
 
-caddy, cloud-init, crowdsec, crowdsec-firewall-bouncer, dbus, fail2ban, fstrim, fwupd, getty, logind, logrotate, lvm, mingetty, nixosManual, nscd, openssh, resolved, sshd, tailscale, timesyncd, udev, udisks2, zram-generator
+caddy, cloud-init, crowdsec, crowdsec-firewall-bouncer, dbus, fstrim, fwupd, getty, logind, logrotate, lvm, mingetty, nixosManual, nscd, openssh, resolved, sshd, tailscale, timesyncd, udev, udisks2, zram-generator
 
 ### Packages
 
-acl, attr, audit, bash-interactive, bat, bcache-tools, bind, bitwarden-cli, btop, bzip2, comma-with-db-2.4.1, coreutils-full, cpio, cscli, curl, dbus, dbus-broker, diffutils, direnv, dosfstools, e2fsprogs, eza, fail2ban, ffmpeg, findutils, flac, fontconfig, fwupd, gawk, git, glibc, glibc-locales, glow, gnugrep, gnused, gnutar, grub, gzip, helix, hicolor-icon-theme, hostname-debian, iproute2, ipset, iptables, iputils, jq, kbd, kexec-tools, kmod, lazygit, less, libcap, libressl, linux-pam, lvm2, man-db, mkpasswd, nano, ncurses, neovim, nh, nix, nix-bash-completions, nix-index-with-full-db-0.1.11, nix-info, nixfmt, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, openssh, patch, polkit, procps, psmisc, rsync, run0-sudo-shim, shadow, shared-mime-info, smartmontools, sops, sound-theme-freedesktop, systemd, tailscale, texinfo-interactive, time, tldr, tmux, topgrade, trippy, udisks, util-linux, wget, which, wireguard-tools, xz, zfs-prune-snapshots, zoxide, zstd
+acl, attr, audit, bash-interactive, bat, bcache-tools, bind, bitwarden-cli, btop, bzip2, comma-with-db-2.4.1, coreutils-full, cpio, cscli, curl, dbus, dbus-broker, diffutils, direnv, dosfstools, e2fsprogs, eza, ffmpeg, findutils, flac, fontconfig, fwupd, gawk, git, glibc, glibc-locales, glow, gnugrep, gnused, gnutar, grub, gzip, helix, hicolor-icon-theme, hostname-debian, iproute2, ipset, iptables, iputils, jq, kbd, kexec-tools, kmod, lazygit, less, libcap, libressl, linux-pam, lvm2, man-db, mkpasswd, nano, ncurses, neovim, nh, nix, nix-bash-completions, nix-index-with-full-db-0.1.11, nix-info, nixfmt, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, openssh, patch, polkit, procps, psmisc, rsync, run0-sudo-shim, shadow, shared-mime-info, smartmontools, sops, sound-theme-freedesktop, systemd, tailscale, texinfo-interactive, time, tldr, tmux, topgrade, trippy, udisks, util-linux, wget, which, wireguard-tools, xz, zfs-prune-snapshots, zoxide, zstd
 
 ### Containers
 
