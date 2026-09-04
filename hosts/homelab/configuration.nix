@@ -296,6 +296,50 @@
     };
   };
 
+  # Backup restore-and-verify (Tier 1) -- see
+  # 2026-09-04-automated-canary-based-backup-restore-and-verify-tier-1.md.
+  # Canary content strings must match, byte for byte, what each source
+  # host's own myBackupCanary.paths declares.
+  myBackupCanary.paths = {
+    "/storage/.backup-canary/canary.txt" = "backup-canary homelab zdata/storage/storage v1";
+    "/storage-bulk/.backup-canary/canary.txt" = "backup-canary homelab zdata/storage/storage-bulk v1";
+    "/nix/state/.backup-canary/canary.txt" = "backup-canary homelab zroot/local/state v1";
+  };
+
+  myBackupRestoreTest = {
+    zbackup = {
+      enable = true;
+      targets = {
+        "zbackup/backup/homelab/zdata/storage/storage".expectedContent =
+          "backup-canary homelab zdata/storage/storage v1";
+        "zbackup/backup/homelab/zdata/storage/storage-bulk".expectedContent =
+          "backup-canary homelab zdata/storage/storage-bulk v1";
+        "zbackup/backup/homelab/zroot/local/state".expectedContent =
+          "backup-canary homelab zroot/local/state v1";
+        "zbackup/backup/torrent/zroot/local/home".expectedContent =
+          "backup-canary torrent zroot/local/home v1";
+        "zbackup/backup/torrent/zroot/local/root".expectedContent =
+          "backup-canary torrent zroot/local/root v1";
+        "zbackup/backup/thinkpad/zroot/local/home".expectedContent =
+          "backup-canary thinkpad zroot/local/home v1";
+        "zbackup/backup/thinkpad/zroot/local/root".expectedContent =
+          "backup-canary thinkpad zroot/local/root v1";
+      };
+    };
+    restic = {
+      enable = true;
+      wrapperCommand = "restic-backblazeWeekly";
+      # Must match backupPrepareCommand's RuntimeDirectory above.
+      mountPrefix = "/run/restic-backups-backblazeWeekly";
+      triggerUnit = "restic-backups-backblazeWeekly.service";
+      # Only the two datasets restic actually backs up (see backupPrepareCommand above) -- not storage-bulk, torrent, or thinkpad.
+      targets = {
+        "zroot/local/state".expectedContent = "backup-canary homelab zroot/local/state v1";
+        "zdata/storage/storage".expectedContent = "backup-canary homelab zdata/storage/storage v1";
+      };
+    };
+  };
+
   # Import zbackup at boot.
   #
   # nixpkgs only generates a zfs-import-<pool>.service for pools something
@@ -556,6 +600,12 @@
       # — a threshold this loose still turns "silently stopped deploying"
       # from never-detected into detected-within-three-weeks.
       "/nix/var/nix/profiles/system" = 504;
+      # myBackupRestoreTest's canary restore-and-verify. These prove the
+      # backup is actually restorable, not just advancing (backupStaleness
+      # above only checks the latter) -- a broken run also trips
+      # failed-units, this catches one that stops running entirely.
+      "/var/lib/backup-restore-test/zbackup-last-success" = 30; # daily check
+      "/var/lib/backup-restore-test/restic-last-success" = 312; # matches restic's own staleness threshold above
     };
   };
 
