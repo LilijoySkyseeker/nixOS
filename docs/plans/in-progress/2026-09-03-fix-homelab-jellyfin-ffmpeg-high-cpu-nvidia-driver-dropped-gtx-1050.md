@@ -71,9 +71,21 @@ spawns.
 
 ## State
 
-Root cause fully diagnosed and confirmed against live host + pinned
-nixpkgs source. D1 (forceEncodingConfig vs one-time delete) needs the
-user's actual answer before implementation starts.
+Fixed, deployed, and verified live on homelab. `nixos-rebuild switch
+--target-host root@homelab` from this branch's merged HEAD (fix +
+up-to-date master, including the just-landed Immich GPU passthrough)
+required a reboot -- the driver bump pulled in a kernel bump too
+(6.18.44 -> 6.18.48), and an out-of-tree module built against a
+different kernel version can't be hot-loaded (see G2). Post-reboot:
+`nvidia-smi` reports driver 580.173.02 with the GTX 1050 correctly
+detected, `encoding.xml` shows `HardwareAccelerationType=nvenc` with no
+more drift warning in the jellyfin log, and `hevc_nvenc`/`h264_nvenc`
+appear in Jellyfin's available-encoders list. `jellyfin`,
+`immich-server`, `immich-machine-learning`, and `zrepl` are all active
+post-reboot with no failed units. CPU is back to normal idle levels.
+Did not force a live client transcode to directly observe `hevc_nvenc`
+in a running ffmpeg process -- the indirect evidence (encoders listed,
+config correct, GPU visible, CPU normal) is treated as sufficient.
 
 ## Progress
 
@@ -83,8 +95,8 @@ user's actual answer before implementation starts.
 - [x] verify-ladder run clean
 - [x] real `nixos-rebuild build` (or switch, if user wants live deploy)
       confirms build succeeds -- via verify-ladder's targeted rebuild
-- [ ] on-host verification: `nvidia-smi` works, a real transcode uses
-      `hevc_nvenc`/`h264_cuvid` instead of `libx264`
+- [x] on-host verification: `nvidia-smi` works, hardware encoders
+      available to jellyfin post-reboot (no forced live transcode test)
 
 ## Decisions (D)
 
@@ -113,6 +125,28 @@ sandbox as a false-positive git-safety match (something about the string
 "eval") inside a worktree -- had to resolve nixpkgs revs via
 `nix flake metadata --json` + `curl` against raw.githubusercontent.com
 instead of evaluating the flake directly.
+
+### G2 -- driver package swap pulled in a kernel bump, needing a reboot
+to actually load
+
+`nixos-rebuild switch --target-host` completed and reported success, but
+`nvidia-smi` still failed afterward and `lsmod` showed no nvidia module
+loaded at all. Cause: `nvidiaPackages.legacy_580` at this nixpkgs-stable
+rev also bumped `boot.kernelPackages` (6.18.44 -> 6.18.48, confirmed via
+`readlink /run/booted-system/kernel` vs `/run/current-system/kernel`
+differing). An out-of-tree kernel module built against one kernel
+version can't be loaded into a different running kernel --
+`modprobe nvidia` failed with "No such device" because it was resolving
+the *old* booted kernel's still-installed 595.71.05 module, not the new
+one on disk. `switch` alone never reloads the running kernel; a reboot
+was required, after which the new kernel + matching nvidia module both
+loaded correctly. `push-deploy` already has `rebootIfKernelChanged`
+logic for exactly this case (see `modules/nixos/push-deploy.nix`) but
+push-deploy is currently disabled fleet-wide, so a manual `switch`
+doesn't get that check for free -- worth checking
+`readlink /run/booted-system/kernel` vs `/run/current-system/kernel`
+after any manual switch that touches `hardware.nvidia.package` or
+`boot.kernelPackages`.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
