@@ -128,6 +128,29 @@ workflow validated on the first: 1,158 assets, dry-run caught 2 files
 with no matching Takeout metadata, real import included them via
 `--include-unmatched` per user's choice.
 
+**2026-09-03, final `/simplify` + `security` pass on F5/D4/D5 (user-
+requested, everything since the prior review), F6/F7/F8 fixed and
+deployed.** Security found: F6 (MEDIUM) -- GPU device access meant only
+for `immich-server` was leaking to `immich-machine-learning` (untrusted-
+media-parsing component) via a user-level group grant plus upstream's
+own shared `commonServiceConfig`; fixed with a per-unit
+`SupplementaryGroups` grant on just `immich-server` and an explicit
+`mkForce` lockout back to zero device access on `immich-machine-learning`
+-- user confirmed this is the right call (ML stays CPU-only per D3; real
+GPU-accelerated ML is the separate deferred CUDA plan, now carrying a G2
+note about undoing this lockout when that work happens). F7 (INFO) --
+narrowed an inert-but-imprecise `rwm` device grant to explicit `rw`,
+matching jellyfin's own pattern. F8 (MEDIUM) -- corrected comments that
+credited the wrong mechanism (`mkAfter`/file order) for why the F5
+re-lock rule wins over upstream's competing rule; real mechanism is
+systemd-tmpfiles' own type-based sort, confirmed against the pinned
+`tmpfiles.c` source. `/simplify` found one accepted-not-fixed efficiency
+tradeoff (double recursive walk over `library/`, not worth the
+enumeration fragility to eliminate) and one declined altitude suggestion
+(extracting a shared ACL-grant helper -- premature for a single real
+consumer). All fixes verified live: correct per-unit device access,
+services healthy, job queue still clean after yet another restart.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -143,6 +166,7 @@ with no matching Takeout metadata, real import included them via
 - [x] rerun `/simplify` + `security` on the G4 fix commit — 4/4 simplify clean, security caught F5 (HIGH), fixed and verified live with a forced boot-simulating tmpfiles pass
 - [x] D4 decided + implemented — torrent/thinkpad get scoped read-only access to mediaLocation/library, verified live
 - [x] D5 decided + implemented — GPU device passthrough for video transcoding deployed live, verified (DeviceAllow, render group, job queue undisturbed by the restart); NVENC backend selection left as a manual admin-UI toggle, not Nix-declared
+- [x] final `/simplify` + `security` pass on F5/D4/D5 — F6/F7/F8 fixed and deployed, verified live; one efficiency tradeoff accepted, one altitude suggestion declined (both with reasoning recorded)
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -418,6 +442,42 @@ Two real bugs, both now fixed in `modules/services/immich.nix`:
   homelab itself, all four units (postgresql, redis-immich,
   immich-server, immich-machine-learning) active, `systemctl --failed`
   empty fleet-wide.
+
+### G5 -- final `/simplify` pass on the F5/D4/D5 commits: one accepted-not-fixed tradeoff, one declined restructure
+Rerun of the 4-way `/simplify` review (reuse/simplification/efficiency/
+altitude) plus `security` on everything since the prior pass
+(`709523c..HEAD`), requested explicitly by the user before wrapping up.
+Reuse: clean. Simplification: two stale/bloated comments (the F5 block
+had accreted into an incident narrative rather than a load-bearing
+invariant; the "always runs last and wins" claim went stale the moment
+D4's rules got appended after it) -- both trimmed as part of the F8 fix
+above. Efficiency: mediaLocation/library gets walked by two separate
+recursive tmpfiles passes every boot (the F5 re-lock covers the whole
+tree, the D4 library grant re-walks library/ specifically) --
+**accepted, not fixed**: the only way to avoid the double walk is to
+scope the re-lock rule away from library/ by enumerating mediaLocation's
+other subdirectories (`upload`/`thumbs`/`encoded-video`/`backups`/
+`profile`) by name, which would silently stop covering any new
+subdirectory a future Immich version adds -- a real correctness
+regression traded for a boot-time-only performance gain on what's
+realistically a modest personal library. Altitude: suggested extracting
+a generic shared helper (e.g. `mkStorageScopedGrant`) for the
+"traverse-then-scoped-grant" ACL pattern, citing that this is the second
+real incident (F5, D4-followup) produced by hand-rolled raw tmpfiles
+rules + `mkAfter` ordering, and that jellyfin.nix hit an analogous
+tmpfiles-ordering trap once already (fixed there by moving to the typed
+`systemd.tmpfiles.settings` API). **Declined**: jellyfin's fix doesn't
+transfer directly -- ACL manipulation genuinely needs the raw-string
+rule format (no typed API surface for it in this nixpkgs version), and
+there is exactly one real consumer of this specific scoped-grant pattern
+today (immich itself; jellyfin doesn't need it, it's a full `multimedia`
+group member). Extracting a generic parameterized module for a
+single-consumer pattern would be premature abstraction under this repo's
+own stated conventions. Addressed the actual root concern narrowly
+instead: F8's comment fix states the true ordering mechanism precisely,
+so a future third rule added to this same list has an accurate
+explanation to build on rather than propagating the mkAfter
+misconception.
 
 ## Findings (F)
 
@@ -702,6 +762,250 @@ Discourse recipe ([discourse.nixos.org/t/immich-and-cuda-accelerated-machine-lea
 
 **FIXED 2026-09-03:** Added a second tmpfiles rule to modules/services/immich.nix: 'A ${mediaLocation} - - - - user:immich:rwx' (recursive replace), ordered via the same mkAfter list as the existing traverse grant, so it always runs immediately after the broad /storage rule on every boot/switch and strips any group:multimedia ACL entry the broad rule just applied underneath mediaLocation. Verified live on homelab, not just by ordering theory: forced a full systemd-tmpfiles --create pass (equivalent to a real boot) and confirmed via getfacl that /storage/immich retained group::--- with only user:immich:rwx -- no group:multimedia entry survived -- while the parent /storage still correctly shows both its normal grants. Deployed and confirmed before any real exposure window (the directory didn't yet exist when the broad rule ran on the deploy that created it, so nothing had actually leaked).
 
+### F6 -- `users.users.immich.extraGroups = [ "render" ]` grants GPU render-node access to `immich-machine-learning` too, not just the transcoding unit that needs it
+
+- **File:** `modules/services/immich.nix:45` (`users.users.immich.extraGroups = [ "render" ];`)
+  interacting with the pinned nixpkgs-stable `services.immich` module
+  (`nixos/modules/services/web-apps/immich.nix`, rev
+  `a3116115851d68b8952a2a4221cc25a84e56b532`): `commonServiceConfig` (lines
+  ~17-46) is shared verbatim (`serviceConfig = commonServiceConfig // {...}`)
+  between `systemd.services.immich-server` (line ~395) *and*
+  `systemd.services.immich-machine-learning` (line ~426), and both units run
+  as `User = cfg.user;` / `Group = cfg.group;` -- the same `immich` account
+  (`cfg.user` defaults to `"immich"`, not overridden anywhere in this repo).
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED for the mechanism (read the exact pinned
+  upstream module source and the systemd default udev rule
+  (`rules.d/50-udev-default.rules.in:61`: `SUBSYSTEM=="drm",
+  KERNEL=="renderD*", GROUP="render", MODE="{{GROUP_RENDER_MODE}}"`, from
+  the same pinned systemd source tree, confirming render nodes are DAC-gated
+  on the `render` group, not just the cgroup device controller). PLAUSIBLE
+  for the specific attack path (a malicious/crafted photo or video
+  triggering code execution inside `immich-machine-learning`'s
+  image-decode/ONNX-inference pipeline) -- asserted as a standard threat
+  model for any component that parses attacker-supplied media, not a known
+  CVE.
+- **Axis:** hardening
+- **Reachability:** `immich-machine-learning` is the one component in this
+  deployment whose entire job is parsing untrusted, externally-supplied
+  input (every photo/video any account uploads, including via a public
+  share link once D2's follow-up lands, or from any tailnet-authorized
+  client today) for face detection/object recognition. An adversary who
+  achieves code execution there -- the plausible first step for exactly this
+  class of service -- inherits every group membership of the shared `immich`
+  Unix account, including `render`, and the cgroup already permits it
+  (`DeviceAllow` is set from the *same* shared `commonServiceConfig`
+  regardless of which unit it's attached to, so the cgroup-level gate is
+  already open for both units regardless of this diff). The only thing
+  actually keeping `immich-machine-learning` off `/dev/dri/renderD128`/`129`
+  before this diff was the traditional DAC group check on the device node
+  (`root:render 0660`-shaped, confirmed via the udev rule above) -- which
+  this diff's `users.users.immich.extraGroups` grant removes for both units
+  at once, not just `immich-server`.
+- **Rule:** violates `docs/hardening.md` rule 6 ("Put privilege on the unit,
+  not the user... a user-level grant applies to *everything* that user ever
+  runs, for as long as the account exists")
+- **Finding:** the fix should have been
+  `systemd.services.immich-server.serviceConfig.SupplementaryGroups = [
+  "render" ]` (scoped to the one unit D5 actually needs it for -- video
+  transcoding, which per D5's own comment only happens in `immich-server`,
+  not `immich-machine-learning`), not a `users.users.*.extraGroups` grant.
+  The jellyfin precedent this diff's comment cites as prior art
+  (`users.users.jellyfin.extraGroups = [ "render" ]`,
+  `modules/services/jellyfin.nix:49`) does not actually establish this is
+  safe to copy: jellyfin has exactly one systemd unit running as the
+  `jellyfin` user, so a user-level grant and a unit-level grant are
+  equivalent there. Immich splits into two systemd units
+  (`immich-server`, `immich-machine-learning`) sharing one Unix account,
+  which is exactly the shape rule 6 is written to cover and jellyfin's
+  single-unit case never exercises. This repo's own prior review pass
+  (this same plan file, "Checked and clean (security review, 2026-09-03)",
+  before D5 existed) explicitly noted "no `users.users.*.extraGroups` grant
+  anywhere in the diff (rule 6)" as a positive finding -- D5 is what
+  introduces the first one.
+- **Fix risk:** low -- swapping to `serviceConfig.SupplementaryGroups` on
+  just `immich-server` is a narrow, mechanical change. The only thing to
+  verify post-fix is that hardware transcoding still actually works from
+  `immich-server` (the unit that opens the render node), since
+  `SupplementaryGroups` takes effect per-unit at process start, same as the
+  user-level grant did for that unit.
+
+
+**FIXED 2026-09-03:** Fixed in two steps, both verified live. (1) Moved render-group membership from users.users.immich.extraGroups (user-level, shared by both immich-server and immich-machine-learning) to systemd.services.immich-server.serviceConfig.SupplementaryGroups -- confirmed via the generated unit file that this merges with upstream's own conditional redis-immich group grant on the same unit rather than replacing it. (2) That alone wasn't sufficient: services.immich.accelerationDevices is applied to both units by the upstream module's own shared commonServiceConfig, so immich-machine-learning still showed DeviceAllow for both render nodes even after the group fix. Added systemd.services.immich-machine-learning.serviceConfig = { PrivateDevices = lib.mkForce true; DeviceAllow = lib.mkForce []; } to force it back to its pre-D5 zero-device posture. Verified live after redeploy: immich-server retains both SupplementaryGroups (redis-immich, render) and both DeviceAllow entries; immich-machine-learning shows PrivateDevices=yes and zero DeviceAllow lines. Job queue confirmed undisturbed by the restart (failed:0 across all queues, same check as after prior restarts). Noted as G2 in the deferred GPU-accelerate-immich-ml plan since that follow-up will need to deliberately undo this override when it's implemented.
+
+### F7 -- `accelerationDevices`' bare device paths grant `rwm` (full, including device-node creation) via `DeviceAllow`, not `rw`, unlike jellyfin's explicit `"... rw"` entry the comment claims to match
+
+- **File:** `modules/services/immich.nix:33-36` (`accelerationDevices = [
+  "/dev/dri/renderD128" "/dev/dri/renderD129" ];`, no access-mode suffix)
+  vs. `modules/services/jellyfin.nix:46-48`
+  (`systemd.services.jellyfin.serviceConfig.DeviceAllow = lib.mkAfter [
+  "/dev/dri/renderD129 rw" ];`, explicit `rw`)
+- **Severity:** INFO
+- **Confidence:** CONFIRMED -- verified against the pinned nixpkgs-stable
+  systemd source (`a3116115851d68b8952a2a4221cc25a84e56b532`):
+  `src/core/load-fragment.c:4186` (`config_parse_device_allow`):
+  `permissions = isempty(p) ? 0 : cgroup_device_permissions_from_string(p);`
+  -- an omitted access-mode token parses to `permissions = 0`, and
+  `src/core/cgroup.c:697-698`/`724-725`
+  (`cgroup_context_add_device_allow`/`_add_or_update_device_allow`):
+  `if (p == 0) p = _CGROUP_DEVICE_PERMISSIONS_ALL;` -- `_ALL` is `r|w|m`.
+  Also confirmed live via `nix repl` against
+  `nixosConfigurations.homelab.config.systemd.services.immich-server.serviceConfig.DeviceAllow`,
+  which evaluates to exactly `[ "/dev/dri/renderD128" "/dev/dri/renderD129" ]`
+  -- bare paths, no access-mode field -- matching the upstream module's own
+  `DeviceAllow = mkIf (cfg.accelerationDevices != null)
+  cfg.accelerationDevices;` (`nixos/modules/services/web-apps/immich.nix:28`),
+  which passes `accelerationDevices` straight through with no access-mode
+  suffix appended.
+- **Axis:** needed-used
+- **Reachability:** n/a beyond the cgroup device-controller permission
+  itself -- practically inert. `mknod(2)` for a character/block device node
+  additionally requires `CAP_MKNOD` (or root) regardless of what the cgroup
+  device controller permits, and `commonServiceConfig` sets
+  `CapabilityBoundingSet = "";` for both `immich-server` and
+  `immich-machine-learning` (confirmed, same upstream source, unmodified by
+  this diff) -- so neither unit can actually exercise the `m` bit even
+  though the cgroup grants it.
+- **Rule:** n/a -- not a specific `docs/hardening.md` line item; general
+  least-privilege beyond that doc's own rules.
+- **Finding:** video transcoding only needs `r`+`w` on the render nodes
+  (open, ioctl, read/write); this repo's `accelerationDevices` list grants
+  `rwm` on both, an over-broad cgroup permission with no demonstrated reach
+  given the capability bounding set already blocks the only thing `m`
+  enables. The diff's own comment ("Same two render nodes jellyfin already
+  uses... jellyfin's own systemd unit has no `/dev/nvidia*` DeviceAllow
+  entries at all, just this") is accurate about the device *list* matching
+  jellyfin's, but not about the access *mode* -- jellyfin's own
+  `DeviceAllow` entry is explicitly `rw`-only, immich's is implicitly `rwm`.
+  This is entirely upstream's module design (`accelerationDevices` has no
+  way to specify an access mode at all, per its option type
+  `types.nullOr (types.listOf types.str)` with device *paths* as the
+  example), not something this repo's diff could have avoided while using
+  that option -- flagged as a real but low-value gap between the stated
+  jellyfin-parity claim and the actual access mode granted.
+- **Fix risk:** none available within `services.immich.accelerationDevices`
+  -- the option doesn't support an access-mode suffix. A real fix would need
+  to bypass the option and set
+  `systemd.services.immich-server.serviceConfig.DeviceAllow = lib.mkForce [
+  "/dev/dri/renderD128 rw" "/dev/dri/renderD129 rw" ]` directly (losing the
+  upstream module's `PrivateDevices = cfg.accelerationDevices == [ ]`
+  wiring's own consistency, and needing to be kept in sync by hand on any
+  future nixpkgs bump that changes `commonServiceConfig`'s shape) -- not
+  worth doing given the capability bounding set already makes the gap
+  inert.
+
+
+**FIXED 2026-09-03:** Added explicit "rw" suffix to both accelerationDevices entries ("/dev/dri/renderD128 rw", "/dev/dri/renderD129 rw") instead of bare paths, which default to DeviceAllow's implicit rwm. Verified live: DeviceAllow=/dev/dri/renderD128 rw / renderD129 rw on immich-server. Matches jellyfin's own explicit rw-only pattern as the comment already claimed but didn't actually achieve before this fix.
+
+### F8 -- the four `tmpfiles.rules` entries' stated correctness reasoning (in this file's own comments, and in two prior "Checked and clean" passes in this same plan) is not what actually makes F5/D4 safe, and the real mechanism is undocumented anywhere in this repo
+
+- **File:** `modules/services/immich.nix:56-60` (this repo's own `d`-type
+  mediaLocation-creation rule) and `:103-126` (the `A`/`a+`/`A+` rules,
+  `lib.mkAfter`), interacting with the pinned nixpkgs-stable
+  `services.immich` module's own unconditional `e`-type rule for the same
+  path (`nixos/modules/services/web-apps/immich.nix:441-454`,
+  `systemd.tmpfiles.settings.immich."${cfg.mediaLocation}".e = { user =
+  cfg.user; group = cfg.group; mode = "0700"; };`)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED -- read `src/tmpfiles/tmpfiles.c` directly from
+  the pinned nixpkgs-stable systemd source (rev
+  `a3116115851d68b8952a2a4221cc25a84e56b532`, same source tree the existing
+  F5 finding and both prior "Checked and clean" passes in this file already
+  cite):
+  - `parse_line()` (`tmpfiles.c:4074-4101`): every parsed line, from *every*
+    tmpfiles.d config file merged in this boot (not just one file), whose
+    type is in `needs_glob()` -- which includes `EMPTY_DIRECTORY` (`e`),
+    `SET_ACL` (`a`/`a+`), and `RECURSIVE_SET_ACL` (`A`/`A+`) -- is inserted
+    into one shared, path-keyed hashmap (`c->globs`) and immediately
+    re-sorted via `typesafe_qsort(existing->items, existing->n_items,
+    item_compare)` (`tmpfiles.c:4101`) every time a new item lands on that
+    exact path. This is a cross-file merge keyed purely on literal path
+    string, not scoped to the file that declared each line.
+  - `item_compare()` (`tmpfiles.c:3305-3315`): "Make sure that the
+    ownership taking item is put first, so that we first create the node,
+    and then can adjust it" -- sorts items whose type is in
+    `takes_ownership()` (`tmpfiles.c:419-439`, which explicitly includes
+    `EMPTY_DIRECTORY`) ahead of items that aren't (`SET_ACL`/
+    `RECURSIVE_SET_ACL` are not in that set), then tie-breaks remaining
+    items by `CMP(a->type, b->type)` -- a raw numeric compare of the
+    `ItemType` enum, whose values are literally the type letter's ASCII
+    code (`tmpfiles.c:84-115`: `SET_ACL = 'a'`, `RECURSIVE_SET_ACL = 'A'`,
+    etc.).
+  - For the literal path `${mediaLocation}` ("/storage/immich"), this means
+    the actual, guaranteed execution order every single systemd-tmpfiles
+    invocation (boot, switch, or `--create`) is: upstream's `e` rule first
+    (ownership-taking), then this repo's `A` rule (F5, `RECURSIVE_SET_ACL`
+    = ASCII `0x41`), then this repo's `a+` rule (D4-followup,
+    `SET_ACL`/append = ASCII `0x61`, sorts after `A` purely because
+    uppercase sorts before lowercase in ASCII) -- regardless of which
+    config file each line lives in, or what order they're declared in this
+    repo's own `systemd.tmpfiles.rules` list.
+  - Separately, `fd_set_perms()` (`tmpfiles.c:937-1033`, specifically
+    `do_chmod = ((new_mode ^ st->st_mode) & 07777) != 0;` at line 981)
+    confirms upstream's `e` rule is *not* the "harmless no-op" this same
+    plan file's second "Checked and clean" pass (line ~842) characterized
+    it as, once steady state is reached: `do_chmod` compares the target
+    mode against the directory's *current* on-disk mode bits, and POSIX
+    ACLs keep a directory's traditional "group" class mode bits in sync
+    with its `ACL_MASK` entry -- so once F5/D4's `A`/`a+` rules have run at
+    least once and given `mediaLocation` a non-trivial ACL (mask reflecting
+    `immich`'s `rwX` entry plus `multimedia`'s `r-X` entry), the directory's
+    raw mode bits no longer equal `0700`, and upstream's `e` rule *does*
+    fire a real `fchmod()`/`fchownat()` on every subsequent invocation --
+    it only looked like a no-op on the very first cycle, right after the
+    `d` rule created the directory with matching mode/ownership and before
+    any ACL had touched it.
+- **Axis:** hardening (closest to `docs/hardening.md` rule 9's "verify
+  config actually takes effect... not by reading the file you just wrote" --
+  here, two separate review passes over the same file reasoned about *why*
+  this ordering is safe and both landed on an inaccurate mechanism, saved in
+  practice only by a systemd internal not examined by either).
+- **Reachability:** n/a as a current live exposure -- independently working
+  through the actual execution order above, the end state after a full
+  invocation is correct (upstream's `e`-triggered chmod happens, but F5's
+  `A` and D4's `a+` always run immediately after it in the same pass,
+  rebuilding the ACL and its mask from scratch each time, so the net result
+  matches what the "verified live" claims in F5/D4 observed). The risk is
+  latent, not active: this repo's own stated reasoning for *why* it's safe
+  is wrong or incomplete in both places that address it (`mkAfter`/file-sort
+  reasoning in F5's comment addresses the `/storage`-vs-`mediaLocation`
+  prefix relationship, not this same-path interaction with upstream's `e`
+  rule at all; the second "Checked and clean" pass addresses this
+  interaction but concludes `e` is inert, which is false in steady state) --
+  so a future contributor who trusts either stated model, and adds another
+  same-path rule believing declaration order (or "it's a no-op anyway")
+  governs the outcome, could get silently reordered by `item_compare`
+  regardless of where they place it in the Nix list. This is also exactly
+  the shape of thing a nixpkgs-stable bump could change without any signal
+  in this repo's own diff: if upstream ever changes its own `mediaLocation`
+  rule from `e` to something not in `takes_ownership()` (or drops it, or
+  changes to a recursive variant), the tie-break this design currently
+  relies on shifts, and nothing in `nixos-rebuild build`/`dry-build` or a
+  `getfacl` listing would catch it -- ACL entries would still be present,
+  only their *effective* permission (gated by the mask) would be wrong,
+  exactly the failure mode rule 9 warns about.
+- **Rule:** violates `docs/hardening.md` rule 9 in spirit (verification
+  gap), though not a literal instance of the example given there.
+- **Finding:** current behavior is correct, but for a different and
+  more fragile reason than either of this plan's two prior reviews
+  documented, and that reason lives entirely in an upstream systemd
+  implementation detail (`item_compare`'s `takes_ownership`-first,
+  then-ASCII-tiebreak sort) that `tmpfiles.d(5)` only commits to loosely
+  ("these are always done in the same fixed order," without specifying
+  what that order is) -- not a guarantee this repo's own comments describe
+  or a future editor would think to check.
+- **Fix risk:** none needed for current correctness. A worthwhile
+  (non-urgent) follow-up would be a comment correction pointing at the real
+  mechanism, plus a functional regression check (e.g. an actual `ls`/read
+  attempt as a `multimedia`-group member, not just `getfacl`) added
+  somewhere it'd run after a `nixpkgs-stable` bump that touches the
+  `services.immich` module -- currently nothing would catch a silent
+  regression here short of a manual live test.
+
+
+
+**FIXED 2026-09-03:** Corrected the comments in modules/services/immich.nix that credited lib.mkAfter/file-processing-order as the mechanism ensuring the F5 re-lock rule wins over upstream's own e-type rule on the same path. Now states the actual mechanism per the security review's direct reading of the pinned tmpfiles.c source (systemd-tmpfiles' own type-based conflict resolution), while noting current behavior is verified correct live regardless of the exact internal mechanism (forced boot-equivalent tmpfiles pass + getfacl, done twice across this plan). Also trimmed the surrounding comment block from an incident-narrative style down to the load-bearing invariant, per the simplification review's related finding -- full story stays in this plan file, cited by anchor.
+
 ## Checked and clean (security review, 2026-09-03)
 
 Reviewed `modules/services/immich.nix` and the one-line
@@ -852,4 +1156,66 @@ data class D1(b) and F3 both assumed was protected. Recommend F3 be
 revisited/amended alongside F5, since F5 disproves a specific factual
 claim F3's acceptance rested on.
 
-_security finished 2026-09-03T22:03:20Z -- see Findings above._
+## Checked and clean (security review, 2026-09-03, D4-followup/D5 diff)
+
+Reviewed `git diff 709523c..HEAD -- modules/services/immich.nix` (four
+commits: F5's fix, D4's scoped read grant, D4's traversal follow-up, D5's
+GPU device passthrough) against `docs/hardening.md` and the pinned
+nixpkgs-stable `services.immich` module source
+(`nixos/modules/services/web-apps/immich.nix`, rev
+`a3116115851d68b8952a2a4221cc25a84e56b532`, confirmed via `flake.lock` and
+`modules/flake/hosts.nix`), plus the pinned systemd source tree
+(`src/tmpfiles/tmpfiles.c`, `src/core/{load-fragment,cgroup}.c`,
+`rules.d/50-udev-default.rules.in`) fetched and read directly rather than
+inferred from man pages alone. F6/F7/F8 above are new findings from this
+pass; the rest of this diff checked out clean:
+
+- **D4's read grant on `mediaLocation` itself does not leak anything
+  meaningful via sibling directory names.** The only children a
+  `multimedia`-group member can list via the new `a+ ${mediaLocation}
+  group:multimedia:r-X` grant are Immich's own fixed top-level layout
+  (`library`, `upload`, `thumbs`, `encoded-video`, `backups`, `profile` --
+  standard, documented Immich directory names, not user- or
+  content-specific), and only the *names*: none of those siblings besides
+  `library` (D4's actual, intended grant) have a `multimedia` ACL entry of
+  their own, so `backups/` (Postgres dumps), `upload/` (in-flight staging),
+  `thumbs/`, and `encoded-video/` stay unreadable/unlistable. `library/`'s
+  own internal layout uses UUIDs for user and asset identifiers, not
+  emails or filenames, per Immich's own storage-template documentation --
+  no additional identity or content leak beyond what D4 already accepted.
+- **`immich-server`'s and `immich-machine-learning`'s systemd sandbox is
+  otherwise unweakened by this diff.** `commonServiceConfig`'s
+  `NoNewPrivileges`, `PrivateUsers`, `PrivateTmp`, `ProtectHome`,
+  `ProtectKernelModules`/`ProtectKernelTunables`/`ProtectKernelLogs`,
+  `ProtectControlGroups`, `RestrictNamespaces`, `RestrictSUIDSGID`,
+  `RestrictAddressFamilies`, `UMask = "0077"`, and `CapabilityBoundingSet
+  = ""` are all untouched by this diff (confirmed by reading the exact
+  pinned module source; the diff only adds `accelerationDevices`, the
+  resulting `PrivateDevices = false` flip that option forces (an inherent,
+  unavoidable upstream tradeoff of using `accelerationDevices` at all --
+  not something this diff could have kept `true` while still passing
+  device access through, and immaterial in practice since `DevicePolicy`
+  defaults to `closed`, so the wider `/dev` visibility `PrivateDevices =
+  false` grants is limited to directory-listing/`stat` information
+  disclosure of other host device nodes, not actual `open()` access to
+  them), `DeviceAllow` (F7), and `users.users.immich.extraGroups` (F6)).
+- **The `a+`/`A+` D4 rules' non-widening of the ACL mask beyond what F5
+  already established.** Confirmed via the same `tmpfiles.c` source read
+  for F8: `a+`'s mask recompute (`calc_acl_mask_if_needed()`) only ever
+  takes the union of entries already present plus the rule's own argument
+  -- `group:multimedia:r-X` cannot widen the mask past what F5's `rwX`
+  grant to `immich` already established, and does not touch `library/`'s
+  separate, independently-scoped `A+` grant's own mask.
+- **No new secrets, no new firewall rule, no new `oci-containers`** in
+  this diff -- `accelerationDevices`/`extraGroups`/the ACL rules are the
+  only substantive additions since the prior "Checked and clean" pass;
+  rules 4/5/10 in `docs/hardening.md` don't apply to any of them.
+
+Not independently re-litigated: F3/F5's NFS/`multimedia`-gid exposure
+(already accepted, and F5's own fix -- confirmed unmodified by the D4/D5
+commits reviewed here), D1/D2/D3 (accepted tradeoffs from earlier in this
+plan, out of scope for this diff).
+
+_security finished 2026-09-03T22:03:20Z -- see Findings above (pass 2: D4-followup/D5 diff, F6-F8)._
+
+_security finished 2026-09-04T01:08:42Z -- see Findings above._

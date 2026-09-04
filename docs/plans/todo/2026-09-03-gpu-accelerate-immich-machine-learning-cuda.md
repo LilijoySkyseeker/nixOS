@@ -49,6 +49,33 @@ explicitly. Worth deciding at implementation time whether that's
 acceptable ongoing cost or whether it needs its own cachix-style binary
 cache.
 
+### G2 -- immich-machine-learning is now explicitly hardened to zero device access; this work needs to deliberately undo that
+The parent plan's security review (F6, 2026-09-03) found that GPU device
+access granted for `immich-server`'s video transcoding (D5) was leaking to
+`immich-machine-learning` too, via mechanisms outside direct per-unit
+control (a user-level group grant, and `accelerationDevices` itself being
+applied to both units by the upstream nixpkgs module's shared
+`commonServiceConfig`). Since the ML worker was CPU-only at the time (no
+benefit from device access it couldn't use) and is the component that
+parses untrusted uploaded media (the worse place to carry unnecessary
+attack surface), `modules/services/immich.nix` now explicitly forces it
+back to zero: `systemd.services.immich-machine-learning.serviceConfig
+= { PrivateDevices = lib.mkForce true; DeviceAllow = lib.mkForce [ ]; }`.
+`mkForce` beats the upstream module's plain (unprioritized) `mkIf`, so
+this override is real and verified live (`PrivateDevices=yes`, no
+`DeviceAllow` lines at all on that unit).
+
+**When this plan is implemented, that override has to be removed or
+adjusted** — otherwise it'll silently continue forcing `PrivateDevices =
+true` on the very unit this plan is trying to give CUDA device access to,
+and the new work will appear broken (or just never actually reach the
+GPU) with no obvious error pointing at why. Don't just delete the
+override wholesale either — re-derive what immich-machine-learning
+*actually* needs for CUDA (likely `/dev/nvidia0`/`nvidiactl`/`nvidia-uvm`
+per F2's Discourse recipe, not necessarily the render nodes `render`
+group grants) and scope the override to exactly that, keeping the same
+"privilege on the unit, not wider than needed" reasoning F6 established.
+
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
