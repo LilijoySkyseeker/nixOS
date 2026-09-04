@@ -60,6 +60,13 @@ about this plan's own remaining scope. Remaining open items are the two
 Progress bullets below — auditing for other secrets that sat in
 persisted dirs at readable modes, and rotating whatever that turns up.
 
+**2026-09-04.** Live-verified on homelab via SSH: `zfs get snapdir
+zroot/local/state` reports `disabled` (source `local`), and
+`/nix/state/.zfs` no longer resolves at all (`No such file or
+directory`) — the fix is deployed and the traversal path is actually
+closed, not just build-verified. Doesn't resolve the two remaining
+Progress items (secret audit, rotation), which are still open.
+
 ## Progress
 
 - [x] D1 decide the mechanism — `.zfs` mode, `snapdir`, or unit sandboxing

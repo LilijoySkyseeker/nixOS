@@ -1,8 +1,8 @@
 ---
 slug: docs-updater-rewrite-inline-comments-for-concision-not-just-check-them
 created: 2026-09-04
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # docs-updater: rewrite inline comments for concision, not just check them
@@ -29,6 +29,13 @@ existing "Inline comments" and "Why context" sections (that shape is
 already documented there, just not actively enforced by the subagent).
 
 ## State
+
+Fully landed on `master`. `docs/agents/docs-updater.md` edited and merged
+via commit `a42614f` / PR #59 (`worktree-docs-updater-comment-rewrite`).
+Verified present in `docs/agents/docs-updater.md` on `master` HEAD
+(`Brevity/register/concision` check, direct-rewrite instruction, and
+rubric line all confirmed in place). Closing this plan out; no further
+work pending.
 
 `docs/agents/docs-updater.md` edited and landed:
 - Merged the new concision mandate into the existing `Brevity/register`
@@ -61,7 +68,7 @@ comment concision, not just the why-leakage subset.
 - [x] Invoke `/simplify` (4 parallel reviews: reuse + simplification
       found triplicated rule text, fixed by merging; efficiency clean;
       altitude's narrowing suggestion considered and rejected).
-- [ ] Commit.
+- [x] Commit. (`a42614f`, merged to `master` via PR #59.)
 
 ## Decisions (D)
 
