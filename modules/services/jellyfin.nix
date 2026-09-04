@@ -4,7 +4,12 @@ let
 in
 {
   flake.modules.nixos.jellyfin =
-    { config, pkgs, lib, ... }:
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
     {
       # jellyfin
       services.jellyfin = {
@@ -14,6 +19,17 @@ in
         cacheDir = "/srv/jellyfin/cache";
         dataDir = "/srv/jellyfin/data";
         logDir = "/srv/jellyfin/log";
+
+        # encoding.xml had drifted to HardwareAccelerationType=none and the
+        # module silently stops applying config once the file exists (only
+        # writes it if absent by default) -- force it so NixOS stays the
+        # source of truth and this can't drift again unnoticed. Backs up the
+        # prior file with a timestamp on every change. Loses a few fields
+        # the module doesn't model (DownMixAudioBoost, MaxMuxingQueueSize,
+        # EncoderPreset, DeinterlaceMethod, tonemapping algorithm/mode/
+        # range, ...), which revert to Jellyfin's own defaults -- accepted.
+        # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md#D1
+        forceEncodingConfig = true;
 
         # Nvidia GTX 1050 Mobile as primary transcoder: dedicated NVENC/NVDEC
         # blocks free the CPU entirely, and it's the stronger of this host's two
@@ -109,25 +125,23 @@ in
       networking.firewall.interfaces.wg0.allowedTCPPorts = [ 8096 ];
 
       # persistence
-      environment.persistence.${vars.persistRoot}.directories =
-        with config.services.jellyfin;
-        [
-          {
-            directory = configDir;
-            inherit user group;
-          }
-          {
-            directory = cacheDir;
-            inherit user group;
-          }
-          {
-            directory = dataDir;
-            inherit user group;
-          }
-          {
-            directory = logDir;
-            inherit user group;
-          }
-        ];
+      environment.persistence.${vars.persistRoot}.directories = with config.services.jellyfin; [
+        {
+          directory = configDir;
+          inherit user group;
+        }
+        {
+          directory = cacheDir;
+          inherit user group;
+        }
+        {
+          directory = dataDir;
+          inherit user group;
+        }
+        {
+          directory = logDir;
+          inherit user group;
+        }
+      ];
     };
 }
