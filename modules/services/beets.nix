@@ -203,6 +203,9 @@ in
                   # are extras (art/booklets/.cue/.log); only relocated when exactly
                   # one destination album came out of this entry
                   # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G6
+                  # '$path' below is beets' own format-field syntax, not a shell
+                  # variable -- must stay single-quoted.
+                  # shellcheck disable=SC2016
                   new_dirs="$(beet -c "$config_path" list -f '$path' "added:''${start_ts}.." 2>/dev/null | xargs -r -I{} dirname {} | sort -u)"
                   new_dir_count=0
                   if [ -n "$new_dirs" ]; then
