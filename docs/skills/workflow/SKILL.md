@@ -3,15 +3,16 @@ name: workflow
 description: Gate and orchestrate any non-trivial task in this repo through a citeable plan file (see the `plan` skill) and the relevant review subagents before it's committed. Trivial one-off changes (a typo fix, a single-line correction) skip this entirely -- see the triviality bar below. Use for anything else: new/changed modules, hosts, services, multi-step fixes, anything security- or secrets-adjacent, anything that will eventually be committed as more than a one-line diff.
 ---
 
-Read `reference.md` in this skill's directory for the subagent-selection
-table, worked trivial-vs-not examples, and the multi-session resume case --
-this file stays short on purpose (progressive disclosure).
+Read `reference.md` in this skill's directory for the trust hierarchy that
+governs step 8's close-out decision, the subagent-selection table, worked
+trivial-vs-not examples, and the multi-session resume case -- this file
+stays short on purpose (progressive disclosure).
 
 ## The step sequence
 
 1. **Triviality check.** Genuinely trivial (a typo, a one-line wording
    fix)? Run `docs/skills/workflow/scripts/mark-trivial "<reason>"`, then
-   skip straight to step 8. Otherwise continue below. This is the one
+   skip straight to step 9. Otherwise continue below. This is the one
    deliberately judgment-based step in the whole system -- everything
    else here is a hardcoded script or hook, not something to remember.
 2. **Find or create the plan file** (see `docs/skills/plan/SKILL.md`).
@@ -46,14 +47,19 @@ this file stays short on purpose (progressive disclosure).
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.
-8. **Commit** per `docs/GIT_WORKFLOW.md` -- short, human, Conventional
-   Commits. A `Plan: <date>-<slug>.md` trailer is fine for traceability;
+8. **Close or leave open, before committing.** `plan-move <file> done`
+   now, in this same branch, if the work is actually complete and
+   verified per the trust hierarchy in `reference.md` (this refuses if
+   any `D*`/`F*` is unresolved) -- not as a follow-up commit or a second
+   PR after this one merges. Leave it in `in-progress/` only when the
+   task genuinely isn't finished yet (e.g. still needs a real host switch
+   or other later verification), and still commit and open the PR either
+   way.
+9. **Commit and merge** per `docs/GIT_WORKFLOW.md` -- short, human,
+   Conventional Commits, including step 8's plan-file move if it
+   happened. A `Plan: <date>-<slug>.md` trailer is fine for traceability;
    never inline the plan's reasoning into the commit body. A
    `PreToolUse` hook blocks the commit unless step 1 or step 2 actually
    happened this session (`plan-touch-guard`); another blocks any
    AI-attribution footer outright (`footer-guard`) -- both fire
    regardless of whether you remember this file.
-9. **Close or leave open** -- `plan-move <file> done` only once the work
-   is actually landed and verified per the trust hierarchy in
-   `docs/procedures/workflow.md` (this refuses if any `D*` is
-   unresolved); otherwise leave it in `in-progress/`.

@@ -6,16 +6,16 @@ genuinely cannot tell you whether something works. This consolidates
 what's scattered across `AGENTS.md`'s command list into one place: what
 each check actually catches, and when to reach for it.
 
-These layers are the concrete commands behind `docs/procedures/
-workflow.md`'s **trust hierarchy** — documentation → source code → local
+These layers are the concrete commands behind `docs/skills/workflow/
+reference.md`'s **trust hierarchy** — documentation → source code → local
 build → VM testing → an actual switch on a real host, least to most
 trusted. Layers 1-3 below are the "local build" rung, layer 4 is "VM
 testing," and layers 5-6 are "an actual switch." The hierarchy's
 corollary applies throughout: **a fix that is not declarative and
 reproducible is no fix at all** — a value patched by hand on a live host
 doesn't count as tested or fixed until it's expressed in this repo's Nix
-and deployed from it (see `docs/procedures/workflow.md` for the full
-rationale).
+and deployed from it (see `docs/skills/workflow/reference.md` for the
+full rationale).
 
 ## The layers, cheapest to most thorough
 

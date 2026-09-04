@@ -55,10 +55,11 @@ message — there's no plan file to cite for those.
 
 ## Why the trust hierarchy is ordered this way
 
-`docs/procedures/workflow.md`'s trust hierarchy (documentation → source →
-local build → VM testing → an actual switch) generalizes something the
-2026-08-26 security audit learned the hard way at a larger scale: each
-rung can lie in a way the next rung can't. Documentation drifts from the
+`docs/skills/workflow/reference.md`'s trust hierarchy (documentation →
+source → local build → VM testing → an actual switch) generalizes
+something the 2026-08-26 security audit learned the hard way at a larger
+scale: each rung can lie in a way the next rung can't. Documentation
+drifts from the
 config it describes (an entire audit failure-mode category was
 "documentation asserting a boundary the config doesn't implement"). Source
 code can evaluate fine and still not build (a missing package on the

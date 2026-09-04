@@ -1,8 +1,8 @@
 ---
 slug: fold-the-trust-hierarchy-and-verify-ladder-automation-into-testing
 created: 2026-08-29
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Fold the trust hierarchy and verify-ladder automation into testing-changes.md
@@ -24,6 +24,14 @@ via the `workflow` skill per explicit request.
 
 ## State
 
+Landed: commit 724b0b0 (PR #32, merged as e171bab) folded the trust
+hierarchy and verify-ladder automation into `testing-changes.md`, fixed
+the stale "not automated at all" claim, and applied docs-updater's F1
+fixes. All Progress items complete, no open `D`/`F`. Closing out now --
+found still sitting in `in-progress/` while working on
+`2026-09-04-workflow-skill-close-plan-before-pr-merge-fold-trust-hierarchy-in.md`,
+which moves this same trust-hierarchy content again, into the `workflow`
+skill itself.
 
 ## Progress
 
