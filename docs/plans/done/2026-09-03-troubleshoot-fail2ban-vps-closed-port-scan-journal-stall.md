@@ -1,8 +1,8 @@
 ---
 slug: troubleshoot-fail2ban-vps-closed-port-scan-journal-stall
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # troubleshoot fail2ban vps-closed-port-scan journal stall
@@ -121,11 +121,26 @@ does *not* attempt to prove CrowdSec's scenario fires a real ban --
 hub content that this repo's sandboxed VM-test build cannot reach; scoped
 and documented as an accepted limit under D6, not silently skipped.
 
-Remaining before this can move to `done`: commit. Not yet deployed to the
-live host -- `nixos-rebuild build`/VM-tested only, per this repo's
-test-before-switch convention; `nixos-rebuild switch`/reboot-testing on
-the real box, plus the D5 post-deploy `cscli decisions delete --all`
-step, are separate follow-ups for whoever deploys this.
+Committed (`68924b2`). Rebased onto master again just before deploy
+(already current, no new commits). User then explicitly directed a
+direct manual deploy from this machine (homelab's automated push-deploy
+is disabled) -- deployed via `nixos-rebuild switch --flake .#vps
+--target-host root@vps`, exit code 0, and independently verified live
+(not just the exit code): `crowdsec`/`bouncer`/`caddy` all active,
+`fail2ban` fully gone (unit not found, binary off PATH), 60 scenarios
+loaded with zero warnings/errors, both new hub items
+(`iptables-logs`/`iptables-scan-multi_ports`) downloaded+enabled+loaded
+against the real hub (F3 confirmed fixed in production, not just the
+offline VM test), the kernel journal acquisition confirmed spawned live,
+and the live `nixos-fw-log-refuse` rule order/rate-limit numbers/
+game-port hashlimit values all matched exactly what was built and
+VM-tested. D5 (post-deploy decision-list wipe) then run for real: 15016
+decisions deleted, confirmed empty in both CrowdSec's own DB and the
+live `crowdsec-blacklists-0` ipset.
+
+Everything in this plan is now done: committed, VM-tested, deployed, and
+independently verified live at every layer this plan identified as
+worth checking.
 
 ## Progress
 
@@ -152,9 +167,10 @@ step, are separate follow-ups for whoever deploys this.
 - [x] resolve F5 (FIXED -- rate limit raised to 50/sec burst 100 after trade-off analysis, user's choice)
 - [x] resolve F6 (FIXED -- verified directly against v1.8.0 Go source, not docs; payload confirmed minimal by default, see G5 for the version-citation correction that preceded this)
 - [x] Rebase onto master (moved substantially -- PRs #51-#56, homelab/immich/jellyfin/keyboard-layout work, none touching hosts/vps/configuration.nix) via `git rebase --autostash origin/master`, clean, no conflicts. Regenerated hosts/vps/README.md's machine-generated Host Inventory block (`scripts/doc-host.sh vps`, itself added to master since this plan started) to drop the stale `fail2ban` service/package listing. Re-ran verify-ladder: identical vps toplevel store hash to pre-rebase, confirming no semantic effect on this host.
-- [ ] commit
+- [x] commit (`68924b2`)
 - [x] D5 -- decide post-deploy decision-list cleanup scope
-- [ ] POST-DEPLOY (not this session, live-host action): `cscli decisions delete --all` on `vps` after this plan's diff is switched, not just built
+- [x] DEPLOYED 2026-09-03: `nixos-rebuild switch --flake .#vps --target-host root@vps` from this machine (torrent) directly, per user's explicit "proceed to deploy and test" -- homelab's automated push-deploy is disabled and was bypassed per user instruction. Exit code 0; final store hash (`p5w3hmak0g50vviyyc1dspv7vamdf8qw`) matched the locally-built/VM-tested one exactly. Verified live, not just trusted the exit code: `crowdsec`/`crowdsec-firewall-bouncer`/`crowdsec-allowlist-tailnet`/`caddy` all active; `fail2ban.service` "could not be found" and `fail2ban-client` gone from PATH -- fully removed, not just disabled; crowdsec's boot log shows zero warnings/errors, 60 scenarios loaded, and both `crowdsecurity/iptables-logs`/`crowdsecurity/iptables-scan-multi_ports` downloaded+enabled+loaded live (F3's fix confirmed correct against the real hub, not just the offline VM test); the kernel journal acquisition confirmed live (`journalctl --follow -n 0 _TRANSPORT=kernel` spawned alongside the sshd/caddy ones); live `iptables -S nixos-fw-log-refuse` matches exactly (`-I`-fixed order, `50/sec`/`burst 100` -- G4 and F5's final numbers both confirmed in production); factorio/minecraft/bedrock hashlimit values confirmed byte-for-byte unchanged live.
+- [x] POST-DEPLOY (D5): ran `cscli decisions delete --all` on vps -- 15016 decisions deleted (raw count including dupes/expired; the human-readable table had shown 9 unique + 7 duplicated-skipped beforehand, all `Source: crowdsec`, none fail2ban-tagged, consistent with the old jail having been dead the whole time per D1). Confirmed empty after (`No active decisions`), and confirmed the wipe propagated all the way to enforcement, not just CrowdSec's own DB: `ipset list crowdsec-blacklists-0` shows 0 entries.
 - [x] D6 -- design and run the VM test (tests/vps-refused-connection-logging.nix, 6 subtests, all passing -- see D6 for what's covered vs. the accepted network-access scope limit)
 
 ## Decisions (D)
