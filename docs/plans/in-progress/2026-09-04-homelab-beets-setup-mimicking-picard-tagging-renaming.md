@@ -61,6 +61,9 @@ See D1/D2/G1-G8/F1-F7 below before resuming.
   fleet-wide out-of-scope debt, 1 moot).
 - [x] `docs-updater` pass — see F7; also re-ran `scripts/doc-host.sh homelab`
   to refresh `hosts/homelab/README.md`'s Host Inventory block.
+- [x] Re-ran `verify-ladder`'s build/lint checks after all of the above —
+  still clean except the same D2 blocker and the same G7-accepted statix
+  nitpick, nothing new introduced by the fix passes.
 - [ ] User creates the AcoustID API key + sops secret (D1 follow-up).
 - [ ] Real switch + a live test drop into `Music/Import`, to actually
   confirm the ported path-format logic renders like the old Picard
