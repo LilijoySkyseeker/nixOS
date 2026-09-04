@@ -1,8 +1,8 @@
 ---
 slug: add-immich-tailscale-only-to-homelab
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Add Immich (Tailscale-only) to homelab
@@ -519,6 +519,9 @@ Researched via GitHub issues/discussions (not just docs):
     D2)** — that's an inherent tradeoff of "no public exposure," not a
     bug to work around.
 
+
+**MOOT 2026-09-03:** Pure research finding from the pre-implementation phase, not a defect -- confirmed Tailscale-only access doesn't break Immich's own functionality, informing the decision to proceed with the tailscale-only architecture. Nothing to fix; superseded by the actual live deployment and real-world Android/PC access testing later in this plan.
+
 ### F2 -- GPU-accelerated ML is real but expensive to stand up; no OpenVINO path via nixpkgs
 Read the pinned nixpkgs `immich-machine-learning` package
 (`pkgs/by-name/im/immich-machine-learning/package.nix`) and its
@@ -546,6 +549,9 @@ Discourse recipe ([discourse.nixos.org/t/immich-and-cuda-accelerated-machine-lea
     as a separate follow-up once real per-photo ML latency on this
     library is known to be worth a multi-hour one-time build cost. D3 is
     still open pending the user's final call on this tradeoff.
+
+
+**MOOT 2026-09-03:** Pure research finding informing D3's decision (GPU-accelerated ML deferred to a separate todo plan, CPU-only for v1). Not a defect in this plan's own scope -- the actual follow-up work it identifies is now tracked in 2026-09-03-gpu-accelerate-immich-machine-learning-cuda.md.
 
 ### F3 -- NFS's `sec=sys` uid-trust model can undermine the 0700 `mediaLocation` boundary D1(b) relied on, for an adversary already holding root on an authorized NFS client
 

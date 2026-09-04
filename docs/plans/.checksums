@@ -37,5 +37,6 @@ b24d9fc52789596d2018b3ee05475f6dfec936e94c0265f6bbb739a3de082699  docs/plans/don
 6f17454e5357c48d183ef72eff799d0234a233bce56b77e0f2b18ac390ffa6f8  docs/plans/done/2026-09-01-zbackup-pool-also-showing-usb-uas-enclosure-checksum-errors.md
 4f97f1a68587f35671d07d88749fc8645c206039acd98bdd974d7b6b505daf3a  docs/plans/done/2026-09-02-add-human-style-writing-skill-manual-not-auto-invoked.md
 8095ab3b927f74b286d4ad55e3e79e69e1af7c32a1ecc6798ae5c4611108ecf2  docs/plans/done/2026-09-02-homelab-zbackup-zdata-cksum-alert-recurrence-2026-09-02-matches-known.md
+e6ccff2fe33f30ad30ed1ba777d643ed6b54cdda86bf3a7394b12c8aa2c15eb5  docs/plans/done/2026-09-03-add-immich-tailscale-only-to-homelab.md
 f6fbfcb9da193d82f797734f06307845c7f2be1bbfbdeaf9c88f63f6284e038a  docs/plans/done/2026-09-03-ensure-printers-service-boot-race-on-torrent-order-after-network.md
 b4d2c086434477f9080ffe5af47c0aae545c90e008d4889c2521d52b5a526f5e  docs/plans/done/2026-09-03-update-flake-inputs.md
