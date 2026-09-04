@@ -2,8 +2,8 @@
 
 No scaffolding or generator exists for this — it's a plain file
 following the pattern already in `modules/services/` (`jellyfin.nix`,
-`copyparty-iso.nix`, `factorio.nix`, `minecraft.nix`, `octodns.nix`,
-`nfs.nix`, `samba.nix`).
+`immich.nix`, `copyparty-iso.nix`, `factorio.nix`, `minecraft.nix`,
+`octodns.nix`, `nfs.nix`, `samba.nix`).
 
 1. Create `modules/services/<name>.nix`, registering as
    `flake.modules.nixos.<name> = { ... }: { ... };`. Unless the config

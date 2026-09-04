@@ -80,6 +80,7 @@ in
         nixosModules."docker-publish-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules.jellyfin
+        nixosModules.immich
         nixosModules.minecraft
         nixosModules.factorio
         nixosModules.octodns
