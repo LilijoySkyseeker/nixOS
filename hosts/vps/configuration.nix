@@ -271,10 +271,6 @@ in
         group = "crowdsec";
         mode = "0750";
       }
-      # fail2ban's ban-history db (fail2ban.sqlite3) — without this, progressive
-      # ban tracking (bantime-increment) resets to first-offense duration every
-      # reboot. Runs as root (no DynamicUser), so no user/group/mode needed.
-      "/var/lib/fail2ban"
     ];
     files = [
       "/etc/machine-id"
@@ -346,8 +342,17 @@ in
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
   # log refused TCP connection attempts (closed-port scans) to the kernel log —
-  # off by default, so these were previously invisible everywhere, including to CrowdSec
-  networking.firewall.logRefusedConnections = true;
+  # off by default, so these were previously invisible everywhere, including to CrowdSec.
+  #
+  # Left false here deliberately: the module's own version of this LOG rule
+  # (nixpkgs firewall-iptables.nix's `-p tcp --syn -j LOG --log-prefix "refused
+  # connection: "`) has no -m limit, so under a real scan it can outrun
+  # journald's own rate limit (10000/30s) and start silently dropping the very
+  # messages the detector reads — flagged in the 2026-08-26 audit (F-P2-03's
+  # amplifier) and still open. A rate-limited replacement is added via
+  # extraCommands below instead. See:
+  # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md#D1
+  networking.firewall.logRefusedConnections = false;
 
   # wireguard tunnel
   # Same latent bug as homelab's, reached by a different route: wg0 here is
@@ -398,6 +403,33 @@ in
 
   # SNAT forwarded traffic to our wg0 IP so source IP's are preserved
   networking.firewall.extraCommands = ''
+    # Rate-limited replacement for logRefusedConnections above: same log-prefix
+    # (so CrowdSec's iptables-scan-multi_ports scenario and anything else reading
+    # this still matches), but capped so a scan burst can't overrun journald's
+    # own rate limit. nixos-fw-log-refuse is flushed and rebuilt from scratch on
+    # every firewall (re)start before extraCommands runs (see firewall-iptables.nix's
+    # startScript), so inserting fresh here is idempotent across restarts — no
+    # duplicate rules pile up. 50/sec, burst 100: still ~6.5x headroom under
+    # journald's 10000/30s (~333/sec) limit -- CrowdSec's iptables-scan-multi_ports
+    # only needs ~3/sec (15 distinct ports/5s) to detect a scan, so the cap was
+    # never actually protecting detection; it was only trading away live-tail
+    # visibility during an incident for headroom nobody was spending. Raised from
+    # an initial 10/sec, burst 30 after that analysis (see D4 addendum:
+    # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md).
+    #
+    # Must be -I (insert at position 1), not -A: the module's own build of this
+    # chain already ends in an unconditional `-j nixos-fw-refuse` (a terminal
+    # REJECT/DROP) by the time extraCommands runs -- an appended rule would sit
+    # after that jump and never see a packet. Confirmed by inspecting the built
+    # firewall-start script directly, not just that it builds. See G4:
+    # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
+    iptables -I nixos-fw-log-refuse 1 -p tcp --syn \
+      -m limit --limit 50/sec --limit-burst 100 \
+      -j LOG --log-level info --log-prefix "refused connection: "
+    ip6tables -I nixos-fw-log-refuse 1 -p tcp --syn \
+      -m limit --limit 50/sec --limit-burst 100 \
+      -j LOG --log-level info --log-prefix "refused connection: "
+
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
 
@@ -647,16 +679,32 @@ in
     };
   };
 
-  # crowdsec: watches sshd/caddy logs, bans abusive IPs via the firewall bouncer
+  # crowdsec: watches sshd/caddy/kernel logs, bans abusive IPs via the firewall bouncer
   services.crowdsec = {
     enable = true;
-    # needed for the local API crowdsec and the bouncer both talk to
-    settings.general.api.server.enable = true;
-    settings.lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
+    settings = {
+      # needed for the local API crowdsec and the bouncer both talk to
+      general.api.server.enable = true;
+      lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
+      # CAPI registration (community blocklist consumption). Declarative and
+      # idempotent: crowdsec-setup's activation script only calls `cscli capi
+      # register` when this file doesn't already contain a password (see
+      # G3 in 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
+      # for a caveat on that check's own syntax). /var/lib/crowdsec is already
+      # persisted (impermanence, above), so no separate persistence entry needed.
+      capi.credentialsFile = "/var/lib/crowdsec/online_api_credentials.yaml";
+    };
     hub.collections = [
       "crowdsecurity/linux"
       "crowdsecurity/sshd"
       "crowdsecurity/caddy"
+      # closed-port-scan detection, replacing the fail2ban jail this used to be
+      # fed to: crowdsecurity/iptables-scan-multi_ports requires 15 distinct
+      # destination ports from one source within 5s (CrowdSec's own hub rates
+      # this spoofable: 3, i.e. not spoof-proof but no longer a one-packet
+      # trigger) -- see D2 in
+      # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
+      "crowdsecurity/iptables"
     ];
     localConfig.acquisitions = [
       {
@@ -670,20 +718,28 @@ in
         # must be "syslog", not "caddy" — strips the journalctl envelope
         labels.type = "syslog";
       }
+      {
+        source = "journalctl";
+        journalctl_filter = [ "_TRANSPORT=kernel" ];
+        # same "syslog" label as sshd/caddy above, confirmed against
+        # crowdsecurity/iptables-logs' own parser source: it filters on
+        # evt.Parsed.program == 'kernel', a field only populated by the
+        # syslog-logs (s00-raw) stage, which keys off labels.type == 'syslog'
+        # -- not a dedicated "iptables" label (none exists). See D2/G3 in
+        # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
+        labels.type = "syslog";
+      }
     ];
-    # progressive bans for CrowdSec's own scenario-detected decisions (sshd/caddy):
-    # each repeat offense (by decision-history count for that IP/range, all-time,
-    # not just currently-active bans) roughly quadruples the ban duration off the
-    # module's stock 4h default — 4h, 16h, ~2.7d, ~10.7d, ~42.7d, then capped —
-    # rather than literal-forever, since a shared/dynamic IP (residential ISP
-    # reassignment, CGNAT, VPN exit) can hand off to an unrelated user later.
-    # This is CrowdSec's own module default profile pair, reproduced verbatim
-    # (services.crowdsec.localConfig.profiles has no merge semantics — setting it
-    # replaces the default, so both scopes must be repeated here) plus duration_expr.
-    # NOTE: only applies to CrowdSec's own alert->profile pipeline; `cscli decisions
-    # add` (fail2ban's cscli.conf action, below) bypasses profile evaluation
-    # entirely — verified against crowdsec's own apiserver source, see
-    # 2026-08-25-add-fail2ban-to-vps-defaulting-to-an-immediate-ban.md.
+    # progressive bans for CrowdSec's own scenario-detected decisions (sshd/caddy/
+    # iptables-scan): each repeat offense (by decision-history count for that
+    # IP/range, all-time, not just currently-active bans) roughly quadruples the
+    # ban duration off the module's stock 4h default — 4h, 16h, ~2.7d, ~10.7d,
+    # ~42.7d, then capped — rather than literal-forever, since a shared/dynamic IP
+    # (residential ISP reassignment, CGNAT, VPN exit) can hand off to an unrelated
+    # user later. This is CrowdSec's own module default profile pair, reproduced
+    # verbatim (services.crowdsec.localConfig.profiles has no merge semantics —
+    # setting it replaces the default, so both scopes must be repeated here) plus
+    # duration_expr.
     localConfig.profiles = [
       {
         name = "default_ip_remediation";
@@ -830,63 +886,6 @@ in
       (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec.settings.general
     }"
   ];
-
-  # fail2ban: complements CrowdSec's scenario-based detection with a zero-threshold
-  # layer for probes against ports/services vps doesn't actually offer — "nothing
-  # legitimate lives here", so ban on first sight instead of after a failure count.
-  # Bans go through CrowdSec's own decision list (cscli), not fail2ban's default
-  # iptables action, so this stays a second detector feeding one unified ban list/
-  # ipset — the same one the DNAT'd game ports already consult (see vps-ratelimit
-  # above) — rather than a second independent ban mechanism on the box.
-  services.fail2ban = {
-    enable = true;
-    # progressive bans: fail2ban's own repeat-offender tracking (per source IP,
-    # keyed off ban history in its sqlite db — persisted above, see /var/lib/fail2ban).
-    # multipliers is a fixed lookup table applied against each jail's *static*
-    # configured bantime (bantime * factor * multipliers[priorBanCount], not
-    # compounding on the previous ban's duration — verified in fail2ban's own
-    # jail.py) — deliberately powers-of-4 to reproduce, ban-for-ban, the exact
-    # same curve as CrowdSec's duration_expr below (both start from a 4h base):
-    # 4h, 16h, 64h, 256h, 1024h, then capped — same cap too, for the same
-    # shared/dynamic-IP reason (residential ISP reassignment, CGNAT, VPN exit).
-    bantime-increment = {
-      enable = true;
-      multipliers = "1 4 16 64 256 1024";
-      maxtime = "90d";
-    };
-    # SSH brute-force is already CrowdSec's job (crowdsecurity/sshd scenario against
-    # sshd.service's journal) — leave the module's auto-added default jail off so
-    # the same threat isn't judged by two uncoordinated detectors.
-    jails.sshd.enabled = false;
-
-    jails.vps-closed-port-scan = {
-      # networking.firewall.logRefusedConnections logs refused TCP SYNs to the
-      # kernel log with this prefix — CrowdSec never sees these, its acquisitions
-      # only read the sshd/caddy journal units, never kernel logs.
-      filter.Definition = {
-        failregex = ''^refused connection: .*\sSRC=<HOST>\s'';
-        ignoreregex = "";
-      };
-      settings = {
-        journalmatch = "_TRANSPORT=kernel";
-        # any hit here is a probe of a port vps doesn't listen on — no legitimate
-        # traffic can trigger this filter, so ban on the very first match
-        findtime = "1d";
-        maxretry = 1;
-        # base for bantime-increment's multiplier table above — matches
-        # CrowdSec's duration_expr base so both curves line up exactly
-        bantime = "4h";
-        action = "cscli";
-      };
-    };
-  };
-  # custom action: bans via `cscli decisions add` instead of fail2ban's own
-  # iptables rules, so this jail's bans land in CrowdSec's decision list/ipset
-  environment.etc."fail2ban/action.d/cscli.conf".text = ''
-    [Definition]
-    actionban = ${config.services.crowdsec.package}/bin/cscli decisions add --ip <ip> --duration <bantime>s --reason "fail2ban-<name>" --type ban
-    actionunban = ${config.services.crowdsec.package}/bin/cscli decisions delete --ip <ip>
-  '';
 
   # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
   sops.secrets.discord_webhook = {

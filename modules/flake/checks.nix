@@ -40,5 +40,9 @@
       checks.anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
         pkgs = config.flake.pkgsUnstable;
       };
+
+      checks.vps-refused-connection-logging = import ../../tests/vps-refused-connection-logging.nix {
+        pkgs = config.flake.pkgsUnstable;
+      };
     };
 }
