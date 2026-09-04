@@ -26,11 +26,10 @@
     {
       config = lib.mkIf enable {
         # no wg0/vps involvement -- Tailscale-only per
-        # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#D1.
-        # Bind broad, restrict at the firewall: same shape as
-        # modules/services/immich.nix (G3 there), not
-        # services.couchdb.bindAddress = "127.0.0.1" (its default), which
-        # would make it unreachable from tailscale0 at all.
+        # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#D1
+        # bind broad, restrict at the firewall (same shape as
+        # modules/services/immich.nix's G3), not bindAddress = "127.0.0.1"
+        # (the option's default), which would be unreachable from tailscale0
         services.couchdb = {
           enable = true;
           bindAddress = "0.0.0.0";
@@ -56,20 +55,9 @@
           # keeps the admin password out of the Nix store entirely -- see
           # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#G1
           extraConfigFiles = [ config.sops.templates."couchdb-admins-ini".path ];
-          # CouchDB always treats configFile (the last -couch_ini file) as
-          # its one writable config target, and unconditionally re-hashes
-          # + persists whatever [admins] password is currently active into
-          # it on every boot -- which then permanently shadows
-          # extraConfigFiles on every subsequent boot regardless of what
-          # sops renders, silently defeating password rotation. Pointing
-          # configFile at /run (tmpfs, never persisted -- already created
-          # by this same module's own uriFile tmpfiles rule) means it
-          # starts blank every boot, so the sops-templated password is
-          # always what gets (re)hashed and takes effect. Trades away
-          # CouchDB's own "persist runtime/Fauxton config changes" feature
-          # for this database, which is fine here: this deployment is
-          # Nix-declared already, so nothing is meant to be configured
-          # through it.
+          # tmpfs, starts blank every boot -- CouchDB persists [admins]
+          # hash changes into whatever configFile points at, which would
+          # otherwise permanently shadow sops-rotated passwords
           # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#F1
           configFile = "/run/couchdb/local.ini";
         };
@@ -85,12 +73,8 @@
           }
         ];
 
-        # couchdb.service itself has no hardening from the upstream module
-        # beyond User/Group -- add the same stack couchdb-provision-obsidian
-        # already gets below. Every path it writes is known: databaseDir/
-        # viewIndexDir (both = databaseDir here), /run/couchdb (uriFile +
-        # the now-ephemeral configFile, see F1), and logFile, already
-        # covered by the plain /var/log persistence entry (G4).
+        # upstream module hardens couchdb-provision-obsidian but not this
+        # unit -- match its stack
         # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#F4
         systemd.services.couchdb.serviceConfig = {
           NoNewPrivileges = true;
@@ -112,11 +96,8 @@
             "/run/couchdb"
             "/var/log"
           ];
-          # local.ini persists the admin password's PBKDF2 hash (see F1) and
-          # upstream never chmods it beyond a bare `touch` -- tighten the
-          # default create mode for every file couchdb.service writes
-          # rather than relying on the (world-executable-by-default)
-          # directory mode alone.
+          # upstream never chmods local.ini (holds the admin hash, F1) --
+          # tighten create mode for every file couchdb.service writes
           # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#F2
           UMask = "0077";
         };
@@ -191,9 +172,8 @@
             done
 
             existing_rev=$("$curl" -sf -u "$auth" "$base/_users/org.couchdb.user:${syncUser}" 2>/dev/null | "$jq" -r '._rev // empty' || true)
-            # built via jq (not manual "\"..\"" string interpolation) so a
-            # sync_pass containing a `"` or `\` can't produce malformed or
-            # attacker-shaped JSON.
+            # jq-built, not string interpolation, so sync_pass can't corrupt/inject JSON
+            # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#F3
             payload=$("$jq" -n --arg name ${lib.escapeShellArg syncUser} --arg pass "$sync_pass" --arg rev "$existing_rev" \
               '{name: $name, password: $pass, roles: [], type: "user"} + (if $rev == "" then {} else {_rev: $rev} end)')
             "$curl" -sf -u "$auth" -X PUT "$base/_users/org.couchdb.user:${syncUser}" \

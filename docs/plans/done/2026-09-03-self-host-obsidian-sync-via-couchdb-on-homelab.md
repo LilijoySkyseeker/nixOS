@@ -1,8 +1,8 @@
 ---
 slug: self-host-obsidian-sync-via-couchdb-on-homelab
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # Self-host Obsidian sync via CouchDB on homelab
@@ -89,6 +89,19 @@ Nothing has been deployed to the real `homelab` host yet — build-only per
 `AGENTS.md`'s hard-confirm rule; a real `nixos-rebuild switch` needs the
 user's explicit go-ahead.
 
+**2026-09-03, docs-updater run, then deployed live on the user's
+go-ahead.** `docs-updater` found and fixed F5-F7 (comment bloat, a stale
+host-inventory doc, a dead doc reference) — none were behavior changes.
+User then asked to deploy: built locally, diffed against the running
+system (additions only), switched via `nixos-rebuild switch --target-host
+root@homelab`. Verified live, not just build-clean: both new units
+active, the provisioning script's own PUTs visible in the journal
+(vault db + sync user actually created), auth enforced (401
+unauthenticated), firewall rule correctly `-i tailscale0`-scoped,
+`systemctl --failed` empty. This plan's Nix-side scope is complete;
+client-side plugin setup (deliberately out of scope per Original plan)
+is being walked through with the user separately, outside this file.
+
 ## Progress
 - [x] D1 decided (exposure model) — Tailscale-only
 - [x] `modules/services/couchdb.nix` drafted
@@ -141,8 +154,27 @@ user's explicit go-ahead.
       build/VM-boot (couchdb.service still starts clean with the full
       hardening stack + moved configFile), same VM failure set as
       baseline, no new regressions
-- [ ] deployed + verified live (only if/when the user asks for a real
-      deploy — build-only otherwise per `AGENTS.md`)
+- [x] `docs-updater` subagent run — F5 (comments duplicating plan
+      narrative, trimmed to citations), F6 (`hosts/homelab/README.md`
+      Host Inventory stale — regenerated, also picked up a pre-existing
+      immich/postgresql/redis gap from an earlier parallel-worktree
+      merge), F7 (`new-service.md` cited a nonexistent
+      `modules/services/README.md`, corrected) — all three fixed,
+      `nixfmt`/`nix flake check`/build re-verified clean
+- [x] deployed + verified live — user explicitly asked to proceed.
+      `nixos-rebuild switch --flake .#homelab --target-host root@homelab`
+      (built locally, `nix store diff-closures` reviewed first: only
+      additions, nothing existing touched). Activation clean. Live on the
+      real host: `couchdb.service` and `couchdb-provision-obsidian.service`
+      both active; the provisioning script's own journal lines show it
+      actually created `_global_changes`, `obsidian` (vault db),
+      `_users/org.couchdb.user:obsidian-sync`, and the vault's `_security`
+      doc, in that order. `systemctl --failed` empty fleet-host-wide.
+      Unauthenticated `GET /obsidian` returns `401` (confirms
+      `require_valid_user` is actually enforced, not just rendered).
+      `iptables -S` confirms the port-5984 accept rule carries `-i
+      tailscale0`, no broader interface. No secret value was read or
+      decrypted at any point.
 
 ## Decisions (D)
 
@@ -330,3 +362,34 @@ found fine, beyond F1-F4:
 No `secrets/*` file was read or decrypted at any point during this review.
 
 _security finished 2026-09-04T04:21:24Z -- see Findings above._
+
+### F5 — `modules/services/couchdb.nix` comments carried plan-duplicate "why"-prose instead of citations
+
+- **File:** `modules/services/couchdb.nix` — the `configFile` comment (was lines 59-73), the `couchdb.service` hardening-block comment (was lines 88-94), and the `UMask` comment (was lines 115-121)
+- **Axis:** docs/style
+- **Finding:** after the F1/F2/F4 fixes landed, their explaining comments reproduced the plan's F1/F2/F4 narrative nearly verbatim inline (multi-sentence, full incident/rationale prose — e.g. the `configFile` comment ran 13 lines re-deriving CouchDB's `-couch_ini` last-writer-wins behavior and the rotation-shadowing mechanism already fully documented in F1 above), violating `docs/style-guide.md`'s "Why context: the plan file, not comments" rule (rationale belongs in the plan; inline comments beyond a citation pointer are mechanics/labeling only). The `jq -n --arg` payload-construction comment (near the `existing_rev`/`payload` lines) also explained F3's rationale in prose without a plan citation at all.
+- **Fix:** trimmed all four comments to a short technical one-liner (or two) plus a `# plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#F<N>` citation, matching the density of this same file's `G1`/`G3`/`G4` comments. Also dropped a stray trailing period after the `#D1` citation on the `bindAddress` comment (style guide: citations don't carry a terminal period) and trimmed that same comment's prose to match. Re-verified `nixfmt --check` and `nix flake check --no-build` clean after the edits.
+
+
+**FIXED 2026-09-03:** Trimmed the four comments in modules/services/couchdb.nix that had duplicated plan finding narrative down to short technical citations, matching the density of this file's own G1/G3/G4 comments. Re-verified nixfmt/flake check clean.
+
+### F6 — `hosts/homelab/README.md`'s Host Inventory block was stale (predated this change, and also predated a prior merge)
+
+- **File:** `hosts/homelab/README.md` (`<!-- inventory:start -->`/`<!-- inventory:end -->` block)
+- **Axis:** docs
+- **Finding:** `modules/flake/hosts.nix` registers `nixosModules.couchdb` on `homelab` (this plan's change), which per `docs/agents/docs-updater.md`'s "Host Inventory freshness" section requires re-running `scripts/doc-host.sh homelab`. Doing so surfaced more drift than just the couchdb addition: `immich`/`postgresql`/`redis`/`redis-immich` were also missing from the block. Root cause: `2026-09-03-add-immich-tailscale-only-to-homelab.md`'s work and `8a0740a` (which introduced the machine-generated inventory feature and did the first-ever generation of this block) were developed in parallel worktrees off diverging points of `master`; the inventory-feature worktree branched before immich was merged, so its first generation of `hosts/homelab/README.md` never had immich's services in scope. Neither branch's merge commit (`1d161f3` / `fc2d0bc`) triggered a regeneration, so the gap persisted silently until this pass.
+- **Fix:** re-ran `scripts/doc-host.sh homelab` (no script failure — no new upstream compat-shim `abort` case encountered; it excludes `services.frp`/`services.redis`/`services.vmalert` as already-known broken compat shims and retries around them, same as it does for every other host). The regenerated block now includes `couchdb`, `immich`, `postgresql`, `redis` in Services; `couchdb`/`postgresql-and-plugins`/`redis` in Packages; TCP `2283` (immich) and `5984` (couchdb) added to the `tailscale0` firewall line; `immich`/`redis-immich` added to System Users; `homelab_couchdb_admin_password`/`homelab_couchdb_sync_password` added to Secrets in use.
+
+
+**FIXED 2026-09-03:** Regenerated hosts/homelab/README.md's Host Inventory block via scripts/doc-host.sh homelab -- picked up couchdb plus a pre-existing gap (immich/postgresql/redis missing since a parallel-worktree merge never triggered regeneration).
+
+### F7 — `docs/procedures/new-service.md` cited a `modules/services/README.md` that doesn't exist
+
+- **File:** `docs/procedures/new-service.md` (closing paragraph)
+- **Axis:** docs
+- **Finding:** the doc said "one-line entries in `modules/services/README.md`'s inventory are enough" — but `docs/procedures/updating-documentation.md` itself states plainly that `modules/`, `profiles/`, `services/`, and `secrets/` have no per-folder READMEs, and no such file exists anywhere in the repo (`find` came up empty). This predates the couchdb change — most likely a leftover from before `8a0740a` replaced the old per-service-folder-README inventory convention with the per-host machine-generated "Host Inventory" block — but nothing had corrected the runbook text since. Falls under `updating-documentation.md`'s own "Discovered a stale reference... fix it immediately if it's a one-line change" rule.
+- **Fix:** rewrote the closing paragraph to point at the actual current convention: no per-service README, refresh the affected host's `hosts/<host>/README.md` Host Inventory block via `scripts/doc-host.sh <host>`, and put non-obvious gotchas in that host's README.
+
+_docs-updater finished 2026-09-04T04:33:09Z -- see Findings above._
+
+**FIXED 2026-09-03:** Rewrote docs/procedures/new-service.md's closing paragraph to point at the actual current convention (scripts/doc-host.sh <host>, no per-service README) instead of the nonexistent modules/services/README.md it used to cite.
