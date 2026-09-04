@@ -29,7 +29,8 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    (dedicated service user, systemd sandboxing, etc.) by default, not
    just when asked.
 
-There's no service-specific README requirement — one-line entries in
-`modules/services/README.md`'s inventory are enough unless the service
-has non-obvious gotchas worth a longer note (see that file's own
-"Gotchas" section for the shape).
+There's no service-specific README requirement — `modules/services/`
+has no README of its own (see `docs/procedures/updating-documentation.md`).
+Re-run `scripts/doc-host.sh <host>` to refresh the affected host's
+`hosts/<host>/README.md` "Host Inventory" block; a non-obvious gotcha
+worth a longer note goes in that host's README instead.
