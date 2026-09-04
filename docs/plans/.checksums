@@ -44,4 +44,5 @@ f6fbfcb9da193d82f797734f06307845c7f2be1bbfbdeaf9c88f63f6284e038a  docs/plans/don
 ead17adbe583dc42e90f16340887800d971f4dd8790697a19e0f80f73d82d17e  docs/plans/done/2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
 aeeb725fcc195e0cc35ec974891a439d1d96f95fbf45912bf96194f857087634  docs/plans/done/2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
 b4d2c086434477f9080ffe5af47c0aae545c90e008d4889c2521d52b5a526f5e  docs/plans/done/2026-09-03-update-flake-inputs.md
+37a3ac969866f590a5f4f7b2d8363ec072b011f7464c682291e5c8893188428b  docs/plans/done/2026-09-04-docs-updater-rewrite-inline-comments-for-concision-not-just-check-them.md
 79d1a5e46d42b1718d5eded713e8581cd6590c46a56b14a2839ca83ba449a4e3  docs/plans/done/2026-09-04-workflow-skill-close-plan-before-pr-merge-fold-trust-hierarchy-in.md
