@@ -1,8 +1,8 @@
 ---
 slug: docs-updater-rewrite-inline-comments-for-concision-not-just-check-them
 created: 2026-09-04
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # docs-updater: rewrite inline comments for concision, not just check them
