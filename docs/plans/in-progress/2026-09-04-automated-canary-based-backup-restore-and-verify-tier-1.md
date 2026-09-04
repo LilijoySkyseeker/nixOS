@@ -52,10 +52,17 @@ forum, AWS Backup / DR-testing guides, real ransomware-recovery drills):
 
 ## State
 
-**2026-09-04, starting implementation.** Plan written and both design
-decisions confirmed. Next: write `modules/nixos/backup-canary.nix` and
-`modules/nixos/backup-restore-test.nix`, wire homelab/torrent/thinkpad,
-verify-ladder, commit.
+**2026-09-04, implementation complete, ready to commit.**
+`modules/nixos/backup-canary.nix` and `modules/nixos/backup-restore-test.nix`
+written, wired into homelab (both zbackup + restic checks, canary paths,
+`myHealthAlerts` markers) and torrent/thinkpad (canary paths only). Full
+verify-ladder green on all 5 hosts. `/simplify`'s 4-way review ran and its
+fixes are applied (G5), including a real bug (OnSuccess= targeting a
+phantom unit) that only a review pass would have caught pre-deploy. Not
+yet deployed to any real host — this plan only covers build+commit, per
+the "test, don't switch" convention; an actual `nixos-rebuild switch` and
+watching the first real daily/weekly run happen is follow-up, either
+requested explicitly or picked up next time this plan is touched.
 
 ## Progress
 - [x] D1
@@ -71,11 +78,12 @@ verify-ladder, commit.
 - [x] Wire `hosts/thinkpad/configuration.nix` (canary paths)
 - [x] Verify ladder (nixfmt --check, flake check --no-build, targeted
       build for all 5 hosts) — all green
-- [ ] `/simplify`
+- [x] `/simplify`
 - [x] G1
 - [x] G2
 - [x] G3
 - [x] G4
+- [x] G5
 
 ## Decisions (D)
 
@@ -139,6 +147,54 @@ starts the restore-test service as a separate unit only once the backup
 unit exits successfully, so a verification failure shows up as its own
 distinct alert (its own marker file, its own `failed-units` entry) instead
 of masquerading as a backup failure.
+
+### G5 -- /simplify's 4-way review caught a real bug: `triggerUnit` with a `.service` suffix silently wires OnSuccess= to a phantom unit
+`systemd.services.<name>` already appends `.service` to whatever attribute
+name it's given, so the initial config (`triggerUnit =
+"restic-backups-backblazeWeekly.service"`, matching the literal systemd
+unit name) would have created `systemd.services."restic-backups-backblazeWeekly.service"`
+— rendering as unit `...service.service`, which never matches the real
+backup unit. `myBackupRestoreTest.restic.triggerUnit`'s consumer now
+normalizes with `lib.removeSuffix ".service"` before use, matching the
+exact fix `modules/nixos/iso-autobuild.nix`'s `triggeredBy` already applied
+for the identical footgun (found by the reuse-angle review agent). This
+would have evaluated and built cleanly either way — nothing short of a
+real deploy+restic-run would have surfaced it, which is exactly why the
+review pass mattered here.
+
+Also applied from the same pass: hoisted the duplicated `zbackup.targets`/
+`restic.targets` submodule into one shared `canaryTargetType`; moved
+`StateDirectory` into `hardeningBase` (was duplicated per-service);
+switched snapshot-alternation from `date +%j` + a `10#` base-10 guard to
+`date +%-j` (GNU date's no-leading-zero form), computed once per run
+instead of once per target; factored the two scripts' identical
+success-marker epilogue into one `successEpilogue` function; replaced a
+runtime `$(basename ...)` subshell with a Nix-eval-time
+`canaryBaseName`; and combined restic's per-target restore calls into one
+`restic restore` invocation carrying multiple `--include` patterns
+(each restic call separately re-authenticates to B2 and reloads the repo
+index — worth paying once, not per target). Also exposed
+`myBackupCanary.relPath` as a real option in `backup-canary.nix`, read by
+`backup-restore-test.nix`, replacing a same-value `let`-binding the two
+modules previously had to agree on only by comment.
+
+**Skipped, with reasoning:** (1) parallelizing zbackup's per-target
+zfs-clone/mount/verify instead of running them serially against one shared
+scratch dataset — real for large restores, but these are KB-sized canary
+files on a nightly job; the added complexity (per-target scratch names,
+concurrent mount management) isn't worth it for a negligible time save.
+(2) Decoupling the restic verify trigger from `OnSuccess=` into an
+independent marker-mtime-diffing mechanism — `OnSuccess=` reaching into
+another module's generated unit is exactly the pattern
+`iso-autobuild.nix`'s `triggeredBy` already established and uses
+successfully elsewhere in this repo, so it's idiomatic here once the
+naming bug above is fixed, not a special-case bandaid. (3) Fully unifying
+the zbackup/restic verify logic into one parameterized routine — the two
+backends have genuinely different privilege/trigger shapes (root+`/dev/zfs`
+clone vs. timer-triggered restic call), and the actual duplicated surface
+was already narrowed to the success-epilogue (now shared); a full
+abstraction over two 3-line mismatch-checks would cost more in indirection
+than it saves.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
