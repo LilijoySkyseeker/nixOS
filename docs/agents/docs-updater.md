@@ -19,6 +19,24 @@ the repo, not against what the main agent believes it did.
 3. Find what actually changed: `git diff HEAD --stat` and `git diff
    --cached --stat` (working tree + staged, combined against HEAD).
 
+## Host Inventory freshness
+
+If the diff touched any host's `configuration.nix`, `hardware-
+configuration.nix`, `disko.nix`, or any `modules/{nixos,services,
+profiles}/*.nix` file that host pulls in (check `modules/flake/hosts.nix`
+for which modules apply to which host) — re-run `scripts/doc-host.sh
+<host>` for every affected host and let it refresh that host's
+`hosts/<host>/README.md` "Host Inventory" block
+(`<!-- inventory:start -->`/`<!-- inventory:end -->`). This is the
+enforcement mechanism decided in
+`2026-09-03-auto-generated-per-host-inventory-doc-services-packages-containers.md#D1`
+in place of a separate pre-commit hook or `nix flake check` derivation —
+do this on every pass where a host's config changed, not just when the
+diff already touched that host's README directly. If `scripts/doc-host.sh`
+itself fails (e.g. a new upstream nixpkgs compat-shim `abort` case it
+doesn't already exclude), report that as an `F<N>` finding rather than
+leaving the block stale.
+
 ## What to check, for every doc or comment touched by the diff
 
 - **Accuracy**: does it describe current behavior, not a stale prior
@@ -62,6 +80,9 @@ do not silently pick an interpretation and rewrite past it.
 - Every doc/comment touched by this task's diff reflects current behavior.
 - No doc/comment retains multi-sentence "why"/rationale prose that should
   have moved to the plan.
+- Every host whose config changed in this diff has had
+  `scripts/doc-host.sh <host>` re-run, so its README's Host Inventory
+  block matches current config.
 - `AGENTS.md`'s docs table and `docs/procedures/updating-documentation.md`
   are consulted if the change is structural enough to require an update
   there.
