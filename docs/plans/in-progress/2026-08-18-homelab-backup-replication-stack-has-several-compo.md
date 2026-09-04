@@ -91,6 +91,14 @@ already automatic (G1) and captured a full timing/throughput benchmark
 warning should be re-checked on the next scheduled run (Fri 2026-09-04)
 to confirm it clears on its own.
 
+**2026-09-04.** Re-checked: it did **not** clear on its own. The
+`restic-backups-backblazeWeekly.service` run at 03:00 today logged the
+same `63 additional files were found in the repo, which likely contain
+duplicate data` message, then `no errors were found` on the integrity
+check — identical to the 2026-08-30 count. Automatic `forget --prune`
+is not reaching these packs. Assumption in G2 below was wrong; a manual
+`restic prune` is the actual fix, not a wait-and-see.
+
 ## Progress
 - [x] G1 -- confirmed pruning is already automatic
 - [ ] G2 -- confirm orphaned-pack warning clears on the 2026-09-04 scheduled run
