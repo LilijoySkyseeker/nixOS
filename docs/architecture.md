@@ -142,8 +142,8 @@ not the boundary itself:
   `modules/home-manager/`) are plain config attrsets with no options
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
-  service configs for things a specific host runs (jellyfin, copyparty,
-  factorio, minecraft, octodns, nfs, samba), each registering as
+  service configs for things a specific host runs (jellyfin, immich,
+  copyparty, factorio, minecraft, octodns, nfs, samba), each registering as
   `flake.modules.nixos.<name>` and listed per-host in
   `modules/flake/hosts.nix`. No options surface. Reach for
   `modules/services/` over an inline host-config block once the config is

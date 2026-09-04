@@ -1219,3 +1219,5 @@ plan, out of scope for this diff).
 _security finished 2026-09-03T22:03:20Z -- see Findings above (pass 2: D4-followup/D5 diff, F6-F8)._
 
 _security finished 2026-09-04T01:08:42Z -- see Findings above._
+
+_docs-updater finished 2026-09-04T01:38:18Z -- see Findings above._
