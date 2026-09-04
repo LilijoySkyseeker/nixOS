@@ -1,8 +1,8 @@
 ---
 slug: fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050
 created: 2026-09-03
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # fix homelab jellyfin/ffmpeg high CPU: nvidia driver dropped GTX 1050 Pascal support, encoding.xml drifted
