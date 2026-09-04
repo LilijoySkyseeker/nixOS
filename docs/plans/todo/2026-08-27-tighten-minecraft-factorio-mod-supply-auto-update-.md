@@ -39,9 +39,21 @@ frozen: false
          projects and is not visible from the config. At minimum, record
          what it actually resolves to once, so there is a baseline.
 
-      Related but separate, already tracked above: the containers still
-      have no `--pids-limit`/`--memory` ceilings, and `userns-remap` is
+      Related but separate, already tracked above: ~~the containers still
+      have no `--pids-limit`/`--memory` ceilings, and~~ `userns-remap` is
       unset. *(F-P4-03, F-P4-13, AR-7)*
+
+      **2026-09-04:** `--memory`/`--pids-limit` ceilings (D15) are already
+      set on both containers (`modules/services/minecraft.nix`,
+      `modules/services/factorio.nix`) — struck through above as stale.
+      Only `userns-remap` is still genuinely unset.
+
+## State
+
+Not started. D1 (which mods are load-bearing) is the blocker for item 1;
+items 2-3 can proceed independently. `--memory`/`--pids-limit` ceilings
+are already landed (D15) and out of scope here; only `userns-remap`
+remains genuinely open on the container-hardening side.
 
 ## Progress
 
