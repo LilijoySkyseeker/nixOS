@@ -107,6 +107,27 @@ session, directly on `torrent` (not just via SSH+getfacl on homelab):
 `thumbs/`/`encoded-video/`/`upload/`/`profile/` all still correctly
 denied.
 
+**2026-09-03, D5: GPU-accelerated video transcoding device access deployed
+live.** Separate from the deferred ML/CUDA work (`2026-09-03-gpu-
+accelerate-immich-machine-learning-cuda.md`) -- video transcoding needs
+no rebuild, just device passthrough, since Immich's own ffmpeg already
+has NVENC/VAAPI compiled in. Mirrored jellyfin's own proven-working
+device access (`/dev/dri/renderD128`+`renderD129`, `render` group
+membership) rather than trusting generic docs. Deployed and verified:
+correct `DeviceAllow`/`PrivateDevices`/group membership, API healthy
+after restart, and -- prompted by a direct user question worth taking
+seriously rather than assuming away -- confirmed via `/api/jobs` that
+restarting mid-backlog from the Takeout imports didn't fail or lose any
+queued job (`failed: 0` everywhere). Declared nothing in
+`services.immich.settings` (a deliberate choice, not an oversight --
+Immich's config-file mechanism locks the *entire* admin settings panel
+once anything is declared, not just the declared keys, so NVENC itself
+still needs a manual one-time toggle in the admin UI). Also imported a
+second Google Takeout (a different account) via the same immich-go
+workflow validated on the first: 1,158 assets, dry-run caught 2 files
+with no matching Takeout metadata, real import included them via
+`--include-unmatched` per user's choice.
+
 ## Progress
 - [x] D1 decided (mediaLocation dataset + NFS exposure) — picked (b), subdir of existing /storage
 - [x] D2 decided (public share links tradeoff) — user wants a later path, tracked as follow-up
@@ -121,6 +142,7 @@ denied.
 - [x] deployed live to homelab (`nixos-rebuild switch --target-host`) — caught and fixed G4 (mediaLocation creation + /storage ACL traversal), verified working end-to-end
 - [x] rerun `/simplify` + `security` on the G4 fix commit — 4/4 simplify clean, security caught F5 (HIGH), fixed and verified live with a forced boot-simulating tmpfiles pass
 - [x] D4 decided + implemented — torrent/thinkpad get scoped read-only access to mediaLocation/library, verified live
+- [x] D5 decided + implemented — GPU device passthrough for video transcoding deployed live, verified (DeviceAllow, render group, job queue undisturbed by the restart); NVENC backend selection left as a manual admin-UI toggle, not Nix-declared
 - [ ] follow-up plan opened for D2 (path to share outside the tailnet) once v1 is live
 
 ## Decisions (D)
@@ -262,6 +284,64 @@ mount (not just `getfacl` on homelab):
 End state, verified via real `ls` from `torrent`: `immich/` browsable,
 `immich/library/` (and everything under it) fully browsable, `backups/`/
 `thumbs/`/`encoded-video/`/`upload/`/`profile/` all still denied.
+
+### D5 -- GPU-accelerated video transcoding (not the deferred ML/CUDA work), and whether to declare Immich's app-level settings in Nix
+Separate from the GPU-accelerated ML work already deferred to
+`2026-09-03-gpu-accelerate-immich-machine-learning-cuda.md` (that needs a
+multi-hour from-source onnxruntime+CUDA rebuild) -- **video transcoding**
+acceleration is much cheaper: Immich's own ffmpeg build already has
+NVENC/VAAPI compiled in (confirmed live -- it's the same
+`jellyfin-ffmpeg` binary jellyfin itself uses), so this is pure device
+passthrough, no rebuild. Checked jellyfin's own live systemd config on
+homelab rather than trusting generic docs: NVENC works there with only
+`/dev/dri/renderD128` in `DeviceAllow` and no `/dev/nvidia*` entries at
+all, and `jellyfin` is in the `render` group but not `video`. Mirrored
+that exact proven-working shape for immich: `services.immich.
+accelerationDevices = [ "/dev/dri/renderD128" "/dev/dri/renderD129" ];`
+(Nvidia + Intel, matching jellyfin's own dual-GPU access) plus
+`users.users.immich.extraGroups = [ "render" ];`. Built and verified in
+the generated config (`DeviceAllow` correct, `PrivateDevices=false`,
+`render` group's members now include both `jellyfin` and `immich`) --
+**not yet deployed**, user said hold off.
+
+Second question this raised: whether to also declare the actual
+hardware-acceleration *backend choice* (`ffmpeg.accel = "nvenc"`) via
+`services.immich.settings`, rather than toggling it in Immich's admin
+UI. Investigated Immich's own config-file behavior before answering --
+it is **not** the "declare only what you care about, everything else
+stays UI-editable" mechanism it looks like: providing *any*
+`services.immich.settings` (even a single key) locks Immich's **entire**
+admin Settings panel read-only, and every key not explicitly declared
+falls back to Immich's built-in defaults rather than whatever was
+previously configured -- confirmed via Immich's own GitHub
+issues/discussions on the config-file feature, not just the docs page
+(which doesn't state this explicitly). Presented three options (declare
+nothing / declare just `ffmpeg.*` / declare a fuller settings block).
+
+**ANSWERED 2026-09-03:** declare nothing in Nix for now -- toggle NVENC
+by hand in Immich's admin UI once the device-access change deploys.
+Revisit declaring `services.immich.settings` in Nix later, once it's
+clear which specific settings are actually worth pinning down (`ffmpeg`,
+possibly `backup`/`trash`/`storageTemplate`), rather than locking the
+whole settings UI now for one setting.
+
+**DEPLOYED 2026-09-03:** `nixos-rebuild switch --target-host root@homelab`.
+Verified live: `DeviceAllow` on `immich-server` shows both
+`/dev/dri/renderD128 rwm` and `/dev/dri/renderD129 rwm`, `PrivateDevices=
+no`, `immich` now a member of the `render` group alongside `jellyfin`,
+API responding after restart. Also checked (unprompted question from the
+user, worth recording since it was a real risk worth verifying rather
+than assuming): did restarting `immich-server`/`immich-machine-learning`
+mid-way through the large Google Photos import's background job backlog
+(thumbnails/transcode/face-detection queues, still draining from the
+first Takeout import) lose or corrupt anything? Checked `/api/jobs`
+directly -- `failed: 0` across every single queue, backlog counts
+consistent with normal draining, nothing stuck. Immich's Redis-backed job
+queue requeues an interrupted job rather than dropping or corrupting it,
+confirmed by evidence not just design assumption. NVENC itself still not
+yet toggled on in the admin UI -- transcoding is still running in
+software mode, by design (D5's answered choice), until that manual step
+happens.
 
 ## Gotchas (G)
 

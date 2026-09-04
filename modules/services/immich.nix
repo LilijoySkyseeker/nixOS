@@ -19,7 +19,30 @@ in
         # than a new one -- already zrepl+restic backed up.
         # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#D1
         mediaLocation = "/storage/immich";
+        # GPU-accelerated video transcoding (not the ML/face-detection
+        # acceleration deferred in the GPU-accelerate-immich-ml plan --
+        # that needs a from-source onnxruntime+CUDA rebuild; this is just
+        # device passthrough, since immich's own ffmpeg build already has
+        # NVENC/VAAPI compiled in). Same two render nodes jellyfin already
+        # uses, confirmed live on this exact host that renderD128 alone is
+        # sufficient for working NVENC -- jellyfin's own systemd unit has
+        # no /dev/nvidia* DeviceAllow entries at all, just this. The
+        # actual hardware-acceleration backend (nvenc) is picked in
+        # Immich's own admin UI, not declared here -- see D5.
+        # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#D5
+        accelerationDevices = [
+          "/dev/dri/renderD128" # Nvidia GTX 1050 Mobile (NVENC)
+          "/dev/dri/renderD129" # Intel HD 630 (QSV/VAAPI fallback)
+        ];
       };
+
+      # matches jellyfin's exact working device-group membership
+      # (modules/services/jellyfin.nix) -- accelerationDevices above
+      # grants the cgroup device-controller permission, but the render
+      # nodes are group-owned too, so immich also needs to actually be a
+      # member to open() them.
+      # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#D5
+      users.users.immich.extraGroups = [ "render" ];
 
       # the upstream module's own tmpfiles rule for mediaLocation is type
       # `e` (adjust mode if it already exists) -- a no-op for anything but
