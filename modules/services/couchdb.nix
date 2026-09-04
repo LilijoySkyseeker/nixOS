@@ -22,6 +22,8 @@
       # Self-hosted LiveSync project's own setup docs, not assumption --
       # plan: 2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md#G3
       corsOrigins = "app://obsidian.md,capacitor://localhost,http://localhost";
+
+      tailscaleBin = lib.getExe' config.services.tailscale.package "tailscale";
     in
     {
       config = lib.mkIf enable {
@@ -180,10 +182,72 @@
               -H "Content-Type: application/json" \
               -d "$payload" >/dev/null
 
+            # syncUser is a *database* admin of just this one db (not a
+            # members.names entry) -- CouchDB restricts writing design
+            # documents (_design/*) to database admins even for a db they're
+            # otherwise a member of, and Self-hosted LiveSync writes design
+            # documents during its own setup/rebuild flow. Confirmed live:
+            # member-level access produced a 403 on exactly that step.
+            # Still not a *server* admin -- can't touch other databases,
+            # _users, or server config.
             "$curl" -sf -u "$auth" -X PUT "$base/${vaultDb}/_security" \
               -H "Content-Type: application/json" \
-              -d "{\"admins\":{\"names\":[],\"roles\":[]},\"members\":{\"names\":[\"${syncUser}\"],\"roles\":[]}}" >/dev/null
+              -d "{\"admins\":{\"names\":[\"${syncUser}\"],\"roles\":[]},\"members\":{\"names\":[],\"roles\":[]}}" >/dev/null
           '';
+        };
+
+        # HTTPS for the LiveSync mobile client, tailnet-only (never
+        # `tailscale funnel`, which goes public) -- terminates TLS inside
+        # tailscaled itself using this tailnet's own HTTPS Certificates
+        # feature and reverse-proxies to CouchDB's existing plain HTTP.
+        # No firewall change: confirmed live that serve traffic never
+        # touches the kernel netfilter path networking.firewall governs.
+        # Runs as root: tailscaled's LocalAPI only grants a non-root caller
+        # write access via a configured --operator=, which this fleet has
+        # none of -- CapabilityBoundingSet below still pares root down to
+        # just what a control-socket RPC needs.
+        # plan: 2026-09-03-serve-couchdb-over-https-via-tailscale-serve-for-obsidian-mobile.md#F1,F2
+        systemd.services.couchdb-tailscale-serve = {
+          description = "CouchDB: expose over HTTPS via tailscale serve (tailnet-only)";
+          # tailscaled-autoconnect ordering matches the upstream tailscale
+          # module's own documented idiom for anything binding to a
+          # Tailscale IP (see its tailscaled-set unit) -- nixos/modules/
+          # services/networking/tailscale.nix, pinned nixpkgs-stable
+          after = [
+            "tailscaled.service"
+            "tailscaled-autoconnect.service"
+            "couchdb.service"
+          ];
+          requires = [
+            "tailscaled.service"
+            "couchdb.service"
+          ];
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = "${tailscaleBin} serve --bg --https=443 http://127.0.0.1:${toString port}";
+            ExecStop = "${tailscaleBin} serve --https=443 off";
+            NoNewPrivileges = true;
+            PrivateTmp = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            ProtectKernelTunables = true;
+            ProtectKernelModules = true;
+            ProtectKernelLogs = true;
+            ProtectClock = true;
+            ProtectControlGroups = true;
+            RestrictRealtime = true;
+            RestrictSUIDSGID = true;
+            LockPersonality = true;
+            MemoryDenyWriteExecute = true;
+            # root is required (see comment above), but a control-socket
+            # RPC needs no Linux capability beyond ordinary DAC access --
+            # plan: 2026-09-03-serve-couchdb-over-https-via-tailscale-serve-for-obsidian-mobile.md#F1
+            CapabilityBoundingSet = [ "" ];
+            RestrictNamespaces = true;
+            SystemCallArchitectures = "native";
+          };
         };
       };
     };

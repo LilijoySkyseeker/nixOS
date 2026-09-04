@@ -42,5 +42,6 @@ abafa88e5fa56896152f9f5ac58aeb0ffcde45f91d3b6a413c8c5aeae7cf4303  docs/plans/don
 f6fbfcb9da193d82f797734f06307845c7f2be1bbfbdeaf9c88f63f6284e038a  docs/plans/done/2026-09-03-ensure-printers-service-boot-race-on-torrent-order-after-network.md
 ead17adbe583dc42e90f16340887800d971f4dd8790697a19e0f80f73d82d17e  docs/plans/done/2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
 68b0d54495816491e952f4a418723c09ab146f04d01a74ce66df14465a71c605  docs/plans/done/2026-09-03-self-host-obsidian-sync-via-couchdb-on-homelab.md
+4f9cf534d96dba7b413a7debceef18f3a8706fbcdc6769520c3cec76f6a6ac6f  docs/plans/done/2026-09-03-serve-couchdb-over-https-via-tailscale-serve-for-obsidian-mobile.md
 aeeb725fcc195e0cc35ec974891a439d1d96f95fbf45912bf96194f857087634  docs/plans/done/2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
 b4d2c086434477f9080ffe5af47c0aae545c90e008d4889c2521d52b5a526f5e  docs/plans/done/2026-09-03-update-flake-inputs.md
