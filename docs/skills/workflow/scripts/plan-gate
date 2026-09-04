@@ -8,6 +8,12 @@
 # anything. A commit with no Plan: trailer (e.g. mark-trivial'd) is simply
 # not gated here -- plan-touch-guard already covers "did this session
 # touch a plan at all" at commit time.
+#
+# Also prints a non-blocking note (does not affect exit status) for any
+# cited plan still under todo/ or in-progress/ at merge time -- a nudge
+# for the close-before-merge convention in docs/skills/workflow/SKILL.md
+# step 8, not a hard gate: some tasks legitimately span multiple PRs and
+# the plan should stay open until the work actually finishes.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(git rev-parse --show-toplevel)" || { echo "not inside a git repository." >&2; exit 1; }
@@ -33,6 +39,7 @@ if [ -z "$plans" ]; then
 fi
 
 fail=0
+still_open=0
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   rel="$(plan_locate "$p" "$root" 2>/dev/null)" || {
@@ -46,12 +53,22 @@ while IFS= read -r p; do
     echo "$unresolved" >&2
     fail=1
   fi
+  case "$rel" in
+    docs/plans/done/*|docs/plans/rejected/*) ;;
+    *)
+      echo "NOTE: $rel is still open (not under done/ or rejected/) at merge time -- plan-move it to done/ first if this range's work is actually complete, per SKILL.md step 8." >&2
+      still_open=$((still_open + 1))
+      ;;
+  esac
 done <<<"$plans"
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
   echo "plan-gate: one or more cited plans have unresolved findings. See above." >&2
   exit 1
+fi
+if [ "$still_open" -gt 0 ]; then
+  echo "" >&2
 fi
 echo "plan-gate: all cited plans ($(printf '%s\n' "$plans" | grep -c .)) have their findings resolved."
 exit 0

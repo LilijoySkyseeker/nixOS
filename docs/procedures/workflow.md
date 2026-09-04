@@ -31,27 +31,17 @@ consolidated in one place rather than scattered per-topic.
 
 ## Trust hierarchy
 
-When verifying a claim or a fix, evidence is not all equally trustworthy.
-Least to most trusted:
+When verifying a claim or a fix, evidence is not all equally trustworthy,
+least to most trusted: **documentation → source code → local build → VM
+testing → an actual switch on a real host.**
 
-**documentation → source code → local build (output actually inspected,
-not just "it built") → VM testing → an actual switch on a real host.**
-
-Each rung supersedes the ones below it when they disagree — a doc saying a
-service is hardened doesn't outrank actually reading the unit's
-`serviceConfig`; a clean build doesn't outrank a VM boot showing the unit
-failing to start. Climb the ladder as far as the task actually warrants
-(see `docs/procedures/testing-changes.md` for the concrete commands at
-each rung) rather than stopping at the cheapest rung that happens to agree
-with what you expected to find. The rationale — including why this
-generalizes beyond security work — is in `docs/agents.md`.
-
-**Corollary: a fix that is not declarative and reproducible is no fix at
-all.** A change made by hand on a live host (an ad hoc `systemctl edit`, a
-manually-run command, a value patched in `/run/secrets` or the running
-config) is not a fix until it's expressed in this repo's Nix and actually
-deployed from it — otherwise the next rebuild silently reverts it, and the
-next person has no way to know the fix ever existed.
+Canonical statement — the full ladder, its "not declarative and
+reproducible is no fix at all" corollary, and how it gates a plan's
+close-out — lives in `docs/skills/workflow/reference.md`'s Trust hierarchy
+section, since that's what the `workflow` skill's step sequence applies
+directly when deciding a plan is actually done. The rationale for why it's
+ordered this way is in `docs/agents.md`; the concrete commands behind each
+rung are in `docs/procedures/testing-changes.md`.
 
 ## Hard-confirm actions — don't do these unprompted
 
