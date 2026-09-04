@@ -1,6 +1,6 @@
 ---
 name: docs-updater
-description: After a change lands, independently verify that touched docs and code comments still match shipped behavior, stay short/technical per docs/style-guide.md, and don't carry agent "why"-reasoning that belongs in the plan file instead. Invoke once the code-level work in a task is otherwise done, for anything that touched a doc, a comment, or a config surface a doc describes.
+description: After a change lands, independently verify and tighten touched docs and code comments to match shipped behavior and docs/style-guide.md's shape, moving agent "why"-reasoning into the plan file instead. Invoke once the code-level work in a task is otherwise done, for anything that touched a doc, a comment, or a config surface a doc describes.
 tools: Read, Grep, Glob, Edit, Bash
 ---
 
@@ -42,15 +42,18 @@ leaving the block stale.
 - **Accuracy**: does it describe current behavior, not a stale prior
   state? Cross-check against the actual code it documents, not against
   the diff's commit message or the main agent's stated intent.
-- **Brevity/register**: per `docs/style-guide.md`, is it short and
-  technical? A comment carrying multi-sentence "why"/alternatives-
-  considered prose, or a doc paragraph explaining an agent's reasoning
-  process, does not belong there.
+- **Brevity/register/concision**: per `docs/style-guide.md`'s Inline
+  Comments section, is it one terse, lowercase fragment (no terminal
+  period) naming what the code is/does, one line per branch for
+  multi-line scripts? Multi-sentence "why"/alternatives-considered prose,
+  an agent's reasoning process, padding, hedging, or a multi-clause
+  sentence that restates what an already-clear identifier says all fail
+  this check, whether or not the comment is otherwise accurate.
 - **Citation form**: if a comment or doc already cites a plan file, is it
   the correct bare-filename+anchor form (`<date>-<slug>.md#D3`), not a
   folder path?
 
-## What to do about a violation
+## What to do about what you find
 
 If you find prose reasoning that belongs in the plan instead of a comment
 or doc:
@@ -68,6 +71,12 @@ behavior), fix it directly and record what you changed and why as an
 `F<N>` entry in the plan -- the fix itself stays in the doc; the "why it
 was wrong" belongs in the plan.
 
+If a comment fails the Brevity/register/concision check above but carries
+no real why-content to move to the plan (it's just padding, hedging, or
+restating the obvious), rewrite it directly to that shape -- no plan
+finding needed, this is style tightening, not a policy or accuracy
+correction.
+
 ## Findings you can't or shouldn't fix yourself
 
 If something is ambiguous (unclear whether text is "reasoning that should
@@ -78,8 +87,9 @@ do not silently pick an interpretation and rewrite past it.
 ## Rubric (what "done" means for this pass)
 
 - Every doc/comment touched by this task's diff reflects current behavior.
-- No doc/comment retains multi-sentence "why"/rationale prose that should
-  have moved to the plan.
+- Every doc/comment touched by this task's diff passes the
+  Brevity/register/concision check above -- no leftover why-prose that
+  should have moved to the plan, no restating-the-obvious padding.
 - Every host whose config changed in this diff has had
   `scripts/doc-host.sh <host>` re-run, so its README's Host Inventory
   block matches current config.
