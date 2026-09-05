@@ -315,6 +315,12 @@ Three independent paths, none of them factored into `modules/services/` —
 worth knowing since that's where you'd expect to look based on the
 module-organization boundary above.
 
+Which protection a given dataset gets — replicated, backed up offsite,
+persisted-only, or none — is decided per dataset via the `myDatasets`
+registry (`modules/nixos/datasets.nix`), not per filesystem. See
+[`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`](adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md)
+for the tiers and why a registry exists at all.
+
 - **Offsite: restic -> Backblaze B2 via rclone**, inline in
   `hosts/homelab/configuration.nix`. Weekly, from mounted ZFS snapshots.
 - **Local replication on homelab**: its own datasets -> `zbackup`, over
