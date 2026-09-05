@@ -158,6 +158,25 @@ in
           # matching the rest of /storage's convention rather than the Picard
           # subtree's looser legacy other::r-x holdover.
           UMask = "0007";
+          # NFS/SMB clients drop files into Import with whatever mode/ownership
+          # their own umask produced -- often unreadable by anyone but the
+          # dropping uid. beets (unprivileged, no group override can fix a
+          # file whose *owner* bits are the only ones set) can't read those at
+          # all. Narrowly-scoped privilege escalation (the "+" prefix, a
+          # systemd mechanism -- see systemd.service(5)) on just this one
+          # claim step, not on the service's own User=, which stays "beets"
+          # for everything else.
+          ExecStartPre = "+${
+            lib.getExe (
+              pkgs.writeShellApplication {
+                name = "beets-import-claim";
+                text = ''
+                  chown -R beets:multimedia ${lib.escapeShellArg importDir}
+                  chmod -R u+rwX,g+rwX ${lib.escapeShellArg importDir}
+                '';
+              }
+            )
+          }";
           ExecStart = lib.getExe (
             pkgs.writeShellApplication {
               name = "beets-import-sweep";
@@ -167,6 +186,11 @@ in
               ];
               text = ''
                 config_path=${lib.escapeShellArg config.sops.templates.${beetsConfigName}.path}
+                # beets' own app-dir lookup (state.pickle, plugin caches) falls
+                # back to $HOME/.config/beets independent of -c -- the beets
+                # user's $HOME (/var/empty) is real and read-only, so this
+                # crashes without BEETSDIR pointed somewhere writable.
+                export BEETSDIR=/var/lib/beets
 
                 move_to_review() {
                   dest=${lib.escapeShellArg reviewDir}/"$(basename "$1")"

@@ -20,20 +20,24 @@ practical.
 
 ## State
 
-Implemented, not yet deploy-verified. `modules/services/beets.nix`
-registers `flake.modules.nixos.beets`, wired into `homelab` in
-`modules/flake/hosts.nix`. `docs/skills/workflow/scripts/verify-ladder`
-run in full: `nixfmt --check` clean, `nix flake check --no-build` clean,
-all of `thinkpad`/`torrent`/`vps`/`isoimage` build clean (unaffected by
-this change beyond re-evaluating `modules/`), and `homelab` itself builds
-every derivation this module introduces (config file, the shell script,
-tmpfiles, the systemd units) — the *only* failure is
-`sops-install-secrets`' manifest validation rejecting
-`homelab_beets_acoustid_apikey` because the key doesn't exist in
-`secrets/secrets.yaml` yet, which is exactly D2, not a bug. The new
-`statix` "repeated keys" warnings are accepted, not fixed — see G7. Not
-yet switched on the real host. Both that and D2 block calling this done.
-See D1/D2/G1-G8/F1-F7 below before resuming.
+Deployed and live on `homelab`. `modules/services/beets.nix` registers
+`flake.modules.nixos.beets`, wired into `homelab` in
+`modules/flake/hosts.nix`. D2 (AcoustID secret) is resolved, the host has
+been switched to this config (`nixos-rebuild switch --target-host
+root@homelab`), and a real end-to-end test drop has been run — see G9/G10
+for two real bugs the first live run found and fixed (`BEETSDIR`, and an
+unprivileged-`mv`-permission failure on NFS/SMB-dropped files), and their
+"Findings"-style writeup for exactly what broke and why. The
+no-confident-match → `NeedsReview` path is confirmed working correctly on
+the real host. The new `statix` "repeated keys" warnings are accepted,
+not fixed — see G7.
+
+Not yet done, so this plan stays `in-progress`: the "confident match"
+happy path (a release beets/AcoustID can actually identify, landing
+under `Music/Picard` with the ported path-format logic rendering
+correctly) hasn't been exercised yet — only the review-fallback path
+has. See D1/D2/G1-G10/F1-F7 below before resuming, and the Progress
+list's last item for exactly what's left.
 
 ## Progress
 
@@ -64,10 +68,15 @@ See D1/D2/G1-G8/F1-F7 below before resuming.
 - [x] Re-ran `verify-ladder`'s build/lint checks after all of the above —
   still clean except the same D2 blocker and the same G7-accepted statix
   nitpick, nothing new introduced by the fix passes.
-- [ ] User creates the AcoustID API key + sops secret (D1 follow-up).
-- [ ] Real switch + a live test drop into `Music/Import`, to actually
-  confirm the ported path-format logic renders like the old Picard
-  script (see G5 — this can only be verified on the real host).
+- [x] User created the AcoustID API key + sops secret (D1 follow-up).
+- [x] Real switch on `homelab`, done. First live test drop found and fixed
+  two real bugs (`BEETSDIR`, unprivileged-`mv`-permission) — see G9/G10.
+  The no-confident-match → `NeedsReview` path is now confirmed working
+  end to end on the real host.
+- [ ] Still not tested: the "confident match" happy path actually filing
+  a release under `Music/Picard` with the ported path-format logic
+  rendering correctly (see G5/G10's own note) — needs a release
+  beets/AcoustID can actually identify.
 
 ## Decisions (D)
 
@@ -105,6 +114,9 @@ fingerprinting).
 
 
 **DEFERRED 2026-09-04:** Blocked on the user's action, not a design question. To resolve: user runs 'sops secrets/secrets.yaml', adds key homelab_beets_acoustid_apikey with a value from https://acoustid.org/api-key, saves. No agent action needed beyond this pointer per docs/procedures/secrets.md.
+
+
+**ANSWERED 2026-09-04:** User added the homelab_beets_acoustid_apikey secret via sops. Build succeeds end-to-end; deployed to homelab and confirmed the secret renders correctly into the beets config at runtime.
 
 ## Gotchas (G)
 
@@ -368,6 +380,69 @@ a version of the file already improved by this one):
   (only "multiple genuinely distinct new destinations from one drop"
   falls through to the review sweep, which is the correct fallback
   outcome anyway, not a bug).
+
+### G9 -- live-test bug: beets needs `BEETSDIR`, not just `-c <config>`, for a writable app-dir
+
+The AcoustID secret was added (D2 resolved) and the first real switch on
+`homelab` deployed cleanly, but the very first real `beet import` call
+crashed: `OSError: [Errno 30] Read-only file system: '/var/empty/.config'`.
+`beet -c <path>` only overrides which config *file* beets reads — it still
+independently resolves an "app directory" (via `confuse`'s
+`config_dir()`) for its own state (a default `state.pickle`, plugin
+caches) based on the platform default (`$HOME/.config/beets`), completely
+independent of `-c`. The `beets` user's `$HOME` is `/var/empty` (a real,
+read-only directory, correct for a nologin system user) — `os.makedirs`
+on it fails outright. Fixed by exporting `BEETSDIR=/var/lib/beets` (the
+official beets env var for this) at the top of the script, in addition to
+`-c`. Not caught by any build/lint layer — `nix flake check`/
+`nixos-rebuild build`/shellcheck have no way to know beets needs this;
+only an actual run surfaced it. This is exactly the kind of gap G5 was
+tracking.
+
+### G10 -- live-test bug: NFS/SMB-dropped files are often unreadable by the unprivileged `beets` user
+
+Same first real test: after the `BEETSDIR` fix, beets correctly ran and
+decided (correctly — see below) it couldn't confidently match the
+dropped track, and tried to move it to `NeedsReview` — which then failed
+with `mv: ... Permission denied`. The dropped file was `-rw-------`
+(mode 600), owned by the client's own uid:group, not `multimedia` —
+`Music/Import`'s own `setgid`+`multimedia`-group directory mode has no
+effect here, because the file's *own* mode has no group-read/write bits
+at all for *any* group to use. This isn't specific to this one file — any
+client whose umask produces an owner-only mode will hit this on every
+future drop, so it needed a general fix, not a one-off chmod. Fixed with
+a narrowly-scoped privilege escalation: `ExecStartPre = "+<claim
+script>"` (the `+` prefix is a systemd mechanism, `systemd.service(5)`,
+that runs *only that one command* with full privileges, independent of
+the unit's own `User=`) that `chown -R beets:multimedia` +
+`chmod -R u+rwX,g+rwX` the whole `Import` tree before the main
+(unprivileged, `User = "beets"`) sweep script runs. The `beets` user
+itself gains no new standing privilege — root access is scoped to this
+one bootstrap command on this one path, matching the "put privilege on
+the unit, not the user" hardening principle.
+
+Also observed, not fixed: a `gst-plugin-scanner: pygobject
+initialization failed: could not import gobject` line in the journal on
+every run. This is a known, harmless GStreamer plugin-registry-scan
+quirk (a `python`-language GStreamer plugin's scanner subprocess can't
+find `gi`/PyGObject), unrelated to any beets functionality actually
+used here (nothing in the enabled plugin list needs GStreamer's Python
+bindings) — left alone rather than chased.
+
+**End-to-end result of this test**: a real album (`Vylet Pony - The
+Queen is Back`, dropped as a single loose `.flac`) went through the full
+pipeline correctly once both bugs above were fixed — settle-check
+passed, `beet import` ran, found no confident match (plausibly because
+it's actually a track already cataloged under a different existing
+album, "Girls Who Are Wizards" — a real disambiguation case, not an
+importer failure), and the file was relocated intact to
+`Music/NeedsReview/Vylet Pony - The Queen is Back-<timestamp>/`,
+`Music/Import` ending up empty. This confirms G4's import/review
+mechanism and G10's permission-claim fix both work correctly together on
+the real host. Not yet tested: the "confident match" happy path (a
+release beets/AcoustID *can* identify) actually landing correctly under
+`Music/Picard` with the ported path-format logic — see the Progress
+list.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
