@@ -221,11 +221,25 @@
       # whole multi-day duration, and mkdir -p on a path an unprivileged
       # process pre-planted as a symlink would follow it — systemd's
       # RuntimeDirectory creation refuses that (docs/audits/2026-08-26/findings-tail.md L-02).
+      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D6
+      # union of the legacy list and a recursive walk of every offsite-tier
+      # myDatasets root -- shrinks to just the roots once
+      # 2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md lands
+      # `zfs list -r` orders parents before children, keeping mount order safe.
+      # newline-delimited, not space-delimited -- zfs dataset names may
+      # contain spaces (zfs(8)); plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F3
       backupPrepareCommand = ''
-        datasets="zroot/local/state zdata/storage/storage"
+        datasets="zroot/local/state"$'\n'"zdata/storage/storage"
 
-        for dataset in $datasets; do
-          snapshot=$(zfs list -H -t snapshot -o name -s creation -r $dataset | tail -n 1)
+        for root in zroot/offsite zdata/offsite; do
+          if names=$(zfs list -H -o name -t filesystem -r "$root" 2>/dev/null); then
+            datasets="$datasets"$'\n'"$names"
+          fi
+        done
+
+        printf '%s\n' "$datasets" | while IFS= read -r dataset; do
+          [ -n "$dataset" ] || continue
+          snapshot=$(zfs list -H -t snapshot -o name -s creation -r "$dataset" | tail -n 1)
           if [[ -n "$snapshot" ]]; then
             mkdir -p "$RUNTIME_DIRECTORY/$snapshot"
             mount -t zfs "$snapshot" "$RUNTIME_DIRECTORY/$snapshot"
@@ -385,7 +399,11 @@
         "zdata/storage/storage"
         "zdata/storage/storage-bulk"
         "zroot/local/state"
-      ];
+      ]
+      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G4
+      # onsite/offsite myDatasets entries join local replication
+      # automatically; homelab is the "local" role for its own datasets.
+      ++ config.myDatasetsReplicated;
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
@@ -702,6 +720,40 @@
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zdata" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;
+
+  # myDatasets: per-service ZFS datasets, tiered.
+  # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G2
+  # none of these exist on the live host yet -- zfs create each manually
+  # (docs/procedures/new-service.md) before the next deploy
+  myDatasets = {
+    # Fleet log-monitoring's Loki store: persistent but deliberately never
+    # snapshotted or backed up (plan:
+    # 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md).
+    "zroot/persist/loki" = {
+      tier = "persist";
+      mountpoint = "/nix/state/loki";
+      # No owner/group here: this mountpoint already sits under
+      # persistRoot, so no persistence entry is generated (they'd have
+      # no effect) -- ownership is the log-monitoring plan's problem
+      # once it exists.
+    };
+
+    # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D5
+    # jellyfin cacheDir + /var/lib/docker reclassified persist (#D7)
+    # managePersistence = false: entries already exist elsewhere
+    # (jellyfin.nix's cacheDir, the /var/lib/docker line below) -- #D9
+    # no owner/group either, they'd have no effect
+    "zroot/persist/jellyfin-cache" = {
+      tier = "persist";
+      mountpoint = config.services.jellyfin.cacheDir;
+      managePersistence = false;
+    };
+    "zroot/persist/docker" = {
+      tier = "persist";
+      mountpoint = "/var/lib/docker";
+      managePersistence = false;
+    };
+  };
 
   # impermanance
   fileSystems."/nix/state".neededForBoot = true;

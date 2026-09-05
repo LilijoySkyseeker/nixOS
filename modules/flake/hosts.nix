@@ -79,6 +79,7 @@ in
         nixosModules."zrepl"
         nixosModules."docker-publish-guard"
         nixosModules."zfs-dataset-properties"
+        nixosModules."datasets"
         nixosModules.jellyfin
         nixosModules.immich
         nixosModules.beets
