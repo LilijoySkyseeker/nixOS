@@ -19,6 +19,7 @@ encrypted with sops-nix.
 | Doc | What's there |
 |---|---|
 | `docs/architecture.md` | How hosts/profiles/modules/services compose, the dendritic registration model, navigating "what does host X run," adding a new module, module-system gotchas. |
+| `docs/adr/` | Architecture decision records — *why* a shape was chosen and which alternatives were rejected, where `docs/architecture.md` covers *how* it is built. Numbered, permanent, and outlive the plan that produced them. `README.md` explains the ADR-vs-plan-file split and the bar for writing one. Started 2026-09-05; older decisions are being backfilled. |
 | `docs/style-guide.md` | Nix conventions actually in use (formatting, `my<Name>` options pattern, comment style, naming). |
 | `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
 | `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). Opens with **eleven standing rules** harvested from the 2026-08-26 audit — secrets, network exposure, privilege, backups, verification, containers, observability. Read those before adding a service or opening a port. |

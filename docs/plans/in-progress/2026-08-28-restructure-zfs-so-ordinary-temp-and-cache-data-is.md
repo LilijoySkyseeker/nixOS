@@ -56,6 +56,27 @@ homelab gets this free from impermanence: its root is rolled back to
   `iso-autobuild` drops built ISOs. torrent's replica on homelab is
   3.16T.
 
+## State
+
+**2026-09-05.** One of three decisions is landed. D1
+(`boot.tmp.useTmpfs = true`, `modules/profiles/default.nix`) is committed
+and builds clean on all five configurations, with the rendered
+`tmp.mount` checked on torrent and vps — but **not yet deployed to any
+host**; it takes effect at each host's next switch. Both findings are
+closed: F1 MOOT (the pinned nix-2.34.8 defaults `build-dir` to
+`/nix/var/nix/builds`, not `$TMPDIR`) and F2 MOOT (superseded by a4f5e95,
+which moved restic's snapshot mounts to a `RuntimeDirectory`).
+
+D2 (fleet-wide impermanence) is delegated to
+`2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md` and is
+untouched; this plan owns the reason, not the execution.
+
+D3 remains the open item, but as of 2026-09-05 it is no longer
+open-ended: ADR-0001 gives it a tier vocabulary, so each `/home` split is
+now a bounded "which tier?" question — see the note under D3. The
+mechanism it was going to have to invent now lives in
+`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md`.
+
 ## Progress
 
 - [ ] G1 confirmed empirically — no action taken yet
@@ -123,6 +144,28 @@ not be read as closing this plan.
 - Whether `zroot/local/root` needs replicating on a laptop at all once it
   is impermanent, given `/nix` is excluded already and the config is in
   this repo.
+
+**2026-09-05: D3 is now a tier choice, not an open-ended question.**
+`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md` generalises
+this plan's own premise — that a dataset is the only unit of exclusion —
+into four named tiers (`offsite`/`onsite`/`persist`/`volatile`), so each
+bullet above becomes "which tier?" rather than a fresh argument:
+
+- `~/.cache` and `~/.local/share/Trash` → `persist`. Regenerable by
+  definition, which is exactly what the tier means.
+- `~/Downloads` → still a judgement call, but now a bounded one between
+  `onsite` and `persist`. The "promise to the user" concern is the whole
+  content of that choice.
+- `zroot/local/root` on an impermanent laptop → `volatile`, if the
+  reasoning in this plan holds.
+
+Execution of the convention is
+`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md`, which
+deliberately scoped itself to new datasets (`#D5`); migrating existing
+state — including these `/home` splits — is
+`2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md`.
+This plan still owns the *reason* for the laptop splits; it no longer has
+to invent the mechanism.
 
 ## Gotchas (G)
 
