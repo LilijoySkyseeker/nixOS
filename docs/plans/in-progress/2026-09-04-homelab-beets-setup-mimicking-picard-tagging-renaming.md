@@ -444,6 +444,31 @@ release beets/AcoustID *can* identify) actually landing correctly under
 `Music/Picard` with the ported path-format logic — see the Progress
 list.
 
+### G11 -- live-test bug: `mv` between `Import`/`NeedsReview` is cross-device under the sandbox, so a failed move can leave an empty leftover folder
+
+Noticed after G10's test: `NeedsReview` ended up with *two* entries for
+the same album — an empty `Vylet Pony - The Queen is Back/` alongside the
+real `Vylet Pony - The Queen is Back-<timestamp>/` containing the actual
+file. Cause: `ProtectSystem = "strict"` gives each `ReadWritePaths` entry
+its own bind mount inside the unit's private mount namespace, so from
+inside the sandbox `Import` and `NeedsReview` look like different
+filesystems to `mv` even though they're the same ZFS dataset outside it
+— `mv` falls back to copy+delete instead of an atomic rename. On the
+run that hit G10's permission bug, `mv` got as far as creating the empty
+destination directory before failing to copy the (then-unreadable) file
+into it, leaving both the empty destination and the untouched source
+behind. The next successful run's own collision-check
+(`move_to_review`'s `[ -e "$dest" ]`) saw that pre-existing empty
+directory and treated it as a real collision, so it filed the actual
+album under a timestamp-suffixed name instead of reusing the plain one.
+
+Fixed `move_to_review` to `rmdir "$dest"` first (which only succeeds on
+a genuinely empty directory) and only fall back to the timestamp suffix
+if that fails — reclaims an empty leftover instead of accumulating one
+per retry. Cleaned up the one stray empty directory by hand on the real
+host (`rmdir`, not `rm -rf` — confirmed empty first); no data was lost,
+nothing else was touched.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
 

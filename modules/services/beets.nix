@@ -195,7 +195,13 @@ in
                 move_to_review() {
                   dest=${lib.escapeShellArg reviewDir}/"$(basename "$1")"
                   if [ -e "$dest" ]; then
-                    dest="$dest-$(date +%Y%m%d%H%M%S)"
+                    # an empty leftover from an earlier failed/interrupted move
+                    # (mv falls back to copy+delete here, since Import and
+                    # NeedsReview are separate ReadWritePaths bind mounts under
+                    # ProtectSystem=strict, so a failed copy can leave an empty
+                    # destination dir behind) isn't a real collision -- reclaim
+                    # the name instead of timestamp-suffixing every retry.
+                    rmdir "$dest" 2>/dev/null || dest="$dest-$(date +%Y%m%d%H%M%S)"
                   fi
                   mv "$1" "$dest"
                 }
