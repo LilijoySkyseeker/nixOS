@@ -5,6 +5,16 @@ How snapshots are taken and replicated across `homelab`, `torrent`, and
 offsite restic path see the last section; for deployment status see
 `docs/plans/` (`in-progress/` for what's still being verified).
 
+Which of these paths a given dataset gets is a per-dataset decision, made
+via the `myDatasets` registry (`modules/nixos/datasets.nix`) and its four
+tiers -- see
+[`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`](adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md).
+restic's dataset list below is the union of the pre-registry hardcoded
+list and a recursive walk of every `offsite`-tier root the registry
+declares; the hardcoded half is a migration remnant that shrinks as
+`2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md`
+moves datasets into the tiered tree.
+
 ## Three independent paths
 
 1. **Offsite: restic → Backblaze B2 via rclone.** Inline in

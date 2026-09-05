@@ -44,6 +44,21 @@ Neither is required for a purely mechanical change (a version bump, a
 rename with no behavior change) — use judgment, and if genuinely unsure,
 invoke the one in question rather than skip it silently.
 
+**Run these three strictly one after another: `/simplify` first, then
+`security`, then `docs-updater` last** — never two of them in the same
+parallel batch, even though `security` and `docs-updater` are read-only
+review agents that would seem safe to overlap. Each one needs to see the
+code *after* the previous one's fixes actually landed: `/simplify` can
+change the code out from under a `security` review that started against
+the pre-fix state, and `docs-updater`'s whole job is to describe the
+settled state of the code and plan, which doesn't exist yet if `/simplify`
+or `security` are still mid-flight. Concretely: a real session had
+`/simplify` suggest a refactor that was applied and only later found to
+cause an eval-time infinite recursion and get reverted, while
+`docs-updater` ran concurrently and had already written the (now-reverted)
+design into the plan file's Findings section as settled fact — leaving the
+plan and the code briefly contradicting each other until hand-reconciled.
+
 - **`/simplify`** — required for every non-trivial change (see the
   triviality bar above), no judgment call. Reviews for reuse,
   simplification, efficiency, and condensing into shared modules, then

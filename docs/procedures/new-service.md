@@ -24,7 +24,40 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    `switch` unprompted — see `AGENTS.md`).
 5. If the service writes state on an impermanence host (currently
    homelab), check the new state paths against that host's
-   persistence list before deploying.
+   persistence list before deploying. If it warrants its own dataset
+   (rollback/replication/backup should be decided for this service
+   independently of its neighbours), add a `myDatasets` entry instead
+   of a bare directory — see
+   `docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`.
+   `myDatasets` generates the disko entry, the ZFS properties and (where
+   needed) the persistence entry, but **not** the dataset itself:
+   disko only creates datasets when it formats a disk, so a new entry
+   still needs a manual, one-time
+   `zfs create -o mountpoint=<mountpoint> <dataset>` on the live host
+   before the next deploy, or the path stays an ordinary directory
+   inside its parent dataset instead of its own — silently defeating
+   the whole point (plan:
+   2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G2).
+   `<mountpoint>` is the entry's own
+   `mountpoint` field verbatim if that path is already under
+   `persistRoot` (the flat `/nix/state/<service>` convention new
+   services use, e.g. Loki); otherwise it's `persistRoot` + that field
+   (`modules/nixos/datasets.nix`'s `diskoMountpoint`), e.g.
+   `/var/lib/docker` becomes `/nix/state/var/lib/docker`.
+   `myZfsDatasetProperties` reapplies the rest
+   (`com.sun:auto-snapshot`, etc.) on the next switch. If the path
+   already held data (a reclassification, not a new service), that
+   data is not carried over; only do this for state that's fine to
+   start empty.
+
+   `myDatasets`' `owner`/`group` fields only take effect on a
+   *generated persistence entry* (a path outside `persistRoot`). A
+   flat `/nix/state/<service>` dataset -- the convention new services
+   should default to -- gets no persistence entry and so is **not**
+   chowned by the registry at all; it mounts root:root unless the
+   service module itself arranges ownership (a `systemd.tmpfiles.rules`
+   entry, or a service that manages its own directory permissions on
+   start). Don't assume declaring `owner` here is enough.
 6. Apply the security-hardening conventions in `docs/hardening.md`
    (dedicated service user, systemd sandboxing, etc.) by default, not
    just when asked.
