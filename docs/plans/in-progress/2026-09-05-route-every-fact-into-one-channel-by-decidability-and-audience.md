@@ -126,8 +126,21 @@ Landed so far:
   The eighth, the GitHub description and homepage URL, needs the user's
   own wording.
 
-Next takeable: child 4 (agent trigger table, the keystone — unblocks 6,
-7, 8, 14), then child 3, then child 2 now that 5 has landed.
+**2026-09-06: child 4 landed**, so 6, 7, 8 and 14 are unblocked.
+`docs/skills/workflow/scripts/required-agents` computes the obliged set
+from the diff; `workflow/reference.md`'s "Subagent selection" and step 6
+of `workflow/SKILL.md` no longer contain a judgment escape. Child 1 is
+complete — GitHub description and homepage set 2026-09-06.
+
+Next takeable: child 3, child 6, child 2, or child 8. Child 3 is the
+smallest; child 6 turns child 4's table into an actual gate and is the
+natural follow-on.
+
+Caveat on this branch's own compliance: `required-agents` names
+`docs-updater` and `spec-check` for this diff, and neither was run —
+`spec-check` does not exist yet (child 8), and subagents were out of
+scope for the session that wrote this. Child 6 is what makes that
+omission impossible rather than merely recorded.
 
 **Verified to rung 4 (VM).** `verify-ladder` passes, and
 `nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
@@ -140,16 +153,17 @@ Blocked on nothing. The frontier is children 1-5 in Progress.
 
 Frontier (no blockers, takeable now):
 
-- [ ] 1. free-fix batch — eight documentation corrections, see G3.
-      Seven done 2026-09-05; the eighth (GitHub description and homepage
-      URL) needs the user's own wording
+- [x] 1. free-fix batch — all eight done, seven in-repo 2026-09-05 and
+      the GitHub description plus homepage URL 2026-09-06. See G3
 - [x] 5. G31 citation-integrity checker — done 2026-09-05,
       `docs/skills/plan/scripts/plan-citations`, wired into
       `verify-ladder`. See G7
+- [x] 4. agent trigger table — done 2026-09-06,
+      `docs/skills/workflow/scripts/required-agents` plus the rewritten
+      "Subagent selection" in `workflow/reference.md` and step 6 of
+      `workflow/SKILL.md`. See D7 and G8
 - [ ] 3. verification ladder split — evidence ladder vs deploy sequence
       — see D6
-- [ ] 4. agent trigger table — mechanical triggers replace the judgment
-      escape in `workflow/reference.md` — see D7
 
 Blocked:
 
@@ -487,6 +501,25 @@ a latent GC-triggered breakage, and the reason it looks like corruption is
 that nix reports the symptom (invalid path) rather than the cause (a copy
 nothing can rebuild).
 
+**2026-09-06: a near-identical error that is *not* this bug.** Fixing the
+above let `nix flake check` get further and hit
+`error: path 'ihrfigy8...-base16-schemes-...drv' is not valid`, reached
+through `modules/profiles/PC.nix:237`'s
+`"${pkgs-stable.base16-schemes}/share/themes/..."`. That looks like the
+same defect and is not: interpolating a *derivation* puts its `.drv` in
+the string's context, and a `.drv` is **re-instantiable** — one
+`nix build --dry-run` of a host toplevel recreated it and the error
+vanished on its own. No repo change was needed, and PC.nix:237 is
+idiomatic.
+
+The distinction is the whole lesson, because the error text is identical:
+interpolating a **path** copies a tree in with no deriver and is
+permanent breakage; interpolating a **derivation** is normal and
+self-heals. Check whether the invalid path ends in `.drv` before
+suspecting the code. Note also that `nix flake check` stops at the first
+failure, so one such fault can mask the next — the base16 one was only
+visible once the zrepl one was fixed.
+
 ### G6 - the G-to-F reclassification breaks live citations, so child 5 gates child 2
 
 Charted with child 2 unblocked; that was wrong, corrected 2026-09-05.
@@ -533,6 +566,26 @@ Baseline at the time of writing: **167 citations resolve, zero broken.**
 That is the number child 2 must not regress, and it is what made wiring
 the checker into `verify-ladder` safe — the opposite of G5, where a gate
 that could not pass would have taught bypassing.
+
+### G8 - `verify-ladder` does not see untracked files, and child 4 will conflict with PR #67
+
+**Untracked files are invisible to `git diff`.** `required-agents` counts
+them (`git ls-files --others --exclude-standard`) because a brand-new
+module is the change most in need of review and appears in no diff view
+until it is staged. `verify-ladder` does **not**: its `changed_nix` is
+`git diff --name-only HEAD` plus `--cached` only, so a new, unstaged
+`.nix` file skips `nixfmt`, `statix` and `deadnix` entirely. Found while
+testing `required-agents`, which reported nothing for a tree whose only
+change was a new file. Worth folding into child 7, which is already
+touching `verify-ladder`.
+
+**Child 4 collides with PR #67.** That PR adds the `/simplify` ->
+`security` -> `docs-updater` serialization paragraph to the same region
+of `workflow/reference.md` that child 4 rewrote. The rewrite already
+carries that rule *and* the incident behind it, extended with the
+convergence loop and the trigger table, so resolve the conflict by taking
+this branch's version rather than merging both. If #67 lands first, redo
+the section rather than hand-merging two overlapping prose blocks.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

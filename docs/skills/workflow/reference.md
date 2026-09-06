@@ -30,7 +30,58 @@ whether a plan's work is actually done, or still belongs in
 
 ## Subagent selection
 
-Not every task needs every subagent. Invoke:
+Which agents a change obliges is decided **mechanically, from the diff**
+-- never by judging whether one is "relevant".
+`docs/skills/workflow/scripts/required-agents` prints the set for the
+current working tree and is the authority; this table only explains it.
+
+| Agent | Fires when | Built? |
+|---|---|---|
+| `/simplify` | any `.nix` changed | yes |
+| `security` | any `.nix` changed | yes |
+| `docs-updater` | any `.nix` **or** `.md` changed | yes |
+| `spec-check` | the active plan has any `### D<N>` | not yet |
+
+Why mechanical: "invoke where relevant" ran on 12 of 89 plans while
+"`/simplify`, always" ran every time -- same skill, same agent, one
+sentence apart. A trigger that has to be judged is a trigger that gets
+skipped. `docs-updater` deliberately fires on `.nix` too, because a code
+change can invalidate a doc without touching it, which is the drift that
+matters most.
+`plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7`
+
+### Order, and the loop
+
+Run them strictly one after another -- never two in the same parallel
+batch, even though the review agents are read-only and would seem safe to
+overlap:
+
+```
+loop { /simplify -> security -> spec-check }  until clean or signed off
+                                              then docs-updater, once
+```
+
+Each needs to see the code *after* the previous one's fixes landed.
+`/simplify` can change the code out from under a `security` review that
+started against the pre-fix state. Concretely: a real session had
+`/simplify` land a refactor that was later reverted for an eval-time
+infinite recursion, while `docs-updater` ran concurrently and had already
+written the reverted design into the plan's Findings as settled fact --
+leaving plan and code contradicting each other until hand-reconciled.
+
+Any actionable finding from `security` or `spec-check` **restarts the loop
+at `/simplify`**: their fixes are code changes the earlier agents have not
+seen. `docs-updater` runs last and outside the loop, because its job is
+describing the settled state, which does not exist until the loop
+converges.
+
+Termination needs no new machinery. Every finding resolves `fixed`,
+`accepted` or `moot`, and `plan-freeze` already refuses while any is
+unresolved -- the loop's exit condition is the gate that already exists.
+If the same finding recurs across passes, seek the user's sign-off rather
+than looping again.
+
+### The agents themselves
 
 - **`security`** — anything touching firewall rules (`networking.firewall.*`,
   `openFirewall`), secrets wiring (`sops.secrets.*`), a newly exposed
@@ -40,12 +91,8 @@ Not every task needs every subagent. Invoke:
   anything that touched a doc, a comment, or a config surface a doc
   describes. See `docs/agents/docs-updater.md`.
 
-Neither is required for a purely mechanical change (a version bump, a
-rename with no behavior change) — use judgment, and if genuinely unsure,
-invoke the one in question rather than skip it silently.
-
-- **`/simplify`** — required for every non-trivial change (see the
-  triviality bar above), no judgment call. Reviews for reuse,
+- **`/simplify`** — fires on any `.nix` change, no judgment call. Reviews
+  for reuse,
   simplification, efficiency, and condensing into shared modules, then
   applies its own fixes. This is a deliberately cheap stand-in for a
   dedicated repo-aware cleanliness subagent (matching `security`/

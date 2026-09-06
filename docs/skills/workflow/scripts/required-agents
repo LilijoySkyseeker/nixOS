@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# required-agents -- prints, one per line, which review agents this
+# working tree's diff obliges. Read-only; decides nothing about whether
+# they ran.
+#
+# The triggers are mechanical on purpose. "Invoke where relevant" ran on
+# 12 of 89 plans while "/simplify, always" ran every time -- same skill,
+# same agent, one sentence apart. A trigger an agent has to *judge* is a
+# trigger that gets skipped, so this computes the obligation from the
+# diff instead.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
+set -uo pipefail
+
+root="$(git rev-parse --show-toplevel)" || {
+  echo "not inside a git repository." >&2
+  exit 1
+}
+cd "$root" || exit 1
+
+# Untracked files count. A brand-new module is the case most in need of
+# review, and it appears in none of git's diff views until it is staged.
+changed="$( {
+  git diff --name-only HEAD
+  git diff --cached --name-only
+  git ls-files --others --exclude-standard
+} | sed '/^$/d' | sort -u)"
+[ -n "$changed" ] || exit 0
+
+has() { printf '%s\n' "$changed" | grep -qE "$1"; }
+
+# /simplify and security key off .nix: they review code, and a diff with
+# no Nix in it has no code for them to review.
+if has '\.nix$'; then
+  echo "/simplify"
+  echo "security"
+fi
+
+# docs-updater keys off .nix *or* .md. A .nix change can invalidate a doc
+# that describes it without touching that doc, which is exactly the drift
+# it exists to catch -- so "only when a .md changed" would miss the case
+# that matters most. Narrowing this to the docs a given .nix file is
+# actually named by needs a doc-to-code index that does not exist yet.
+if has '\.nix$|\.md$'; then
+  echo "docs-updater"
+fi
+
+# spec-check reads the active plan's Decisions as the spec. No plan, or a
+# plan with nothing decided, means there is no spec to check against.
+active=".claude/.active-plan"
+if [ -r "$active" ]; then
+  plan="$(cat "$active")"
+  if [ -n "$plan" ] && [ -r "$plan" ] && grep -qE '^### D[0-9]+' "$plan"; then
+    echo "spec-check"
+  fi
+fi

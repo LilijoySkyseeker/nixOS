@@ -37,15 +37,19 @@ stays short on purpose (progressive disclosure).
    reference.md.
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
    `### G<N>` entries, append-only.
-6. **Invoke `security`/`docs-updater` where relevant, and `/simplify`
-   always** (reference.md has the selection table). `security`/
-   `docs-updater` append findings into the *same* current plan file; a
-   `SubagentStop` hook stamps proof it actually finished, independent of
-   whether this skill's own sequencing "waited" for it -- see
-   reference.md, "Why a hook at all", for why that matters. `/simplify`
-   is required for any non-trivial change (reuse/simplification/
-   condensation-into-modules review) -- run it before step 7, and if it
-   proposes fixes, apply them before moving on.
+6. **Run every agent
+   `docs/skills/workflow/scripts/required-agents` names**, in the order
+   and loop reference.md sets out -- `/simplify` -> `security` ->
+   `spec-check`, restarting at `/simplify` on any actionable finding,
+   then `docs-updater` once at the end. Never two in the same parallel
+   batch. The script decides *which*, from the diff; nothing here is a
+   judgment call, because "where relevant" ran on 12 of 89 plans while
+   "always" ran every time. `security`/`docs-updater` append findings
+   into the *same* current plan file; a `SubagentStop` hook stamps proof
+   it actually finished, independent of whether this skill's own
+   sequencing "waited" for it -- see reference.md, "Why a hook at all",
+   for why that matters. If `/simplify` proposes fixes, apply them before
+   moving on.
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.
