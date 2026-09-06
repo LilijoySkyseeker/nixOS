@@ -45,7 +45,11 @@ let
   # nixpkgs' own throwaway test keys, so no private key lives in this
   # repo. They grant nothing outside the ephemeral VMs below; the real
   # puller key is the homelab_zrepl_key sops secret.
-  inherit (import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs)
+  # Path concatenation, not "${pkgs.path}/..." interpolation: coercing a
+  # path to a string copies the whole nixpkgs source into the store as a
+  # deriver-less source path, which nothing can rebuild once it is
+  # garbage-collected -- plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G5
+  inherit (import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs)
     snakeOilEd25519PrivateKey
     snakeOilEd25519PublicKey
     ;

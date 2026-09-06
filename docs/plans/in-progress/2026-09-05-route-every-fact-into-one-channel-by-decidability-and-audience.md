@@ -107,10 +107,19 @@ Ruled outside this destination; these do not graduate.
 
 ## State
 
-**2026-09-05, charted, no child worked.** The map exists; no child plan
-has been created yet. The spec above and D1-D10 below are settled from a
-full grilling session with the user on 2026-09-05. Nothing else in the
-repo has been changed by this plan.
+**2026-09-05, charted; G5 fixed, no numbered child worked.** The map
+exists and D1-D10 are settled from a full grilling session with the user
+on 2026-09-05. No child plan has been created yet.
+
+One repo change beyond the map itself: `tests/zrepl-replication.nix` now
+imports nixpkgs' test SSH keys by path concatenation rather than string
+interpolation, which fixes G5 — `verify-ladder` was un-passable on master
+for any change.
+
+**Verified to rung 4 (VM).** `verify-ladder` passes, and
+`nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
+produced `vm-test-run-zrepl-replication`. Not deployed to any host, and
+nothing here needs a switch.
 
 Blocked on nothing. The frontier is children 1-5 in Progress.
 
@@ -418,14 +427,48 @@ Reproduced against clean `origin/master` (commit `0bc0265`) with no local
 changes, so it is not caused by any work in flight. `snakeOilEd25519PrivateKey`
 resolves through a store path that no longer exists —
 `/nix/store/sr2lpwrcdjfpkk8gpvr98gp4nrgsijns-source` is present but the
-derived `m8319qq...` path is not, which reads as a garbage-collected
-input rather than a repo defect.
+derived `m8319qq...` path is not, ~~which reads as a garbage-collected
+input rather than a repo defect~~.
 
 The consequence is the interesting part: `verify-ladder` hard-blocks on
 `nix flake check`, so while this holds **every** non-trivial change is
 either blocked or committed past a failing gate. A gate that cannot pass
 for environmental reasons trains exactly the bypass habit D7 is trying to
 design out, which makes this worth fixing before children 3, 4 or 6 land.
+
+**2026-09-05: fixed, and the "not a repo defect" reading above was
+wrong.** It was both — a garbage-collected path *and* a repo defect that
+made a collectable path load-bearing.
+
+`tests/zrepl-replication.nix:48` read
+`import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs`. Coercing a path to
+a string copies the referenced directory into the store, so that
+interpolation silently added a **203 MiB copy of the entire nixpkgs
+source**, named after the original — hence the `<hash>-<original
+basename>` shape. That copy is a *source* path with no deriver, so
+`nix build` can never recreate it: once `nix-collect-garbage` takes it,
+`nix flake check` breaks with an error that looks unrecoverable. It would
+have recurred after every GC.
+
+Two-part fix:
+
+1. Immediate — `nix-store --add /nix/store/sr2lpw...-source` reproduced
+   the exact missing hash, confirming the diagnosis and unblocking the
+   gate.
+2. Durable — the import now uses path concatenation,
+   `import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs`, which never
+   coerces the path to a string and so never makes the copy.
+
+Verified by deleting the re-added copy (203.4 MiB freed) and re-running
+`verify-ladder` with the fix in place: all checks passed without it, so
+the dependency is gone rather than merely re-satisfied. The interpolation
+was the only occurrence in `tests/`, `modules/` and `hosts/`.
+
+Lesson worth keeping: **a deriver-less source path is unrecoverable by
+`nix build`.** Any `"${somePath}/..."` interpolation over a large tree is
+a latent GC-triggered breakage, and the reason it looks like corruption is
+that nix reports the symptom (invalid path) rather than the cause (a copy
+nothing can rebuild).
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
