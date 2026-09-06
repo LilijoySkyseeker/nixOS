@@ -50,9 +50,11 @@ full rationale).
      `runNixOSTest` asserting on actual runtime behavior (multi-host
      interaction, a service doing its job), where it exists for the
      module being touched. Lives in `tests/`, wired up in
-     `modules/flake/checks.nix`; currently `zrepl-replication` and
-     `zfs-space-guard`. Write one per `vm-testing.md`'s guidance when a
-     change's failure mode is runtime-only and none already covers it.
+     `modules/flake/checks.nix` — read that file for the current list
+     rather than trusting one written here. `nix flake check` with no
+     `--no-build` runs *all* of them, since they are `perSystem.checks.*`
+     outputs. Write one per `vm-testing.md`'s guidance when a change's
+     failure mode is runtime-only and none already covers it.
 
    Slow (minutes, boots one or more VMs), so skip only when something
    concrete prevents it — no meaningful boot behavior to check (a

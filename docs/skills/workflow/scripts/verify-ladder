@@ -17,6 +17,20 @@ cd "$root"
 fail=0
 changed_nix="$( { git diff --name-only HEAD -- '*.nix'; git diff --cached --name-only -- '*.nix'; } | sed '/^$/d' | sort -u)"
 
+echo "== plan-citations =="
+# Cheap (a grep over tracked .nix/.md), so it runs on every pass rather
+# than only when a plan file changed: a citation breaks from the *target*
+# side -- a renamed plan or a retyped id -- and that edit need not touch
+# the file doing the citing.
+if [ -x "$root/docs/skills/plan/scripts/plan-citations" ]; then
+  if ! "$root/docs/skills/plan/scripts/plan-citations"; then
+    echo "BLOCKED: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
+    fail=1
+  fi
+else
+  echo "(plan-citations not present -- skipping)"
+fi
+
 echo "== nixfmt --check =="
 if [ -z "$changed_nix" ]; then
   echo "(no changed .nix files)"

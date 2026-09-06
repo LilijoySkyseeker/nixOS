@@ -107,14 +107,27 @@ Ruled outside this destination; these do not graduate.
 
 ## State
 
-**2026-09-05, charted; G5 fixed, no numbered child worked.** The map
-exists and D1-D10 are settled from a full grilling session with the user
-on 2026-09-05. No child plan has been created yet.
+**2026-09-05: child 5 done, child 1 all but one item, G5 and G6 closed.**
+D1-D10 are settled from a full grilling session with the user on
+2026-09-05.
 
-One repo change beyond the map itself: `tests/zrepl-replication.nix` now
-imports nixpkgs' test SSH keys by path concatenation rather than string
-interpolation, which fixes G5 — `verify-ladder` was un-passable on master
-for any change.
+Landed so far:
+
+- **G5** — `tests/zrepl-replication.nix` imports nixpkgs' test SSH keys by
+  path concatenation rather than string interpolation. `verify-ladder`
+  had been un-passable on master for any change.
+- **G6** — child 2 re-blocked behind child 5; 18 live `#G` citations
+  would have broken silently otherwise.
+- **Child 5** — `docs/skills/plan/scripts/plan-citations` exists and is
+  wired into `verify-ladder`. 167 citations resolve, zero broken.
+- **Child 1** — seven of eight corrections applied across `AGENTS.md`,
+  `docs/adr/README.md`, `docs/procedures/testing-changes.md`,
+  `docs/skills/plan/reference.md` and `docs/skills/workflow/SKILL.md`.
+  The eighth, the GitHub description and homepage URL, needs the user's
+  own wording.
+
+Next takeable: child 4 (agent trigger table, the keystone — unblocks 6,
+7, 8, 14), then child 3, then child 2 now that 5 has landed.
 
 **Verified to rung 4 (VM).** `verify-ladder` passes, and
 `nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
@@ -127,18 +140,22 @@ Blocked on nothing. The frontier is children 1-5 in Progress.
 
 Frontier (no blockers, takeable now):
 
-- [ ] 1. free-fix batch — eight documentation corrections, see G3
-- [ ] 2. plan-file layout revision — `## State` first, three frontmatter
-      fields, defect G-to-F reclassification — see D4
+- [ ] 1. free-fix batch — eight documentation corrections, see G3.
+      Seven done 2026-09-05; the eighth (GitHub description and homepage
+      URL) needs the user's own wording
+- [x] 5. G31 citation-integrity checker — done 2026-09-05,
+      `docs/skills/plan/scripts/plan-citations`, wired into
+      `verify-ladder`. See G7
 - [ ] 3. verification ladder split — evidence ladder vs deploy sequence
       — see D6
 - [ ] 4. agent trigger table — mechanical triggers replace the judgment
       escape in `workflow/reference.md` — see D7
-- [ ] 5. G31 citation-integrity checker — prerequisite for any
-      expand-contract contract step, see D4
 
 Blocked:
 
+- [ ] 2. plan-file layout revision — `## State` first, three frontmatter
+      fields, defect G-to-F reclassification — blocked by 5, see D4
+      and G6
 - [ ] 6. `plan-gate` requires the `docs-updater` stamp — blocked by 4
 - [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
       — blocked by 3, 4
@@ -469,6 +486,53 @@ Lesson worth keeping: **a deriver-less source path is unrecoverable by
 a latent GC-triggered breakage, and the reason it looks like corruption is
 that nix reports the symptom (invalid path) rather than the cause (a copy
 nothing can rebuild).
+
+### G6 - the G-to-F reclassification breaks live citations, so child 5 gates child 2
+
+Charted with child 2 unblocked; that was wrong, corrected 2026-09-05.
+
+Renaming a defect from `G<N>` to `F<N>` changes its **anchor**, and
+anchors are cited. Eighteen live citations point at `#G` anchors today —
+sixteen from `.nix` (`#G1` x3, `#G8` x2, `#G6` x2, `#G4` x2, `#G2` x2,
+plus `#G3`, `#G5`, `#G12`, `#G13`) and two more from `docs/`. Every
+cited G that turns out to be a defect breaks its citation, and G31 means
+nothing would report it.
+
+This is the `8ae2a4a` failure mode exactly: 74 plan files renamed in one
+commit, every inbound bare-filename citation broken, nothing to catch it.
+So child 2 is blocked by child 5, and child 2 runs as **expand-contract**
+per D4 rather than one mass edit — the first real use of that pattern.
+Ordering within child 2: add the new `F<N>` beside the old `G<N>`,
+migrate citations in batches, delete the old anchors only once the
+checker reports zero unresolved references.
+
+### G7 - `plan-tick` cannot tick a map child, and the checker needed an opt-out
+
+Two things child 5 turned up.
+
+**`plan-tick` only addresses `D`/`G`/`F` ids.** A map's children are
+numbered items, not typed ids, so their checkboxes have to be ticked by
+hand — which collides with the skill's "never hand-edit these mechanics"
+rule even though a Progress checkbox is free-text content. Either
+`plan-tick` grows a map-child form, or the map kind reuses typed ids for
+its children. Decide this inside child 2, since that is where the schema
+changes; until then, map children are ticked by hand.
+
+**Docs that teach citation syntax must contain citations that resolve to
+nothing.** `docs/skills/plan/reference.md` explains the convention with a
+placeholder filename, and its worked example is an entire fictional plan
+file. (Writing this entry tripped the checker on its own quoted example,
+which is the shortest possible demonstration that the category is real.) That is a permanent category, not a one-off, so `plan-citations`
+skips regions between `<!-- plan-citations: ignore-start -->` and
+`<!-- plan-citations: ignore-end -->` rather than excluding whole files —
+real citations in the same file still get checked. This is the same
+false-positive class that made a naive doc-path checker too noisy to
+wire up, and it is why that one stayed deferred while this one did not.
+
+Baseline at the time of writing: **167 citations resolve, zero broken.**
+That is the number child 2 must not regress, and it is what made wiring
+the checker into `verify-ladder` safe — the opposite of G5, where a gate
+that could not pass would have taught bypassing.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

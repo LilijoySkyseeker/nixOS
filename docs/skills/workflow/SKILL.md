@@ -18,7 +18,9 @@ stays short on purpose (progressive disclosure).
 2. **Find or create the plan file** (see `docs/skills/plan/SKILL.md`).
    Grep `docs/plans/{todo,in-progress}/` for something already covering
    this task; `plan-move <file> in-progress` an existing `todo/` match,
-   or `plan-new "<title>"` if nothing exists.
+   or `plan-new "<title>"` if nothing exists. Grep `docs/plans/done/`
+   too -- never to reuse a frozen plan, but because one often already
+   records why this was tried, shaped this way, or undone.
 3. **Do the work**, following existing conventions unchanged
    (`docs/style-guide.md`, `AGENTS.md`'s hard-confirm rules). Write
    comments right the first time -- lowercase, terse, mechanics-only,

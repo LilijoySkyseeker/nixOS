@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# plan-citations -- repo-wide citation-integrity checker, read-only.
+# Scans every tracked .nix and .md file for plan citations of the form
+# <YYYY-MM-DD>-<slug>.md, optionally anchored (#D3/#G1/#F2), and verifies
+# that the file resolves to a real plan under docs/plans/*/ and that the
+# anchor resolves to a real "### <id>" heading inside it. Prints every
+# problem; exits non-zero if any exist.
+#
+# Resolves G31 in 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
+# -- nothing previously verified that a bare-filename citation still hits
+# anything. Bare filenames are what let a plan move between folders
+# without breaking citations (reference.md, "Why bare-filename
+# citations"), but the same property means a rename or a retyped id
+# breaks every inbound reference silently. Commit 8ae2a4a renamed 74 plan
+# files in one commit with nothing to catch it.
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 0 ] || { printf 'usage: plan-citations\n' >&2; exit 1; }
+root="$(plan_repo_root)"
+cd "$root" || plan_die "cannot cd to repo root"
+
+problems=0
+report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
+
+# basename -> path, so a citation resolves regardless of which status
+# folder the plan currently sits in. That folder-independence is the
+# whole point of citing by bare filename.
+declare -A plan_path
+for f in docs/plans/*/*.md; do
+  [ -e "$f" ] || continue
+  plan_path["$(basename "$f")"]="$f"
+done
+[ "${#plan_path[@]}" -gt 0 ] || plan_die "no plan files found under docs/plans/*/"
+
+checked=0
+while IFS= read -r file; do
+  [ -f "$file" ] || continue
+  while IFS= read -r cite; do
+    [ -n "$cite" ] || continue
+    fname="${cite%%#*}"
+    anchor=""
+    case "$cite" in *#*) anchor="${cite#*#}" ;; esac
+
+    target="${plan_path[$fname]:-}"
+    if [ -z "$target" ]; then
+      report "$file: cites '$fname' -- no such plan file under docs/plans/*/"
+      continue
+    fi
+    checked=$((checked + 1))
+
+    if [ -n "$anchor" ] &&
+      ! grep -qE "^### ${anchor}([[:space:]]|\$)" "$target"; then
+      report "$file: cites '${fname}#${anchor}' -- no '### ${anchor}' heading in $target"
+    fi
+    # Regions between the ignore markers are stripped before matching:
+    # docs that *teach* the citation convention have to contain example
+    # citations that deliberately resolve to nothing, and reference.md's
+    # worked example is a whole fictional plan file. That is a permanent
+    # category, not a one-off, so it gets an explicit opt-out rather than
+    # a file exclusion -- real citations in the same file still count.
+  done < <(awk '/plan-citations: ignore-start/{skip=1; next}
+                /plan-citations: ignore-end/{skip=0; next}
+                !skip' "$file" |
+    grep -ohE '[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]*\.md(#[DGF][0-9]+)?' | sort -u)
+done < <(git ls-files -- '*.nix' '*.md')
+
+if [ "$problems" -gt 0 ]; then
+  plan_note "plan-citations: $problems broken citation(s)."
+  exit 1
+fi
+printf 'plan-citations: OK (%s citations resolve)\n' "$checked"

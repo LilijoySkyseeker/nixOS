@@ -35,12 +35,21 @@ did the obvious thing."
 
 ## Format
 
-A title and a paragraph is a legitimate ADR. `Status` frontmatter,
-`Considered alternatives` and `Consequences` are optional — include them
-only where they carry weight. Most will not need all three.
+A title and a paragraph is a legitimate ADR, and a short one is not a
+lesser one. But `Status` frontmatter, `Considered alternatives` and
+`Consequences` are optional only in principle: a decision that clears
+all three bars above usually earns them, because the rejected
+alternatives and the downstream costs are *what made it* hard to reverse
+and surprising in the first place.
 
-Existing architectural decisions predate this practice and are being
-migrated in
-`2026-09-05-migrate-existing-architectural-decisions-into-docs-adr.md`;
-until that lands, `docs/architecture.md` remains the primary home for
-anything not yet given an ADR.
+`0001` is the worked example — the decision stated in a paragraph, then
+the constraint that forces it, then alternatives and consequences.
+Follow it rather than the minimum, and cut sections that would be empty
+rather than padding them.
+
+Existing architectural decisions predate this practice; each gets an ADR
+when the thing it describes is next changed, tracked in
+`2026-09-05-migrate-existing-architectural-decisions-into-docs-adr.md`.
+That is a trigger, not a holding pattern: `docs/architecture.md` keeps
+describing **how the system is built now**, permanently, and cites an ADR
+for **why a shape was chosen**. Neither restates the other.

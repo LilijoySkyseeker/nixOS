@@ -23,6 +23,8 @@
 
 ## Why bare-filename citations
 
+<!-- plan-citations: ignore-start (the example filenames below resolve to nothing on purpose) -->
+
 A plan physically moves between `todo/`/`in-progress/`/`done/` as work
 progresses, and a `done/` plan is frozen forever the moment it lands there.
 If a citation encoded the folder (`docs/plans/done/foo.md#D1`), then either
@@ -33,6 +35,8 @@ fix it (frozen means frozen). Citing by bare filename instead
 changes, so the citation is valid the instant it's written and stays valid
 forever, regardless of where the file currently sits. Resolving one is a
 single `git grep -rl '2026-08-27-foo.md'` or an editor's "quick open."
+
+<!-- plan-citations: ignore-end -->
 
 ## The three decision states, precisely
 
@@ -122,7 +126,7 @@ is rare enough not to need its own mechanic.
    or if any decision is unresolved (above).
 2. Sets `frozen: true`.
 3. Records a `sha256sum`-format line (`<hash>  <relpath>`) in
-   `docs/plans/done/.checksums`, which the git-level `pre-commit` hook
+   `docs/plans/.checksums`, which the git-level `pre-commit` hook
    uses to detect any later attempt to modify a frozen file, from any
    tool or human.
 
@@ -153,6 +157,8 @@ Never delete text in an unfrozen plan. To correct something:
 `~~strike it through~~` and add a new line below it explaining why, dated.
 
 ## Worked example
+
+<!-- plan-citations: ignore-start (a fictional plan file; its citations resolve to nothing on purpose) -->
 
 ```markdown
 ---
@@ -197,3 +203,5 @@ Needs a real two-host runNixOSTest instead.
 build user with no shell, and the whole fleet is behind Tailscale ACLs
 already; a passphrase would break unattended builds for no real gain here.
 ```
+
+<!-- plan-citations: ignore-end -->
