@@ -4,6 +4,18 @@
 PLAN_CHECKSUMS_RELPATH="docs/plans/.checksums" # shared by done/ and rejected/ -- both are frozen states
 PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
 
+# Review agents whose completion is *mechanically recorded*: they are
+# subagents, so SubagentStop fires and subagent-stamp writes a stamp.
+# Recorded, not proven -- see plan_stamp_line for what a stamp is and is
+# not evidence of.
+# Deliberately narrower than the set of agents a change obliges (see
+# workflow/scripts/required-agents) -- /simplify is a slash command with
+# no such event, and spec-check does not exist yet. Both the writer
+# (subagent-stamp) and the reader (plan-gate) take the list from here, so
+# adding an agent cannot half-land: a stamper with no checker silently
+# degrades the gate to a no-op.
+PLAN_STAMPABLE_AGENTS="security docs-updater"
+
 plan_die() { printf 'plan: %s\n' "$*" >&2; exit 1; }
 plan_note() { printf '%s\n' "$*" >&2; }
 
@@ -213,4 +225,123 @@ plan_mark_touched() {
   local root="$1" rel="$2" marker="$root/$PLAN_ACTIVE_MARKER_RELPATH"
   mkdir -p "$(dirname "$marker")"
   printf '%s\n' "$rel" > "$marker"
+}
+
+# plan_is_stampable <agent> -- is this agent one subagent-stamp records?
+plan_is_stampable() {
+  local a="$1" x
+  for x in $PLAN_STAMPABLE_AGENTS; do
+    [ "$x" = "$a" ] && return 0
+  done
+  return 1
+}
+
+# Files whose content a review agent actually reads. Code only: `.md` is
+# deliberately excluded, because every stamp appends to a plan file and
+# docs-updater edits docs, so folding prose in would make each stamp
+# invalidate itself and every stamp before it.
+PLAN_CODE_GLOBS=("*.nix" "docs/skills/*/scripts/*" ".githooks/*")
+
+# plan_code_fingerprint -- content hash of the reviewable code in the
+# working tree. Must be run from the repo root.
+#
+# Content, not history. An agent reviews uncommitted work and the commit
+# lands *after* the stamp, so anything keyed on HEAD or on commit time
+# reports a review that genuinely happened as stale -- an un-passable
+# gate, which is worse than a weak one. See D11 in
+# 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md
+plan_code_fingerprint() {
+  local out
+  out="$(
+    set -o pipefail
+    # -z throughout: a path may contain a newline, which `tr '\n' '\0'`
+    # would mangle into two paths.
+    #
+    # --cached and --others together, so a file's presence in the hash
+    # does not change when it goes from untracked to tracked at commit
+    # time -- it is in the union either way. That is what lets a stamp
+    # written before the commit still match in CI after it. (A scratch
+    # code file that never gets committed *will* skew the local hash;
+    # remove it before the review rather than after the gate complains.)
+    #
+    # LC_ALL=C because sort order is part of the hash, and the writer
+    # (a local hook, typically a UTF-8 locale) and the reader (CI, which
+    # sets no LANG) otherwise disagree -- measured: identical content
+    # hashes differently under en_US.UTF-8 and C, which would report
+    # every correctly stamped plan as stale in CI.
+    #
+    # Absent-but-tracked files are skipped rather than failing the hash:
+    # a deletion that is not yet committed is a normal mid-work state,
+    # and CI, where the deletion *is* committed, also omits the file.
+    git ls-files -z --cached --others --exclude-standard -- "${PLAN_CODE_GLOBS[@]}" |
+      while IFS= read -r -d '' f; do
+        [ -f "$f" ] && printf '%s\0' "$f"
+      done |
+      LC_ALL=C sort -zu |
+      xargs -0 -r sha256sum |
+      LC_ALL=C sort |
+      sha256sum
+  )" || return 1
+  printf '%.16s' "${out%% *}"
+}
+
+# plan_is_code_path <path> -- does this path fall inside PLAN_CODE_GLOBS?
+# The single test for "is this reviewable code", so required-agents,
+# plan-citations and the fingerprint cannot drift into three different
+# answers -- one missed edit there means a file changes without obliging
+# review, or changes without ever invalidating a stamp.
+plan_is_code_path() {
+  local p="$1" g
+  for g in "${PLAN_CODE_GLOBS[@]}"; do
+    # shellcheck disable=SC2053  # $g is a pattern here, deliberately
+    [[ "$p" == $g ]] && return 0
+  done
+  return 1
+}
+
+# plan_stamp_line <agent> <timestamp> <fingerprint> -- the single
+# definition of the completion-stamp format. subagent-stamp writes it and
+# plan_stamp_fingerprint reads it; with the two in separate files and no
+# shared definition, a reworded stamp would silently block every merge.
+#
+# What a stamp is evidence of, precisely: an agent of that type ran to
+# completion against code with that fingerprint. It is *not* proof a
+# review happened. SubagentStop fires for any subagent of the type
+# whatever it did, so a no-op prompt yields an identical valid stamp, and
+# the line is plaintext in a file the author controls, so one printf
+# forges one. That is acceptable against the adversary this system has --
+# an agent that forgets -- and useless against one that lies. Do not
+# describe it as proof.
+plan_stamp_line() {
+  printf '_%s finished %s (code %s) -- see Findings above._' "$1" "$2" "$3"
+}
+
+# plan_stamp_fingerprint <file> <agent> -- prints the code fingerprint
+# <agent>'s most recent stamp recorded. Returns non-zero if it never
+# stamped. Prints "legacy" for a stamp written before fingerprints
+# existed, so an older plan cited by a live range degrades to a warning
+# rather than an unfixable block.
+plan_stamp_fingerprint() {
+  local line fp
+  line="$(grep -E "^_$2 finished " "$1" | tail -n 1)"
+  [ -n "$line" ] || return 1
+  case "$line" in
+    *"(code "*)
+      fp="${line#*(code }"
+      fp="${fp%%)*}"
+      # An empty capture is a truncated stamp, not a fingerprint of "".
+      # Reported as malformed so it cannot be silently compared against
+      # the real hash and reported as an ordinary staleness.
+      [ -n "$fp" ] || { printf 'malformed'; return 0; }
+      printf '%s' "$fp"
+      ;;
+    *) printf 'legacy' ;;
+  esac
+}
+
+# plan_has_heading <file> <id> -- does "### <id>" exist as a real heading?
+# Shared by plan-lint's sequencing check and plan-citations' anchor
+# resolution so the two cannot drift on what counts as a match.
+plan_has_heading() {
+  grep -qE "^### $2([[:space:]]|\$)" "$1"
 }

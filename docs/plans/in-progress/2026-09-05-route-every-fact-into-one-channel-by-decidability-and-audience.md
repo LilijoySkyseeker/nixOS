@@ -132,22 +132,70 @@ from the diff; `workflow/reference.md`'s "Subagent selection" and step 6
 of `workflow/SKILL.md` no longer contain a judgment escape. Child 1 is
 complete — GitHub description and homepage set 2026-09-06.
 
-Next takeable: child 3, child 6, child 2, or child 8. Child 3 is the
-smallest; child 6 turns child 4's table into an actual gate and is the
-natural follow-on.
+**2026-09-06: child 6 landed, and D11 with it.** `plan-gate` now refuses
+a merge unless every obliged, stampable agent left a completion stamp in
+the cited plan, and the stamp carries a fingerprint of the code it read
+so a stale stamp is caught rather than accepted. `/simplify` ran and its
+ten findings were applied; `security` and `docs-updater` follow.
 
-Caveat on this branch's own compliance: `required-agents` names
-`docs-updater` and `spec-check` for this diff, and neither was run —
-`spec-check` does not exist yet (child 8), and subagents were out of
-scope for the session that wrote this. Child 6 is what makes that
-omission impossible rather than merely recorded.
+Also this session: skill scripts and git hooks were added to the trigger
+set. They are code *and* they are the enforcement machinery — a change to
+`plan-gate` or `verify-ladder` can weaken every other gate — so keying
+only off `.nix` had left them reviewed by nothing.
+
+Four children done (1, 4, 5, 6). Next takeable: child 3 (smallest),
+child 2 (now that 5 has landed), child 7, or child 8.
 
 **Verified to rung 4 (VM).** `verify-ladder` passes, and
 `nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
 produced `vm-test-run-zrepl-replication`. Not deployed to any host, and
 nothing here needs a switch.
 
-Blocked on nothing. The frontier is children 1-5 in Progress.
+---
+
+### Pick-up point, 2026-09-06
+
+**Where.** Worktree
+`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
+branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
+not in the main checkout. Everything below is committed and pushed.
+
+**Done:** children 1, 4, 5, 6. G5, G6 closed. `security` ran once and
+raised F1-F9, all nine now resolved. `/simplify` ran twice; both passes
+applied. D11 answered and built.
+
+**The immediate next step, and the only thing standing between this
+branch and its own gate:**
+
+1. Run `docs-updater` (subagent). The user authorised subagent use on
+   2026-09-06.
+2. Run `security` (subagent) *after* it -- that order is now mandatory,
+   see D7's 2026-09-06 note and F2.
+3. Apply anything either raises; an actionable finding restarts the loop
+   at `/simplify`. Resolve every new `F<N>` with `plan-resolve`
+   (`accepted` needs the user's own sign-off, never the agent's).
+4. `docs/skills/workflow/scripts/plan-gate origin/master HEAD` must come
+   back clean. It currently blocks on the missing `docs-updater` stamp,
+   which is correct.
+
+Do not hand-write a completion stamp. The `SubagentStop` hook writes it,
+and forging one is F7.
+
+**Then the frontier:** child 3 (verification-ladder split, smallest),
+then 2 (plan-file layout -- unblocked now 5 has landed, and it must run
+as expand-contract per G6, since 18 live `#G` citations break otherwise),
+then 7, 8, 14.
+
+**Live traps a new session will hit:**
+
+- `plan-citations` and `plan-gate` are wired into `verify-ladder`, so a
+  broken citation or a missing stamp blocks commits. That is intended.
+- Editing `docs/skills/*/scripts/*` now obliges `/simplify`, `security`
+  and `docs-updater` -- see `required-agents`.
+- PR #67 will conflict with child 4's rewrite of `reference.md`'s
+  "Subagent selection". Resolve by taking this branch's version, which
+  already subsumes #67's serialization rule (G8).
+- `git stash` is shared across worktrees here; use a WIP commit instead.
 
 ## Progress
 
@@ -162,6 +210,9 @@ Frontier (no blockers, takeable now):
       `docs/skills/workflow/scripts/required-agents` plus the rewritten
       "Subagent selection" in `workflow/reference.md` and step 6 of
       `workflow/SKILL.md`. See D7 and G8
+- [x] 6. `plan-gate` requires a completion stamp — done 2026-09-06.
+      Stamps carry a code fingerprint, so the gate distinguishes "ran"
+      from "ran against this code". See D11
 - [ ] 3. verification ladder split — evidence ladder vs deploy sequence
       — see D6
 
@@ -170,7 +221,6 @@ Blocked:
 - [ ] 2. plan-file layout revision — `## State` first, three frontmatter
       fields, defect G-to-F reclassification — blocked by 5, see D4
       and G6
-- [ ] 6. `plan-gate` requires the `docs-updater` stamp — blocked by 4
 - [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
       — blocked by 3, 4
 - [ ] 8. `spec-check` subagent — blocked by 4
@@ -343,6 +393,23 @@ dissolves G41 of the weak-points plan for free — `/simplify` does not
 fire on a docs-only diff — and removes any need for a no-op path in a
 mandatory agent, since an irrelevant agent never starts.
 
+**2026-09-06: the order above is superseded.** It read
+`/simplify -> security -> spec-check`, then `docs-updater` once at the
+end. `security` F2 showed that and the D11 staleness rule are mutually
+unsatisfiable: `docs-updater` rewrites inline comments in `.nix` files and
+skill scripts, all inside `PLAN_CODE_GLOBS`, so running it after
+`security` leaves `security`'s stamp stale *by construction* and
+`plan-gate` blocks on a task where nothing is wrong. A gate that goes red
+on the first honest attempt every time is the one people learn to route
+around.
+
+New order: **`/simplify` -> `docs-updater` -> `security` -> `spec-check`**,
+one loop, restarting at `/simplify` on any actionable finding. The rule
+behind it is *every agent that writes runs before every agent whose stamp
+must stay valid*. PR #67's incident constrained `docs-updater` to follow
+`/simplify`; it never required it to follow the read-only reviewers, so
+moving them last keeps what that incident actually established.
+
 `spec-check` is new. It reads the plan's `## Decisions` and `## Progress`
 as the spec, which are already written and already anchored. Every
 existing gate checks that the *record* is complete — `plan-gate` asks
@@ -399,6 +466,66 @@ across sessions.
 
 
 **ANSWERED 2026-09-05:** structured as this map plan
+
+### D11 - should a completion stamp prove *what* was reviewed?
+
+**Open.** Child 6 proves an obliged agent ran **at least once**, not that
+it ran against the code being merged. A fix applied after `docs-updater`
+stamped leaves a stale stamp and `plan-gate` still passes. The convergence
+loop in D7 is therefore discipline, not mechanism -- the exact conversion
+this effort exists to make.
+
+The obvious designs all break the same way. An agent reviews
+*uncommitted* work at T and stamps; that work is committed at T+1. So
+"stamp must be newer than the last commit touching reviewable files" and
+"stamp must name the current HEAD" both read as stale immediately, for a
+review that did happen. An un-passable gate is worse than a weak one
+(G5).
+
+Options:
+
+1. **Content fingerprint.** The stamp records a hash over the reviewable
+   file set as it stood when the agent ran; `plan-gate` recomputes it for
+   the range head. Immune to the commit-boundary false positive, since it
+   compares content rather than history. Costs a hash over ~220 tracked
+   files and needs the reviewed work staged before the agent runs, so
+   the index reflects what was read.
+2. **Stamp the merge-base diff hash.** Cheaper, but the hook does not
+   know the base branch, so it would have to be passed in or guessed.
+3. **Leave it.** Keep the stamp as proof-of-invocation and rely on
+   unresolved findings to catch the substantive case: a review that ran
+   and found something still blocks until resolved.
+
+Leaning (1), but it is a real change to both the stamp format and the
+workflow's ordering, so it wants its own child rather than riding along
+with child 6.
+
+**Built 2026-09-06 as option 1**, inside child 6 after all, because the
+design turned out smaller than feared once the fingerprint was scoped to
+code.
+
+`plan_code_fingerprint` hashes the tracked *and untracked* content of
+`PLAN_CODE_GLOBS` -- `*.nix`, `docs/skills/*/scripts/*`, `.githooks/*`.
+`.md` is deliberately excluded: every stamp appends to a plan file and
+`docs-updater` edits docs, so folding prose in would make each stamp
+invalidate itself and every stamp before it. Excluding it also sharpens
+the question the stamp answers to exactly the right one -- *did the code
+change since this agent read it?*
+
+`subagent-stamp` records the fingerprint in the stamp line;
+`plan-gate` recomputes it and blocks on a mismatch. A stamp written
+before fingerprints existed reads as `legacy` and downgrades to a
+warning, so an older plan cited by a live range cannot become an
+unfixable block.
+
+Verified by direct test: fingerprint stable across calls; absent stamp
+returns non-zero; write/read round-trips; a legacy stamp reports
+`legacy`; **a code edit moves the fingerprint and a prose edit does
+not** -- the last being the property that makes the scheme
+self-consistent.
+
+
+**ANSWERED 2026-09-06:** option 1: stamps record a code-only content fingerprint
 
 ## Gotchas (G)
 
@@ -587,5 +714,195 @@ convergence loop and the trigger table, so resolve the conflict by taking
 this branch's version rather than merging both. If #67 lands first, redo
 the section rather than hand-merging two overlapping prose blocks.
 
+### G9 - the fingerprint enforces the loop, but `docs-updater` can force an extra pass
+
+D11's fingerprint makes the convergence loop mechanical for stampable
+agents: fix code after `security` stamped, the fingerprint moves, and
+`plan-gate` demands a re-run. It terminates exactly when a pass stops
+changing code, which is the right condition.
+
+Three gaps remain, and the third is self-inflicted:
+
+1. **`/simplify` is never stamped** -- a slash command fires no
+   `SubagentStop`. D7 makes it the loop's *restart point*, so the one
+   step the loop pivots on is the one with no mechanical proof.
+2. **`spec-check` does not exist** (child 8), so its leg is unenforced by
+   construction.
+3. **`docs-updater` edits inline comments in `.nix` files by contract.**
+   That moves the fingerprint, which makes the earlier `security` stamp
+   stale, which forces another `security` pass -- every time it touches
+   code. It converges, because a second `docs-updater` pass over
+   already-tightened comments is a no-op, but it costs a guaranteed extra
+   round.
+
+Do not "fix" (3) by dropping code comments from the fingerprint: a
+comment edit and a logic edit are indistinguishable at the file level
+without parsing Nix, and a fingerprint that ignores some code changes
+stops answering the question it exists for. The honest options are to
+accept the extra pass, or to run `docs-updater` inside the loop rather
+than after it -- which contradicts the ordering rationale in D7, so it
+needs a decision rather than a quiet change.
+
+### G10 - a content fingerprint is only as stable as its `sort`
+
+`plan_code_fingerprint`'s first form hashed a file list sorted under the
+ambient locale. Measured over an identical 87-file set:
+
+```
+C / C.UTF-8 / POSIX   4fe06a04e030d9d7
+en_US.UTF-8 / en_GB   d6ceceb07eea0414
+```
+
+`sort` honours `LC_COLLATE`, and the writer and reader of a stamp are in
+different environments by construction: `subagent-stamp` runs in the
+author's shell, typically a UTF-8 locale, while `plan-gate` also runs on
+`ubuntu-latest`, which sets no `LANG`. Every correctly stamped plan would
+therefore have reported `stamp is stale` in CI with no code change --
+turning the gate meant to stop bypasses into the best possible argument
+for one. `LC_ALL=C` on both sorts fixes it.
+
+Two neighbouring traps found with it, both now closed:
+
+- `git ls-files --cached --others` must include **both**, or a file's
+  presence in the hash changes when it goes from untracked to tracked at
+  commit time, giving the same false staleness from the other direction.
+  A scratch code file that is never committed still skews the local hash;
+  remove it before the review, not after the gate complains.
+- `2>/dev/null` plus an unchecked `xargs` turned any failure into
+  `e3b0c442...`, the sha256 of nothing, returned successfully.
+
+General lesson: a fingerprint used across two machines has to pin every
+input to its own value -- locale, file order, and the tracked/untracked
+distinction are all part of the hash whether or not you meant them to be.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+### F1 — a frozen plan plus a stale fingerprint is an unfixable block, and the only escape is the G42 no-trailer bypass
+
+- **File:** `docs/skills/workflow/scripts/plan-gate:95-101`, `docs/skills/workflow/scripts/subagent-stamp:34`, `docs/skills/plan/scripts/plan-move:48-52`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** any contributor following `workflow/SKILL.md` steps 6 to 8 to 9 in order. Step 8 mandates `plan-move <file> done` in the same branch, before committing; `plan-move done` execs `plan-freeze`, which sets `frozen: true`. `subagent-stamp:34` refuses to stamp a frozen plan, and `plan_require_not_frozen` refuses every other `plan-*` edit. So the moment step 8 runs, the stamp set is immutable. Any later fingerprint drift — a rebase onto an advanced master, a follow-up fix commit, or F2/F3 below — makes `plan-gate` print `BLOCKED: ... stamp is stale` with no in-system remedy: re-running the agent cannot re-stamp, `plan-resolve` cannot touch the file, and hand-editing it breaks `docs/plans/.checksums`.
+- **Rule:** new-rule candidate (a gate whose only recovery path is outside the system is a gate that gets routed around); compare `docs/hardening.md` rule 11.
+- **Finding:** The three escapes available to a blocked author are (a) hand-edit a frozen plan, (b) unfreeze it, (c) drop the `Plan:` trailer, at which point `plan-gate` prints "nothing to gate" and exits 0 — the documented `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G42` bypass. (c) is the cheapest and leaves no trace, so the fingerprint's net effect is to teach the bypass that disables the whole gate, including the unresolved-findings check that predates this change. This is exactly the dynamic G5 in this plan identified ("an un-passable gate is worse than a weak one") and D11 tried to design around; the fingerprint dodges the commit-boundary false positive D11 names but not the freeze-boundary one. A second instance of the same class: the pinned base-branch `lib.sh` supplies `PLAN_CODE_GLOBS` for `current_fp` while the PR's own `lib.sh` supplied it for `stamped_fp`, so any PR that edits `PLAN_CODE_GLOBS` compares two different file sets and is unconditionally blocked.
+- **Fix risk:** Making `subagent-stamp` exempt stamps from the freeze re-opens frozen plans to writes and invalidates `.checksums`; scoping the fingerprint to the range's own changed files instead of the whole repo weakens what it proves. Either way, test the full step 6-8-9 sequence end to end with master advanced underneath, not just `plan-gate` in isolation.
+
+
+**FIXED 2026-09-06:** a stale stamp on a frozen plan degrades to NOTE; blocking was unsatisfiable
+
+### F2 — the mandated agent order guarantees a stale `security` stamp whenever `docs-updater` edits code
+
+- **File:** `docs/skills/plan/scripts/lib.sh:238` (`PLAN_CODE_GLOBS`), `docs/skills/workflow/SKILL.md:41-52` (step 6 order), `docs/agents/docs-updater.md` (frontmatter `tools: ... Edit`; "for every doc or comment touched by the diff")
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** every non-trivial change that touches a `.nix` file or a skill script — i.e. every change `security` is obliged on. Step 6 fixes the order as `/simplify`, `security`, `spec-check`, then `docs-updater` once at the end. `docs-updater` holds `Edit` and its brief tells it to rewrite inline comments in the code the diff touched. `PLAN_CODE_GLOBS` is `*.nix`, `docs/skills/*/scripts/*`, `.githooks/*` — all of which `docs-updater` edits. Its edits therefore land after `security` stamped, `subagent-stamp` fingerprints at `SubagentStop` (so `docs-updater`'s own stamp is current and `security`'s is not), and `plan-gate` blocks on `security` being stale.
+- **Rule:** n/a — internal control correctness.
+- **Finding:** The ordering `SKILL.md` mandates and the staleness rule `plan-gate` enforces are mutually unsatisfiable in one pass. Recovery requires re-running `security` after `docs-updater`, which contradicts step 6 and, if step 8 already ran, is impossible (F1). This will fire on this very PR: `docs/skills/*/scripts/*` was added to both the trigger set and `PLAN_CODE_GLOBS` in the same change, and those scripts carry the longest comment blocks in the repo — prime `docs-updater` concision targets. The practical outcome is a first-run red gate on essentially every task, which is the strongest possible training signal toward F1's bypass (c).
+- **Fix risk:** Re-ordering `docs-updater` before `security` means security reviews comments the docs agent has not yet corrected. Excluding comment-only changes from the fingerprint requires parsing Nix and shell, which is not cheap. Whatever is chosen, verify by running the actual step-6 sequence, not by reasoning about it.
+
+
+**FIXED 2026-09-06:** reordered to editors-then-reviewers: /simplify, docs-updater, security, spec-check
+
+### F3 — `required-agents` turns a failed `git diff` into "no agents obliged", so `plan-gate`'s mandatory-dependency guard cannot fire
+
+- **File:** `docs/skills/workflow/scripts/required-agents:14,25,36`, `docs/skills/workflow/scripts/plan-gate:56-59`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** any PR whose head branch has no merge base with `master` (an orphan branch, a re-imported history, or a clone shallow enough that the merge base is beyond the graft). Verified in a scratch repo: `git log master..HEAD` succeeds and prints the commits while `git diff --name-only master...HEAD` exits 128 with `fatal: no merge base`. `plan-gate` therefore gets a non-empty `plans` list, proceeds past its early exit, and reaches the stamp check with an empty obligation set. Narrow but not hypothetical; every other trigger for a failing `git diff` (bad ref, missing object) is caught earlier by the `git log` step.
+- **Rule:** n/a — internal control correctness.
+- **Finding:** `required-agents` runs under `set -uo pipefail` with no `set -e`, so the failing `git diff` on line 25 leaves `changed` empty and line 36's `[ -n "$changed" ] || exit 0` returns exit 0 with no output. Verified against this repo: `required-agents <bogus-ref> HEAD` prints `fatal: Invalid symmetric difference expression ...` to stderr and exits 0. `plan-gate`'s `obliged="$("$ra" ...)" || { BLOCKED; exit 1; }` only tests exit status, so the guard whose own comment says "a missing or failing required-agents would otherwise yield an empty obligation set and quietly turn the stamp check into a pass" cannot detect the one failure mode it names. `required-agents` also cannot distinguish "empty diff" from "diff failed" — both are exit 0 with no output — so no caller can.
+- **Fix risk:** Making `required-agents` exit non-zero on a git failure will make `plan-gate` hard-block on any range it cannot diff; confirm that does not break the legitimate empty-diff case (a range whose files match no glob still exits 0 with no output today, and that must stay a pass).
+
+
+**FIXED 2026-09-06:** required-agents now checks git diff's exit status and dies rather than reporting an empty set
+
+### F4 — `plan-gate` reports success for a base or head ref it cannot resolve
+
+- **File:** `docs/skills/workflow/scripts/plan-gate:34-39`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** anyone invoking `plan-gate` by hand (its own header advertises a pre-merge and pre-deploy path) with a mistyped or absent ref, and in CI if `github.event.pull_request.head.sha` is ever absent from the fetched objects. Verified in this worktree: `plan-gate origin/main HEAD` and `plan-gate deadbeef... HEAD` both print `no 'Plan:' trailers found ... nothing to gate.` and exit 0.
+- **Rule:** `docs/hardening.md` rule 11 ("a guard that declines to act must be watched by something that measures the outcome, not the attempt") — a skip and a pass are indistinguishable here.
+- **Finding:** `git log ... 2>/dev/null` swallows `fatal: bad revision`, so an unresolvable ref is indistinguishable from a range with no `Plan:` trailers. Pre-existing, but this change makes `plan-gate` the sole enforcement point for review-completion too, so the blast radius of a silently-skipped run grew. Nothing in the repo invokes `plan-gate` locally today (grep over `docs/`, `.githooks/`, `modules/`, `hosts/` finds no caller), so the header's "used both pre-merge and pre-deploy" is currently aspirational — the only real caller is `.github/workflows/plan-gate.yml`, which does pass a good ref.
+- **Fix risk:** Validating refs with `git rev-parse --verify` before use is cheap; the only risk is a caller that deliberately passes a ref that may not exist yet (the workflow's "base branch doesn't have the script yet" path already handles that separately).
+
+
+**FIXED 2026-09-06:** plan-gate resolves both refs up front and blocks on an unresolvable one
+
+### F5 — `plan-citations` fails open: one unreadable file silently truncates the scan and it still prints `OK`
+
+- **File:** `docs/skills/plan/scripts/plan-citations:41,124`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** any contributor whose working tree has a tracked-but-deleted file when `verify-ladder` runs — mid-rename, an interrupted `git mv`, or a sparse checkout. `git ls-files` still lists the path, `awk` aborts with `fatal: cannot open file` and exit 2, and because the whole pipeline sits in a process substitution (`done < <(awk "$awk_prog" "${scan[@]}" | sort -u)`) that status is discarded — `set -o pipefail` does not reach inside `<( )`. Verified: `awk '{print}' nosuchfile.md </dev/null` exits 2 and processes nothing further.
+- **Rule:** `docs/hardening.md` rule 11 — the gate measures the attempt, not the outcome.
+- **Finding:** Every file after the unreadable one goes unscanned, and `plan-citations` then prints `plan-citations: OK (N citations resolve)` and exits 0, so `verify-ladder` goes green. The success line reports a count with nothing to compare it against, so a scan that covered 12 of 87 files looks identical to a full one. Second, smaller instance of the same class: `awk` treats an operand of the form `<identifier>=<value>` as a variable assignment, not a filename — verified, `awk '{print FILENAME": "$0}' 'foo=bar.md' </dev/null` produces no output and no error. Any tracked repo-root file named e.g. `notes=1.md` is therefore silently excluded from the scan (paths containing `/` are unaffected, which is why this only reaches top-level files).
+- **Fix risk:** Checking `awk`'s exit status means capturing it out of the process substitution (a temp file, or restructuring to a pipeline with `PIPESTATUS`); prefixing operands with `./` fixes the assignment case but changes `FILENAME` in every report line, so the report strings need adjusting together.
+
+
+**FIXED 2026-09-06:** awk output goes through a file so its status is observed; absent files filtered; ./ prefix stops = being read as an assignment
+
+### F6 — the `plan-citations` ignore markers are an unrestricted, unreported off switch
+
+- **File:** `docs/skills/plan/scripts/plan-citations:62-77`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** any contributor blocked by `verify-ladder`'s new hard `plan-citations` gate. Wrapping a whole file between a balanced ignore-start / ignore-end HTML-comment pair mutes it entirely, and a balanced pair produces no diagnostic at all — only the unbalanced case is reported. There is no allowlist of files permitted to use the markers, no cap on region size, and no "N regions skipped" line in the success output.
+- **Rule:** n/a.
+- **Finding:** The design correctly hardened against the unbalanced marker as "an undetectable off switch", but the balanced form is equally undetectable and strictly easier to write. The markers also fire on any line containing the text, including prose inside backticks — this plan file's own lines 623-624 open and close a region purely by describing the feature, which happens to be harmless only because the two mentions are adjacent. A doc that mentions the start marker without a nearby end marker would mute the rest of itself.
+- **Fix risk:** Reporting skipped-region counts is free. An allowlist would need `docs/skills/plan/reference.md`'s two legitimate regions enumerated, and would have to be kept current.
+
+
+**FIXED 2026-09-06:** markers must start a line, and ignored regions are now reported on success
+
+### F7 — a completion stamp is self-issued plaintext, and the fingerprint is a public helper
+
+- **File:** `docs/skills/plan/scripts/lib.sh:249-273`, `docs/skills/workflow/scripts/subagent-stamp:37-41`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** the authoring agent or human itself — the only principal in scope. `plan_stamp_fingerprint` greps a plain line out of a file the PR fully controls, and `plan_code_fingerprint` is a shell function in the same sourced library, so a stamp that satisfies the gate with zero review is one `printf` with `$(plan_code_fingerprint)` substituted in.
+- **Rule:** n/a.
+- **Finding:** `subagent-stamp`'s header calls the stamp "mechanical proof the step actually ran", and `lib.sh` calls the agent set the ones "whose completion can be mechanically proven". Neither is true of a forged line, and the stamp does not even prove a review happened when it is genuine: `SubagentStop` fires for any subagent of that `agent_type` regardless of what it did, so dispatching a `security` subagent with a no-op prompt produces an identical, valid stamp. This is acceptable against the stated adversary ("an agent simply forgetting"), but it should be written down as such rather than described as proof — and F1/F2 matter here precisely because a gate that blocks spuriously makes forging the cheapest correct-looking resolution.
+- **Fix risk:** Any real attestation (a signed note, a `git notes` ref written by a trusted runner) is a much larger change and cannot be produced by a local hook the same principal controls; the realistic fix is to soften the claim in the comments, not to strengthen the mechanism.
+
+
+**FIXED 2026-09-06:** claims softened: a stamp is a record that defeats forgetting, not proof
+
+### F8 — `plan-gate.yml`'s new comment states the opposite of what `plan-gate` does when `required-agents` is missing
+
+- **File:** `.github/workflows/plan-gate.yml:48-55`, `docs/skills/workflow/scripts/plan-gate:51-55`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** the next person reasoning about the gate's fail mode from the workflow file.
+- **Finding:** The comment says "Absent on the base branch (the PR introducing it), plan-gate skips the stamp check rather than failing." `plan-gate:51-55` does the opposite — `[ -x "$ra" ] || { echo "BLOCKED: required-agents is missing or not executable ..."; exit 1; }`. Fail-closed is the right behaviour; the comment describing it as fail-open is the defect, and it is the single comment a reader would consult to decide whether a missing `required-agents` is dangerous. Separately, `git show "origin/$BASE_REF:.../lib.sh"` on line 46 has no `git cat-file -e` guard where its two siblings do — harmless today (the step's implicit `bash -e` fails the job), but the asymmetry reads as intentional and is not.
+- **Fix risk:** none, comment-only.
+
+
+**FIXED 2026-09-06:** plan-gate.yml comment now states the actual fail-closed behaviour
+
+### F9 — `plan-gate`'s failure summary always blames unresolved findings
+
+- **File:** `docs/skills/workflow/scripts/plan-gate:123-125`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** anyone reading CI output. Verified in this worktree: a run that failed only on two missing stamps still ended with `plan-gate: one or more cited plans have unresolved findings. See above.`
+- **Finding:** `fail=1` is now set by four distinct causes (unlocatable plan, unresolved findings, missing stamp, stale stamp) but the summary names only one. The per-cause `BLOCKED:` lines above it are correct, so this is cosmetic — but it is the line that will be quoted when someone reports the gate misbehaving, and it points at the wrong subsystem.
+- **Fix risk:** none.
+
+**Checked and clean (security, 2026-09-06).** `tests/zrepl-replication.nix`: verified that `import (pkgs.path + "/nixos/tests/ssh-keys.nix")` selects the same keys as the `"${pkgs.path}/..."` form it replaces. nixpkgs is a locked `github` flake input (`nix flake metadata --json`), so `pkgs.path` is already a store path and both forms read byte-identical content; `snakeOilEd25519PrivateKey`/`PublicKey` in `/nix/store/sr2lpwrcdjfpkk8gpvr98gp4nrgsijns-source/nixos/tests/ssh-keys.nix` are a `writeText` of a literal string and a literal `concatStrings`, both content-addressed, so the derivation and the key bytes are identical either way. These are nixpkgs' published RFC 9500 / OpenSSH-fuzz test keys, ephemeral to the VMs, and no private key enters this repo. `nix flake check --no-build` now passes end to end, so G5 is genuinely closed.
+
+No NixOS module, systemd unit, firewall rule, user, group, capability, container, or `sops.secrets` reference is touched by this change, so `docs/hardening.md`'s standing rules 1-10 have no surface here; no secret was decrypted or read at any point. `plan_locate`'s `..` rejection was re-read against its new attacker-influenced input (commit-trailer text) and holds — a `/`-rooted, glob-bearing, or multi-match trailer all fail closed. `plan_has_heading` and `plan_stamp_fingerprint` take only regex-safe inputs (`[DGF][0-9]+` from the citation matcher, names from `PLAN_STAMPABLE_AGENTS`), so no shell or regex injection is reachable from `git ls-files` output or from trailer text. The CI pinning is sound as far as it goes: pinned `plan-gate`, `lib.sh` and `required-agents` all resolve through `SCRIPT_DIR`, never `$root`, so a PR editing its own gate scripts is judged by the base branch's logic, and a PR tampering with `PLAN_CODE_GLOBS` fails closed rather than open. `plan_code_fingerprint` cannot return empty (worst case it is `sha256sum` of nothing), and `xargs` batch-splitting does not perturb it since paths are sorted and included in the hash. `plan-citations` runs clean over 171 citations in ~0.4s and its memoisation and `checked` accounting are correct. `verify-ladder` dropping its `[ -x ]` guard around `plan-citations` is a real improvement — a missing script now yields exit 127 and `fail=1` rather than a printed skip.
+
+_security finished 2026-09-06T18:32:51Z -- see Findings above._
+
+**FIXED 2026-09-06:** summary line no longer names a cause; points at the BLOCKED lines

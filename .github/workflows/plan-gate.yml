@@ -45,6 +45,18 @@ jobs:
           git show "origin/$BASE_REF:docs/skills/workflow/scripts/plan-gate" > /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
           git show "origin/$BASE_REF:docs/skills/plan/scripts/lib.sh" > /tmp/plan-gate-trusted/skills/plan/scripts/lib.sh
           chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
+          # required-agents decides which review agents the range obliged,
+          # so it is enforcement logic too and gets pinned on the same
+          # reasoning. A plan-gate that has the stamp check *requires* it
+          # and blocks without it -- deliberately, since a missing
+          # dependency that yielded "no agents obliged" would be a silent
+          # pass. The conditional copy is safe because the two are pinned
+          # from the same base branch: a base old enough to lack
+          # required-agents also has a plan-gate that never calls it.
+          if git cat-file -e "origin/$BASE_REF:docs/skills/workflow/scripts/required-agents" 2>/dev/null; then
+            git show "origin/$BASE_REF:docs/skills/workflow/scripts/required-agents" > /tmp/plan-gate-trusted/skills/workflow/scripts/required-agents
+            chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/required-agents
+          fi
           echo "found=true" >> "$GITHUB_OUTPUT"
 
       - name: Check every plan cited in this PR has its findings resolved

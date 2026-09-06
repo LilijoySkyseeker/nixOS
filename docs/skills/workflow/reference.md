@@ -37,17 +37,23 @@ current working tree and is the authority; this table only explains it.
 
 | Agent | Fires when | Built? |
 |---|---|---|
-| `/simplify` | any `.nix` changed | yes |
-| `security` | any `.nix` changed | yes |
-| `docs-updater` | any `.nix` **or** `.md` changed | yes |
+| `/simplify` | any `.nix`, skill script, or git hook changed | yes |
+| `security` | same as `/simplify` | yes |
+| `docs-updater` | any of the above **or** any `.md` changed | yes |
 | `spec-check` | the active plan has any `### D<N>` | not yet |
+
+"Skill script or git hook" means `docs/skills/*/scripts/*` and
+`.githooks/*`. They are code, and they are the enforcement machinery
+itself -- a change to `plan-gate` or `verify-ladder` can weaken every
+other gate in the system, so they earn review at least as much as a
+module does.
 
 Why mechanical: "invoke where relevant" ran on 12 of 89 plans while
 "`/simplify`, always" ran every time -- same skill, same agent, one
 sentence apart. A trigger that has to be judged is a trigger that gets
-skipped. `docs-updater` deliberately fires on `.nix` too, because a code
-change can invalidate a doc without touching it, which is the drift that
-matters most.
+skipped. `docs-updater` deliberately fires on code, not just `.md`,
+because a code change can invalidate a doc without touching it, which is
+the drift that matters most.
 `plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7`
 
 ### Order, and the loop
@@ -57,29 +63,65 @@ batch, even though the review agents are read-only and would seem safe to
 overlap:
 
 ```
-loop { /simplify -> security -> spec-check }  until clean or signed off
-                                              then docs-updater, once
+loop { /simplify -> docs-updater -> security -> spec-check }
+      until security and spec-check are clean or signed off
 ```
 
-Each needs to see the code *after* the previous one's fixes landed.
-`/simplify` can change the code out from under a `security` review that
-started against the pre-fix state. Concretely: a real session had
-`/simplify` land a refactor that was later reverted for an eval-time
-infinite recursion, while `docs-updater` ran concurrently and had already
-written the reverted design into the plan's Findings as settled fact --
-leaving plan and code contradicting each other until hand-reconciled.
+**Every agent that writes runs before every agent whose stamp must stay
+valid.** `/simplify` and `docs-updater` edit; `security` and `spec-check`
+are read-only. Ordering them the other way is not merely untidy, it is
+unsatisfiable: `docs-updater` rewrites inline comments in `.nix` files and
+skill scripts, all of which the stamp fingerprint covers, so a
+`docs-updater` pass after `security` leaves `security`'s stamp stale by
+construction and `plan-gate` blocks on a task where nothing is actually
+wrong. A gate that goes red on the first honest attempt every time is the
+one people learn to route around.
+
+Each also needs to see the code *after* the previous one's fixes landed,
+which is why none of them run in parallel. A real session had `/simplify`
+land a refactor that was later reverted for an eval-time infinite
+recursion, while `docs-updater` ran concurrently and had already written
+the reverted design into the plan's Findings as settled fact -- leaving
+plan and code contradicting each other until hand-reconciled. That
+incident constrains `docs-updater` to follow `/simplify`; it says nothing
+about the read-only reviewers, so putting them last costs nothing it
+protects.
 
 Any actionable finding from `security` or `spec-check` **restarts the loop
-at `/simplify`**: their fixes are code changes the earlier agents have not
-seen. `docs-updater` runs last and outside the loop, because its job is
-describing the settled state, which does not exist until the loop
-converges.
+at `/simplify`**: their fixes are code changes no earlier agent has seen,
+including `docs-updater`, whose description of the settled state is stale
+the moment the code moves again.
 
 Termination needs no new machinery. Every finding resolves `fixed`,
 `accepted` or `moot`, and `plan-freeze` already refuses while any is
 unresolved -- the loop's exit condition is the gate that already exists.
 If the same finding recurs across passes, seek the user's sign-off rather
 than looping again.
+
+### What a completion stamp proves
+
+`subagent-stamp` appends a stamp to the active plan when a stampable
+agent finishes, and `plan-gate` refuses a merge if an obliged agent left
+none. The stamp carries a **fingerprint of the code the agent read** --
+a content hash over `*.nix`, `docs/skills/*/scripts/*` and `.githooks/*`
+-- and `plan-gate` blocks when it no longer matches. That is what
+separates "this agent ran" from "this agent ran against *this* code": a
+fix applied after the agent finished leaves a stale stamp and is caught.
+
+The fingerprint covers code only, never `.md`. Every stamp appends to a
+plan file and `docs-updater` edits docs, so including prose would make
+each stamp invalidate itself and every stamp before it.
+
+**What a stamp is not.** It is a record, not proof. `SubagentStop` fires
+for any subagent of that type whatever it actually did, so a no-op prompt
+produces an identical valid stamp; and the line is plaintext in a file the
+author controls, so one `printf` forges one. That is fine against the
+adversary this system has -- an agent that forgets a step -- and worth
+nothing against one that lies. Real attestation would need a signature
+from something the author does not control, which a local hook cannot be.
+
+Consequence for the loop: re-running an agent after a code change is not
+etiquette, it is how the merge passes.
 
 ### The agents themselves
 

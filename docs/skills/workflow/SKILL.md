@@ -39,10 +39,11 @@ stays short on purpose (progressive disclosure).
    `### G<N>` entries, append-only.
 6. **Run every agent
    `docs/skills/workflow/scripts/required-agents` names**, in the order
-   and loop reference.md sets out -- `/simplify` -> `security` ->
-   `spec-check`, restarting at `/simplify` on any actionable finding,
-   then `docs-updater` once at the end. Never two in the same parallel
-   batch. The script decides *which*, from the diff; nothing here is a
+   and loop reference.md sets out -- `/simplify` -> `docs-updater` ->
+   `security` -> `spec-check`, restarting at `/simplify` on any
+   actionable finding. Agents that edit run before agents that only
+   review, so a later edit cannot invalidate an earlier reviewer's
+   completion stamp. Never two in the same parallel batch. The script decides *which*, from the diff; nothing here is a
    judgment call, because "where relevant" ran on 12 of 89 plans while
    "always" ran every time. `security`/`docs-updater` append findings
    into the *same* current plan file; a `SubagentStop` hook stamps proof

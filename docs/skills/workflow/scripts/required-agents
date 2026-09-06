@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# required-agents -- prints, one per line, which review agents this
-# working tree's diff obliges. Read-only; decides nothing about whether
-# they ran.
+# required-agents [<base> [<head>]]
+# Prints, one per line, which review agents a diff obliges. With no
+# arguments, the working tree (including untracked files); with a base
+# ref, the merge range, for plan-gate. Read-only; decides nothing about
+# whether they actually ran.
 #
 # The triggers are mechanical on purpose. "Invoke where relevant" ran on
 # 12 of 89 plans while "/simplify, always" ran every time -- same skill,
@@ -10,45 +12,75 @@
 # diff instead.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
 set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../../plan/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
 
-root="$(git rev-parse --show-toplevel)" || {
-  echo "not inside a git repository." >&2
-  exit 1
-}
-cd "$root" || exit 1
+root="$(plan_repo_root)"
+cd "$root" || plan_die "cannot cd to repo root"
 
-# Untracked files count. A brand-new module is the case most in need of
-# review, and it appears in none of git's diff views until it is staged.
-changed="$( {
-  git diff --name-only HEAD
-  git diff --cached --name-only
-  git ls-files --others --exclude-standard
-} | sed '/^$/d' | sort -u)"
+if [ $# -ge 1 ]; then
+  # Range mode, for plan-gate. Three-dot: the diff against the merge
+  # base, not against wherever the base branch has since moved on to.
+  #
+  # The exit status is checked, not assumed. A failed `git diff` inside a
+  # command substitution leaves `changed` empty, which reads as "no files
+  # changed, so no agents obliged" -- turning plan-gate's mandatory
+  # dependency into a silent pass. That is the fail-open this whole check
+  # exists to close, so it must not reappear here (F3).
+  if ! changed="$(git diff --name-only "${1}...${2:-HEAD}")"; then
+    plan_die "cannot diff ${1}...${2:-HEAD} -- refusing to report an empty obligation set"
+  fi
+  changed="$(printf '%s\n' "$changed" | sed '/^$/d' | sort -u)"
+else
+  # Working-tree mode. Untracked files count: a brand-new module is the
+  # change most in need of review, and it appears in none of git's diff
+  # views until it is staged.
+  changed="$( {
+    git diff --name-only HEAD
+    git diff --cached --name-only
+    git ls-files --others --exclude-standard
+  } | sed '/^$/d' | sort -u)"
+fi
 [ -n "$changed" ] || exit 0
 
-has() { printf '%s\n' "$changed" | grep -qE "$1"; }
+# "Is this reviewable code" comes from plan_is_code_path / PLAN_CODE_GLOBS
+# rather than a regex spelled out here. Encoding the same set twice means
+# one missed edit makes a file oblige review without ever invalidating a
+# stamp, or the reverse -- and the set already has to agree with what
+# plan-citations scans and what the fingerprint covers.
+code=0 docs=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  plan_is_code_path "$f" && code=1
+  case "$f" in *.md) docs=1 ;; esac
+done <<<"$changed"
 
-# /simplify and security key off .nix: they review code, and a diff with
-# no Nix in it has no code for them to review.
-if has '\.nix$'; then
+# /simplify and security review code: Nix, or the scripts that gate it.
+# The skill scripts and git hooks are this repo's enforcement machinery --
+# a change to plan-gate or verify-ladder can weaken every other gate -- so
+# they earn review at least as much as a module does.
+if [ "$code" = 1 ]; then
   echo "/simplify"
   echo "security"
 fi
 
-# docs-updater keys off .nix *or* .md. A .nix change can invalidate a doc
-# that describes it without touching that doc, which is exactly the drift
-# it exists to catch -- so "only when a .md changed" would miss the case
-# that matters most. Narrowing this to the docs a given .nix file is
-# actually named by needs a doc-to-code index that does not exist yet.
-if has '\.nix$|\.md$'; then
+# docs-updater keys off code *or* docs: a code change can invalidate a doc
+# without touching that doc, which is exactly the drift it exists to
+# catch, so "only when a .md changed" would miss the case that matters
+# most. Narrowing this to the docs a given file is actually named by needs
+# a doc-to-code index that does not exist yet.
+if [ "$code" = 1 ] || [ "$docs" = 1 ]; then
   echo "docs-updater"
 fi
 
-# spec-check reads the active plan's Decisions as the spec. No plan, or a
-# plan with nothing decided, means there is no spec to check against.
-active=".claude/.active-plan"
-if [ -r "$active" ]; then
-  plan="$(cat "$active")"
+# spec-check reads the active plan's Decisions as the spec, which makes it
+# a working-tree notion -- the active-plan marker describes a live
+# session, not a merge range. plan-gate keeps only stampable agents
+# anyway (PLAN_STAMPABLE_AGENTS) and spec-check is not one yet, so
+# emitting it in range mode would be output with no consumer.
+if [ $# -eq 0 ] && [ -r "$PLAN_ACTIVE_MARKER_RELPATH" ]; then
+  plan="$(cat "$PLAN_ACTIVE_MARKER_RELPATH")"
   if [ -n "$plan" ] && [ -r "$plan" ] && grep -qE '^### D[0-9]+' "$plan"; then
     echo "spec-check"
   fi

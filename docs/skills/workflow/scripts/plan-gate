@@ -31,6 +31,15 @@ cd "$root"
 [ $# -ge 1 ] || { printf 'usage: plan-gate <base-ref> [<head-ref>]\n' >&2; exit 1; }
 base="$1" head="${2:-HEAD}"
 
+# Resolve both refs before trusting anything derived from them. A typo'd
+# base makes `git log` fail, and its error is swallowed below, leaving an
+# empty plan list that reads as "nothing to gate" and exits 0 -- a green
+# gate over an unexamined range (F4).
+for r in "$base" "$head"; do
+  git rev-parse --verify --quiet "$r^{commit}" >/dev/null ||
+    { echo "BLOCKED: cannot resolve ref '$r'." >&2; exit 1; }
+done
+
 plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head}" 2>/dev/null | sed '/^$/d' | sort -u)"
 
 if [ -z "$plans" ]; then
@@ -40,6 +49,35 @@ fi
 
 fail=0
 still_open=0
+
+# Which review agents this range obliged, computed once: it depends only
+# on the range's file list, never on which plan is cited. Mandatory, not
+# best-effort -- a missing or failing required-agents would otherwise
+# yield an empty obligation set and quietly turn the stamp check into a
+# pass, which is the exact failure this check exists to prevent. CI pins
+# both scripts from the base branch together (see plan-gate.yml), so
+# whenever this version of plan-gate runs, required-agents is beside it.
+ra="$SCRIPT_DIR/required-agents"
+[ -x "$ra" ] || {
+  echo "BLOCKED: required-agents is missing or not executable beside plan-gate; cannot tell which reviews this range obliged." >&2
+  exit 1
+}
+# Deliberately two steps. Inlining this as `for a in $("$ra" ... || exit 1)`
+# reads tidier and is wrong: the `exit` would run in the command
+# substitution's subshell, leaving the parent to carry on with an empty
+# obligation set -- the same silent pass F3 was about.
+obliged="$("$ra" "$base" "$head")" || {
+  echo "BLOCKED: required-agents failed for ${base}...${head}; cannot tell which reviews this range obliged." >&2
+  exit 1
+}
+obliged_stampable=""
+for a in $obliged; do
+  plan_is_stampable "$a" && obliged_stampable="$obliged_stampable $a"
+done
+
+# The code as it stands now, to compare each stamp's fingerprint against.
+current_fp="$(plan_code_fingerprint)"
+
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   rel="$(plan_locate "$p" "$root" 2>/dev/null)" || {
@@ -53,6 +91,44 @@ while IFS= read -r p; do
     echo "$unresolved" >&2
     fail=1
   fi
+
+  # Every review agent this range obliged must have left a completion
+  # stamp in the cited plan. Unresolved findings prove a review that ran
+  # was closed out; this proves it ran at all -- different failure modes,
+  # and only the second survives an agent simply forgetting.
+  # Frozenness is a per-plan fact, so it is read once rather than
+  # re-parsed for every obliged agent. It gates *both* stamp failures
+  # below, not just staleness: subagent-stamp refuses to write to a
+  # frozen plan at all, so a missing stamp on one is exactly as
+  # unfixable as a stale one, and every pre-stamp-era done/ plan has no
+  # stamps. Blocking either way would be a demand nothing in the system
+  # can satisfy, whose cheapest escape is dropping the Plan: trailer --
+  # which disables this gate entirely, including the unresolved-findings
+  # check that predates it. An unfixable gate teaches the bypass (F1).
+  frozen=0
+  plan_is_frozen "$root/$rel" && frozen=1
+
+  for agent in $obliged_stampable; do
+    if ! stamped_fp="$(plan_stamp_fingerprint "$root/$rel" "$agent")"; then
+      if [ "$frozen" = 1 ]; then
+        echo "NOTE: $rel is frozen and carries no '${agent}' stamp. A frozen plan cannot be stamped; if this range really needed that review, it needs its own plan." >&2
+      else
+        echo "BLOCKED: $rel cites a range that changed files obliging '${agent}', but carries no completion stamp for it. Run the agent, or record why it was skipped." >&2
+        fail=1
+      fi
+    elif [ "$stamped_fp" = legacy ]; then
+      echo "NOTE: $rel's '${agent}' stamp predates code fingerprints, so it records that the agent ran but not what it read." >&2
+    elif [ "$stamped_fp" = malformed ]; then
+      echo "NOTE: $rel's '${agent}' stamp is malformed -- it names no code fingerprint. Re-run '${agent}' to replace it." >&2
+    elif [ "$stamped_fp" != "$current_fp" ]; then
+      if [ "$frozen" = 1 ]; then
+        echo "NOTE: $rel is frozen and its '${agent}' stamp is stale ($stamped_fp, code is now $current_fp). If the code really changed after close-out, that work needs its own plan." >&2
+      else
+        echo "BLOCKED: $rel's '${agent}' stamp is stale -- it reviewed code $stamped_fp, but the code is now $current_fp. Re-run '${agent}'." >&2
+        fail=1
+      fi
+    fi
+  done
   case "$rel" in
     docs/plans/done/*|docs/plans/rejected/*) ;;
     *)
@@ -64,7 +140,10 @@ done <<<"$plans"
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
-  echo "plan-gate: one or more cited plans have unresolved findings. See above." >&2
+  # Deliberately does not name a cause: this gate now blocks for
+  # unresolved findings, a missing stamp, or a stale one, and naming only
+  # the first sends the reader looking for the wrong thing (F9).
+  echo "plan-gate: blocked. See the BLOCKED line(s) above for which check failed." >&2
   exit 1
 fi
 if [ "$still_open" -gt 0 ]; then

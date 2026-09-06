@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # plan-citations -- repo-wide citation-integrity checker, read-only.
-# Scans every tracked .nix and .md file for plan citations of the form
+# Scans tracked source, docs and scripts for plan citations of the form
 # <YYYY-MM-DD>-<slug>.md, optionally anchored (#D3/#G1/#F2), and verifies
 # that the file resolves to a real plan under docs/plans/*/ and that the
 # anchor resolves to a real "### <id>" heading inside it. Prints every
 # problem; exits non-zero if any exist.
 #
 # Resolves G31 in 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
-# -- nothing previously verified that a bare-filename citation still hits
+# -- nothing previously verified that a bare-filename citation still hit
 # anything. Bare filenames are what let a plan move between folders
 # without breaking citations (reference.md, "Why bare-filename
 # citations"), but the same property means a rename or a retyped id
 # breaks every inbound reference silently. Commit 8ae2a4a renamed 74 plan
 # files in one commit with nothing to catch it.
-set -u
+set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 . "$SCRIPT_DIR/lib.sh"
@@ -26,49 +26,143 @@ problems=0
 report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
 
 # basename -> path, so a citation resolves regardless of which status
-# folder the plan currently sits in. That folder-independence is the
-# whole point of citing by bare filename.
+# folder the plan currently sits in. That folder-independence is the whole
+# point of citing by bare filename.
 declare -A plan_path
 for f in docs/plans/*/*.md; do
   [ -e "$f" ] || continue
-  plan_path["$(basename "$f")"]="$f"
+  plan_path["${f##*/}"]="$f"
 done
 [ "${#plan_path[@]}" -gt 0 ] || plan_die "no plan files found under docs/plans/*/"
 
-checked=0
-while IFS= read -r file; do
-  [ -f "$file" ] || continue
-  while IFS= read -r cite; do
-    [ -n "$cite" ] || continue
-    fname="${cite%%#*}"
-    anchor=""
-    case "$cite" in *#*) anchor="${cite#*#}" ;; esac
+# Scripts are in scope, not just .nix/.md: this script's own header cites
+# a plan, as do plan-lint's and required-agents'. Globbing only source and
+# docs left G31's exact failure mode alive in the files that fix it.
+# The code set comes from PLAN_CODE_GLOBS so it cannot drift from what
+# required-agents obliges review on and what the stamp fingerprint covers;
+# docs are added here because citations live in prose too.
+mapfile -t tracked < <(git ls-files -- "${PLAN_CODE_GLOBS[@]}" '*.md')
+# Tracked-but-absent files are a normal mid-work state (a deletion not yet
+# committed) and have no citations to check, but awk aborts the whole scan
+# on the first one. Filter them out rather than either crashing or, worse,
+# reporting OK over a scan that stopped early (F5). Each path is prefixed
+# with ./ so awk cannot read a filename containing '=' as a variable
+# assignment.
+scan=()
+for f in "${tracked[@]}"; do
+  [ -f "$f" ] && scan+=("./$f")
+done
+[ "${#scan[@]}" -gt 0 ] || exit 0
 
-    target="${plan_path[$fname]:-}"
-    if [ -z "$target" ]; then
-      report "$file: cites '$fname' -- no such plan file under docs/plans/*/"
+# One awk over every file rather than awk|grep|sort per file: the per-file
+# form spawned ~650 processes and took 0.4s on a gate that runs before
+# every commit, and it grew with the repo rather than with the plans.
+#
+# Regions between the ignore markers are skipped, because docs that
+# *teach* the citation convention have to contain citations that resolve
+# to nothing -- reference.md's worked example is a whole fictional plan
+# file. That is a permanent category, so it gets an explicit opt-out
+# rather than a file exclusion; real citations in the same file still
+# count. `skip` resets at each file boundary, and a region left open at
+# the end of a file is reported rather than silently muting the rest of
+# it -- an unbalanced marker would otherwise be an undetectable off
+# switch.
+#
+# The markers must appear inside an HTML comment. Matching the bare words
+# meant this script muted itself: the very line that reports an
+# unbalanced region names both markers, `ignore-start` first, so it
+# opened a region it never closed.
+awk_prog='
+FNR == 1 {
+  if (skip && prev != "") print "UNBALANCED\t" prev
+  skip = 0; prev = FILENAME
+}
+/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-start/ { skip = 1; regions++; rfiles[FILENAME] = 1; next }
+/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-end/   { skip = 0; next }
+!skip {
+  line = $0
+  while (match(line, /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9][a-z0-9-]*\.md(#[DGF][0-9]+)?/)) {
+    print "CITE\t" FILENAME "\t" substr(line, RSTART, RLENGTH)
+    line = substr(line, RSTART + RLENGTH)
+  }
+}
+END {
+  if (skip && prev != "") print "UNBALANCED\t" prev
+  nf = 0
+  for (f in rfiles) nf++
+  print "REGIONS\t" regions + 0 "\t" nf
+}
+'
+
+# Anchor lookups are memoised: the same plan#id is routinely cited from
+# several files, and re-reading the target for each one re-greps a file
+# already known good.
+declare -A anchor_ok
+checked=0
+skipped_regions=0
+skipped_files=0
+
+# awk's output goes through a file, not a process substitution, so its
+# exit status is actually observed. Via `< <(awk ...)` a mid-scan abort
+# was discarded and the script still printed OK over a partial scan (F5).
+scan_out="$(mktemp)"
+trap 'rm -f "$scan_out"' EXIT
+awk "$awk_prog" "${scan[@]}" | sort -u > "$scan_out" ||
+  plan_die "scan failed -- refusing to report a result over an incomplete scan"
+
+while IFS=$'\t' read -r kind a b; do
+  case "$kind" in
+    UNBALANCED)
+      report "${a#./}: an opened ignore region was never closed -- the rest of the file went unchecked"
+      continue
+      ;;
+    REGIONS)
+      # Reported even on success: a *balanced* pair mutes its region with
+      # no diagnostic at all, which makes it strictly easier to write than
+      # the unbalanced form this already catches. Surfacing the count is
+      # what stops a muted region from being something you have to go
+      # looking for (F6).
+      skipped_regions="$a" skipped_files="$b"
+      continue
+      ;;
+    CITE) ;;
+    *) continue ;;
+  esac
+
+  file="${a#./}" cite="$b"
+  fname="${cite%%#*}"
+  anchor=""
+  case "$cite" in *#*) anchor="${cite#*#}" ;; esac
+
+  target="${plan_path[$fname]:-}"
+  if [ -z "$target" ]; then
+    report "$file: cites '$fname' -- no such plan file under docs/plans/*/"
+    continue
+  fi
+
+  if [ -n "$anchor" ]; then
+    key="$fname#$anchor"
+    if [ -z "${anchor_ok[$key]:-}" ]; then
+      if plan_has_heading "$target" "$anchor"; then
+        anchor_ok["$key"]=ok
+      else
+        anchor_ok["$key"]=bad
+      fi
+    fi
+    if [ "${anchor_ok[$key]}" = bad ]; then
+      report "$file: cites '${fname}#${anchor}' -- no '### ${anchor}' heading in $target"
       continue
     fi
-    checked=$((checked + 1))
+  fi
 
-    if [ -n "$anchor" ] &&
-      ! grep -qE "^### ${anchor}([[:space:]]|\$)" "$target"; then
-      report "$file: cites '${fname}#${anchor}' -- no '### ${anchor}' heading in $target"
-    fi
-    # Regions between the ignore markers are stripped before matching:
-    # docs that *teach* the citation convention have to contain example
-    # citations that deliberately resolve to nothing, and reference.md's
-    # worked example is a whole fictional plan file. That is a permanent
-    # category, not a one-off, so it gets an explicit opt-out rather than
-    # a file exclusion -- real citations in the same file still count.
-  done < <(awk '/plan-citations: ignore-start/{skip=1; next}
-                /plan-citations: ignore-end/{skip=0; next}
-                !skip' "$file" |
-    grep -ohE '[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]*\.md(#[DGF][0-9]+)?' | sort -u)
-done < <(git ls-files -- '*.nix' '*.md')
+  # Counted only once it has fully resolved, so the total can never
+  # include a citation the run also reported as broken.
+  checked=$((checked + 1))
+done < "$scan_out"
 
 if [ "$problems" -gt 0 ]; then
   plan_note "plan-citations: $problems broken citation(s)."
   exit 1
 fi
-printf 'plan-citations: OK (%s citations resolve)\n' "$checked"
+printf 'plan-citations: OK (%s citations resolve; %s ignored region(s) in %s file(s))\n' \
+  "$checked" "$skipped_regions" "$skipped_files"
