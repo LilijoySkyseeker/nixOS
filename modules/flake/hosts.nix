@@ -81,6 +81,7 @@ in
         nixosModules."zfs-dataset-properties"
         nixosModules.jellyfin
         nixosModules.immich
+        nixosModules.beets
         nixosModules.minecraft
         nixosModules.factorio
         nixosModules.octodns
