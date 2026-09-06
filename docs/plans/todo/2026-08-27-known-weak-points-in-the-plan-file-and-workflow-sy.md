@@ -70,6 +70,7 @@ every line below is currently unstarted.
 - [x] G39 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 - [ ] G40 — no priority signal on a plan file or in any index
 - [ ] G41 — `/simplify` is mandated unconditionally in step 6, even for docs-only changes
+- [ ] G42 — `plan-gate` can't tell a legitimately untrailered commit from a forgotten `Plan:` trailer
 
 ## Decisions (D)
 
@@ -511,6 +512,38 @@ file" but "touches at least one file of reviewable, hand-authored
 source" — i.e. usecase-scoped like `docs-updater`/`security` already are,
 not a doc/non-doc binary. Generated artifacts (lockfiles, compiled/binary-
 ish config blobs) should sit outside the gate the same way pure docs do.
+
+### G42 — `plan-gate` can't tell a legitimately untrailered commit from a forgotten `Plan:` trailer
+`plan-gate` keys entirely off `Plan:` commit trailers: with none in the
+range it prints "no `Plan:` trailers found -- nothing to gate", exits 0,
+and CI goes green. Both the unresolved-findings block and the
+still-open-plan note are skipped, because there is no cited plan to check.
+
+Nothing distinguishes the legitimate reasons for having no trailer —
+authoring plans rather than executing one, a docs-only change, a
+`mark-trivial`'d fix — from simply having forgotten it. The observable
+result is identical in all four cases.
+
+Composes badly with `G13`, and the pair is worse than either alone: `G13`
+says touching *any* plan satisfies the commit-time hook, and this says
+omitting the trailer makes the merge-time gate a no-op. So a commit can
+clear both gates while being governed by no plan at all — `plan-touch-guard`
+satisfied by an unrelated plan file, `plan-gate` satisfied by silence.
+
+Observed 2026-09-05 on PR #65 (the log-monitoring/ADR planning commit),
+where the omission was *correct* — a `Plan:` trailer asserts "this commit
+is work governed by that plan", and the commit authored five plans for
+future work rather than executing any. Adding trailers would have made
+the gate emit "plan-move it to done" notes for work that had not started.
+So the gap is not that this commit was wrong; it is that a wrong one
+would have looked exactly the same.
+
+Fix is not obvious and may not be worth it. A "trailer or explicit
+opt-out" requirement would mirror how `mark-trivial` already makes the
+trivial path explicit rather than silent, but it adds ceremony to every
+docs commit. Worth weighing against `G24` (`mark-trivial` has no usage
+audit trail), which is the same "explicit escape hatch, unaudited"
+shape.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

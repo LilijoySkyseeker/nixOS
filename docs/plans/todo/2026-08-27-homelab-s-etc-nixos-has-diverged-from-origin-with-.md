@@ -56,6 +56,14 @@ frozen: false
       keeping the lock bump deliberately. That is a judgement call on a
       live host's git state, so it is yours.
 
+## State
+
+Still open. D1 (discard vs. keep) has been answered and re-answered
+twice already (G3, G4) because the underlying cause -- `/etc/nixos` on
+homelab drifting onto whatever branch someone last checked out there --
+keeps recurring. Not something to fix host-by-host; see G4's note on the
+pipeline-rebuild plan.
+
 ## Progress
 
 
@@ -92,6 +100,26 @@ The durable lesson is not about this one commit. It is that
 checkout* an input to deploying a different host, so whatever branch
 someone last used on homelab silently becomes what vps gets. That belongs
 to `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`.
+
+### G4 -- 2026-09-04: same pattern, a third time, and now worse
+
+Live-checked via SSH: `/etc/nixos` is *again* on
+`worktree-worktree-security-audit-plan`, this time 72 commits behind
+that branch's own `origin` copy, while local `master` sits 174 commits
+behind `origin/master`. On top of that, the currently *running* system
+generation (`/nix/var/nix/profiles/system` -> `system-373-link`,
+`nixos-system-homelab-26.05.20260901.a311611`) was built from a commit
+hash (`a311611`) that does not resolve to any object in this checkout's
+history at all, even after `git fetch --all` -- the actually-deployed
+config and whatever is sitting in `/etc/nixos` right now are from two
+different, disconnected sources. Not touched -- resolving a live host's
+git/deploy state is explicitly the user's call (D1's framing still
+applies), and this is now the third distinct instance of the G3 pattern.
+Strengthens G3's "durable lesson": this cannot be fixed plan-by-plan,
+only by the pipeline rebuild
+(`2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`)
+removing "whatever branch is checked out on the live host" as an input
+to anything.
 
 ### G1 -- F-P7-10's evidence was right about the remote, wrong about the machine
 "Not one `chore: automated flake.lock update` commit in the repository's 1371-commit history" is still true of the repo; it was not true of homelab's checkout -- the run happened, flake-update-test just could not publish (no openssh on PATH for the git push over SSH). D11 was closer to firing than documented: the auto-merge chain works end to end except the push.
