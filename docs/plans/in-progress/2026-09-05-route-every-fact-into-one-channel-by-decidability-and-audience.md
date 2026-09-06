@@ -1,0 +1,431 @@
+---
+slug: route-every-fact-into-one-channel-by-decidability-and-audience
+created: 2026-09-05
+status: in-progress
+frozen: false
+---
+
+# route every fact into one channel by decidability and audience
+
+**Plan kind: map.** The first plan of the `map` kind proposed in D4 — a
+destination plus child plans with blocking edges, worked one child at a
+time, rather than a single task plan. Until D4's `blocked_by` frontmatter
+exists the edges live in Progress below (see G1).
+
+## Original plan
+
+### Destination
+
+Every fact in this repo lives in **one** channel, chosen by whether a
+machine can decide it and who needs to read it — and the mechanism that
+keeps it there runs without anyone remembering to run it.
+
+Reaching it means: no channel carries a fact another channel already
+carries, every obligation fires on a mechanical trigger rather than on
+judgment, and an outside reader can learn something here without reading
+anything written for an agent.
+
+### Why
+
+Three failures, one cause:
+
+1. Agents do not read `docs/` prose.
+2. Agents do not update it — **78 of 86** plan files still carry the
+   untouched `*(populated by security/docs-updater when invoked)*`
+   placeholder.
+3. There is no concise human-facing layer, though the repo is public
+   under the Unlicense specifically so others can learn from and lift
+   out of it.
+
+The cause is visible in one file. `docs/skills/workflow/SKILL.md` step 6
+mandates `/simplify` for every non-trivial change — done — and
+`security`/`docs-updater` "where relevant" — done ~9% of the time. Same
+skill, same agent, one sentence apart. **Judgment-gated obligations get
+skipped; mechanically-triggered ones do not.** `scripts/doc-host.sh` is
+the control: it fires on "did the diff touch host config", and its
+generated inventory blocks are current.
+
+Volume is a symptom, not the disease. Markdown outruns Nix roughly 4:1,
+but prose nobody reads would be a problem at any size.
+
+### The routing rule (D1)
+
+Ask decidability first, then audience and scope:
+
+| Ask | Channel |
+|---|---|
+| Can a machine decide it? | **Mechanism** |
+| Does an agent need it on *every* task? | **`AGENTS.md`** — auto-loaded, hard budget (~1,290 words) |
+| Does an agent need it *during a specific activity*? | **That activity's skill reference** — loaded on invoke |
+| Otherwise, a person needs to understand it | **Human prose** — `README.md`, explainers, `docs/` |
+
+Decidability leads because it is the only objective question; audience is
+a judgment call, and leading with it makes every routing decision inherit
+that judgment. `AGENTS.md` is both index and rules channel, and its budget
+is exactly what forces the third row to exist.
+
+**No fact is rendered twice, and the unit is the fact, not the topic.**
+ZFS policy tiers spans all four channels without duplication: "tier is
+path segment 2, a dataset declared without one is an eval error" is
+mechanism (`modules/nixos/datasets.nix`); "never point a root service at
+a user-writable path" is an `AGENTS.md`-class standing rule; "how to add
+a dataset to a live host" is a skill reference, because disko will not and
+`zfs create` stays manual; "why exclusion means a separate dataset" is
+human prose, already in
+`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`.
+
+Plans and ADRs are orthogonal to all four — they are the why-record, not
+a delivery channel.
+
+### Notes
+
+Consult on every session working this map: `docs/skills/plan/SKILL.md`,
+`docs/skills/workflow/SKILL.md` and its `reference.md` (trust hierarchy),
+`docs/style-guide.md`, `docs/procedures/testing-changes.md`.
+
+Standing preference for this effort: prefer deleting prose over rewriting
+it, and prefer a generated block over prose describing what could be
+generated.
+
+### Out of scope
+
+Ruled outside this destination; these do not graduate.
+
+- **Adopting the Matt Pocock engineering skill set.** Evaluated and
+  declined: its pipeline assumes a live issue tracker (this repo has 0
+  issues and 86 plan files) and a sub-second test loop (this repo has 8
+  VM tests that boot real machines), and its enforcement is prose where
+  this repo's is hooks. Four ideas were taken and appear as children
+  below — the map shape, expand-contract, two-axis review separation,
+  and the diagnosis goal met by making the trust hierarchy binding.
+  Nothing else from it is in scope.
+- **Rewriting the plan-file schema.** See D4 — a rewrite breaks 86 files
+  and 31 live `# plan:` code citations to buy what a targeted revision
+  already delivers.
+- **Rolling back `docs/adr/`.** See D3.
+- **Deleting any plan, audit, or superseded document.** See D5.
+
+## State
+
+**2026-09-05, charted, no child worked.** The map exists; no child plan
+has been created yet. The spec above and D1-D10 below are settled from a
+full grilling session with the user on 2026-09-05. Nothing else in the
+repo has been changed by this plan.
+
+Blocked on nothing. The frontier is children 1-5 in Progress.
+
+## Progress
+
+Frontier (no blockers, takeable now):
+
+- [ ] 1. free-fix batch — eight documentation corrections, see G3
+- [ ] 2. plan-file layout revision — `## State` first, three frontmatter
+      fields, defect G-to-F reclassification — see D4
+- [ ] 3. verification ladder split — evidence ladder vs deploy sequence
+      — see D6
+- [ ] 4. agent trigger table — mechanical triggers replace the judgment
+      escape in `workflow/reference.md` — see D7
+- [ ] 5. G31 citation-integrity checker — prerequisite for any
+      expand-contract contract step, see D4
+
+Blocked:
+
+- [ ] 6. `plan-gate` requires the `docs-updater` stamp — blocked by 4
+- [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
+      — blocked by 3, 4
+- [ ] 8. `spec-check` subagent — blocked by 4
+- [ ] 9. `plan-supersede` + `docs/plans/superseded/` — blocked by 2
+- [ ] 10. generated plan index — blocked by 2, carries fog (below)
+- [ ] 11. `docs/procedures/` folds into skills — blocked by 7, carries
+      fog (below)
+- [ ] 12. `docs/audits/` declared a frozen report, one paragraph — see D8
+- [ ] 13. `security-audit` output contract: emit plans + doc updates +
+      a small frozen report — blocked by 12
+- [ ] 14. standing-rules mechanization, 7-8 rules from `docs/hardening.md`
+      — blocked by 4
+- [ ] 15. `README.md` gains a "goodies" register beside "Interesting
+      stuff" — secondary track, see D9
+- [ ] 16. three explainers: push-deploy topology, sops-nix key model,
+      ZFS policy tiers — blocked by 15; the ZFS one additionally gated
+      on PR #67 landing
+
+## Not yet specified
+
+In scope, not yet sharp enough to make a child. Graduates as the frontier
+advances.
+
+- **Index fallback for the 44 plans with no `## State`.** Child 10
+  generates the index from `## State`, but only 42 of 86 plans have that
+  section — it arrived with
+  `2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`
+  and was not retrofitted. Whether the fallback is a generated stub, a
+  first-paragraph excerpt, or a backfill pass is undecided.
+- **Whether `docs/procedures/` folds into existing skills or needs new
+  ones.** `new-host.md` and `new-service.md` read as skills already;
+  `backup-restore.md` and `remote-access.md` may map onto none.
+- **How much of `docs/architecture.md` survives as human prose** once
+  child 7's generated host-composition block exists. Cannot be sized
+  before that block is real.
+
+## Decisions (D)
+
+### D1 - what is the routing rule?
+
+Four channels, asked in order: decidability, then whether an agent needs
+it always, then whether an agent needs it during a specific activity,
+then human prose. Rejected: a two-outcome test (checkable vs prose),
+which has no entry rule for skill references and would have wrongly
+routed `docs/procedures/` — 1,041 lines of agent-facing runbook — to the
+human layer. Also rejected: asking audience first, which makes routing
+inherit a judgment call.
+
+
+**ANSWERED 2026-09-05:** four channels, decidability asked before audience
+
+### D2 - what forms does mechanism take?
+
+Three: **check** (evaluate the claim, refuse if false), **generate**
+(write the fact so it cannot drift), **require-declaration** (refuse
+without a recorded judgment, when the claim itself cannot be evaluated).
+The third makes expensive-but-decidable obligations enforceable — a hook
+cannot verify a VM test was meaningful, but it can refuse to close a plan
+that does not say whether one ran.
+
+
+**ANSWERED 2026-09-05:** check / generate / require-declaration
+
+### D3 - do ADRs survive?
+
+Yes; `docs/adr/` is not rolled back. It is the conclusion of
+`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D8`,
+which considered and rejected both a section in `docs/architecture.md`
+and the plan file alone. ADR-0001 is cited by that ANSWERED marker and by
+`2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md`, and
+the work sits inside commit `0dd1b1b` alongside the ZFS and
+log-monitoring plans. `docs/architecture.md` is **not** superseded by
+ADRs: an append-only decision log cannot answer "what is true now", which
+is the lesson `## State` already encodes one level down.
+
+
+**ANSWERED 2026-09-05:** ADRs survive; docs/adr is not rolled back
+
+### D4 - revise or rewrite the plan-file schema?
+
+Revise. `## State` moves first and `## Original plan` is demoted beneath
+it, because the latter is stale by construction and currently sits above
+the only section that is true. Frontmatter gains `priority`,
+`blocked_by`, `superseded_by`, and `kind`. Defects reclassify G to F.
+Two plan kinds: task and map. Expand-contract becomes a named map
+pattern, not a skill, since it is a blocking-edge graph and `blocked_by`
+already expresses it. Rejected: a rewrite, which breaks 86 files and 31
+live `# plan:` citations for no gain the revision does not deliver.
+
+Rationale for G to F: D has `plan-decide`, F has `plan-resolve`, G has
+neither — correct for G's design meaning, a lesson, but wrong for how it
+is used. `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md`
+holds 40 G items of which 33 are open defects, arriving ~5/day and
+draining ~0.9/day, because nothing can resolve them. G returns to meaning
+lesson and needs no drain.
+
+
+**ANSWERED 2026-09-05:** revise the plan-file schema, do not rewrite it
+
+### D5 - is anything ever deleted?
+
+No. A superseded plan holds the highest-value knowledge in the corpus:
+the newer plan records *that* something was removed, the older one
+records *why it was built that way*. Deleting the older leaves the next
+agent with the removal and not the reasoning, and it re-proposes the
+original design — the exact re-derivation the plan system exists to
+prevent. Contamination is a labeling problem, so `plan-supersede` writes
+a frontmatter marker and moves the file to `docs/plans/superseded/`, out
+of the default grep path but still citeable, because bare-filename
+citations survive folder moves by design.
+
+
+**ANSWERED 2026-09-05:** nothing is deleted; plan-supersede plus a superseded/ folder
+
+### D6 - one verification list or two?
+
+Two. The six-layer list in `docs/procedures/testing-changes.md` mixes
+evidential depth with deploy chronology, which is why `nvd diff` sits at
+position 5 despite costing seconds where layer 4 costs minutes. Split
+into an **evidence ladder** mapping 1:1 onto the trust hierarchy
+(documentation, source, local build with output inspected, VM, switch)
+and a separate **deploy sequence** (build, `nvd diff`, switch, observe).
+Old layers 2, 3 and `nvd` collapse into one rung, because the hierarchy
+always described rung 3 as a single thing; splitting it across three
+non-adjacent positions is why nothing could stamp it. **Lint is not a
+rung** — by the ladder's own words it catches style and dead code, not
+correctness. It gates; it warrants nothing.
+
+`verify-ladder` stamps the rung-3 floor mechanically. Rung 3 full, rung 4
+and rung 5 are declared, and `plan-move ... done` requires the
+declaration. VM testing stays manual — minutes inside a pre-commit gate
+teaches bypassing — but the skip becomes visible instead of silent.
+`docs/audits/2026-08-26/RESUME.md` already declares rungs by hand
+("build-verified only, not deployed to any host yet"), which is proof the
+practice works and that it is currently manual.
+
+
+**ANSWERED 2026-09-05:** split into an evidence ladder and a deploy sequence; lint is not a rung
+
+### D7 - how are the review agents invoked and ordered?
+
+A convergence loop, not a pipeline:
+
+```
+loop { /simplify -> security -> spec-check }  until clean or signed off
+                                              then docs-updater, once
+```
+
+Any actionable finding from `security` or `spec-check` restarts the loop
+at `/simplify`, because their fixes are code changes the earlier agents
+have not seen. `docs-updater` runs last and outside the loop, because its
+job is describing the settled state. Serialization is required, not
+preferred: a real session had `/simplify` land a refactor later reverted
+for eval-time infinite recursion while `docs-updater` ran concurrently and
+wrote the reverted design into a plan's Findings as settled fact.
+
+Termination needs no new machinery. Every finding resolves `fixed`,
+`accepted`, or `moot`, and `plan-freeze` already refuses while any is
+unresolved — the loop's exit condition is the gate that already exists.
+If the same finding recurs across passes, seek sign-off rather than loop
+again.
+
+Invocation is **mechanically triggered, never judgment-gated**:
+`/simplify` and `security` fire when `.nix` changed, `docs-updater` when
+a doc, comment, or documented config surface changed, `spec-check` when
+the plan carries `## Decisions`. This replaces the escape hatch in
+`docs/skills/workflow/reference.md` ("use judgment, and if genuinely
+unsure, invoke the one in question"), which is the ~9% channel. It also
+dissolves G41 of the weak-points plan for free — `/simplify` does not
+fire on a docs-only diff — and removes any need for a no-op path in a
+mandatory agent, since an irrelevant agent never starts.
+
+`spec-check` is new. It reads the plan's `## Decisions` and `## Progress`
+as the spec, which are already written and already anchored. Every
+existing gate checks that the *record* is complete — `plan-gate` asks
+"is the security review this range depended on actually closed out" —
+and none checks that the *code matches the record*. It is kept separate
+from `security` and from `docs-updater` on the no-rerank principle: a
+change can pass one axis and fail the other, and merging them lets one
+mask the other. It sits before `docs-updater` so it judges an unmutated
+plan.
+
+
+**ANSWERED 2026-09-05:** convergence loop, restart at /simplify, mechanical triggers
+
+### D8 - what happens to `docs/audits/`?
+
+Declared a frozen report now, in one paragraph, with remaining findings
+ported on-touch rather than swept. It is not an archive — it is the last
+body of work still running on the pre-plan system, doing three jobs at
+once: point-in-time evidence (keep), a live work queue duplicating
+`docs/plans/todo/` (port), and a session log duplicating `## State`
+(retire). Its 19,479 lines carry ~170 findings and almost no per-finding
+state; status lives in `RESUME.md`'s narrative instead.
+
+Rejected: a one-pass sweep, which floods `todo/` with ~150 plans most of
+which will never be worked. Rejected: pruning to unresolved findings,
+which destroys the evidence half — the part an outside reader finds
+credible.
+
+
+**ANSWERED 2026-09-05:** audits become a frozen report; findings port on-touch
+
+### D9 - what is the human layer?
+
+`README.md` gains a **"goodies — easy to take for your own"** section
+beside the existing **"Interesting stuff"**: lift-this register and
+resume register, two jobs, two voices. Three explainers, each
+self-contained enough to lift without adopting the repo: the push-deploy
+topology (homelab builds and pushes `vps`'s closure over the tailnet),
+the sops-nix per-host age key model, and ZFS policy tiers once PR #67
+lands. Secondary track, sequenced behind the agent-facing children.
+
+
+**ANSWERED 2026-09-05:** README gains a goodies register; three explainers, secondary track
+
+### D10 - how is this work itself structured?
+
+As this map plan. The effort spans the `workflow` skill, `docs-updater`,
+a `docs/` restructure, the plan-file schema, three explainers,
+`AGENTS.md`, and mechanism for 7-8 standing rules — too large for one
+session, and its back half is not specifiable until the front half lands.
+Rejected: a single task plan, which would freeze with half its decisions
+unresolved. Rejected: incremental with no plan, which loses the thread
+across sessions.
+
+
+**ANSWERED 2026-09-05:** structured as this map plan
+
+## Gotchas (G)
+
+### G1 - this map bootstraps on a field it is proposing
+
+Blocking edges belong in `blocked_by` frontmatter, which D4 introduces
+and which does not exist yet. Until child 2 lands, the edges live in
+Progress as prose. Migrate them into frontmatter as part of child 2, not
+as a separate pass, or the two will disagree.
+
+### G2 - child plans are created at the frontier, not all at once
+
+Creating all 16 children now would take `docs/plans/todo/` from 29 to 45
+in one commit, most of them unworkable for weeks. This is the same
+objection that ruled out a one-pass audit sweep in D8, and it applies to
+this map's own children. Create a child plan when its blockers clear, and
+cite it back here by bare filename.
+
+### G3 - the free-fix batch is documentation drift found while charting
+
+Eight corrections, all evidence for the destination rather than
+incidental:
+
+- `docs/skills/plan/reference.md:125` names `docs/plans/done/.checksums`;
+  the manifest is `docs/plans/.checksums`.
+- `docs/skills/workflow/SKILL.md:19` greps only `{todo,in-progress}/`, so
+  `done/` sits outside the documented search path — which is why 31 of 50
+  done plans are cited from nowhere outside `docs/plans/`.
+- `AGENTS.md:22` says older ADR decisions are "being backfilled",
+  implying a sweep rather than the on-touch trigger.
+- `AGENTS.md:33` renders the verification ladder omitting VM testing.
+- `docs/procedures/testing-changes.md` layer 4 says the VM checks are
+  "currently `zrepl-replication` and `zfs-space-guard`"; there are eight.
+- `docs/adr/README.md`'s Format section says most ADRs will not need
+  Status, Considered alternatives or Consequences, while the only ADR
+  uses all three plus two more; its closing line also casts
+  `docs/architecture.md` as a temporary home pending migration.
+- No document names `nix flake check` without `--no-build` as the
+  run-all-VM-tests form.
+- The GitHub repo description is "my nixOS config", with no homepage URL.
+
+### G4 - two remote branches are merged and deletable
+
+`origin/worktree-docs-verify-ladder-trust-hierarchy` and
+`origin/workflow-plan-done-before-merge` have zero diff against master.
+
+### G5 - `verify-ladder` is currently un-passable on master
+
+`nix flake check --no-build` fails while evaluating
+`checks.zrepl-replication`, on `nodes.puller.environment.etc."zrepl/snakeoil"`:
+
+```
+error: path 'm8319qq7008kira1p5m725xk6s5d4fa3-sr2lpwrcdjfpkk8gpvr98gp4nrgsijns-source' is not valid
+```
+
+Reproduced against clean `origin/master` (commit `0bc0265`) with no local
+changes, so it is not caused by any work in flight. `snakeOilEd25519PrivateKey`
+resolves through a store path that no longer exists —
+`/nix/store/sr2lpwrcdjfpkk8gpvr98gp4nrgsijns-source` is present but the
+derived `m8319qq...` path is not, which reads as a garbage-collected
+input rather than a repo defect.
+
+The consequence is the interesting part: `verify-ladder` hard-blocks on
+`nix flake check`, so while this holds **every** non-trivial change is
+either blocked or committed past a failing gate. A gate that cannot pass
+for environmental reasons trains exactly the bypass habit D7 is trying to
+design out, which makes this worth fixing before children 3, 4 or 6 land.
+
+## Findings (F)
+*(populated by security/docs-updater when invoked)*
