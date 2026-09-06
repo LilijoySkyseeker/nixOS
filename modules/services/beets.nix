@@ -13,7 +13,9 @@ in
     let
       importDir = "/storage/Music/Import";
       reviewDir = "/storage/Music/NeedsReview";
-      libraryDir = "/storage/Music/Picard";
+      # a fresh folder, deliberately separate from the pre-existing Picard/
+      # tree -- see plan#D3.
+      libraryDir = "/storage/Music/Library";
 
       # shared by every non-default bucket below and by `default` itself --
       # they differ only in which folder prefix comes before this.
@@ -70,6 +72,16 @@ in
             incremental: yes
             duplicate_action: skip
 
+          # default (0.04) requires ~96% metadata similarity to auto-accept in
+          # quiet mode -- confirmed via a live test that this rejects even an
+          # AcoustID-fingerprint-confirmed, unambiguously-correct match scored
+          # at 0.12-0.14 distance. Loosened per the user's explicit choice,
+          # above beets' own docs' "loosen it a bit" example (0.10) since that
+          # value wouldn't have caught the observed 0.12-0.14 case either.
+          # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G12
+          match:
+            strong_rec_thresh: 0.15
+
           acoustid:
             apikey: ${config.sops.placeholder.homelab_beets_acoustid_apikey}
 
@@ -105,19 +117,28 @@ in
           filefilter:
             path: '(?i).*\.(mp3|flac|m4a|m4b|mp4|ogg|opus|wma|wv|ape|mpc|aac|aiff?|dsf|wav)$'
 
-          inline:
-            album_fields:
-              initial: >
-                next((c.upper() for c in (albumartist_sort or albumartist or "") if c.isalpha()), '#')
-              year_bracket: >
-                '[%04d-%02d-%02d]' % (original_year or year or 0, original_month or 0, original_day or 0)
-            item_fields:
-              track_padded: >
-                ('%02d' % track) if (tracktotal or 0) < 100 else ('%03d' % track)
-              disc_prefix: >
-                ('%d-' % disc) if (disctotal or 1) > 1 else ""
-              feat_bracket: >
-                "" if (artist or "").strip().lower() == (albumartist or "").strip().lower() else ' [%s]' % artist
+          # NOTE: item_fields/album_fields are deliberately top-level, NOT
+          # nested under an `inline:` key. beetsplug/inline.py imports the
+          # global `beets.config` object directly rather than using the
+          # plugin-scoped `self.config` property every other plugin here
+          # uses -- confirmed by reading the actual bundled plugin source on
+          # the pinned nixpkgs beets derivation after a live test revealed
+          # these fields silently never registered (literal unresolved
+          # `$fieldname` text ended up in real file/folder names on the real
+          # host). `beet fields` is the fast way to check this kind of thing
+          # is actually registered, read-only, without touching the library.
+          album_fields:
+            initial: >
+              next((c.upper() for c in (albumartist_sort or albumartist or "") if c.isalpha()), '#')
+            year_bracket: >
+              '[%04d-%02d-%02d]' % (original_year or year or 0, original_month or 0, original_day or 0)
+          item_fields:
+            track_padded: >
+              ('%02d' % track) if (tracktotal or 0) < 100 else ('%03d' % track)
+            disc_prefix: >
+              ('%d-' % disc) if (disctotal or 1) > 1 else ""
+            feat_bracket: >
+              "" if (artist or "").strip().lower() == (albumartist or "").strip().lower() else ' [%s]' % artist
 
           # queries soundtrack/other/single before the `comp` (Various Artists)
           # catch-all, matching PicardNamingScript.txt's override order
@@ -132,13 +153,13 @@ in
         '';
       };
 
-      # new, human-facing drop/review folders -- libraryDir needs no rule of
-      # its own, hosts/homelab/configuration.nix's pre-existing
-      # "A /storage - - - - group:multimedia:rwx" already covers it recursively
-      # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#F2
+      # human-facing drop/review folders, and the fresh library output root --
+      # all three created the same way (2770, setgid, root:multimedia).
+      # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#D3
       systemd.tmpfiles.rules = [
         "d ${importDir} 2770 root multimedia -"
         "d ${reviewDir} 2770 root multimedia -"
+        "d ${libraryDir} 2770 root multimedia -"
       ];
 
       systemd.services.beets-import = {
@@ -151,7 +172,15 @@ in
         serviceConfig = {
           Type = "oneshot";
           User = "beets";
-          Group = "beets";
+          # runtime (not account) group: a live test found setgid inheritance
+          # from libraryDir's own mode isn't a reliable enough guarantee on
+          # its own (observed a new subdirectory beets created land as
+          # beets:beets instead of beets:multimedia) -- setting the
+          # *process's* own effective gid directly means every new
+          # file/directory it creates gets group:multimedia regardless of
+          # whichever parent directory's mode it happens to land in.
+          # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G13
+          Group = "multimedia";
           StateDirectory = "beets";
           # new files/dirs beets creates default to systemd's usual 022 (world-
           # readable) otherwise -- this keeps them multimedia-group-only,
@@ -292,7 +321,7 @@ in
         };
       };
 
-      # /storage/Music/{Import,NeedsReview,Picard} are already-persistent ZFS
+      # /storage/Music/{Import,NeedsReview,Library} are already-persistent ZFS
       # datasets (see zdata/storage/storage in hosts/homelab/configuration.nix),
       # not impermanence paths -- only the beets library db itself needs this.
       environment.persistence.${vars.persistRoot}.directories = [

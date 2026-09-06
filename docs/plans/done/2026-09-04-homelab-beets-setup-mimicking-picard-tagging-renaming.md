@@ -1,8 +1,8 @@
 ---
 slug: homelab-beets-setup-mimicking-picard-tagging-renaming
 created: 2026-09-04
-status: in-progress
-frozen: false
+status: done
+frozen: true
 ---
 
 # homelab beets setup mimicking Picard tagging/renaming
@@ -32,12 +32,39 @@ no-confident-match → `NeedsReview` path is confirmed working correctly on
 the real host. The new `statix` "repeated keys" warnings are accepted,
 not fixed — see G7.
 
-Not yet done, so this plan stays `in-progress`: the "confident match"
-happy path (a release beets/AcoustID can actually identify, landing
-under `Music/Picard` with the ported path-format logic rendering
-correctly) hasn't been exercised yet — only the review-fallback path
-has. See D1/D2/G1-G10/F1-F7 below before resuming, and the Progress
-list's last item for exactly what's left.
+**Update 2026-09-05:** The "confident match" happy path is now confirmed
+end to end. A third, cleanly-tagged test drop (a direct Bandcamp
+download, `Vylet Pony - Gonarch's Lair`, chosen specifically to rule out
+messy source tags as a confound after G14's diagnosis) landed correctly
+under `libraryDir` via the real production service: correct
+letter-bucket/artist/year-bracketed-album path, correct `%aunique{}`
+disambig suffix, correct `ftintitle`/`feat_bracket` rendering, and the
+PDF booklet/cover art carried over via G6's extras sweep. `libraryDir`
+staying at the fresh `/storage/Music/Library` folder (rather than
+reverting to the existing `Picard/` tree) is now the **permanent**
+answer, not just a testing measure — see D3's final resolution. Along
+the way, two more real gotchas were found and closed: G14 (two earlier
+live-test drops' `NeedsReview` outcome was a genuine tag-quality/
+distance issue, not a bug) and G15 (Jellyfin's own Lyrics provider, not
+beets, was writing unreadable `.lrc` sidecars into the shared tree —
+resolved by the user disabling that Jellyfin setting, no code change).
+G16 documents how duplicate albums are handled (parked in `NeedsReview`,
+same as any other no-confident-action outcome, never silently discarded
+or double-added). Test data (the Bandcamp album, its Jellyfin-written
+`.lrc` sidecars) has been cleaned up via `beet remove -d` plus manual
+removal of the non-beets-tracked leftovers; `FWLR`/`ItaloBrothers`
+(earlier live-test drops, not marked as disposable test data) are left
+in `NeedsReview` deliberately, exactly where the designed workflow is
+supposed to put a real album it can't confidently match — a decision
+for the user to resolve by hand, not something to delete.
+
+This plan's original scope is now complete: the pipeline works
+end-to-end on the real host for both the confident-match and
+needs-review paths, extras carry over correctly, and every live-test bug
+found along the way (G9-G16) is fixed or explicitly accepted. The
+long-term goal of migrating the existing `Picard/` tree's ~13k files
+into `Library/` is explicitly out of scope here — a separate future
+task. See D1-D3/G1-G16/F1-F7 below for the full history.
 
 ## Progress
 
@@ -73,10 +100,24 @@ list's last item for exactly what's left.
   two real bugs (`BEETSDIR`, unprivileged-`mv`-permission) — see G9/G10.
   The no-confident-match → `NeedsReview` path is now confirmed working
   end to end on the real host.
-- [ ] Still not tested: the "confident match" happy path actually filing
-  a release under `Music/Picard` with the ported path-format logic
-  rendering correctly (see G5/G10's own note) — needs a release
-  beets/AcoustID can actually identify.
+- [x] Loosened `strong_rec_thresh` (G12) after a live test showed the
+  default rejecting even an AcoustID-confirmed correct match.
+- [x] Two more live-test drops (`FWLR`, `ItaloBrothers`) still fell to
+  `NeedsReview` after G12's fix — diagnosed the real per-field distance
+  breakdown (G14): a genuine missing-`album`-tag penalty for FWLR (not a
+  bug), plausibly a real tracklist-edition mismatch for ItaloBrothers.
+- [x] Confident match happy path confirmed end to end on the real host
+  (Bandcamp test album, correct path/renaming/extras), so G14's proposed
+  `distance_weights.album` fix turned out unnecessary — it would only
+  have mattered if the clean-tag test had also failed.
+- [x] `libraryDir` finalized as permanent (D3), not just a testing
+  measure.
+- [x] Found and closed two more real gotchas along the way (G15
+  Jellyfin `.lrc` writes, G16 duplicate-album handling verified against
+  source).
+- [x] Test data cleaned up (`beet remove -d` + manual removal of
+  non-beets-tracked leftovers); `FWLR`/`ItaloBrothers` deliberately left
+  in `NeedsReview` for the user's own manual review.
 
 ## Decisions (D)
 
@@ -117,6 +158,37 @@ fingerprinting).
 
 
 **ANSWERED 2026-09-04:** User added the homelab_beets_acoustid_apikey secret via sops. Build succeeds end-to-end; deployed to homelab and confirmed the secret renders correctly into the beets config at runtime.
+
+### D3 -- `libraryDir` temporarily pointed at a fresh folder, not `Picard/`, during happy-path validation
+
+While testing the still-unvalidated "confident match" happy path (G5/G10's
+last open item), `libraryDir` was switched from `/storage/Music/Picard`
+(D1's answered choice) to a new, empty `/storage/Music/Library` folder.
+This looks like it reverses D1 ("not a fresh folder") but isn't intended
+as one.
+
+
+**ANSWERED 2026-09-05:** Temporary isolation, not a reversal of D1 -- the
+user wants the still-unvalidated happy path writing into a folder
+separate from the real, ~13k-file `Picard/` tree until it's proven
+reliable end to end, rather than risking a wrong/mis-filed real album
+landing among the existing manually-curated collection during this
+testing phase. Whether `libraryDir` reverts to `Picard/` once validated
+(folding new imports into the existing tree as D1 originally intended) or
+the fresh `Library/` folder becomes the permanent answer is still open --
+revisit once a real confident match has been observed working correctly
+end to end.
+
+
+**ANSWERED-PERMANENT 2026-09-05:** `Library/` is the permanent target,
+not just a testing measure -- reverses D1's original "not a fresh
+folder" choice now that the happy path (see State) is proven. The
+user's stated long-term goal is to eventually migrate the existing
+`Picard/` tree's ~13k files into `Library/` too, folding everything under
+one beets-managed root -- a separate, future task, not scoped here.
+Keeping new imports in their own fresh tree for now also continues to
+give more real-world testing surface (further drops may still surface
+issues) without touching the precious existing collection.
 
 ## Gotchas (G)
 
@@ -468,6 +540,180 @@ if that fails — reclaims an empty leftover instead of accumulating one
 per retry. Cleaned up the one stray empty directory by hand on the real
 host (`rmdir`, not `rm -rf` — confirmed empty first); no data was lost,
 nothing else was touched.
+
+### G12 -- live-test bug: default `strong_rec_thresh` (0.04) rejects even an AcoustID-confirmed correct match
+
+While probing the still-untested "confident match" happy path (G5/G10),
+a real drop that `chroma` fingerprint-matched to the *correct*, single
+MusicBrainz release still fell to `NeedsReview` under quiet mode's
+default `strong_rec_thresh: 0.04` (beets requires ~96% metadata
+similarity to auto-accept without prompting). The observed distance for
+an unambiguously-correct, AcoustID-confirmed candidate was 0.12-0.14 in
+that test. Loosened to `0.15` -- above beets' own docs' "loosen it a
+bit" example of `0.10`, since that value wouldn't have caught the
+observed case either.
+
+Loosening this one threshold turned out not to be sufficient on its own
+-- see G14 for why two more real test albums still didn't clear even the
+loosened value, and the actual root cause.
+
+### G13 -- live-test bug: setgid inheritance on `libraryDir` isn't reliable enough; process-level `Group=` needed instead
+
+A live test found a new subdirectory beets created under `libraryDir`
+land as `beets:beets` instead of `beets:multimedia`, despite
+`libraryDir`'s own `2770`/setgid mode (which should make new children
+inherit its group). Setgid inheritance depends on every intermediate
+`mkdir` call actually happening under a setgid-mode parent at the moment
+of creation -- not reliable enough to trust for every path beets/its
+plugins might create (e.g. `fetchart`/`embedart` writes, or a plugin
+using a different internal mkdir sequence). Fixed by setting the
+*process's own* effective group directly (`serviceConfig.Group =
+"multimedia"`, a runtime override, not an account-membership change --
+the `beets` account's own primary group stays `beets`, per
+`users.users.beets.group` above) so every file/directory the process
+creates gets `multimedia` group ownership regardless of which parent
+directory's mode it happens to land under.
+
+### G14 -- two real, mainstream commercial albums still don't clear even the loosened threshold; root cause is missing `album` tag data, not a threshold-calibration problem
+
+Two more live-test drops after G12's fix (`FWLR - How We Win`/`Hot`,
+`ItaloBrothers - Stamp!` -- both real, easily-identifiable commercial
+releases) still fell to `NeedsReview`. Diagnosed by copying each to a
+scratch folder and re-running `beet import` manually (`-I` to bypass
+`import.incremental`'s already-seen-path tracking, `-vv`, and a
+throwaway diagnostic plugin registered on the `album_matched` event to
+print `match.distance.items()` -- the per-field distance breakdown,
+which the CLI never prints itself even at `-vv`; confirmed by reading
+the actual bundled `beets.autotag.match`/`distance` source on the pinned
+nixpkgs derivation, not assumed):
+
+- `FWLR - How We Win`: `chroma` correctly fingerprint-matched both
+  tracks to the one genuinely correct MusicBrainz release (single
+  candidate, no competing albums). Distance was still 0.38, entirely
+  from `album: 0.25` (the file's `album` tag is blank -- these are
+  loose files with only filename-derived title/artist via
+  `fromfilename`, no album tag at all -- compared against MusicBrainz's
+  real album title is scored as a near-total mismatch) plus
+  `data_source: 0.08` and `tracks: 0.05`. Not a missing-tracks or
+  wrong-candidate problem at all -- the match itself is correct, but the
+  distance metric penalizes the missing `album` tag heavily regardless.
+- `ItaloBrothers - Stamp!`: best candidate distance 0.43, across several
+  same-named MusicBrainz release editions -- plausibly the user's copy
+  is a self-compiled 14-track collection that doesn't correspond 1:1 to
+  any single official release's tracklist (a genuine edition-mismatch,
+  not investigated to the same per-field depth as FWLR since the root
+  cause pattern was already established by then).
+
+**Conclusion:** raising `strong_rec_thresh` further to blindly catch
+cases like FWLR's would also start accepting genuinely-wrong candidates
+at similar distances, since the penalty is real (missing data), not a
+miscalibration. The correct fix is a `match.distance_weights.album`
+override (lowering how much a missing/mismatched album tag can penalize
+an otherwise AcoustID-confirmed match) rather than continuing to loosen
+`strong_rec_thresh` -- not yet implemented; needs a decision on how much
+to lower it and a re-test against the same FWLR case to confirm it
+actually crosses the threshold without also letting through a
+genuinely-wrong candidate. A third, cleanly-tagged real test (a Bandcamp
+direct-download, chosen specifically to rule out messy-source-tags as a
+confound) was in progress against the real, unmodified production
+service (not a scratch-copy diagnostic) when this note was written --
+see the Progress list/State section for its outcome.
+
+### G15 -- Jellyfin, not beets, writes `.lrc` sidecars into the shared library tree, and does so unreadably by anyone else
+
+After the Vylet Pony happy-path success (see State/Progress), 11 new
+`.lrc` files appeared under the freshly-imported album's folder within
+minutes -- not present in the original drop, and not something beets can
+produce (traced the actual write path in the pinned `lyrics` plugin
+source: it only ever embeds lyrics into the audio file's own tag via
+`item.try_write`, never a standalone sidecar file; confirmed no code
+path anywhere in the installed Python environment writes `.lrc`). Fully
+confirmed via `journalctl -u jellyfin.service`:
+`MediaBrowser.Providers.Lyric.LyricManager: Saving lyrics to
+.../01 outlaw feat. lulamoon.lrc` -- Jellyfin has its own Music library
+(dashboard/runtime state, not Nix-managed) watching `/storage/Music`,
+picked up the newly-landed album, and used its own built-in Lyrics
+provider.
+
+The files land `rw-------` (`0600`), owned by `jellyfin:multimedia` --
+exactly matching `jellyfin.service`'s `UMask=0077` (`0666 & ~0077 =
+0600`). That `UMask=0077` is the upstream nixpkgs `services.jellyfin`
+module's own default, previously reviewed and endorsed in a prior
+security audit (`docs/audits/2026-08-26/P4-services.md`) -- but that
+review only ever considered it against jellyfin's own private
+`configDir`/`cacheDir`/`dataDir` (each already `0700 jellyfin:multimedia`
+via typed tmpfiles, so file-level umask is moot there regardless). This
+task is the first time Jellyfin has been observed writing new content
+*into* the shared, group-collaborative `/storage/Music` tree, and the
+same umask that's harmless for its private dirs means anyone else in
+`multimedia` (`lilijoy` on `torrent`, or `beets` itself) can't read the
+lyrics sidecar it just wrote there.
+
+Not yet fixed -- this is jellyfin.nix's file to fix, not beets.nix's
+(the beets pipeline itself is not the writer here), and it touches a
+previously-audited hardening decision, so it needs the user's direction
+on approach before changing anything:
+- Loosen `jellyfin.service`'s `UMask` from `0077` to `0007` (matching
+  `beets.nix`'s own `F3` precedent) -- simple, but revisits a decision a
+  prior audit explicitly endorsed, even though the endorsement predates
+  Jellyfin writing into shared space.
+- A narrower fix scoped to just `/storage/Music` (e.g. an
+  `ExecStartPost`-style corrective sweep, mirroring beets' own
+  `ExecStartPre` claim-script pattern) rather than a blanket
+  service-wide `UMask` change.
+- Leave as-is, if direct filesystem access to jellyfin-fetched `.lrc`
+  files by anything other than Jellyfin itself (which can already read
+  its own files fine, and serves lyrics to clients over its own API
+  regardless of POSIX mode) turns out not to actually matter.
+
+
+**RESOLVED 2026-09-05:** User disabled Jellyfin's "save lyrics as
+separate files" option in its own dashboard settings instead -- Jellyfin
+now keeps lyrics wherever its non-file-sidecar storage is, and no longer
+writes into `/storage/Music` at all. Runtime/dashboard state, not a Nix
+change; nothing in `jellyfin.nix` or `beets.nix` needed touching. The
+previously-audited `UMask=0077` stays as-is, unrevisited.
+
+### G16 -- how duplicate albums are handled (verified against the pinned `beets.importer` source)
+
+Asked by the user; verified against `beets/importer/tasks.py` and
+`config_default.yaml` on the pinned nixpkgs derivation rather than
+assumed:
+
+- Detection is **by metadata text, not file identity**: `import.
+  duplicate_keys.album` defaults to `albumartist album` (unchanged
+  here) -- a new drop is flagged as a duplicate if its chosen
+  `albumartist`+`album` string matches an album already in the beets
+  database, regardless of whether the actual audio (bitrate, edition,
+  rip) is identical. An exact re-import of files already cataloged at
+  the same paths is explicitly excluded from this check (`find_
+  duplicates`'s `album_paths <= task_paths` guard) -- that's a retag,
+  not a duplicate.
+- Our config sets `import.duplicate_action: skip` (default is `ask`,
+  which would hang a non-interactive quiet-mode timer run). Per
+  `ImportTask.skip`, `duplicate_action is DuplicateAction.SKIP` forces
+  the whole task to skip -- nothing gets written to the database and
+  `move: yes` never fires, so the duplicate's files are left exactly
+  where they were.
+- Because nothing gets added, our own sweep script's `added:` timestamp
+  query (G8) finds zero new items for that entry, and the entry still
+  has real audio files sitting in it -- so it falls through to the same
+  `move_to_review` path as any other no-confident-action outcome.
+  **A duplicate album drop ends up parked in `NeedsReview` for manual
+  review, the same as an unmatched one** -- never silently discarded,
+  never double-added to the library. This is a byproduct of the
+  existing `skip`/`quiet_fallback` design (G4), not special-cased
+  duplicate logic of its own.
+- If a duplicate the user actually confirms as wanted (e.g. deliberately
+  replacing a low-bitrate rip with a better one) ever does make it
+  through, `%aunique{}` in `pathSuffix` still guards the *filesystem*
+  side independently -- it appends a disambiguating suffix if two
+  albums would otherwise render to the same path, so this never risks a
+  silent overwrite on disk even outside the database-level check above.
+- Not part of the automated pipeline: the `duplicates` *plugin* (in the
+  enabled list for other reasons, see G1) only provides an on-demand
+  `beet duplicates` command for scanning the *existing* library for
+  dupes after the fact -- it never runs automatically during import.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
