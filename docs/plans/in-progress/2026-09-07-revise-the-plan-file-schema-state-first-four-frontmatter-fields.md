@@ -130,6 +130,66 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-07
+
+**Where.** Worktree
+`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69** (draft). Work
+there, never the main checkout. The previous branch,
+`worktree-map-plan-docs-channel-routing`, merged as PR #68 and is done.
+
+**Committed and pushed through `08996f3`.** `0ca8889` is the schema
+change and the 51-file migration; `08996f3` closes the second `security`
+pass. Every finding here is resolved, `plan-lint` and `plan-citations`
+pass, `gate-tests` is 92/0/3, and `verify-ladder` passes end to end with
+the lint genuinely running over this plan.
+
+**One thing blocks the PR, and it is a decision, not work.** `plan-gate`
+refuses on a stale `security` stamp, because fixing `#F18`-`#F22` changed
+code after `security` last looked. By D7's letter a third pass is owed;
+by D7's own recurrence rule this is where sign-off replaces another loop,
+since the same shape has now returned eight times and each fix was
+confirmed by mutation rather than by re-reading. Either run `security`
+once over `git diff 0ca8889..HEAD` and resolve what it finds, or record
+the sign-off. Do not self-issue a stamp.
+
+**Next, and it is the substance of this plan: the G-to-F
+reclassification.** Nothing has been moved yet. Everything needed to
+start is settled:
+
+- **The shape** is `#G4`: move the body to `### F<N>`, leave `### G<N>`
+  as a one-line pointer so inbound `#G` citations keep resolving, and
+  delete the pointer only in the contract phase. Not `#G6`'s literal
+  "add the new beside the old", which means two copies of every item.
+- **The first batch** is
+  2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md, the
+  file `#D4` names: 42 `G` headings, of which `#D4` counts 33 as open
+  defects. Classify each as defect (becomes `F`) or lesson (stays `G`)
+  before moving anything.
+- **The bound** is `#G2`: 24 of the 47 live `#G` citations resolve into
+  frozen plans and can never be migrated, so contract completes per
+  batch and never corpus-wide. `#G` remains a valid citation form.
+- **The check** is `plan-citations`, which must report zero broken
+  citations after each batch. That is the gate `#G6` makes the contract
+  phase wait on.
+
+**Live traps a new session will hit:**
+
+- `gate-tests` is at ~1.0s against a one-second budget (`#G8`). Split a
+  fast tier from a slow one *before* adding cases, or the whole harness
+  becomes something people skip.
+- `plan-lint` now takes "frozen" from `docs/plans/.checksums`, not from
+  the `frozen:` field. A plan that disagrees with the manifest is
+  reported in both directions (`#F11`, `#F20`).
+- A throwaway plan created by `plan-new` and then deleted leaves
+  `.claude/.active-plan` dangling. That used to make `verify-ladder`
+  skip its lint silently; it now blocks (`#F10`). Remove the marker or
+  repoint it.
+- 18 of 102 plans still fail `plan-lint`, 17 of them non-frozen and 16
+  of those failing on `origin/master` too. They are pre-existing, not
+  this change; do not treat a red corpus sweep as a regression without
+  comparing.
+
 ## Original plan
 
 Child 2 of

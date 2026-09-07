@@ -100,8 +100,8 @@ finds defects and one that records old ones.
 
 **Where.** Worktree
 `/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
-branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-never the main checkout.
+branch `worktree-map-child-2-plan-file-layout`, PR **#69**. Work there,
+never the main checkout. PR #68 and its branch are merged and done.
 
 **Committed and pushed through `08771c2`.** `5eb67ef` closed the review
 loop over `854156c`'s unreviewed tail (F61-F65 on the map plan).
@@ -129,17 +129,49 @@ mutation, and wrong that the round was finished: the two MEDIUMs were
 both live, and F14 is the one that names why the previous two rounds
 could not have worked.
 
-**Then:** push the stamps, and merge PR #68 -- the user
-signed that off 2026-09-07, to be done after child 3 lands and *before*
-child 2 starts, so child 2 runs against a base where the stamp gates are
-real rather than legacy (#F12 on the map plan). Resolve the PR #67
-conflict by taking this branch's `reference.md`. Then child 2 of the
-map, as expand-contract per its G6.
+**PR #68 merged 2026-09-07** as `cfe6106` on master, after the owed
+`security` pass ran and its three findings (`#F14`-`#F16`) were fixed.
+The main checkout was fast-forwarded in the same session, which matters:
+worktree sessions run hooks from there, so completion stamps written from
+now on carry a real code fingerprint instead of reading `legacy`. That
+was the whole reason the merge had to precede child 2 (`#F12` on the map
+plan), and it is now true rather than planned.
+
+**The PR #67 conflict is still open and unchanged:** resolve it by taking
+this branch's `reference.md`, which subsumes #67's serialization rule.
+
+**Where the harness stands.** `gate-tests` is 92 assertions, 0 failed, 3
+recorded residues, hermetic, ~1.0s. Since this plan's own pass it also
+covers `plan-lint` (four cases plus a sabotage sweep), the active-plan
+marker, and the two frontmatter readers -- all added under child 2 and
+recorded in
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md.
+
+**Next for the harness, in order, and the first one is now blocking:**
+
+1. **Split a fast tier from a slow one.** `#G2` sets the budget at under
+   a second and it is at ~1.0s. Every remaining gate on the list mutates
+   and so needs a scratch repo per sabotage iteration, which multiplies
+   the cost. The split has to land before the cases do, or the result is
+   the bypassed gate `#G2` warns about. Recorded as `#G8` on the child
+   plan.
+2. Then sweep `subagent-stamp`, `plan-freeze`/`plan-move` and
+   `.githooks/*`.
+3. `#F4` remains the open Progress item: run `gate-tests` server-side, as
+   a `checks.*` entry or a CI step. Accepted for now by the user
+   2026-09-07; the choice between the two homes is still theirs.
+
+**The recurrence is worth knowing before touching a test here.** The
+shape `#F3`, `#F6`, `#F7` and `#F10` name -- an assertion satisfied by
+something other than the thing it names -- returned four more times in
+child 2, and four of the eight instances across both plans were in tests
+written to catch it. The rule distilled from that: **key a test on the
+symptom a bypass removes, not the one it preserves.** See the child
+plan's `## State`.
 
 **Do not backfill the rung declaration into older plans.** Seven open
 plans predate the gate and will refuse to close until whoever did the
-work adds one sentence. The user signed that off 2026-09-07; see the
-child plan's G2.
+work adds one sentence. The user signed that off 2026-09-07.
 
 ## Original plan
 

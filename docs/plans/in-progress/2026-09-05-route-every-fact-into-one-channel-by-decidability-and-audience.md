@@ -68,77 +68,53 @@ nothing here needs a switch.
 
 **Where.** Worktree
 `/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
-branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69**. Work there,
 not in the main checkout.
 
-**Children done:** 1, 3, 4, 5, 6. G5, G6 closed; G11 added. D11
-answered and built. Child 3 landed 2026-09-06 as
-2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md
--- the evidence-ladder/deploy-sequence split plus the rung declaration
-`plan-move done` and `plan-freeze` now require.
+**PR #68 merged 2026-09-07** as `cfe6106`. Children **1, 3, 4, 5, 6** are
+done and on master. The main checkout was fast-forwarded in the same
+session, so `#F12` is closed in practice: stamps written from a worktree
+now carry a real code fingerprint instead of `legacy`.
 
-**The unreviewed tail of `854156c` is closed.** The 2026-09-07 session
-ran the full loop twice over `git diff origin/master...HEAD` plus the
-working tree, in D7's order. Pass one: `/simplify` (four angles) applied
-six cleanups -- `plan_in_list` replacing three membership idioms,
-`plan_active_plan` tightened to `plan_locate`'s guard shape per F59's
-own prescription, `plan_has_heading` reuse, dead awk guard dropped, and
-the build-trigger set now spelled once per file in `pre-push` and
-`verify-ladder` (equivalence tested case by case); `docs-updater` fixed
-five comment/doc drifts (F61-F63); `security`'s seventh pass
-re-reproduced the F52/F56/F57 fixes as real, proved the new build-set
-selection never under-builds, and found F64 (the coordinated both-arrays
-tamper still green-passed) and F65 (latent glob expansion in the new
-`plan_in_list` call sites). Pass two, after the F64 floor and the array
-conversions landed: all three agents clean, zero findings. F61-F65 all
-resolved fixed.
+**Child 2 is half done.** Its schema half landed 2026-09-07 as
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69** (draft):
+`## State` first, the four `#D4` frontmatter fields, and all 51
+non-frozen plans migrated. Read that plan's pick-up point before
+continuing -- it carries the batch, the shape and the bound.
 
-**The full review record.** Eight `security` passes, seven
-`docs-updater` passes and six `/simplify` rounds have produced **65
-findings**: 58 fixed, 7 accepted by the user with a follow-up plan each.
-The loop's own shape was settled with the user along the way -- see D7's
-three dated notes for the order, the named fix stage, why the read-only
-reviewers stay serialized, and the narrowed restart rule.
+**The G-to-F reclassification, which is what `#G6` is about, is not
+started.** Three things the charting did not know:
 
-**What the review actually found, and it is worth reading before
-touching any gate script.** Almost every defect was a gate that *failed
-in a way that reported the wrong answer*, not a gate that was missing.
-Eight instances reported success without checking; four blocked in a way
-nothing could clear. Six were the same index-versus-worktree confusion,
-five of those in `.githooks/pre-commit`, and four were live secret-scan
-or frozen-plan bypasses reproduced end to end. Fifteen were documentation
-describing code that had since changed. The classification is
-`2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md`,
-and its first item -- a failure-mode harness for the gate scripts --
-would have caught eight of them mechanically.
+- **24 of the 47 live `#G` citations resolve into frozen plans**, which
+  can never be reclassified. So `#G` stays a valid citation form
+  permanently and the contract phase completes per batch, never
+  corpus-wide.
+- `#G6`'s count of 18 live `#G` citations is now 47.
+- Expand is a *move plus a pointer*, not "add the new beside the old":
+  the literal reading means two copies of every migrated item, which is
+  this map's own most frequent defect class. See the child plan's `#G4`.
 
-**Thirteen follow-up plans are filed** under `docs/plans/todo/`, all
-dated 2026-09-06. The ones that block or shape later work here: inverting the
-code set from an allowlist to a denylist; making `plan-gate` survive a
-PR that changes the fingerprint's inputs; making CI hash the tree it was
-told to gate.
+**PR #69 is blocked on a decision, not on work.** `plan-gate` refuses on
+a stale `security` stamp; D7's recurrence rule says seek sign-off rather
+than loop again, and that is the user's call.
 
-**Then the frontier:** child 2 (plan-file layout -- unblocked now 5 has
-landed, and it must run as expand-contract per G6, since 18 live `#G`
-citations break otherwise), then 7 (unblocked now 3 and 4 are done),
-8, 14.
+**Then the rest of the frontier:** child 7 (unblocked by 3 and 4), child
+8, child 14. Children 9 and 10 stay blocked until child 2 finishes.
 
 **Live traps a new session will hit:**
 
 - `plan-citations`, `plan-lint` and `plan-gate` are wired into
   `verify-ladder`, so a broken citation, a malformed active plan or a
   missing stamp blocks commits. That is intended.
-- Editing any of `PLAN_CODE_GLOBS` -- now including `.claude/`,
-  `.github/workflows/`, `.sops.yaml`, `secrets/`, `flake.lock`,
-  `.gitignore` and `.gitattributes` -- obliges `/simplify`, `security`
-  and `docs-updater`. See `required-agents`.
-- Every stamp on this branch reads `legacy`, because a worktree session
-  runs hooks from the main checkout (F12). Pull the main checkout after
-  this merges before trusting new hook behaviour.
-- PR #67 will conflict with child 4's rewrite of `reference.md`'s
-  "Subagent selection". Resolve by taking this branch's version, which
-  already subsumes #67's serialization rule (G8).
+- Editing any of `PLAN_CODE_GLOBS` obliges `/simplify`, `security` and
+  `docs-updater`. See `required-agents`.
+- PR #67 will still conflict with this branch's rewrite of
+  `reference.md`'s "Subagent selection". Resolve by taking this branch's
+  version, which subsumes #67's serialization rule (`#G8`).
 - `git stash` is shared across worktrees here; use a WIP commit instead.
+- `gate-tests` is at ~1.0s against a one-second budget. Split it before
+  adding cases.
 
 ## Original plan
 
