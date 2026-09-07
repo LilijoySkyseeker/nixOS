@@ -22,8 +22,18 @@ WORKFLOW_SCRIPTS="$SCRIPT_DIR/../docs/skills/workflow/scripts"
 # caller's real repository instead of the scratch one, which is a write
 # outside $scratch by a script that claims not to make any.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F12
+# GIT_TEMPLATE_DIR and the GIT_CONFIG_COUNT/KEY_n/VALUE_n channel belong on
+# the same list and were missed. Both let the caller's environment decide
+# the verdict -- an injected core.excludesFile or an `info/exclude` in a
+# template drops a.nix from `git add -A`, and each turns a clean run into
+# 7 failures. Env-supplied config is also the *last* source git consults,
+# so it outranks GIT_CONFIG_GLOBAL and the repo-local pins below; dropping
+# GIT_CONFIG_COUNT is what makes those pins the last word. KEY_n/VALUE_n
+# are inert once the count is gone.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F16
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
-  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_COMMON_DIR
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_COMMON_DIR \
+  GIT_TEMPLATE_DIR GIT_NAMESPACE GIT_ATTR_NOSYSTEM GIT_CONFIG_COUNT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 
 pass=0 fail=0 known=0
@@ -163,8 +173,10 @@ mkdir -p "$repo"
 git -C "$repo" init -q
 git -C "$repo" config user.email t@t
 git -C "$repo" config user.name t
-# Belt and braces with GIT_CONFIG_GLOBAL above: a signing key or a
-# hooksPath must not decide whether the harness passes. No
+# Belt and braces with the global/system pins above: a signing key or a
+# hooksPath must not decide whether the harness passes. These are the last
+# word only because GIT_CONFIG_COUNT is unset above -- env-supplied config
+# outranks both a repo-local `git config` and GIT_CONFIG_GLOBAL. No
 # commit.template -- the fixture commits with -qm, which never reads one.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F8
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F13
@@ -182,13 +194,32 @@ find "$repo/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/
 grep -rlZ '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md' "$repo/docs/skills" 2>/dev/null |
   xargs -0 -r sed -i 's/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md/A-PLAN-NAME/g'
 mkdir -p "$repo/docs/plans/in-progress"
-printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false\n---\n\n# t\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Findings (F)\n' \
-  > "$repo/docs/plans/in-progress/example-plan.md"
+# Date-prefixed, because that is the only shape plan-citations recognises
+# as a citation. Named `example-plan` still, so the trailer below reads the
+# way a real one does.
+# Assembled from parts, never written whole: plan-citations scans this
+# script too, and a literal `YYYY-MM-DD-slug.md` here is a citation to a
+# plan that deliberately does not exist. Same category as the ignore
+# markers, whose HTML-comment form cannot be used inside a shell script.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G7
+fixture_date="2026-01-01"
+fixture_plan="${fixture_date}-example-plan.md"
+fixture_absent="${fixture_date}-no-such-plan.md"
+printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false\n---\n\n# t\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Gotchas (G)\n\n### G1 - a heading an anchored citation can resolve to\n\n## Findings (F)\n' \
+  > "$repo/docs/plans/in-progress/$fixture_plan"
+# One deliberately resolvable citation. The strip above removes every
+# citation the copied skills carried, which left plan-citations' whole
+# resolution path -- the basename map, the ambiguity check, the anchor
+# lookup -- exercised zero times: its baseline read `OK (0 citations
+# resolve)` and the sweep proved nothing about any of it.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+printf -- '# note\n\nCites %s#G1 so the resolution path is under the sweep.\n' \
+  "$fixture_plan" > "$repo/docs/note.md"
 git -C "$repo" add -A >/dev/null
 git -C "$repo" commit -qm base
 printf '{ }\n' > "$repo/a.nix"
 git -C "$repo" add a.nix >/dev/null
-git -C "$repo" commit -qm $'code change\n\nPlan: example-plan.md'
+git -C "$repo" commit -qm "$(printf 'code change\n\nPlan: %s' "$fixture_plan")"
 
 # <name> <expected-stderr-fragment> <command...>
 # The fragment is load-bearing: "exited non-zero" is satisfied by a
@@ -302,7 +333,7 @@ section "fail-closed: an honest sequence must end green"
   fp="$(plan_code_fingerprint)"
   for agent in "${PLAN_STAMPABLE_AGENTS[@]}"; do
     printf '\n%s\n' "$(plan_stamp_line "$agent" "2026-01-01T00:00:00Z" "$fp")" \
-      >> docs/plans/in-progress/example-plan.md
+      >> "docs/plans/in-progress/$fixture_plan"
   done
 )
 # The success *line*, not just rc=0: "nothing to gate" also exits 0, and
@@ -317,6 +348,35 @@ elif ! printf '%s' "$control_out" | grep -qF 'obliged reviews stamped'; then
 else
   ok "plan-gate passes a stamped plan with resolved findings"
 fi
+
+section "plan-citations resolves what exists and refuses what does not"
+# The sweep below asserts that plan-citations refuses when a git call under
+# it fails. That says nothing about whether it can tell a good citation
+# from a bad one, and until the fixture carried a resolvable citation it
+# never entered that code at all. Both directions, because a checker that
+# resolves everything and one that resolves nothing are the same defect.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+cite_out="$(env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations" 2>&1)"
+if printf '%s' "$cite_out" | grep -qE 'OK \([1-9][0-9]* citations resolve'; then
+  ok "plan-citations resolves a citation that exists"
+else
+  bad "plan-citations resolves a citation that exists" \
+    "$(printf '%s' "$cite_out" | tail -n 1)"
+fi
+# The cited name arrives as an argument for the same reason it is
+# assembled above, and $? / $rc are the child's, not this shell's.
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a citation to no such plan" "no such plan file" \
+  env -C "$repo" bash -c '
+    printf "Cites %s here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$fixture_absent"
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a citation to no such anchor" "### G9" \
+  env -C "$repo" bash -c '
+    printf "Cites %s#G9 here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$fixture_plan"
 
 # ------------------------------------------------------------- properties
 
@@ -427,8 +487,39 @@ mkdir -p "$fakebin"
 } > "$fakebin/git"
 chmod +x "$fakebin/git"
 
+# The shim below only sees a `git` resolved through PATH. A gate that
+# invokes an absolute binary is swept zero times for those calls while
+# every iteration still reports ok, and no counting inside the shim can
+# detect it -- the baseline is taken through that same blind instrument,
+# so it undercounts by exactly the calls in question. The property has to
+# be asserted on the source instead, which is also the only form that
+# catches the refactor *before* it silently hollows out the sweep.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F14
+swept_gate_sources=(
+  "$PLAN_SCRIPTS/lib.sh"
+  "$PLAN_SCRIPTS/plan-citations"
+  "$WORKFLOW_SCRIPTS/plan-gate"
+  "$WORKFLOW_SCRIPTS/required-agents"
+)
+# Comments stripped first, so prose about absolute paths is not a finding.
+# The three forms that leave PATH: an absolute or relative path ending in
+# /git, a binary captured with `command -v`/`which`, and a $GIT holding
+# either.
+path_git_violations=""
+for _f in "${swept_gate_sources[@]}"; do
+  _hits="$(sed 's/#.*//' "$_f" |
+    grep -nE '(/git([[:space:]]|$|")|command -v git|which git|\$\{?GIT\}?[^A-Z_])')" || continue
+  path_git_violations+="${_f##*/}:$(printf '%s' "$_hits" | tr '\n' ' ') "
+done
+if [ -z "$path_git_violations" ]; then
+  ok "every git the swept gates invoke is resolved through PATH"
+else
+  bad "every git the swept gates invoke is resolved through PATH" \
+    "the sabotage shim cannot see these calls: $path_git_violations"
+fi
+
 sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
-  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count swept=0
+  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count
   shift 3
   # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
   # gate already refusing for an unrelated reason, and then stays green
@@ -468,7 +559,6 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     rc=$?
     # A gate that never reached call n is fine: nothing was sabotaged.
     [ "$(cat "$scratch/sabotage.count" 2>/dev/null || echo 0)" -lt "$n" ] && break
-    swept="$n"
     if [ "$rc" -eq 0 ]; then
       leaked="$n"
       printf '    (call %s failed; gate still exited 0 saying: %s)\n' "$n" "$(printf '%s' "$out" | tail -n 1)" >&2
@@ -477,13 +567,17 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
   done
   if [ -n "$leaked" ]; then
     bad "$name" "reported success with git call $leaked sabotaged"
-  elif [ "$swept" -lt "$base_count" ]; then
-    # Every call the clean run made must have been sabotaged in turn.
-    # Stopping earlier means the later calls were never tested, which is
-    # the difference between "the shim is a git this gate calls" and
-    # "the shim is the git this gate calls".
-    # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F11
-    bad "$name" "swept $swept of the $base_count git calls the clean run made"
+  elif [ "$base_count" -gt "$max" ]; then
+    # A gate that outgrew `max`: the loop stops at `max` and everything
+    # after it is never sabotaged. Stated as its own condition because
+    # the previous form -- comparing calls swept against the baseline --
+    # could only ever restate this one. Sabotage fires *at* call n, so a
+    # sabotaged run is identical to the clean run up to that point and
+    # the sweep always reaches exactly min(base_count, max). It is not
+    # the PATH-bypass check either; that is asserted on the source above,
+    # because a count taken through the shim cannot see past it.
+    # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F14
+    bad "$name" "made $base_count git calls but max is $max; the calls past $max were never sabotaged"
   else
     ok "$name"
   fi
@@ -495,7 +589,12 @@ sabotage_sweep "required-agents over a real range" "security" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" HEAD~1 HEAD
 sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents"
-sabotage_sweep "plan-citations over a working tree" "plan-citations: OK" 25 \
+# "citations resolve", not "plan-citations: OK": the latter is a prefix of
+# the "no files matched the scan set" line too -- the one F2's fix added to
+# make a scanned-nothing run visible -- so the baseline accepted a gate that
+# scanned nothing. Only the working line can print this.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
 
 printf '\ngate-tests: %s passed, %s failed, %s recorded residue(s)\n' "$pass" "$fail" "$known"

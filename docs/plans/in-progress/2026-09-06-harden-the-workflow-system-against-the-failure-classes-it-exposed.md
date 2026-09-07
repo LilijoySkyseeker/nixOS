@@ -144,9 +144,9 @@ defensible under that assumption.
 
 **2026-09-07: the Class 1 and 2 harness is built and it found two live
 fail-opens on its first run.** `scripts/gate-tests` exists, runs in
-about 0.7s, and is wired into `verify-ladder` as a hard block, so it
+about 0.8s, and is wired into `verify-ladder` as a hard block, so it
 fires on every non-trivial change rather than when someone remembers
-it. 78 assertions pass, 0 fail, 3 recorded residues.
+it. 82 assertions pass, 0 fail, 3 recorded residues.
 
 It is deliberately not only a regression suite. Three kinds of check,
 in increasing order of what they can discover:
@@ -176,19 +176,47 @@ wearing four hats: an assertion that looks like a check and is satisfied
 by something other than the thing it names. Each round's fix opened the
 next round's hole — a baseline that caught "the gate already fails" but
 not "the gate made no call", then one that caught both but accepted a
-gate exiting 0 without doing any work. Every sweep now asserts four
+gate exiting 0 without doing any work. Every sweep now asserts three
 things: the gate succeeds cleanly, prints the line that means it did its
-work, routes its git through the shim, and has every one of those calls
-sabotaged in turn. Each fix was confirmed by mutation rather than by
-reading, which is the only evidence that separates a real assertion from
-a shaped one — and is why G2 leads with "make the test fail first". A
-suite built to catch Class 1 was itself Class 1 four times; the method
-caught that, inspection did not.
+work, and routes at least one git call through the shim. (It also
+claimed a fourth — that every one of those calls was sabotaged in turn
+— which F14 later showed it could not express; see below.) Each fix was
+confirmed by mutation rather than by reading, which is the only evidence
+that separates a real assertion from a shaped one — and is why G2 leads
+with "make the test fail first". A suite built to catch Class 1 was
+itself Class 1 four times; the method caught that, inspection did not.
+
+**2026-09-07, the owed `security` pass: a fifth and sixth instance, and
+one of them marks where this technique stops.** F14, F15 and F16 came
+out of the pass over `5a7a400..HEAD` run before merging. F15 is the same
+hat worn again — F10 closed the "exited 0 without doing the work" hole
+for three of the four sweeps and left the fourth, because
+`plan-citations: OK` is a *prefix* of the scanned-nothing line that F2's
+own fix had added. Fixed with a fragment only the working line can
+print; and the fixture now carries a resolvable citation, so
+plan-citations' whole resolution path went from swept zero times to
+asserted in both directions.
+
+F14 is the one worth reading. F11 asked the sweep to prove the shim is
+*the* git a gate calls rather than merely *a* git it calls, and F11's
+fix counted calls through the shim to do it. That can never work: the
+instrument is blind to exactly the calls in question, so a baseline
+taken through it undercounts by precisely the amount being measured, and
+the resulting comparison was provably dead at all four call sites.
+Demonstrated after the fix as well as before — point
+`plan_code_fingerprint` at an absolute `git` and all four sweeps still
+report `ok`. **A dynamic check cannot assert a property about the calls
+it cannot observe.** That property is now asserted on the source
+instead: every `git` in the four swept gates and `lib.sh` must be a bare
+PATH-resolved word. The dead comparison was replaced by the only
+condition it could ever have expressed — a gate that outgrew `max`,
+leaving its tail unswept — stated as itself. Two rounds were spent
+fixing a check that was in the wrong layer.
 
 Verified to rung 3 (ran it locally, output inspected): the harness runs
-green, each of the two findings was reproduced before the fix and
-re-checked after, and `verify-ladder` passes with the harness wired in.
-Rungs 4-5 do not apply — no host-visible behaviour changed.
+green, every finding was reproduced before its fix and re-checked after,
+and `verify-ladder` passes with the harness wired in. Rungs 4-5 do not
+apply — no host-visible behaviour changed.
 
 **Next, in order:** sweep the remaining gates (`plan-lint`,
 `subagent-stamp`, `plan-freeze`/`plan-move`, and the `.githooks`, which
@@ -221,9 +249,14 @@ for stopping: F3, F6, F7 and F10 are the *same finding* recurring, and
 the loop was converting one round's fix into the next round's defect.
 Each of the four fixes was instead confirmed by mutation -- break the
 code, watch the assertion go red, restore it -- which is stronger
-evidence than a fifth reading. **Next session: run `security` once over
-`git diff 5a7a400..HEAD` before merging.** `plan-gate` will report a
-stale stamp until then; that is the gate working, not a fault.
+evidence than a fifth reading. **That owed pass ran 2026-09-07 over
+`git diff 5a7a400..HEAD`** and found F14, F15 and F16 -- the shape a
+fifth and sixth time, plus a hermeticity gap. All three are fixed and
+each was reproduced before its fix; see `## State`. Stopping on the
+recurrence rule was right about the reading being weaker than the
+mutation, and wrong that the round was finished: the two MEDIUMs were
+both live, and F14 is the one that names why the previous two rounds
+could not have worked.
 
 **Then:** push the stamps, and merge PR #68 -- the user
 signed that off 2026-09-07, to be done after child 3 lands and *before*
@@ -293,6 +326,18 @@ Extend the sweep to any gate that shells out. The gates left are
 `plan-lint`, `subagent-stamp`, `plan-freeze`/`plan-move` and
 `.githooks/*`; those mutate, so each iteration needs its own scratch
 repo instead of the shared one.
+
+**Assert in a layer that can see the thing.** A check can only assert a
+property over what its instrument observes. The sabotage sweep's
+instrument is a fake `git` on `PATH`, so it is blind to a gate that
+invokes an absolute binary — and no amount of counting *inside* the shim
+recovers that, because the baseline is taken through the same blind
+instrument and undercounts by exactly the calls in question. Two rounds
+(F11, then F14) went into fixing that comparison before the layer error
+was the finding. The property is a statement about the gate's *source*,
+so it is now asserted there: every `git` in the swept gates and `lib.sh`
+must be a bare PATH-resolved word. When a check keeps not quite working,
+ask what its instrument can observe before writing the next version.
 
 **Assert both directions.** A gate that wrongly refuses is as bad as one
 that wrongly passes, because its escape is a habit (`--no-verify`, a
@@ -994,3 +1039,231 @@ under `secrets/` — not opened.
 _security finished 2026-09-07T21:13:46Z -- see Findings above._
 
 **FIXED 2026-09-07:** commit.template dropped -- the fixture commits with -qm, which never reads one. gpgsign and hooksPath stay, and are now belt and braces with GIT_CONFIG_GLOBAL
+
+### F14 — F11's fix counts the calls the shim saw, not the calls the gate made, so the scenario F11 names still reports `ok` — and the new check is dead for all four call sites
+
+- **File:** `scripts/gate-tests:445-447` (the baseline count),
+  `scripts/gate-tests:465-489` (the loop, `swept`, and the new
+  `swept < base_count` check)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED by mutation
+- **Axis:** needed-used
+- **Reachability:** no external adversary — the principal is the next
+  person to refactor one of the four swept gates, or `lib.sh`, so that
+  `git` stops being resolved through `PATH` (an absolute store path, a
+  `GIT="$(command -v git)"` captured at source time, a wrapper). The
+  harness is a hard block in `verify-ladder`
+  (`docs/skills/workflow/scripts/verify-ladder:52`), so its `ok` line is
+  what the next reader trusts. This is the same reachability F6 and F11
+  already named; the fix did not move it.
+- **Rule:** `docs/hardening.md` rule 11 — "a guard that declines to act
+  must be watched by something that measures the outcome, not the
+  attempt". `base_count` measures the attempt (calls the instrument
+  intercepted), never the outcome (calls the gate made).
+- **Finding:** sabotage fires only *at* call `n`, so a sabotaged run is
+  byte-identical to the clean run up to that point. Therefore
+  `[ count -lt n ]` can only be true when `n > base_count`, and `swept`
+  always ends at exactly `min(base_count, max)`. The new
+  `swept < base_count` comparison is consequently **equivalent to
+  `max < base_count`** and to nothing else: with `max = 25` against
+  measured baselines of 8 / 2 / 4 / 2 (instrumented in the fixture), it
+  can never fire at any of the four call sites as they stand. F11's own
+  scenario — a gate that resolves `git` from `PATH` once and calls an
+  absolute binary thereafter — is unchanged, because `base_count` is
+  taken through the same shim that is blind to those calls, so it
+  reports 1, the sweep sabotages 1, and `swept == base_count` is
+  satisfied. Reproduced with the function extracted byte-identically
+  (`sed -n '418,490p' scripts/gate-tests`) and pointed at a synthetic
+  gate making one `PATH` call and seven absolute ones: `ok  synthetic
+  partially-absolute gate (base_count=1 swept=1)` — 7 of 8 calls never
+  sabotaged, no diagnostic. The same harness *does* go red on an
+  all-`PATH` gate with `max` lowered to 3 (`swept 3 of the 8 git calls
+  the clean run made`), which is the only case the check actually
+  covers, and which is F6's secondary `max`-overflow concern rather than
+  F11. The comment at `:481-485` therefore asserts the distinction ("the
+  shim is *a* git this gate calls" vs "*the* git this gate calls") that
+  the code still cannot make, and the `FIXED` note above claims the
+  sweep "refuses unless it sabotaged every one of them" when it only
+  refuses if it sabotaged fewer than the shim happened to see. Fifth
+  instance of the F3/F6/F7/F10 shape: an assertion satisfied by
+  something other than the thing it names.
+- **Fix risk:** the two remedies F11 itself listed still apply and are
+  not equivalent. An independently-derived expected call count is
+  brittle. Making `$fakebin` the *only* `git` on the child's `PATH`
+  (`PATH="$fakebin"` plus explicit entries for whatever else the gates
+  need, or a shim that refuses when invoked by any other name) turns an
+  absolute-path caller into a hard failure instead of a silent
+  undercount, but must be tested against `plan-gate`, which execs
+  `required-agents` and `plan-citations` as children and needs a working
+  `PATH` for them. Re-test by adding a throwaway gate that calls
+  `real_git` directly and confirming the sweep refuses it — the check
+  that was never run on the current fix.
+
+
+**FIXED 2026-09-07:** the dead comparison is replaced by the condition it could only ever have restated -- base_count greater than max, a gate that outgrew the sweep -- and the property F11 and F14 actually wanted is now asserted on the source, where a count taken through the shim cannot reach: every git the four swept gates and lib.sh invoke must be a bare PATH-resolved word, never an absolute path, a command -v capture or a $GIT. Verified by mutation both ways: making plan_code_fingerprint's git absolute leaves all four sabotage sweeps reporting ok -- F14's own point, that no shim-side counting can see it -- while the new invariant goes red; lowering max to 3 fires the overflow check with 'made 8 git calls but max is 3'
+
+### F15 — the sabotage baseline's success fragment for `plan-citations` matches the gate's own "scanned nothing" line, so F10's fix is real for three call sites and cosmetic for the fourth
+
+- **File:** `scripts/gate-tests:498` (the fragment),
+  `scripts/gate-tests:457-460` (the assertion),
+  `docs/skills/plan/scripts/plan-citations:82` vs `:202` (the two emitters)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED by mutation
+- **Axis:** hardening
+- **Reachability:** no external adversary; the principal is whoever next
+  changes `PLAN_TEXT_GLOBS`/`PLAN_DOC_GLOBS`, the fixture's file set, or
+  the candidate listing. `plan-citations` has exactly two `exit 0`
+  paths, and `plan-citations: OK` is a prefix of **both**: the working
+  line `plan-citations: OK (%s citations resolve; %s ignored region(s))`
+  at `:202`, and `plan-citations: OK (no files matched the scan set)` at
+  `:82` — the line added by F2's own fix precisely to make "scanned
+  nothing" visible. F10's whole point was that the fragment must be one
+  only the work path can print.
+- **Rule:** n/a — the harness's own principle turned on the harness,
+  same as F10.
+- **Finding:** reproduced two ways. (1) Directly: a repository whose
+  scan set is empty prints `plan-citations: OK (no files matched the
+  scan set)`, rc 0, and `grep -qF -- "plan-citations: OK"` matches it.
+  (2) By mutation of the real thing: replacing the `scan+=("./$f")` loop
+  in `docs/skills/plan/scripts/plan-citations` with a no-op — reducing
+  the gate to exactly the scanned-nothing fail-open F2 exists to prevent
+  — leaves the harness at **78 passed, 0 failed, 3 recorded residues**,
+  with `ok  plan-citations over a working tree`. `base_count` is
+  unaffected (2 either way, since both git calls precede the scan), so
+  F11's `swept == base_count` leg does not rescue it either. Instrumenting
+  the real fixture shows the baseline is already thin on its own terms:
+  it prints `plan-citations: OK (0 citations resolve; 2 ignored
+  region(s))`, because the fixture strips every plan citation at
+  `:181-183`, so the entire resolution path (`plan_path`, `dup`,
+  `anchor_ok`, `report`) is swept zero times today. The `FIXED` note for
+  F10 records a mutation against the **plan-gate** sweep only; the
+  equivalent mutation at this call site was never run, and it passes.
+- **Fix risk:** low. A fragment that only the working line can emit
+  (`citations resolve`) makes the assertion honest, and goes red today
+  under the mutation above. It does not fix the thinness of the fixture's
+  citation set — asserting a non-zero resolved count, which requires the
+  fixture to keep at least one resolvable citation rather than stripping
+  all of them, is the separate change and would interact with F3's
+  stripping. Re-test both by re-running the no-op mutation and confirming
+  the sweep goes red.
+
+
+**FIXED 2026-09-07:** the plan-citations success fragment is now 'citations resolve', which only the working line emits, instead of the 'plan-citations: OK' prefix shared with the scanned-nothing line. Verified by the mutation this finding names: reducing the scan loop to a no-op left the harness at 78 passed 0 failed before, and now fails with 'the gate exited 0 without doing its work: plan-citations: OK (no files matched the scan set)'. The second half is closed too -- the fixture plan is renamed to a date-prefixed name and a fixture doc cites it, so the baseline resolves 1 citation where it resolved 0, and three new cases assert the resolution path in both directions (resolves what exists, refuses an unknown plan, refuses an unknown anchor). All three go red when the code they name is neutered
+
+### F16 — the `GIT_*` isolation closes six of the seven variables F12 named and none of the config-injection channel, and the "belt and braces" comment is wrong about what protects the pins
+
+- **File:** `scripts/gate-tests:25-27`, `scripts/gate-tests:166-172`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED against git 2.55.0, the version on `PATH` here
+- **Axis:** hardening
+- **Reachability:** no external adversary; the principal is an operator
+  or a wrapper whose environment carries git variables — the same
+  principal F12 named (a `pre-commit`/`pre-push` hook, `git rebase
+  --exec ./scripts/gate-tests`, CI). Both gaps currently fail *closed*,
+  which is the good direction, so this is a hermeticity and
+  comment-accuracy finding rather than a fail-open.
+- **Rule:** n/a — but it contradicts `scripts/gate-tests:3-4` ("builds a
+  scratch one under `$TMPDIR`") and `docs/testing-changes.md`'s
+  "Hermetic", the same two claims F12 cited.
+- **Finding:** two legs. (1) **`GIT_TEMPLATE_DIR` is missing from the
+  unset list** although F12's own remediation paragraph names it. It is
+  honoured by the fixture's `git init`: with a template carrying
+  `info/exclude` containing `*.nix`, a repo built by the exact sequence
+  at `:163-172` silently drops `a.nix` from `git add -A`. Running the
+  real harness with that variable set gives **71 passed, 7 failed** —
+  loud, but the verdict is decided by the caller's environment.
+  (2) **The `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_n` / `GIT_CONFIG_VALUE_n`
+  channel is untouched, and it defeats both remaining defences.** Verified:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile ...
+  ./scripts/gate-tests` gives 71 passed, 7 failed; and env-injected
+  `core.hooksPath` runs a hook on a repo whose *own* config sets
+  `core.hooksPath=/dev/null` and with `GIT_CONFIG_GLOBAL=/dev/null`
+  exported (`git config core.hooksPath` reports the env value). So the
+  comment at `:166-168` — "Belt and braces with `GIT_CONFIG_GLOBAL`
+  above: a signing key or a hooksPath must not decide whether the harness
+  passes" — is false for the one channel that can still inject them:
+  env-supplied config is the last source consulted and outranks both the
+  repo-local `git config` lines and `GIT_CONFIG_GLOBAL`. The two pins are
+  still correct against an inherited `~/.gitconfig`, so they are not
+  dead; the claim about them is just wider than the mechanism.
+- **Fix risk:** none of consequence. Adding `GIT_TEMPLATE_DIR`,
+  `GIT_CONFIG_COUNT`, `GIT_NAMESPACE` and `GIT_ATTR_NOSYSTEM` to the
+  `unset` list is behaviour-preserving for an interactive run
+  (`GIT_CONFIG_KEY_n`/`VALUE_n` are inert once `GIT_CONFIG_COUNT` is
+  gone). It must not unset the shim's `SABOTAGE_*` variables, and
+  `plan_repo_root` inside the swept gates must still resolve `$repo`
+  afterwards — re-run and confirm 78 passed, 0 failed, 3 residues.
+
+**Checked and clean (security, 2026-09-07, second pass over the F10-F13 fixes).**
+Reviewed `5a7a400..HEAD` — commits `f0ce8b6` and `1f34d78`, 61 lines of
+`scripts/gate-tests` plus this plan — against the current content of the
+whole file, not just the diff lines. Verified positively, by running or by
+mutation, not only by reading:
+
+- **F13 is genuinely closed and safe to close.** `commit.template` is
+  gone and nothing in the harness can reach an editor buffer: the only
+  two commits are `-qm` (`:188`, `:191`), and the rest of the git
+  mutations are `add`, `config` and `checkout -q --`. No `--amend`, no
+  `commit` without `-m`. `GIT_CONFIG_GLOBAL=/dev/null` makes an inherited
+  global template inert independently.
+- **F12's own claim re-tested and holds.** With `GIT_DIR` and
+  `GIT_INDEX_FILE` pointed at a second repository, the harness exits 0
+  and that repository has 0 commits and a clean status before and after.
+  The remaining leaks are F16, and they are a different variable set.
+- **The `unset` is late but harmless.** It sits at `:25`, *after*
+  `. "$PLAN_SCRIPTS/lib.sh"` at `:18`, which would matter if `lib.sh`
+  touched git at source time. It does not: every `git` in `lib.sh`
+  (`:38`, `:321`, `:480`, `:512`, `:573-575`) is inside a function body,
+  and the file's only top-level work is array definitions and the
+  `PLAN_CODE_GLOBS`/`PLAN_NONTEXT_GLOBS` consistency loops at `:451-466`.
+- **`SABOTAGE_*` survives the isolation.** The change is `unset`/`export`
+  of `GIT_*` only, never `env -i`, and the sweep passes `SABOTAGE_COUNT`
+  and `SABOTAGE_AT` as a prefix assignment on the same command line, so
+  they reach the shim and its children unaltered. Confirmed by the sweeps
+  still intercepting: measured baseline counts 8 / 2 / 4 / 2.
+- **Three of the four success fragments do prove work.** Instrumented the
+  real fixture and read each emitter. `obliged reviews stamped` has
+  exactly one emitter (`plan-gate:215`), reached only after the whole
+  per-plan loop; `plan-gate`'s only other `exit 0` is the `nothing to
+  gate` short-circuit at `:59`, which the fragment excludes — F10's fix
+  is real here. `security` and `docs-updater` are emitted by
+  `required-agents` only from the `PLAN_AGENT_ORDER` loop, i.e. only once
+  `changed` was non-empty and a glob matched; the empty-diff path is
+  `[ -n "$changed" ] || exit 0`, which prints nothing and fails the
+  fragment. The one `plan_die` that could contain the string `security`
+  is unreachable here because `rc != 0` is tested first. The fourth is
+  F15.
+- **The `swept`/`break` ordering is right even though the check is
+  ineffective.** `swept="$n"` is set after the "gate never reached call
+  n" break and before the leak test, so a run that stopped short does not
+  inflate the count, and a leak is reported as a leak rather than as an
+  undercount. `base_count` and the counter file can never be empty —
+  `printf 0` at `:444` replaces the `: >` that caused F3's third defect,
+  and the `-eq`/`-lt` tests always see an integer.
+- **`rc` capture is correct.** `base_out="$(...)"` at `:445` is a plain
+  assignment, so `rc=$?` at `:446` is the substitution's status, not
+  `local`'s; `base_count="$(cat ...)"` on the next line cannot clobber it.
+- **Hermetic against this worktree.** `sha256sum` over every non-`.git`
+  file and `git status --porcelain` are byte-identical before and after a
+  full run; the scratch tree is removed by the `EXIT` trap. Runtime
+  0.75s, inside G2's one-second budget.
+- **Full suite, unmodified:** 78 passed, 0 failed, 3 recorded residues,
+  which matches the count in `## State`.
+- **Repo-level gates still green over the delta:** `plan-citations` gives
+  `OK (320 citations resolve; 2 ignored region(s))`, so the four new
+  `#F10`-`#F13` citation comments resolve; `plan-lint` reports `OK` on
+  this plan. `shellcheck -x` raises nothing new in the changed hunks —
+  the `SC2181` at `:312` and the `SC2015`/`SC2016` notes are all
+  pre-existing and benign.
+- **No secret material anywhere in the delta.** Nothing under `secrets/`
+  is touched, read or referenced; not opened.
+
+Not reviewed (out of this pass's scope): the rung-matcher and property
+sections of `gate-tests`, which are unchanged since the previous stamp;
+`plan-gate`, `required-agents` and `plan-citations` themselves beyond the
+exit paths their success fragments depend on; and everything on the
+branch before `5a7a400`.
+
+_security finished 2026-09-07T22:00:50Z -- see Findings above._
+
+**FIXED 2026-09-07:** GIT_TEMPLATE_DIR, GIT_CONFIG_COUNT, GIT_NAMESPACE and GIT_ATTR_NOSYSTEM join the unset list, and the 'belt and braces' comment now says what actually makes the repo-local pins the last word -- that GIT_CONFIG_COUNT is unset, since env-supplied config outranks both a repo-local git config and GIT_CONFIG_GLOBAL. Verified: the two injections this finding reproduces each turned a clean run into 7 failures beforehand and now change nothing
