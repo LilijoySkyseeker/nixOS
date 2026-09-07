@@ -189,23 +189,25 @@ finds defects and one that records old ones.
 branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
 never the main checkout.
 
-**Committed and pushed through `5eb67ef`** -- the review loop over
-`854156c`'s unreviewed tail, which closed F61-F65 on the map plan.
+**Committed and pushed through `08771c2`.** `5eb67ef` closed the review
+loop over `854156c`'s unreviewed tail (F61-F65 on the map plan).
+`08771c2` is child 3 of the map -- the evidence-ladder/deploy-sequence
+split with the rung declaration and its gate -- plus this plan's
+harness. Both plans have every finding resolved, both declare a rung,
+both pass `plan-lint`, and `verify-ladder` passes with `gate-tests`
+wired in.
 
-**Uncommitted, and this is the live work:** child 3 of the map (the
-evidence-ladder/deploy-sequence split, with the rung declaration and its
-gate) plus this plan's harness. Both plans have every finding resolved,
-both declare a rung, both pass `plan-lint`. `verify-ladder` passes with
-`gate-tests` wired in.
+**The loop is mid-pass, and this is the first thing to finish.**
+`/simplify`'s angle reviews ran over the harness and the two gate fixes;
+`docs-updater` and `security` have not seen them, so `08771c2` is
+committed ahead of its last two reviewers -- the same debt this session
+opened with, deliberately taken again because context ran short rather
+than because the work is done. The active-plan marker points at this
+file, so their stamps land here, which matches the commit's `Plan:`
+trailer. `plan-gate origin/master HEAD` will fail on a stale stamp until
+they run; that is the gate working, not a fault.
 
-**The loop is mid-pass.** `/simplify`'s angle reviews ran over the
-harness and the two gate fixes; `docs-updater` and `security` have not
-yet seen them. The active-plan marker points at this file, so their
-stamps land here -- which is correct, since the commit should cite this
-plan. Finish that pass before committing: `plan-gate` needs a current
-stamp from each, and the fingerprint has moved since the last ones.
-
-**Then:** commit both plans' work, push, and merge PR #68 -- the user
+**Then:** push the stamps, and merge PR #68 -- the user
 signed that off 2026-09-07, to be done after child 3 lands and *before*
 child 2 starts, so child 2 runs against a base where the stamp gates are
 real rather than legacy (#F12 on the map plan). Resolve the PR #67
