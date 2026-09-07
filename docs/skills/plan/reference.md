@@ -43,11 +43,16 @@
 ### Which files the schema rules apply to
 
 **The mutable corpus is migrated to the current schema whenever the
-schema changes; frozen files are exempt by definition.** A frozen plan
+schema changes; frozen files are exempt by definition.** "Frozen" means
+recorded in `docs/plans/.checksums`, which only `plan-freeze` writes and
+which `.githooks/pre-commit` enforces — not the file's own `frozen:`
+field, which a plan could otherwise set about itself to switch off every
+rule below. `plan-lint` reports the two disagreeing in either direction. A frozen plan
 cannot be edited, so every rule added after it froze is one it can never
 satisfy, and a gate nothing can clear is what teaches the bypass.
 `plan-lint` therefore checks the section set, the section order and the
-schema fields only where `frozen: false`, and checks the rules that do
+schema fields only on a plan `docs/plans/.checksums` does not record as
+frozen, and checks the rules that do
 not depend on the era — core frontmatter, status against folder, id
 sequencing, Progress citations — everywhere.
 

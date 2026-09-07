@@ -65,7 +65,7 @@ version written this session was worse than either, about 43 ms; an
 earlier draft of this paragraph quoted that version's corpus sweep as the
 "before", which was the wrong baseline.
 
-**The review loop ran in full, and found seventeen things.** Four
+**The review loop ran in full, twice, and found twenty-two things.** Four
 `/simplify` angles, then `docs-updater`, then `security`, in D7's order.
 All 17 are resolved. Three are worth carrying forward as lessons rather
 than as fixes:
@@ -85,10 +85,38 @@ than as fixes:
   reference list, and four reviewers read that helper without seeing it.
   It surfaced only on running the thing with more than one value.
 
-`gate-tests` grew from 82 assertions to **90**, covering `plan-lint` and
-the active-plan marker; each new case was observed failing under the
-mutation that reintroduces its defect. It now runs in 0.98s against a
-one-second budget — see `#G8`, which is the next thing to do to it.
+`gate-tests` grew from 82 assertions to **92**, covering `plan-lint`, the
+active-plan marker and the two frontmatter readers; each new case was
+observed failing under the mutation that reintroduces its defect. It runs
+in about 1.0s against a one-second budget — see `#G8`, which is now the
+next thing to do to it, not a later one.
+
+**The second `security` pass, owed because the fix stage changed code,
+found five more — and two of them were in the regression tests written
+during the first.** `#F18`: the case guarding `#F11` keyed on the
+self-freeze *warning*, so restoring the bypass in full left the harness
+green; enforcement and warning are now separate assertions. `#F21`: the
+duplicate-key probe read `plan_frontmatter`'s *first* value, so it agreed
+with `plan_get_field` even with first-wins deleted; it now reads the last,
+which is how `plan-lint`'s consumer loop reads it.
+
+**That shape has now occurred eight times across two plans** — `#F3`,
+`#F6`, `#F7` and `#F10` on
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md,
+and `#F10`, `#F13`, `#F18` and `#F21` here — and four of those eight were
+in tests written to catch it. The pattern is stable enough to state as a
+rule: **a test keyed on a diagnostic asserts that the diagnostic exists,
+not that the check ran.** When a defect has several symptoms, key the test
+on the symptom the bypass removes, not the one it preserves. Each of the
+eight was found by mutation and none by reading.
+
+By the letter of D7 a third `security` pass is owed, since fixing
+`#F18`-`#F22` changed code again. It was not run: D7's own recurrence rule
+says to seek sign-off rather than loop when the same finding keeps
+returning, and this is that case. Every one of the five fixes was confirmed
+by mutation instead, which is the evidence a re-read does not produce.
+**That is the user's call, not the agent's** — the PR stays a draft until
+it is made.
 
 Not started: the G-to-F reclassification. Its design is settled in
 `#G4`, its first batch is chosen (the file `#D4` names, 42 `G` items),
@@ -224,9 +252,11 @@ edit, and the precedent was that each future schema addition gets its own
 ad-hoc `if`.
 
 The rule is now one decision, stated in `reference.md`: rules that depend on
-the schema era are checked where `frozen: false`, and rules that do not —
-core frontmatter, status against folder, id sequencing, Progress citations —
-are checked everywhere. Corpus failures went 45 to 18, and the single
+the schema era are checked on a plan the checksum manifest does not record
+as frozen, and rules that do not — core frontmatter, status against folder,
+id sequencing, Progress citations — are checked everywhere. (Written as
+"where `frozen: false`" until `#F11`; the field is self-declared and the
+manifest is not.) Corpus failures went 45 to 18, and the single
 remaining frozen failure is a non-sequential id, which is correctly era-
 independent.
 
@@ -798,3 +828,288 @@ _security finished 2026-09-07T23:04:43Z (code 38b247d66b10a659) -- see Findings 
   rather than as this one case.
 
 **FIXED 2026-09-07:** plan_field_refs terminates its last field, so a ref list's final entry is no longer silently skipped. Verified by the reproduction that found it -- four invalid refs now report four problems where they reported three -- and guarded in gate-tests by a case whose only bad reference is the last one
+
+### F18 — the gate-tests case guarding `#F11` asserts the warning, not the enforcement, so the bypass it names still passes 90/90
+
+- **File:** `scripts/gate-tests:397-402`; `docs/skills/plan/scripts/plan-lint:57-71`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by mutation
+- **Axis:** needed-used
+- **Reachability:** the next edit to `plan-lint`'s frozen decision. `plan-lint`
+  has exactly one automated caller, `verify-ladder`, which is local-only
+  (`.github/workflows/` holds only `plan-gate.yml`, which does not lint; no
+  git hook calls it), so the reach is "the regression guard on the structural
+  gate does not guard the thing the gate was fixed to do".
+- **Rule:** n/a — new-rule candidate, and a re-occurrence of the shape this
+  file's own `#F13` note records ("the first version of one of these cases
+  passed under the very mutation it was meant to catch"), in a sibling case
+  added in the same commit.
+- **Finding:** `#F11`'s harm was not the missing warning. It was that a
+  `todo/` plan asserting `frozen: true` "switches off every rule below" — a
+  file with no `## State`, none of the six sections and none of the four new
+  fields printed `OK`. The new case `expect_fail "plan-lint refuses a plan
+  that declares itself frozen" "only plan-freeze may freeze"` asserts exit
+  non-zero plus that one diagnostic string, and nothing about the era rules.
+  Mutation run in a scratch copy of this branch: leave the manifest lookup
+  and both disagreement reports exactly as written, and add one line after
+  them — `[ "$frozen_field" = "true" ] && frozen=1` — which restores `#F11`'s
+  bypass in full. `./scripts/gate-tests` reports **90 passed, 0 failed, 3
+  recorded residues**, and the case named after `#F11` is one of the 90. The
+  probe would report ten problems under the honest linter (verified: the
+  disagreement plus five missing sections and four missing schema fields), so
+  the assertion had nine other reports available to key on and keyed on the
+  one the mutation preserves. Four other mutations were run for contrast and
+  are all caught: fence-blind `plan_headings` (2 failures), `printf '%s'` in
+  `plan_field_refs` (1), field-based `frozen` (1), deleting the `#F14` shape
+  regex (1), and both directions of `plan_active_plan_problem` (1 and 2).
+- **Fix risk:** none material. `expect_fail` matches a single fragment, so
+  covering the enforcement needs a second assertion over the same probe (or a
+  fragment such as `missing required section '## State'` instead of the
+  warning). Whichever is chosen, re-run the bypass mutation above and require
+  the case to fail — asserting only the warning is what this finding is.
+
+
+**FIXED 2026-09-07:** the case is split in two, because enforcement and warning fail independently: one requires 'missing required section', which only appears if the schema rules actually ran, and the other requires the self-freeze warning. Verified with security's own mutation -- restoring the bypass in full now fails the enforcement case where the single warning-keyed case stayed green
+
+### F19 — `SKILL.md` and `reference.md` still say the era rules gate on `frozen: false`, which is the definition `#F11` removed
+
+- **File:** `docs/skills/plan/SKILL.md:31`; `docs/skills/plan/reference.md:50`;
+  this plan's `#G5`; contrast `docs/skills/plan/scripts/plan-lint:58`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** the next person adding a schema-era rule, or anyone
+  debugging why a plan is or is not exempt. Both documents are the ones
+  `plan-lint`'s own row points at ("see `reference.md`, 'Which files the
+  schema rules apply to'"), so the pointer lands on the wrong authority.
+- **Rule:** n/a — `docs/hardening.md` covers no repo tooling. Rubric class:
+  documentation that no longer matches the code.
+- **Finding:** `SKILL.md:31` says the schema-era rules "run only where
+  `frozen: false`" and `reference.md:50` says "`plan-lint` therefore checks
+  the section set, the section order and the schema fields only where
+  `frozen: false`". After `#F11` neither is true: `plan-lint:58` branches on
+  `plan_manifest_frozen`, i.e. on a `docs/plans/.checksums` entry, and the
+  `frozen:` field now only feeds a disagreement report. The two disagree in
+  both directions and both directions are demonstrable — a `todo/` plan with
+  `frozen: true` gets every era rule (that is `#F11`'s fix), and a `done/`
+  file with `frozen: true` but no manifest entry does too. `#G5` in this file
+  carries the same stale sentence, and cites `reference.md` as where the
+  decision is "stated". So the change closed one two-definitions-of-frozen
+  problem in code and left a second one between the code and its own
+  documentation. Verified there is no third statement: `grep -rn 'frozen:
+  false' docs/skills docs/agents AGENTS.md` returns only these two plus two
+  literal frontmatter examples, and no doc mentions `plan_manifest_frozen`
+  or the two new reports at all.
+- **Fix risk:** none — it is prose. The wording has to name the manifest as
+  the authority and say the field is now only cross-checked against it,
+  otherwise the next schema rule gets written against the field again.
+
+
+**FIXED 2026-09-07:** SKILL.md, reference.md and this plan's G5 now say the era rules gate on the checksum manifest, naming why -- only plan-freeze writes it and pre-commit enforces it -- rather than on the self-declared field
+
+### F20 — `plan_manifest_frozen` matches the manifest by unanchored substring, on a `$rel` `plan_locate` never canonicalises
+
+- **File:** `docs/skills/plan/scripts/lib.sh:189-193`;
+  `docs/skills/plan/scripts/plan-lint:17,58`; same idiom at
+  `docs/skills/plan/scripts/lib.sh:435` (`plan_do_freeze`)
+- **Severity:** INFO
+- **Confidence:** CONFIRMED by reproduction
+- **Axis:** needed-used
+- **Reachability:** a contributor or agent invoking `plan-lint` (or writing
+  the active-plan marker via `plan-decide`/`plan-resolve`) with a legal but
+  non-canonical path. No adversary is needed for the second half — a typo is
+  enough — and no privilege is gained either way; the consequence is a wrong
+  verdict from the gate, printed as an accusation.
+- **Rule:** n/a — new-rule candidate: a lookup keyed on a path must anchor
+  the key and canonicalise the input, or it is a substring search.
+- **Finding:** two defects in one line, `grep -qF "  $2" "$manifest"`.
+  1. **Unanchored.** The match succeeds anywhere in the line, so a `$rel`
+     that is a strict *prefix* of a manifest entry reports frozen.
+     Reproduced in a scratch tree: with the manifest holding one entry whose
+     path is `<some-plan>.md.bak.md`, `plan_manifest_frozen` returns true for
+     `<some-plan>.md`, which has no entry of its own. `-F` does close the
+     metacharacter half — a `$rel` built from regex and glob metacharacters
+     matched no entry — and no prefix pair exists among the 50 real entries
+     (checked), so this is latent, not live. It is the same unanchored idiom
+     `plan_do_freeze` uses to *delete* a line, where the direction is worse:
+     freezing the shorter path would silently drop the longer path's
+     manifest entry.
+  2. **Non-canonical `$rel`.** `plan_locate`'s first arm returns its argument
+     verbatim whenever it matches `docs/plans/*/*.md`, and a `case` `*`
+     matches `/`, so `docs/plans/./done/<file>.md` is returned unchanged.
+     Run against a real frozen plan on this branch, `plan-lint` then prints
+     `frontmatter says 'frozen: true' but docs/plans/.checksums has no entry
+     -- only plan-freeze may freeze a plan` plus five schema-era problems the
+     file can never fix — a correctly frozen plan accused of self-freezing.
+     The canonical path and the absolute path both report `OK`. This
+     sensitivity is new: before this change `$rel` was only used for `-f`,
+     `basename`/`dirname` and display, and nothing keyed a lookup on it.
+- **Fix risk:** anchoring (`grep -qxF`-style on the whole line, or
+  `awk -v p="$2" '$2 == p'`) changes no verdict on the current corpus — all
+  50 entries are `<hash>  <canonical rel>` and `sha256sum -c` passes — but
+  it must tolerate the two-space separator `sha256sum` writes and must not
+  start reading the hash. Canonicalising in `plan_locate` is the wider change
+  and touches every caller, including `plan_do_freeze`'s manifest writer, so
+  the two are separable.
+
+
+**FIXED 2026-09-07:** plan_manifest_frozen matches the manifest's path field exactly instead of any substring of the line, and normalises leading and embedded ./ segments first. Verified: docs/plans/./done/<frozen>.md now lints OK where it previously reported a self-freeze plus five unfixable era failures, a suffix of a recorded path no longer matches, and the exact path still does
+
+### F21 — `#F12`'s first-wins fix has no regression guard: reverting it passes 90/90
+
+- **File:** `docs/skills/plan/scripts/lib.sh:134-139`; `scripts/gate-tests`
+  (no case names `plan_frontmatter`, a duplicate key, or first-wins)
+- **Severity:** INFO
+- **Confidence:** CONFIRMED by mutation
+- **Axis:** needed-used
+- **Reachability:** the next edit to `plan_frontmatter`. Same principal and
+  same local-only blast radius as `#F18`.
+- **Finding:** deleting the two lines that make the reader first-wins
+  (`if (k in seen) next; seen[k] = 1`) leaves `./scripts/gate-tests` at 90
+  passed, 0 failed. `#F12` was specifically a *two readers disagree* defect,
+  the class this file records as recurring, and it is the one fix in the
+  F11-F17 batch that came back with no assertion. The consequence of a
+  silent revert is smaller than it was — `plan-lint` no longer takes the
+  frozen exemption from the field, so last-wins would flip only the
+  disagreement report and the `kind`/`priority`/`status` values, and in the
+  `frozen` case it flips *stricter* — but it would also silently reopen the
+  gap between `plan-lint` and `plan_get_field` that `#F12` closed, on the
+  same key `plan-move` rewrites. Confirmed separately that the fix does work
+  today: a `todo/` plan with an unterminated frontmatter block and a body
+  line reading `frozen: true` lints `OK` rather than tripping the
+  self-freeze report, precisely because the earlier `frozen: false` wins.
+- **Fix risk:** a case is cheap and hermetic (two `frozen:` lines in a probe,
+  assert `plan_frontmatter` prints the first) — but `#G8` records the harness
+  at 0.98s against a one-second budget with no margin, so this lands after
+  the fast/slow split, not before it.
+
+
+**FIXED 2026-09-07:** gate-tests asserts the two frontmatter readers agree on a duplicated key. The first version of the probe read plan_frontmatter's first value and so agreed with plan_get_field even with first-wins deleted -- it now reads the last, which is how plan-lint's consumer loop reads it, and it fails under that mutation
+
+### F22 — the sabotage sweep's "citations resolve" comment now sits above the plan-lint sweep it does not describe
+
+- **File:** `scripts/gate-tests:731-739`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** the next person editing a sweep's success fragment, who
+  reads the comment as being about the line under it.
+- **Rule:** n/a. Third occurrence of the misattached-comment shape already
+  filed twice in this file, as `#F6` and `#F15`.
+- **Finding:** the comment block explaining why the fragment must be
+  `"citations resolve"` and not `"plan-citations: OK"` — with its
+  `2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15`
+  citation — was already at `gate-tests:731-735`. The new
+  `sabotage_sweep "plan-lint over a well-formed plan"` was inserted between
+  it and the `plan-citations` sweep at line 739, so the comment now describes
+  the line two below it. The reasoning it carries does not apply to
+  `"lint-clean.md: OK"`, which is not a prefix of anything else `plan-lint`
+  prints.
+- **Fix risk:** none — move the new sweep above the comment, or the comment
+  down onto its own sweep.
+
+**Checked and clean (security, second pass, 2026-09-07).** Hardening axis is
+empty again and plainly so: `git diff origin/master..HEAD --stat` is 59 files,
+all under `docs/plans/`, `docs/skills/` and `scripts/`, with zero `.nix`,
+`hosts/`, `modules/`, `secrets/`, `.sops.yaml`, firewall, systemd-unit or
+capability content. No host, service, port or secret is touched, so there is
+nothing to weigh against `docs/hardening.md`, and no `nix eval` against the
+pinned nixpkgs was applicable. No secret was decrypted or read at any point.
+The whole pass is on gate correctness.
+
+Verified positively, not merely read, on commit `0ca8889`:
+
+- **The corpus claims still hold after the F11-F17 fixes.** 18 of 102 plans
+  fail `plan-lint`; exactly 1 of the 18 is manifest-frozen
+  (`2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md`, a
+  non-sequential `G` id, era-independent as `#G5` says). The aggregate over
+  the whole corpus is 17 missing-`## State`, 3 Progress-cites-a-missing-`G`
+  and 11 non-sequential-`G` reports — **no file trips either new
+  frozen-disagreement report**, so the both-directions check fires on nothing
+  legitimate today.
+- **No frozen plan was touched and the manifest verifies.** `sha256sum -c
+  docs/plans/.checksums` passes on all 50 entries; `comm` of the 50 manifest
+  paths against the 59 paths the commit changes is empty.
+- **`plan_headings` and `plan_state_body` cannot disagree.** Differential
+  fuzz of 4000 generated files over 17 fence and heading shapes (plain,
+  tilde, four-backtick, two- and four-space indented, tab-indented,
+  blockquote- and list-prefixed, info-string, an inline `` ``` `` `` ``` ``
+  line, and `## State` with a trailing space): zero disagreements between
+  "`plan_headings` emits `## State`" and "`plan_state_body` succeeds". Same
+  comparison over all 102 real plans: zero. The fence state machines are
+  byte-identical; the only asymmetry is `/^## /` versus `/^## State$/`, and
+  every heading that splits them (`## State ` with a trailing space,
+  `##State`, `## State foo`, a CR-terminated heading) makes *both* readers
+  report the section missing.
+- **Both fence directions are genuinely guarded.** Replacing `plan_headings`
+  with the fence-blind `awk '/^## / { print FNR "\t" $0 }'` fails exactly the
+  two new fence cases, including the reshaped false-failure one — so `#F13`'s
+  note about the first version passing under its own mutation is closed for
+  that case.
+- **`#F17` and `#F14` are guarded.** Reverting `printf '%s\n'` to
+  `printf '%s'` in `plan_field_refs`, and separately deleting the canonical
+  filename regex, each fail the reference-list case. Edge inputs behave: a
+  lone `,`, an all-whitespace value and an empty value all yield no
+  references and exit 0; a value can never contain a newline because
+  `plan_get_field` prints one line.
+- **The `#F14` regex rejects nothing legitimate.** All 102 corpus filenames
+  match `^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]*\.md$`. It also cannot
+  be bypassed: the preceding `case */*|*..*` arm is strictly redundant with
+  it (neither `/` nor a second `.` can match the character classes), so it
+  only improves the message.
+- **`plan_active_plan_problem` fails in the safe direction on every marker
+  shape tried.** No marker and an empty marker are silent; a whitespace-only
+  marker, a two-line marker, a marker naming a path outside `docs/plans/`, a
+  marker that is a directory, and an unreadable marker all report a problem.
+  `head -n 1` never fails open — worst case it prints an empty name after a
+  `head:` error on stderr. Two cosmetic residues, not filed: a two-line
+  marker's message names only the first line, so it can call a path "not a
+  usable plan file" when that path exists and the second line is the fault;
+  and the message echoes the marker's raw bytes, so control characters reach
+  the terminal (writer is `plan_mark_touched`, so this needs worktree write
+  access already).
+- **`plan_frontmatter`'s `seen` array cannot be poisoned.** The key is
+  everything before the first `:`, and `seen[k]` is set before the
+  `^[A-Za-z_][A-Za-z0-9_]*$` shape test — but a key that fails that test can
+  never be byte-equal to one that passes, so no malformed line can shadow a
+  real key. Checked against `plan_get_field` on `frozen:true` (no space),
+  `frozen : true`, `  frozen: true`, `a: frozen: true`, a `---` not on line
+  1, and no frontmatter at all: same answer both ways. One divergence
+  survives and is harmless today — `plan_frontmatter` strips trailing
+  whitespace from a value and `plan_get_field` does not, so `frozen: true `
+  reads as `true` in `plan-lint` and as not-frozen in `plan_is_frozen`; on a
+  non-frozen file `plan-lint` reports it anyway, and on a frozen file the
+  edit needed to introduce it is what `.githooks/pre-commit`'s checksum guard
+  blocks.
+- **`declare -A` subscripts cannot be steered by file content.** A plan whose
+  headings are `## @` and `## *` lints `OK` with no bash diagnostic;
+  `sec_line` and `fm_val`/`fm_seen` are all `declare -A`, so no arithmetic
+  evaluation happens on a subscript taken from the file.
+- **The freeze path has no legitimate mid-freeze window.** `plan-move ...
+  done` `exec`s `plan-freeze`, and `plan_do_freeze` sets `frozen: true`, the
+  manifest entry and the `git add` in one function with no intervening
+  `plan-lint`; `plan-reject` uses the same helper. So the only way to reach
+  either disagreement report is a hand edit or a partial merge — which is
+  what the report is for.
+- **`gate-tests` is hermetic and still under budget** at 90 passed, 0 failed,
+  3 recorded residues in 0.96s. The four new `plan-lint` cases, the three
+  marker cases and the new `plan-lint` sabotage sweep all run in the scratch
+  repo; the sweep's baseline correctly requires `lint-clean.md: OK` and at
+  least one shimmed `git` call, and `plan-lint` makes exactly one
+  (`plan_repo_root`), which the sweep sabotages.
+- **Blast radius is unchanged and small.** `plan-lint` still has exactly one
+  automated caller, `verify-ladder`, which is local-only; `.github/workflows/`
+  holds only `plan-gate.yml`, which does not lint, and no `.githooks/*` calls
+  it. That is why every finding above is LOW or INFO.
+- **One residue recorded, not filed:** a plan file whose frontmatter has no
+  closing `---` still lints `OK` — `plan_frontmatter` and `plan_get_field`
+  both scan to EOF. `#F11`'s fix-risk note offered "require a terminating
+  `---`" as part of the cheaper alternative fix; the manifest fix was taken
+  instead and this half was not. It is no longer a *bypass* (`#F12`'s
+  first-wins makes the real `frozen: false` win over any body line), and it
+  is pre-existing on `origin/master`, so it is a gap in the structural
+  validator rather than a defect this change introduced.
+
+_security finished 2026-09-07T23:27:30Z (code 832e3b086c764756) -- see Findings above._
+
+**FIXED 2026-09-07:** the citations-fragment comment moved back onto the plan-citations sweep it explains

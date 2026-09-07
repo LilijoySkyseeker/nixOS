@@ -187,9 +187,20 @@ plan_active_plan_problem() {
 # off every rule that applies only to editable files
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 plan_manifest_frozen() {
-  local manifest="$1/$PLAN_CHECKSUMS_RELPATH"
+  local manifest="$1/$PLAN_CHECKSUMS_RELPATH" rel="$2"
   [ -f "$manifest" ] || return 1
-  grep -qF "  $2" "$manifest"
+  # plan_locate passes a caller-supplied path through as given, so the same
+  # frozen file can arrive spelled `docs/plans/./done/x.md`. Left unnormalised
+  # that misses the manifest and the file is then accused of self-freezing.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F20
+  rel="${rel#./}"
+  while [ "$rel" != "${rel//\/.\//\/}" ]; do rel="${rel//\/.\//\/}"; done
+  # Exact match on the path field, not a substring of the line: `grep -F`
+  # matched any entry this path is a suffix of.
+  awk -v want="$rel" '
+    { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) { found = 1; exit } }
+    END { exit(found ? 0 : 1) }
+  ' "$manifest"
 }
 
 # plan_field_refs <file> <key> -- one bare plan filename per line from a

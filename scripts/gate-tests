@@ -391,15 +391,21 @@ x
 
 ## Findings (F)'
 
-# A plan may not exempt itself. Only plan-freeze, via the checksum manifest,
-# can make a file frozen -- the field alone used to switch off every rule.
+# A plan may not exempt itself. Two separate assertions, because they can
+# fail independently: the schema rules must still *run* (the enforcement),
+# and the self-freeze must be *reported* (the warning). Keyed on the warning
+# alone, this case stayed green with the bypass restored in full -- the probe
+# emits nine other reports and the warning is the one a bypass preserves.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
-expect_fail "plan-lint refuses a plan that declares itself frozen" "only plan-freeze may freeze" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
-  "$(lint_probe "slug: probe
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F18
+self_frozen_probe="$(lint_probe "slug: probe
 created: ${fixture_date}
 status: todo
 frozen: true" "## Progress")"
+expect_fail "plan-lint still applies the schema rules to a self-declared frozen plan" "missing required section" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
+expect_fail "plan-lint reports a plan that declares itself frozen" "only plan-freeze may freeze" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
 
 # Both directions of the fence rule, because each was live: sections that
 # exist only inside a fence must not count, and a correct plan that quotes
@@ -448,6 +454,35 @@ if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$probe" >/dev/null
 else
   bad "plan-lint passes a plan that quotes the template inside State" \
     "a correct file was blocked by its own quoted example"
+fi
+
+# The two frontmatter readers must agree about a duplicated key, or one
+# caller sees a file as frozen and another as editable. Asserted as agreement
+# between them rather than as either one's answer -- and the plan_frontmatter
+# side is read the way plan-lint reads it, last assignment winning, because a
+# probe that took the first value agreed with plan_get_field even with
+# first-wins deleted and so asserted nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F12
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F21
+dup_probe="$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+frozen: true
+kind: task
+priority: normal
+blocked_by:
+superseded_by:" "$lint_sections")"
+dup_readers="$( cd "$repo" && bash -c '
+  . docs/skills/plan/scripts/lib.sh
+  printf "%s|%s" \
+    "$(plan_get_field "'"$dup_probe"'" frozen)" \
+    "$(plan_frontmatter "'"$dup_probe"'" | awk -F"\t" "\$1==\"frozen\"{v=\$2} END{print v}")"' )"
+if [ "${dup_readers%|*}" = "${dup_readers#*|}" ]; then
+  ok "both frontmatter readers agree on a duplicated key"
+else
+  bad "both frontmatter readers agree on a duplicated key" \
+    "plan_get_field and plan_frontmatter disagree: $dup_readers"
 fi
 
 # Every entry in a reference list is checked, including the last. Asserted as
@@ -728,14 +763,14 @@ sabotage_sweep "required-agents over a real range" "security" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" HEAD~1 HEAD
 sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents"
+sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "docs/plans/in-progress/$lint_plan"
 # "citations resolve", not "plan-citations: OK": the latter is a prefix of
 # the "no files matched the scan set" line too -- the one F2's fix added to
 # make a scanned-nothing run visible -- so the baseline accepted a gate that
 # scanned nothing. Only the working line can print this.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
-sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
-  "docs/plans/in-progress/$lint_plan"
 sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
 
