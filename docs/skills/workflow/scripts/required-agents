@@ -5,11 +5,9 @@
 # ref, the merge range, for plan-gate. Read-only; decides nothing about
 # whether they actually ran.
 #
-# The triggers are mechanical on purpose. "Invoke where relevant" ran on
-# 12 of 89 plans while "/simplify, always" ran every time -- same skill,
-# same agent, one sentence apart. A trigger an agent has to *judge* is a
-# trigger that gets skipped, so this computes the obligation from the
-# diff instead.
+# The triggers are mechanical on purpose: a trigger an agent has to
+# *judge* is a trigger that gets skipped, so the obligation is computed
+# from the diff instead.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -27,61 +25,73 @@ if [ $# -ge 1 ]; then
   # command substitution leaves `changed` empty, which reads as "no files
   # changed, so no agents obliged" -- turning plan-gate's mandatory
   # dependency into a silent pass. That is the fail-open this whole check
-  # exists to close, so it must not reappear here (F3).
-  if ! changed="$(git diff --name-only "${1}...${2:-HEAD}")"; then
+  # exists to close, so it must not reappear here.
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F3
+  # core.quotePath=false, and what it does not cover -- see
+  # plan_worktree_files
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
+  if ! changed="$(git -c core.quotePath=false diff --name-only "${1}...${2:-HEAD}")"; then
     plan_die "cannot diff ${1}...${2:-HEAD} -- refusing to report an empty obligation set"
   fi
-  changed="$(printf '%s\n' "$changed" | sed '/^$/d' | sort -u)"
 else
-  # Working-tree mode. Untracked files count: a brand-new module is the
-  # change most in need of review, and it appears in none of git's diff
-  # views until it is staged.
-  changed="$( {
-    git diff --name-only HEAD
-    git diff --cached --name-only
-    git ls-files --others --exclude-standard
-  } | sed '/^$/d' | sort -u)"
+  # Working-tree mode: unstaged + staged + untracked, one definition for
+  # all callers -- see plan_worktree_files for why untracked files count.
+  changed="$(plan_worktree_files)" ||
+    plan_die "cannot list working-tree changes -- refusing to report an empty obligation set"
 fi
 [ -n "$changed" ] || exit 0
 
-# "Is this reviewable code" comes from plan_is_code_path / PLAN_CODE_GLOBS
-# rather than a regex spelled out here. Encoding the same set twice means
-# one missed edit makes a file oblige review without ever invalidating a
-# stamp, or the reverse -- and the set already has to agree with what
-# plan-citations scans and what the fingerprint covers.
+# "is this reviewable code" comes from plan_is_code_path / PLAN_CODE_GLOBS
+# rather than a regex here: what obliges review has to be exactly what
+# the stamp fingerprint covers
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F29
 code=0 docs=0
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  plan_is_code_path "$f" && code=1
-  case "$f" in *.md) docs=1 ;; esac
+  if plan_is_code_path "$f"; then code=1; fi
+  # `if`, not `&&` -- a while loop exits with its last body command's
+  # status, which is inert here but one refactor from mattering
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
+  if plan_is_doc_path "$f"; then docs=1; fi
 done <<<"$changed"
 
-# /simplify and security review code: Nix, or the scripts that gate it.
-# The skill scripts and git hooks are this repo's enforcement machinery --
-# a change to plan-gate or verify-ladder can weaken every other gate -- so
-# they earn review at least as much as a module does.
-if [ "$code" = 1 ]; then
-  echo "/simplify"
-  echo "security"
-fi
+obliged=""
+# /simplify and security review code, per PLAN_CODE_GLOBS -- see the
+# rationale there for why the set is wider than Nix.
+[ "$code" = 1 ] && obliged="$obliged /simplify security"
 
 # docs-updater keys off code *or* docs: a code change can invalidate a doc
 # without touching that doc, which is exactly the drift it exists to
 # catch, so "only when a .md changed" would miss the case that matters
 # most. Narrowing this to the docs a given file is actually named by needs
 # a doc-to-code index that does not exist yet.
-if [ "$code" = 1 ] || [ "$docs" = 1 ]; then
-  echo "docs-updater"
-fi
+{ [ "$code" = 1 ] || [ "$docs" = 1 ]; } && obliged="$obliged docs-updater"
 
 # spec-check reads the active plan's Decisions as the spec, which makes it
 # a working-tree notion -- the active-plan marker describes a live
-# session, not a merge range. plan-gate keeps only stampable agents
-# anyway (PLAN_STAMPABLE_AGENTS) and spec-check is not one yet, so
-# emitting it in range mode would be output with no consumer.
-if [ $# -eq 0 ] && [ -r "$PLAN_ACTIVE_MARKER_RELPATH" ]; then
-  plan="$(cat "$PLAN_ACTIVE_MARKER_RELPATH")"
-  if [ -n "$plan" ] && [ -r "$plan" ] && grep -qE '^### D[0-9]+' "$plan"; then
-    echo "spec-check"
-  fi
+# session, not a merge range, so range mode cannot answer the question at
+# all.
+if [ $# -eq 0 ] && plan="$(plan_active_plan)"; then
+  grep -qE "$(plan_heading_re 'D[0-9]+')" "$plan" && obliged="$obliged spec-check"
 fi
+
+# Emitted in PLAN_AGENT_ORDER, never in the order the tests above happen
+# to run: an agent reading this output top-to-bottom must get a sequence
+# it can actually execute, and running security before docs-updater
+# leaves security's stamp stale by construction.
+emitted=""
+for a in "${PLAN_AGENT_ORDER[@]}"; do
+  case " $obliged " in *" $a "*) echo "$a"; emitted="$emitted $a" ;; esac
+done
+
+# An obliged agent absent from PLAN_AGENT_ORDER would simply not be
+# printed: no error, exit 0, and plan-gate then obliges no stamp for it.
+# One renamed entry silently degrades the whole gate to a no-op behind a
+# green check, so the mismatch is fatal rather than filtered.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
+for a in $obliged; do
+  case " $emitted " in
+    *" $a "*) ;;
+    *) plan_die "'$a' is obliged but missing from PLAN_AGENT_ORDER -- refusing to report an incomplete set" ;;
+  esac
+done

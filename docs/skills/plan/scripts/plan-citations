@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # plan-citations -- repo-wide citation-integrity checker, read-only.
-# Scans tracked source, docs and scripts for plan citations of the form
+# Scans every non-ignored text file in the working tree that could carry
+# a citation (PLAN_TEXT_GLOBS + PLAN_DOC_GLOBS), tracked and untracked,
+# for plan citations of the form
 # <YYYY-MM-DD>-<slug>.md, optionally anchored (#D3/#G1/#F2), and verifies
 # that the file resolves to a real plan under docs/plans/*/ and that the
 # anchor resolves to a real "### <id>" heading inside it. Prints every
@@ -27,29 +29,39 @@ report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
 
 # basename -> path, so a citation resolves regardless of which status
 # folder the plan currently sits in. That folder-independence is the whole
-# point of citing by bare filename.
-declare -A plan_path
+# point of citing by bare filename. Duplicates are tracked, not
+# last-wins: plan_locate dies on an ambiguous basename, and this map must
+# not quietly resolve what the canonical resolver refuses.
+declare -A plan_path dup
 for f in docs/plans/*/*.md; do
   [ -e "$f" ] || continue
-  plan_path["${f##*/}"]="$f"
+  base="${f##*/}"
+  [ -n "${plan_path[$base]:-}" ] && dup["$base"]=1
+  plan_path["$base"]="$f"
 done
 [ "${#plan_path[@]}" -gt 0 ] || plan_die "no plan files found under docs/plans/*/"
 
 # Scripts are in scope, not just .nix/.md: this script's own header cites
 # a plan, as do plan-lint's and required-agents'. Globbing only source and
-# docs left G31's exact failure mode alive in the files that fix it.
-# The code set comes from PLAN_CODE_GLOBS so it cannot drift from what
-# required-agents obliges review on and what the stamp fingerprint covers;
-# docs are added here because citations live in prose too.
-mapfile -t tracked < <(git ls-files -- "${PLAN_CODE_GLOBS[@]}" '*.md')
+# docs left the failure mode alive in the files that fix it
+# plan: 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G31
+# PLAN_TEXT_GLOBS + PLAN_DOC_GLOBS, not the code set
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F30
+# -z, because a path may contain a newline.
+# --cached --others: untracked files are scanned too, same trade
+# plan_code_fingerprint makes -- a brand-new doc or script with a broken
+# citation must not pass the gate just because it was never staged.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F16
+mapfile -d '' -t candidates < <(git ls-files -z --cached --others --exclude-standard -- "${PLAN_TEXT_GLOBS[@]}" "${PLAN_DOC_GLOBS[@]}")
 # Tracked-but-absent files are a normal mid-work state (a deletion not yet
 # committed) and have no citations to check, but awk aborts the whole scan
 # on the first one. Filter them out rather than either crashing or, worse,
-# reporting OK over a scan that stopped early (F5). Each path is prefixed
-# with ./ so awk cannot read a filename containing '=' as a variable
-# assignment.
+# reporting OK over a scan that stopped early.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
+# Each path is prefixed with ./ so awk cannot read a filename containing
+# '=' as a variable assignment.
 scan=()
-for f in "${tracked[@]}"; do
+for f in "${candidates[@]}"; do
   [ -f "$f" ] && scan+=("./$f")
 done
 [ "${#scan[@]}" -gt 0 ] || exit 0
@@ -69,15 +81,15 @@ done
 # switch.
 #
 # The markers must appear inside an HTML comment. Matching the bare words
-# meant this script muted itself: the very line that reports an
-# unbalanced region names both markers, `ignore-start` first, so it
-# opened a region it never closed.
+# meant this script muted itself: the awk program's own match patterns
+# name both markers, `ignore-start` first, so it opened a region it never
+# closed.
 awk_prog='
 FNR == 1 {
   if (skip && prev != "") print "UNBALANCED\t" prev
   skip = 0; prev = FILENAME
 }
-/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-start/ { skip = 1; regions++; rfiles[FILENAME] = 1; next }
+/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-start/ { skip = 1; regions++; next }
 /^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-end/   { skip = 0; next }
 !skip {
   line = $0
@@ -88,9 +100,7 @@ FNR == 1 {
 }
 END {
   if (skip && prev != "") print "UNBALANCED\t" prev
-  nf = 0
-  for (f in rfiles) nf++
-  print "REGIONS\t" regions + 0 "\t" nf
+  print "REGIONS\t" regions + 0
 }
 '
 
@@ -100,11 +110,11 @@ END {
 declare -A anchor_ok
 checked=0
 skipped_regions=0
-skipped_files=0
 
 # awk's output goes through a file, not a process substitution, so its
 # exit status is actually observed. Via `< <(awk ...)` a mid-scan abort
-# was discarded and the script still printed OK over a partial scan (F5).
+# was discarded and the script still printed OK over a partial scan.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
 scan_out="$(mktemp)"
 trap 'rm -f "$scan_out"' EXIT
 awk "$awk_prog" "${scan[@]}" | sort -u > "$scan_out" ||
@@ -121,12 +131,16 @@ while IFS=$'\t' read -r kind a b; do
       # no diagnostic at all, which makes it strictly easier to write than
       # the unbalanced form this already catches. Surfacing the count is
       # what stops a muted region from being something you have to go
-      # looking for (F6).
-      skipped_regions="$a" skipped_files="$b"
+      # looking for.
+      # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F6
+      skipped_regions="$a"
       continue
       ;;
     CITE) ;;
-    *) continue ;;
+    # Fail closed on anything else: the scanner emits exactly three
+    # record kinds, so a fourth means this reader and the awk program
+    # have drifted apart.
+    *) plan_die "unexpected scan record '${kind}' -- scanner and reader have drifted" ;;
   esac
 
   file="${a#./}" cite="$b"
@@ -134,6 +148,10 @@ while IFS=$'\t' read -r kind a b; do
   anchor=""
   case "$cite" in *#*) anchor="${cite#*#}" ;; esac
 
+  if [ -n "${dup[$fname]:-}" ]; then
+    report "$file: cites '$fname' -- ambiguous, more than one plan file has that basename under docs/plans/*/"
+    continue
+  fi
   target="${plan_path[$fname]:-}"
   if [ -z "$target" ]; then
     report "$file: cites '$fname' -- no such plan file under docs/plans/*/"
@@ -161,8 +179,8 @@ while IFS=$'\t' read -r kind a b; do
 done < "$scan_out"
 
 if [ "$problems" -gt 0 ]; then
-  plan_note "plan-citations: $problems broken citation(s)."
+  plan_note "plan-citations: $problems broken citation(s). Untracked files are scanned too; if a reported file is scratch, delete or gitignore it."
   exit 1
 fi
-printf 'plan-citations: OK (%s citations resolve; %s ignored region(s) in %s file(s))\n' \
-  "$checked" "$skipped_regions" "$skipped_files"
+printf 'plan-citations: OK (%s citations resolve; %s ignored region(s))\n' \
+  "$checked" "$skipped_regions"

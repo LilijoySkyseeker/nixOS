@@ -20,7 +20,17 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
-  files="$(git diff --name-only "$range" -- hosts/ profiles/ modules/ services/ flake.nix flake.lock 2>/dev/null || true)"
+  # core.quotePath=false so a non-ASCII path is not C-quoted, which would
+  # defeat the ^(hosts/...) anchor below and skip the build
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F34
+  # status checked, not swallowed: an unresolvable range read as "no host
+  # config changed" and pushed unbuilt -- the fail-open this branch closed
+  # at every other diff call site
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F56
+  if ! files="$(git -c core.quotePath=false diff --name-only "$range" -- hosts/ modules/ files/ flake.nix flake.lock)"; then
+    echo "BLOCKED: cannot diff $range; refusing to decide the build set from a failed diff." >&2
+    exit 1
+  fi
   changed_files+=$'\n'"$files"
 done
 
@@ -34,7 +44,9 @@ hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
 to_build=""
 
 for host in $hosts; do
-  if echo "$changed_files" | grep -qE "^(hosts/${host}/|profiles/|modules/|services/|flake\.nix|flake\.lock)"; then
+  # byte-identical to verify-ladder's targeted-build anchor, deliberately
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
+  if echo "$changed_files" | grep -qE "^(hosts/${host}/|modules/|files/|flake\.nix|flake\.lock)"; then
     to_build+=" $host"
   fi
 done

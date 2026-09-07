@@ -77,10 +77,16 @@ full rationale).
 
 ## What's automated vs. what isn't
 
-- **`pre-commit` hook** — blocks obviously-plaintext secrets: a
-  `secrets.yaml` file without a `sops:` metadata block, or a staged
-  file containing a private-key PEM block. Not a full secrets scanner,
-  just a last-resort catch for the most common mistake.
+- **`pre-commit` hook** — two guards. It blocks obviously-plaintext
+  secrets: a `secrets.yaml` without a `sops:` metadata block, or a
+  staged file containing a private-key PEM block, an age secret key, or
+  something shaped like a live AWS/Slack/GitHub token. Not a full
+  secrets scanner, just a last-resort catch for the most common mistake.
+  It also refuses to commit a change to a frozen plan under
+  `docs/plans/{done,rejected}/`, checked against the recorded checksum.
+  Both read the **index**, not the working tree — see
+  2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
+  for why that distinction is the whole guard.
 - **`commit-msg` hook** — enforces Conventional Commits format on the
   subject line (`<type>(<scope>)?: <subject>`), skipping merge/
   fixup/squash commits.
@@ -98,7 +104,13 @@ full rationale).
   matches by path prefix, not by file extension.
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
-  before commit rather than at push time. Automates layers 1-3 above:
+  before commit rather than at push time. Runs two plan-file gates
+  first — `docs/skills/plan/scripts/plan-citations` (blocks on any plan
+  citation that no longer resolves; run on every pass, since a citation
+  breaks from the target side) and `docs/skills/plan/scripts/plan-lint`
+  on the active plan (blocks on a missing section, a duplicate or
+  non-sequential `D`/`G`/`F` id, or a `Progress` line citing a heading
+  that does not exist) — then automates layers 1-3 above:
   `nixfmt --check`, `nix flake check --no-build`, a targeted
   `nixos-rebuild build --flake .#<host>` for any host whose directory or
   a shared path actually changed, and `statix`/`deadnix` — but

@@ -2,36 +2,61 @@
 # verify-ladder -- the cheap, already-tooled part of
 # docs/procedures/testing-changes.md's verification ladder, wired in as a
 # hard gate in the `workflow` skill's own step sequence instead of left to
-# memory. Hard-blocks on nixfmt --check, nix flake check, a targeted
-# nixos-rebuild build, and statix/deadnix -- but only for *newly introduced*
-# warnings (line falls inside the actual diff), never pre-existing debt
-# elsewhere in a touched file; linting a whole file over a one-line edit
-# would otherwise block on unrelated history. Requires jq for the
-# diff-scoped precision; falls back to informational-only if jq is missing.
+# memory. Hard-blocks on plan-citations, plan-lint over the active plan,
+# nixfmt --check, nix flake check, a targeted nixos-rebuild build, and
+# statix/deadnix -- but only for *newly introduced* warnings (line falls
+# inside the actual diff), never pre-existing debt elsewhere in a touched
+# file; linting a whole file over a one-line edit would otherwise block
+# on unrelated history. Requires jq for the diff-scoped precision; falls
+# back to informational-only if jq is missing.
 # Independent of the tabled vm-testing question -- never VM-boots or
 # switches anything.
 set -uo pipefail
-root="$(git rev-parse --show-toplevel)" || { echo "not inside a git repository." >&2; exit 1; }
-cd "$root"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../../plan/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
+root="$(plan_repo_root)"
+cd "$root" || plan_die "cannot cd to repo root"
 
 fail=0
-# Untracked files included: a brand-new module appears in no diff view
-# until it is staged, so it was obliging review from required-agents while
-# skipping nixfmt/statix/deadnix here entirely.
-changed_nix="$( { git diff --name-only HEAD -- '*.nix'; git diff --cached --name-only -- '*.nix'; git ls-files --others --exclude-standard -- '*.nix'; } | sed '/^$/d' | sort -u)"
+# Untracked included (see plan_worktree_files): a brand-new module was
+# obliging review from required-agents while skipping nixfmt/statix/
+# deadnix here entirely. Deleted-but-not-yet-committed paths are dropped
+# -- the linters below take filenames and would block on a legitimate
+# deletion. The host-detection set further down keeps them, because a
+# deleted module still has to rebuild.
+changed_nix="$(plan_worktree_files '*.nix' | plan_existing_files)" || {
+  echo "BLOCKED: cannot list working-tree changes; refusing to lint an empty set." >&2
+  exit 1
+}
 
 echo "== plan-citations =="
-# Cheap (a grep over tracked .nix/.md), so it runs on every pass rather
-# than only when a plan file changed: a citation breaks from the *target*
-# side -- a renamed plan or a retyped id -- and that edit need not touch
-# the file doing the citing.
+# Cheap (one awk pass over the working tree's code and docs, tracked and
+# untracked), so it runs on every pass rather than only when a plan file
+# changed: a citation breaks from the *target* side -- a renamed plan or
+# a retyped id -- and that edit need not touch the file doing the citing.
 # Called unconditionally: unlike plan-gate, which CI runs from a pinned
 # base-branch copy that may predate a sibling, verify-ladder always ships
 # from the same checkout as plan-citations. An existence check here could
 # only ever fire on a broken checkout, and would hide it behind a pass.
-if ! "$root/docs/skills/plan/scripts/plan-citations"; then
+if ! "$SCRIPT_DIR/../../plan/scripts/plan-citations"; then
   echo "BLOCKED: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
   fail=1
+fi
+
+echo "== plan-lint (active plan) =="
+# The active plan only. Structural faults it catches -- duplicate or
+# non-sequential D/G/F ids, a Progress line citing a heading that does
+# not exist -- are what two agents appending findings concurrently
+# produce, so the serialization rule in reference.md depends on something
+# actually running this.
+if active_plan="$(plan_active_plan)"; then
+  if ! "$SCRIPT_DIR/../../plan/scripts/plan-lint" "$active_plan"; then
+    echo "BLOCKED: the active plan is malformed. See the problems above." >&2
+    fail=1
+  fi
+else
+  echo "(no active plan this session)"
 fi
 
 echo "== nixfmt --check =="
@@ -128,14 +153,19 @@ if ! nix flake check --no-build; then
 fi
 
 # Targeted build: same host-detection pattern as .githooks/pre-push, but
-# against the working tree (staged + unstaged) rather than a push range,
-# since this runs mid-session before a commit even exists.
-changed_all="$( { git diff --name-only HEAD -- hosts/ modules/ flake.nix flake.lock; git diff --cached --name-only -- hosts/ modules/ flake.nix flake.lock; } | sed '/^$/d' | sort -u)"
+# against the working tree rather than a push range, since this runs
+# mid-session before a commit even exists. Untracked included, same as
+# the lint set above -- a brand-new hosts/ or modules/ file must trigger
+# a build too, not just linting.
+changed_all="$(plan_worktree_files hosts/ modules/ files/ flake.nix flake.lock)" || {
+  echo "BLOCKED: cannot list working-tree changes; refusing to skip the targeted build." >&2
+  exit 1
+}
 
 if [ -n "$changed_all" ]; then
   to_build=""
   for host in $(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n'); do
-    if printf '%s\n' "$changed_all" | grep -qE "^(hosts/${host}/|modules/|flake\.nix|flake\.lock)"; then
+    if printf '%s\n' "$changed_all" | grep -qE "^(hosts/${host}/|modules/|files/|flake\.nix|flake\.lock)"; then
       to_build="$to_build $host"
     fi
   done

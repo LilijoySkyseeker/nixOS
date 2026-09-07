@@ -17,13 +17,16 @@ repo_root="$(git rev-parse --show-toplevel)"
 # files are silently skipped by the lookup below regardless. Deletions are
 # allowed (e.g. repo reorganization) since this only guards against silent
 # content drift, not against removing the file outright.
-checksums="$repo_root/docs/plans/.checksums"
-if [[ -f "$checksums" ]]; then
-  staged_done="$(git diff --cached --name-only --diff-filter=ACMR -- 'docs/plans/*/*.md')"
+# manifest read from the index, matching the `git show ":$f"` it is
+# compared against -- an unstaged edit or `rm` of the working-tree copy
+# otherwise disabled the check
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
+if manifest="$(git show ':docs/plans/.checksums' 2>/dev/null)"; then
+  staged_done="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT -- 'docs/plans/*/*.md')"
   if [[ -n "$staged_done" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      recorded="$(awk -v f="$f" '$2==f{print $1}' "$checksums")"
+      recorded="$(awk -v f="$f" '$2==f{print $1}' <<<"$manifest")"
       [[ -z "$recorded" ]] && continue # not a frozen file plan-freeze knows about
       actual="$(git show ":$f" | sha256sum | awk '{print $1}')"
       if [[ "$actual" != "$recorded" ]]; then
@@ -50,13 +53,20 @@ if [[ -x "$repo_root/scripts/claude-links-check" ]]; then
   fi
 fi
 
-staged_files="$(git diff --cached --name-only --diff-filter=ACM)"
+# core.quotePath=false, and what it does not cover -- see
+# plan_worktree_files in docs/skills/plan/scripts/lib.sh
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
+# ACMRT excludes deletions and nothing else; ACM also dropped renames
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
+staged_files="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT)"
 [[ -z "$staged_files" ]] && exit 0
 
 fail=0
 
 while IFS= read -r file; do
-  [[ -f "$file" ]] || continue
+  # no working-tree test: every scan below reads the index, and ACMRT
+  # already excludes deletions
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F41
 
   # secrets.yaml files must be sops-encrypted (contain sops metadata block).
   if [[ "$(basename "$file")" == "secrets.yaml" ]]; then
@@ -67,10 +77,31 @@ while IFS= read -r file; do
     continue
   fi
 
-  # Skip binary files.
-  git diff --cached --numstat -- "$file" | awk '$1=="-"{exit 1}' || continue
+  # a gitlink is a commit id, not content: there is no blob to scan and
+  # no secret it could carry, so skip it deliberately rather than fail
+  # closed on it -- blocking would make `git submodule add` unfixable
+  # except by --no-verify, which switches off every check in this hook
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F57
+  if [[ "$(git ls-files -s -- "$file" | cut -d' ' -f1)" == "160000" ]]; then
+    continue
+  fi
 
-  content="$(git show ":$file")"
+  # anything else that cannot be read is still fail-closed
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
+  if ! content="$(git show ":$file" 2>/dev/null)"; then
+    echo "BLOCKED: cannot read the staged content of $file; refusing to scan it." >&2
+    fail=1
+    continue
+  fi
+
+  # binary detected from the blob's own bytes, never from
+  # `git diff --numstat`, whose "-" answer comes from the `diff`
+  # gitattribute: staging a .gitattributes saying `*.pem -diff` beside a
+  # .pem holding a private key switched this scan off entirely, verified
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F52
+  if git show ":$file" | grep -qaP '\x00'; then
+    continue
+  fi
 
   if grep -qE -- '-----BEGIN (RSA |EC |OPENSSH |DSA |)PRIVATE KEY-----' <<<"$content"; then
     echo "BLOCKED: $file contains a private key block." >&2

@@ -35,18 +35,45 @@ Which agents a change obliges is decided **mechanically, from the diff**
 `docs/skills/workflow/scripts/required-agents` prints the set for the
 current working tree and is the authority; this table only explains it.
 
-| Agent | Fires when | Built? |
-|---|---|---|
-| `/simplify` | any `.nix`, skill script, or git hook changed | yes |
-| `security` | same as `/simplify` | yes |
-| `docs-updater` | any of the above **or** any `.md` changed | yes |
-| `spec-check` | the active plan has any `### D<N>` | not yet |
+| Agent | Fires when | Built? | Stamped? |
+|---|---|---|---|
+| `/simplify` | any code change (see below) | yes | **no** |
+| `docs-updater` | any of the above **or** any `.md` changed | yes | yes |
+| `security` | any code change | yes | yes |
+| `spec-check` | the active plan has any `### D<N>` | not yet | not yet |
 
-"Skill script or git hook" means `docs/skills/*/scripts/*` and
-`.githooks/*`. They are code, and they are the enforcement machinery
-itself -- a change to `plan-gate` or `verify-ladder` can weaken every
-other gate in the system, so they earn review at least as much as a
-module does.
+Listed in run order; `required-agents` prints them in that order too.
+
+**"Stamped?" is the honest column.** `plan-gate` can only refuse a merge
+for an agent that leaves a completion stamp, and `/simplify` is a slash
+command -- no `SubagentStop`, so nothing records that it ran. It is
+obliged on every code change and enforced by nobody, which is the one
+remaining honour-system leg of this loop.
+
+"Code" is `PLAN_CODE_GLOBS` in `docs/skills/plan/scripts/lib.sh`, which
+is the authority. It is deliberately wider than Nix: the skill and repo
+scripts (`*/scripts/*`, `scripts/*`), the git hooks (`.githooks/*`), the
+hook wiring (`.claude/settings.json`), the agent and skill entries under
+`.claude/`, the agent definitions, `.sops.yaml` and `secrets/`, the CI
+workflows, `flake.lock`, `.gitignore` (which, through
+`--exclude-standard`, decides the fingerprint's own input set) and
+`.gitattributes` (`*.pem -diff` switches off the `pre-commit` secret
+scan) are all things a change to which weakens other gates more
+thoroughly than any module edit could. It is an allowlist, and it has
+three times been found to be missing something that met its own rule --
+the standing proposal to invert it is
+2026-09-06-invert-the-reviewable-code-set-from-an-allowlist-to-a-denylist.md.
+
+**What that does and does not buy.** Obliging review and moving the
+fingerprint is enforcement for anything the *repo's own* gates check --
+a `.claude/settings.json` edit that disables the stamp hook still faces
+a server-side missing-stamp block. It is **not** enforcement for the CI
+workflow itself: GitHub resolves a `pull_request` workflow from the PR's
+own ref, so a PR editing `.github/workflows/plan-gate.yml` runs its own
+version, and the required status context is satisfied by whatever job
+carries that name. Listing the workflow here means such a PR is reviewed
+and stamped, not that it is mechanically prevented. See
+2026-09-06-stop-a-pr-from-weakening-the-ci-gate-it-is-judged-by.md.
 
 Why mechanical: "invoke where relevant" ran on 12 of 89 plans while
 "`/simplify`, always" ran every time -- same skill, same agent, one
@@ -63,8 +90,9 @@ batch, even though the review agents are read-only and would seem safe to
 overlap:
 
 ```
-loop { /simplify -> docs-updater -> security -> spec-check }
-      until security and spec-check are clean or signed off
+loop { /simplify -> docs-updater -> security -> spec-check -> fix }
+      until security and spec-check found nothing to fix,
+      or the user signed off
 ```
 
 **Every agent that writes runs before every agent whose stamp must stay
@@ -87,10 +115,40 @@ incident constrains `docs-updater` to follow `/simplify`; it says nothing
 about the read-only reviewers, so putting them last costs nothing it
 protects.
 
+The two read-only reviewers stay serialized too, for a different reason:
+both append `### F<N>` findings to the same plan file, numbering from the
+next unused id. Run them concurrently and both pick the same number --
+duplicate headings `plan-lint` then rejects, on exactly the runs that
+matter, the ones with findings. If parallel tail reviewers are ever
+wanted, that is a design constraint on `spec-check`'s finding-append
+contract, to settle when `spec-check` is built
+(2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7),
+not a scheduling flag to flip.
+
+**The fix stage is the pass's last step, not a detour.** Findings from
+`security` or `spec-check` are applied *after* both have reported, so a
+verdict always lands on a settled tree and a fix is never churned on
+unreviewed. A non-empty fix stage is what sends the loop back to
+`/simplify`; an empty one is the exit. It appears once, at the tail,
+because `/simplify` and `docs-updater` apply their own findings as part
+of running; the read-only reviewers cannot, and an unnamed handoff is one
+that gets skipped.
+
 Any actionable finding from `security` or `spec-check` **restarts the loop
-at `/simplify`**: their fixes are code changes no earlier agent has seen,
-including `docs-updater`, whose description of the settled state is stale
-the moment the code moves again.
+at `/simplify`** -- as does any other manual change the main agent makes
+after `/simplify` last ran to code or to anything functionally
+load-bearing: a skill script, a git hook, an agent definition (`.md` or
+not). Either way the behavior has moved past what
+the earlier agents saw, including `docs-updater`, whose description of the
+settled state is stale the moment the code moves again. `docs-updater`'s
+*own* doc and comment fixes never restart the loop by themselves: they
+change no behavior, so there is nothing new for `/simplify` or the
+reviewers to judge (decided with the user 2026-09-06, see
+2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7).
+The exception is mechanical rather than a judgment call: if `docs-updater`
+edits something inside `PLAN_CODE_GLOBS` -- an agent definition, a script
+comment -- the fingerprint moves and the reviewers must run again anyway,
+which is the same rule, not a second one.
 
 Termination needs no new machinery. Every finding resolves `fixed`,
 `accepted` or `moot`, and `plan-freeze` already refuses while any is
@@ -103,14 +161,18 @@ than looping again.
 `subagent-stamp` appends a stamp to the active plan when a stampable
 agent finishes, and `plan-gate` refuses a merge if an obliged agent left
 none. The stamp carries a **fingerprint of the code the agent read** --
-a content hash over `*.nix`, `docs/skills/*/scripts/*` and `.githooks/*`
--- and `plan-gate` blocks when it no longer matches. That is what
-separates "this agent ran" from "this agent ran against *this* code": a
-fix applied after the agent finished leaves a stale stamp and is caught.
+a content hash over the same `PLAN_CODE_GLOBS` set the trigger table
+above names -- and `plan-gate` blocks when it no longer matches. That is
+what separates "this agent ran" from "this agent ran against *this*
+code": a fix applied after the agent finished leaves a stale stamp and
+is caught.
 
-The fingerprint covers code only, never `.md`. Every stamp appends to a
-plan file and `docs-updater` edits docs, so including prose would make
-each stamp invalidate itself and every stamp before it.
+The line the set draws is **behavior, not file extension**. Plan files
+and explanatory docs stay out: every stamp appends to a plan file and
+`docs-updater` edits docs, so folding prose in would make each stamp
+invalidate itself and every stamp before it. Agent definitions are in
+even though they are `.md`, because an agent definition is what a
+reviewer does, not a description of it.
 
 **What a stamp is not.** It is a record, not proof. `SubagentStop` fires
 for any subagent of that type whatever it actually did, so a no-op prompt
@@ -123,23 +185,32 @@ from something the author does not control, which a local hook cannot be.
 Consequence for the loop: re-running an agent after a code change is not
 etiquette, it is how the merge passes.
 
+**Worktree sessions stamp with the main checkout's scripts.** Hooks
+appear to resolve through the session's original project directory (the
+effect is confirmed, the mechanism inferred), so a PR that changes
+`subagent-stamp` (or any hook script) is never exercised by the sessions
+developing it -- its stamps carry whatever format the main checkout's
+copy writes, and older formats read as `legacy` NOTEs to the gate. That
+is expected, not a failure. After merging a hook-script PR, pull the
+main checkout before trusting the new hook behavior (see
+2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F12).
+
 ### The agents themselves
 
-- **`security`** — anything touching firewall rules (`networking.firewall.*`,
-  `openFirewall`), secrets wiring (`sops.secrets.*`), a newly exposed
-  service, systemd hardening flags, or authentication. Read-only,
+- **`security`** — reviews firewall rules (`networking.firewall.*`,
+  `openFirewall`), secrets wiring (`sops.secrets.*`), newly exposed
+  services, systemd hardening flags, and authentication. Read-only,
   report-only — see `docs/agents/security.md`.
-- **`docs-updater`** — once the code-level work is otherwise done, for
-  anything that touched a doc, a comment, or a config surface a doc
-  describes. See `docs/agents/docs-updater.md`.
-
-- **`/simplify`** — fires on any `.nix` change, no judgment call. Reviews
-  for reuse,
-  simplification, efficiency, and condensing into shared modules, then
-  applies its own fixes. This is a deliberately cheap stand-in for a
-  dedicated repo-aware cleanliness subagent (matching `security`/
-  `docs-updater`'s shape — auto-invoked, appending findings into the plan)
-  that may be worth building later; see
+- **`docs-updater`** — rewrites any doc or comment the diff touched, or
+  that a touched config surface invalidates. Runs after `/simplify` and
+  before the read-only reviewers, per the loop above. See
+  `docs/agents/docs-updater.md`.
+- **`/simplify`** — fires per the table above, no judgment call. Reviews
+  for reuse, simplification, efficiency, and condensing into shared
+  modules, then applies its own fixes. This is a deliberately cheap
+  stand-in for a dedicated repo-aware cleanliness subagent (matching
+  `security`/`docs-updater`'s shape — auto-invoked, appending findings
+  into the plan) that may be worth building later; see
   `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md`. Unlike
   `security`/`docs-updater`, `/simplify` doesn't yet append anything into
   the plan file itself — it just edits the working tree directly.

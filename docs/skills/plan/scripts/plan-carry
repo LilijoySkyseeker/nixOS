@@ -37,7 +37,7 @@ new_rel="$("$SCRIPT_DIR/plan-new" "$title")"
 git -C "$root" add "$new_rel"
 
 today="$(plan_today)"
-heading_re="^### ${id}([[:space:]]|\$)"
+heading_re="$(plan_heading_re "$id")"
 plan_append_under_heading "$root/$rel" "$heading_re" "**CARRIED ${today}:** see \`$(basename "$new_rel")\`"
 git -C "$root" add "$rel"
 plan_mark_touched "$root" "$new_rel"

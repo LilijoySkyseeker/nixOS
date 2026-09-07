@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Shared helpers for the plan-* scripts. Sourced, never executed directly.
 
-PLAN_CHECKSUMS_RELPATH="docs/plans/.checksums" # shared by done/ and rejected/ -- both are frozen states
+PLAN_CHECKSUMS_RELPATH="docs/plans/.checksums" # shared by done/ and rejected/ -- both are frozen states; also hardcoded in .githooks/pre-commit
+
+# also hardcoded in workflow/scripts/plan-touch-guard, which must not
+# depend on this file -- keep in sync
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F15
 PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
 
 # Review agents whose completion is *mechanically recorded*: they are
@@ -14,7 +18,16 @@ PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
 # (subagent-stamp) and the reader (plan-gate) take the list from here, so
 # adding an agent cannot half-land: a stamper with no checker silently
 # degrades the gate to a no-op.
-PLAN_STAMPABLE_AGENTS="security docs-updater"
+PLAN_STAMPABLE_AGENTS=("security" "docs-updater")
+
+# Canonical run order. Every agent that writes runs before every agent
+# whose stamp must stay valid, so a later edit cannot invalidate an
+# earlier reviewer's fingerprint. required-agents emits in this order,
+# which makes the script authoritative on both which agents a change
+# obliges and when each runs -- printing them in any other order invites
+# exactly the stale-stamp block the ordering exists to prevent.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
+PLAN_AGENT_ORDER=("/simplify" "docs-updater" "security" "spec-check")
 
 plan_die() { printf 'plan: %s\n' "$*" >&2; exit 1; }
 plan_note() { printf '%s\n' "$*" >&2; }
@@ -227,35 +240,140 @@ plan_mark_touched() {
   printf '%s\n' "$rel" > "$marker"
 }
 
+# plan_active_plan [<root>] -- the reader for the marker above: prints
+# the plan's relpath, or returns non-zero when there is no live session
+# or the marker names nothing. One definition because three call sites
+# had invented three different existence tests, and `-r` succeeds on a
+# directory where `-f` does not.
+plan_active_plan() {
+  local root="${1:-.}" marker rel
+  marker="$root/$PLAN_ACTIVE_MARKER_RELPATH"
+  [ -f "$marker" ] || return 1
+  rel="$(cat "$marker")" || return 1
+  [ -n "$rel" ] && [ -f "$root/$rel" ] || return 1
+  # Same shape plan_locate rejects: subagent-stamp appends to whatever
+  # this names, so the marker must not be able to point outside
+  # docs/plans/. A real marker is always written by plan_mark_touched.
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F59
+  case "$rel" in
+    *..* | /*) return 1 ;;
+    docs/plans/*) ;;
+    *) return 1 ;;
+  esac
+  printf '%s\n' "$rel"
+}
+
+# plan_existing_files -- filters paths on stdin down to those that still
+# exist. A deletion staged but not committed is a normal mid-work state,
+# and a consumer that passes filenames to another program (a linter, awk)
+# would otherwise fail on it.
+plan_existing_files() {
+  local f
+  while IFS= read -r f; do
+    # `if`, not `&&` -- see plan_code_fingerprint
+    # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
+    if [ -f "$f" ]; then printf '%s\n' "$f"; fi
+  done
+}
+
 # plan_is_stampable <agent> -- is this agent one subagent-stamp records?
 plan_is_stampable() {
   local a="$1" x
-  for x in $PLAN_STAMPABLE_AGENTS; do
+  for x in "${PLAN_STAMPABLE_AGENTS[@]}"; do
     [ "$x" = "$a" ] && return 0
   done
   return 1
 }
 
-# Files whose content a review agent actually reads. Code only: `.md` is
-# deliberately excluded, because every stamp appends to a plan file and
-# docs-updater edits docs, so folding prose in would make each stamp
-# invalidate itself and every stamp before it.
-PLAN_CODE_GLOBS=("*.nix" "docs/skills/*/scripts/*" ".githooks/*")
+# Behavior, not prose: what a change to this file set can alter is what
+# the machine does. Plan files and explanatory docs stay out so a stamp
+# cannot invalidate itself -- see workflow/reference.md, "What a
+# completion stamp proves". Wider than "*.nix" because the enforcement
+# machinery is not all Nix.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G11
+PLAN_CODE_GLOBS=(
+  "*.nix"
+  "*/scripts/*"        # skill scripts, incl. those outside docs/skills/
+  "scripts/*"
+  ".githooks/*"
+  ".github/workflows/*"
+  # named individually, not `.claude/*` -- the harness writes untracked
+  # local-only files into this directory
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F28
+  ".claude/settings.json"
+  ".claude/agents/*"
+  ".claude/skills/*"
+  "docs/agents/*"      # an agent definition is behavior, not prose
+  ".sops.yaml"         # who can decrypt every secret in the repo
+  "secrets/*"
+  "flake.lock"
+  "*.gitignore"        # --exclude-standard means this decides the hash's own inputs
+  "*.gitattributes"    # `*.pem -diff` switches off the pre-commit secret scan
+)
+
+# The docs counterpart, one definition for the same reason: encoding the
+# set twice lets a doc change without obliging docs-updater, or without
+# plan-citations scanning it.
+PLAN_DOC_GLOBS=("*.md")
+
+# Where a plan citation can live: the code set minus the members that
+# cannot hold one. Derived rather than restated, because a hand-kept
+# second list is a copy -- this one silently missed two entries within a
+# day of being written, and a citation checker that skips a file reports
+# OK over it.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F30
+PLAN_NONTEXT_GLOBS=(
+  ".claude/settings.json"  # JSON, no comment syntax
+  ".sops.yaml"             # generated key material
+  "secrets/*"              # encrypted
+  "flake.lock"             # generated JSON
+  ".claude/agents/*"       # symlinks to docs/agents/*, already scanned
+  ".claude/skills/*"       # symlinks to docs/skills/*, already scanned
+)
+# Compared as literal strings, not patterns: both arrays hold globs, and
+# the question is "is this the same glob", not "does this path match".
+# Matching is inlined rather than using plan_path_matches, which is
+# defined further down and would not exist yet at source time.
+# One pass: build the derived set and record which exclusions were used,
+# so the drift check below is a flat lookup rather than a second copy of
+# the same nested scan -- two copies of "is this the same glob" is how
+# the detector goes blind to the drift it exists for.
+declare -A _hit=()
+PLAN_TEXT_GLOBS=()
+for _g in "${PLAN_CODE_GLOBS[@]}"; do
+  _skip=0
+  for _n in "${PLAN_NONTEXT_GLOBS[@]}"; do
+    if [ "$_g" = "$_n" ]; then _skip=1; _hit["$_n"]=1; break; fi
+  done
+  if [ "$_skip" = 0 ]; then PLAN_TEXT_GLOBS+=("$_g"); fi
+done
+# An exclusion matching no code glob is a typo or a half-done rename, and
+# it fails in the dangerous direction: the entry it was meant to exclude
+# (secrets/*, .sops.yaml) stays in the citation scan set.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F43
+for _n in "${PLAN_NONTEXT_GLOBS[@]}"; do
+  [ -n "${_hit[$_n]:-}" ] ||
+    printf 'plan: PLAN_NONTEXT_GLOBS entry %s matches no PLAN_CODE_GLOBS entry -- it excludes nothing\n' "$_n" >&2
+done
+unset _g _n _skip _hit
 
 # plan_code_fingerprint -- content hash of the reviewable code in the
-# working tree. Must be run from the repo root.
+# working tree. Self-locating: pathspecs are cwd-relative, so from a
+# subdirectory this used to hash a subset and return *success*, and a
+# wrong-but-successful hash cannot be told from a real one by any caller.
 #
 # Content, not history. An agent reviews uncommitted work and the commit
 # lands *after* the stamp, so anything keyed on HEAD or on commit time
 # reports a review that genuinely happened as stale -- an un-passable
-# gate, which is worse than a weak one. See D11 in
-# 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md
+# gate, which is worse than a weak one.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D11
 plan_code_fingerprint() {
-  local out
+  local out r
+  r="$(git rev-parse --show-toplevel)" || return 1
   out="$(
+    cd "$r" || exit 1
     set -o pipefail
-    # -z throughout: a path may contain a newline, which `tr '\n' '\0'`
-    # would mangle into two paths.
+    # -z throughout: a path may contain a newline.
     #
     # --cached and --others together, so a file's presence in the hash
     # does not change when it goes from untracked to tracked at commit
@@ -270,33 +388,84 @@ plan_code_fingerprint() {
     # hashes differently under en_US.UTF-8 and C, which would report
     # every correctly stamped plan as stale in CI.
     #
+    # The -f test below drops symlinks-to-directories, so .claude/skills/*
+    # obliges review without moving the hash.
+    # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F31
+    #
     # Absent-but-tracked files are skipped rather than failing the hash:
     # a deletion that is not yet committed is a normal mid-work state,
     # and CI, where the deletion *is* committed, also omits the file.
+    #
+    # `if`, not `[ -f ] &&`: a while loop exits with its last body
+    # command's status, so the `&&` form returned 1 whenever the
+    # sort-last path was not a regular file, and pipefail turned that
+    # into an empty fingerprint -- a gate no re-run could clear.
+    # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
     git ls-files -z --cached --others --exclude-standard -- "${PLAN_CODE_GLOBS[@]}" |
       while IFS= read -r -d '' f; do
-        [ -f "$f" ] && printf '%s\0' "$f"
+        if [ -f "$f" ]; then printf '%s\0' "$f"; fi
       done |
       LC_ALL=C sort -zu |
       xargs -0 -r sha256sum |
-      LC_ALL=C sort |
       sha256sum
   )" || return 1
   printf '%.16s' "${out%% *}"
 }
 
 # plan_is_code_path <path> -- does this path fall inside PLAN_CODE_GLOBS?
-# The single test for "is this reviewable code", so required-agents,
-# plan-citations and the fingerprint cannot drift into three different
-# answers -- one missed edit there means a file changes without obliging
-# review, or changes without ever invalidating a stamp.
-plan_is_code_path() {
+# required-agents' only test for "is this reviewable code", reading the
+# same array plan_code_fingerprint hashes, so what obliges review cannot
+# drift from what invalidates a stamp.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F29
+plan_is_code_path() { plan_path_matches "$1" "${PLAN_CODE_GLOBS[@]}"; }
+
+# plan_is_doc_path <path> -- does this path fall inside PLAN_DOC_GLOBS?
+plan_is_doc_path() { plan_path_matches "$1" "${PLAN_DOC_GLOBS[@]}"; }
+
+# plan_path_matches <path> <glob>... -- shared by both predicates above so
+# the matching semantics have one definition.
+plan_path_matches() {
   local p="$1" g
-  for g in "${PLAN_CODE_GLOBS[@]}"; do
+  shift
+  for g in "$@"; do
     # shellcheck disable=SC2053  # $g is a pattern here, deliberately
     [[ "$p" == $g ]] && return 0
   done
   return 1
+}
+
+# plan_worktree_files [<pathspec>...] -- every path changed in the working
+# tree relative to HEAD: unstaged, staged, and untracked, one per line.
+# Untracked files count -- a brand-new module is the change most in need
+# of review, and it appears in none of git's diff views until staged. One
+# definition, because three call sites each spelling this union is how
+# the untracked leg went missing from one of them.
+# The --cached leg looks redundant against `diff HEAD` and is not: a file
+# staged and then reverted in the working tree shows in --cached only,
+# and its staged content is what a commit would take.
+#
+# core.quotePath=false: git otherwise C-quotes a non-ASCII path
+# ("modules/caf\303\251.nix"), and the quoted form matches none of the
+# globs -- so a .nix file with an accented name obliged no review at all
+# while the fingerprint, which uses -z, still hashed it.
+#
+# It demotes bytes >= 0x80 only. A quote, backslash, tab or newline in a
+# path is still quoted, and a newline additionally splits one path across
+# two lines here. Only -z with a NUL-safe reader closes that, which the
+# fingerprint and plan-citations do and this line-based helper does not.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
+#
+# Each leg's status is checked separately. A `{ a; b; c; }` group reports
+# only c's status, so a failing first leg was invisible and the function
+# returned success with empty output -- "nothing changed, so no agents
+# obliged", the same fail-open required-agents closes for range mode.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
+plan_worktree_files() {
+  local unstaged staged untracked
+  unstaged="$(git -c core.quotePath=false diff --name-only HEAD -- "$@")" || return 1
+  staged="$(git -c core.quotePath=false diff --cached --name-only -- "$@")" || return 1
+  untracked="$(git -c core.quotePath=false ls-files --others --exclude-standard -- "$@")" || return 1
+  printf '%s\n%s\n%s\n' "$unstaged" "$staged" "$untracked" | sed '/^$/d' | LC_ALL=C sort -u
 }
 
 # plan_stamp_line <agent> <timestamp> <fingerprint> -- the single
@@ -304,14 +473,9 @@ plan_is_code_path() {
 # plan_stamp_fingerprint reads it; with the two in separate files and no
 # shared definition, a reworded stamp would silently block every merge.
 #
-# What a stamp is evidence of, precisely: an agent of that type ran to
-# completion against code with that fingerprint. It is *not* proof a
-# review happened. SubagentStop fires for any subagent of the type
-# whatever it did, so a no-op prompt yields an identical valid stamp, and
-# the line is plaintext in a file the author controls, so one printf
-# forges one. That is acceptable against the adversary this system has --
-# an agent that forgets -- and useless against one that lies. Do not
-# describe it as proof.
+# A stamp records that an agent of that type ran to completion against
+# code with that fingerprint. It is a record, not proof -- see
+# workflow/reference.md, "What a completion stamp proves".
 plan_stamp_line() {
   printf '_%s finished %s (code %s) -- see Findings above._' "$1" "$2" "$3"
 }
@@ -339,9 +503,16 @@ plan_stamp_fingerprint() {
   esac
 }
 
+# plan_heading_re <id> -- the one definition of "### <id> is a real
+# heading". The trailing boundary is what stops '### D1' from matching
+# '### D12'. Appenders need the pattern (plan-decide, plan-carry,
+# plan-resolve feed it to plan_append_under_heading); readers want the
+# boolean below. Both come from here so they cannot disagree.
+plan_heading_re() {
+  printf '^### %s([[:space:]]|$)' "$1"
+}
+
 # plan_has_heading <file> <id> -- does "### <id>" exist as a real heading?
-# Shared by plan-lint's sequencing check and plan-citations' anchor
-# resolution so the two cannot drift on what counts as a match.
 plan_has_heading() {
-  grep -qE "^### $2([[:space:]]|\$)" "$1"
+  grep -qE "$(plan_heading_re "$2")" "$1"
 }

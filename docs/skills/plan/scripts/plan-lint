@@ -54,7 +54,7 @@ done
 # Progress section during development.
 while IFS= read -r cited; do
   [ -n "$cited" ] || continue
-  grep -qE "^### ${cited}([[:space:]]|\$)" "$file" || report "Progress cites '${cited}' but no '### ${cited}' heading exists"
+  plan_has_heading "$file" "$cited" || report "Progress cites '${cited}' but no '### ${cited}' heading exists"
 done < <(grep -oE '^- \[[ xX]\] [DGF][0-9]+\b' "$file" | grep -oE '[DGF][0-9]+' | sort -u)
 
 if [ "$problems" -gt 0 ]; then

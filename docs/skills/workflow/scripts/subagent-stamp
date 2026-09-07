@@ -27,18 +27,33 @@ cwd="$(hook_json_str "$input" cwd)"
 root="$(cd "${cwd:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)"
 [ -n "$root" ] || exit 0
 
-active="$root/$PLAN_ACTIVE_MARKER_RELPATH"
-[ -f "$active" ] || exit 0
-rel="$(cat "$active")"
-[ -n "$rel" ] && [ -f "$root/$rel" ] || exit 0
+rel="$(plan_active_plan "$root")" || exit 0
 
-# Never touch a frozen plan, even for a completion stamp.
-grep -q '^frozen: true' "$root/$rel" && exit 0
+# Never touch a frozen plan, even for a completion stamp. Same test
+# plan-gate reads with -- if the two disagree on "frozen", its
+# NOTE-vs-BLOCKED reasoning (which assumes this script refuses frozen
+# plans) silently breaks.
+plan_is_frozen "$root/$rel" && exit 0
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Fingerprint the code as it stood when the agent finished, so plan-gate
-# can tell "ran at all" from "ran against this code" (D11).
-fp="$(cd "$root" && plan_code_fingerprint)"
+# can tell "ran at all" from "ran against this code".
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D11
+# No stamp at all, rather than one naming no code. A stamp this script
+# writes always carries `(code ...)`, so an empty fingerprint would read
+# as `malformed` and block -- not as `legacy`, which is the separate,
+# accepted loophole for stamps written before fingerprints existed. Both
+# block; not writing simply leaves nothing to clean out of the plan file,
+# and the next successful run stamps normally.
+fp="$(cd "$root" && plan_code_fingerprint)" || {
+  # stderr, which Claude Code does not surface for a SubagentStop -- so
+  # this reaches a hook log, not the session. Better than nothing (the
+  # loop is otherwise "run the agent, gate says no stamp, run it again"
+  # with no reason anywhere), but it is not a user-visible signal
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F44
+  plan_note "subagent-stamp: cannot compute the code fingerprint; no stamp written for '$agent_type'."
+  exit 0
+}
 printf '\n%s\n' "$(plan_stamp_line "$agent_type" "$ts" "$fp")" >> "$root/$rel"
 git -C "$root" add "$rel" 2>/dev/null || true
 

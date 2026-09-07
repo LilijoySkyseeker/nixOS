@@ -4,10 +4,10 @@ name: plan-gate
 # discipline docs/skills/plan/scripts/plan-resolve enforces locally --
 # every local hook in this system is bypassable by design (skip hooks,
 # craft tool calls outside their matchers), so this exists so an
-# unresolved security Finding can't reach master purely by skipping local
-# hooks. Runs the same docs/skills/workflow/scripts/plan-gate script the
-# local pre-merge/pre-deploy path uses -- one source of truth, no
-# duplicated logic.
+# unresolved security Finding, or a review that was never run at all,
+# can't reach master purely by skipping local hooks. Runs
+# docs/skills/workflow/scripts/plan-gate rather than reimplementing it,
+# so a hand-run over the same range gives the same verdict.
 
 on:
   pull_request:
@@ -31,6 +31,8 @@ jobs:
       # (nothing to gate) if the base branch doesn't have the script yet
       # -- true only for the one PR that introduces plan-gate itself;
       # every PR after that one has a real base-branch copy to pin to.
+      # what pinning does and does not buy:
+      # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F25
       - name: Pin the gate script to the base branch
         id: pin
         env:
@@ -59,7 +61,7 @@ jobs:
           fi
           echo "found=true" >> "$GITHUB_OUTPUT"
 
-      - name: Check every plan cited in this PR has its findings resolved
+      - name: Check cited plans have findings resolved and obliged reviews stamped
         if: steps.pin.outputs.found == 'true'
         env:
           BASE_REF: ${{ github.base_ref }}

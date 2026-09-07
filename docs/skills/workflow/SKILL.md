@@ -30,6 +30,9 @@ stays short on purpose (progressive disclosure).
    for what slips through, not the primary mechanism.
 4. **Run the cheap verification ladder**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
+   `plan-citations` (any plan citation that no longer resolves),
+   `plan-lint` on the active plan (duplicate or non-sequential `D`/`G`/
+   `F` ids, a `Progress` line citing a heading that does not exist),
    `nixfmt --check`, `nix flake check --no-build`, a targeted
    `nixos-rebuild build`, and any *newly introduced* statix/deadnix issue
    (pre-existing debt elsewhere in a touched file never blocks). This is
@@ -39,18 +42,17 @@ stays short on purpose (progressive disclosure).
    `### G<N>` entries, append-only.
 6. **Run every agent
    `docs/skills/workflow/scripts/required-agents` names**, in the order
-   and loop reference.md sets out -- `/simplify` -> `docs-updater` ->
-   `security` -> `spec-check`, restarting at `/simplify` on any
-   actionable finding. Agents that edit run before agents that only
-   review, so a later edit cannot invalidate an earlier reviewer's
-   completion stamp. Never two in the same parallel batch. The script decides *which*, from the diff; nothing here is a
-   judgment call, because "where relevant" ran on 12 of 89 plans while
-   "always" ran every time. `security`/`docs-updater` append findings
-   into the *same* current plan file; a `SubagentStop` hook stamps proof
-   it actually finished, independent of whether this skill's own
-   sequencing "waited" for it -- see reference.md, "Why a hook at all",
-   for why that matters. If `/simplify` proposes fixes, apply them before
-   moving on.
+   it prints them, one at a time -- never two in the same parallel
+   batch. *Which* agents comes from the diff, the order from
+   `PLAN_AGENT_ORDER`; nothing here is a judgment call. Apply the
+   findings once the read-only reviewers have reported, and if that fix
+   changed code, run the whole sequence again.
+   `security`/`docs-updater` append findings into the
+   *same* current plan file. See reference.md, "Order, and the loop"
+   for the restart rule and why nothing runs concurrently, "What a
+   completion stamp proves" for what the `SubagentStop` hook does and
+   does not establish, and "Why a hook at all" for why this skill's own
+   sequencing is not what makes it work.
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.
