@@ -26,7 +26,9 @@ next person has no way to know the fix ever existed.
 
 The step sequence's close-out step applies this standard when deciding
 whether a plan's work is actually done, or still belongs in
-`in-progress/`.
+`in-progress/`. The rung reached is declared in the plan's `## State`,
+and `plan-move ... done`/`plan-freeze` refuse without it — see
+`docs/procedures/testing-changes.md`, "Declaring the rung".
 
 ## Subagent selection
 
@@ -284,12 +286,13 @@ whether the plan content is honest) is still the agent's job.
 
 ## What this system does not cover yet
 
-**VM-testing is deliberately not part of this roster.** The cheap ladder
-(`verify-ladder`: format, eval, targeted build) is hard-gated; booting a
-VM or running a `runNixOSTest` is not. A single `vm-testing` subagent may
-be the wrong shape for this — it might need to be several subagents (split
-by boot-check vs. `runNixOSTest`), or folded into a broader verification
-agent. This needs its own research/design pass before building it — see
+**VM-testing is deliberately not part of this roster.** The scriptable
+floor (`verify-ladder`: format, lint, eval, targeted build) is
+hard-gated; booting a VM or running a `runNixOSTest` is not. A single
+`vm-testing` subagent may be the wrong shape for this — it might need to
+be several subagents (split by boot-check vs. `runNixOSTest`), or folded
+into a broader verification agent. This needs its own research/design
+pass before building it — see
 `docs/procedures/vm-testing.md` for the manual procedure in the meantime,
 and `2026-08-27-design-the-vm-testing-subagent-s.md` for the tracked plan.
 

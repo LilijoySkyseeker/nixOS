@@ -43,7 +43,16 @@ for r in "$base" "$head"; do
     { echo "BLOCKED: cannot resolve ref '$r'." >&2; exit 1; }
 done
 
-plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head}" 2>/dev/null | sed '/^$/d' | sort -u)"
+# Status checked, stderr not swallowed. Resolving both refs above does
+# not make this call safe: it can still fail on a corrupt object, an
+# unreadable pack or a shallow clone, and an empty result reads as
+# "nothing to gate" -- a green gate over a range nobody examined. Found
+# by sabotaging the Nth git call and requiring a refusal.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F1
+if ! plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head}" | sed '/^$/d' | sort -u)"; then
+  echo "BLOCKED: cannot read commit trailers for ${base}..${head}; refusing to report an unexamined range as clean." >&2
+  exit 1
+fi
 
 if [ -z "$plans" ]; then
   echo "no 'Plan:' trailers found in ${base}..${head} -- nothing to gate."

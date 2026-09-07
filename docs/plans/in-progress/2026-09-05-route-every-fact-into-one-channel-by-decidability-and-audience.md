@@ -160,8 +160,11 @@ nothing here needs a switch.
 branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
 not in the main checkout.
 
-**Children done:** 1, 4, 5, 6. G5, G6 closed; G11 added. D11 answered
-and built.
+**Children done:** 1, 3, 4, 5, 6. G5, G6 closed; G11 added. D11
+answered and built. Child 3 landed 2026-09-06 as
+2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md
+-- the evidence-ladder/deploy-sequence split plus the rung declaration
+`plan-move done` and `plan-freeze` now require.
 
 **The unreviewed tail of `854156c` is closed.** The 2026-09-07 session
 ran the full loop twice over `git diff origin/master...HEAD` plus the
@@ -204,10 +207,10 @@ code set from an allowlist to a denylist; making `plan-gate` survive a
 PR that changes the fingerprint's inputs; making CI hash the tree it was
 told to gate.
 
-**Then the frontier:** child 3 (verification-ladder split, smallest),
-then 2 (plan-file layout -- unblocked now 5 has landed, and it must run
-as expand-contract per G6, since 18 live `#G` citations break otherwise),
-then 7, 8, 14.
+**Then the frontier:** child 2 (plan-file layout -- unblocked now 5 has
+landed, and it must run as expand-contract per G6, since 18 live `#G`
+citations break otherwise), then 7 (unblocked now 3 and 4 are done),
+8, 14.
 
 **Live traps a new session will hit:**
 
@@ -242,8 +245,10 @@ Frontier (no blockers, takeable now):
 - [x] 6. `plan-gate` requires a completion stamp — done 2026-09-06.
       Stamps carry a code fingerprint, so the gate distinguishes "ran"
       from "ran against this code". See D11
-- [ ] 3. verification ladder split — evidence ladder vs deploy sequence
-      — see D6
+- [x] 3. verification ladder split — done 2026-09-06,
+      2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md:
+      evidence ladder vs deploy sequence in `testing-changes.md`, rung
+      declaration required by `plan-move done`/`plan-freeze`. See D6
 
 Blocked:
 

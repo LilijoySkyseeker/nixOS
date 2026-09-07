@@ -28,7 +28,7 @@ stays short on purpose (progressive disclosure).
    "why" rather than inlining the reasoning -- rather than leaning on
    `docs-updater` to clean it up afterward; that subagent is a backstop
    for what slips through, not the primary mechanism.
-4. **Run the cheap verification ladder**:
+4. **Run the scriptable verification floor**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
    `plan-citations` (any plan citation that no longer resolves),
    `plan-lint` on the active plan (duplicate or non-sequential `D`/`G`/
@@ -59,11 +59,13 @@ stays short on purpose (progressive disclosure).
 8. **Close or leave open, before committing.** `plan-move <file> done`
    now, in this same branch, if the work is actually complete and
    verified per the trust hierarchy in `reference.md` (this refuses if
-   any `D*`/`F*` is unresolved) -- not as a follow-up commit or a second
-   PR after this one merges. Leave it in `in-progress/` only when the
-   task genuinely isn't finished yet (e.g. still needs a real host switch
-   or other later verification), and still commit and open the PR either
-   way.
+   any `D*`/`F*` is unresolved, or if `## State` has no paragraph
+   *opening* with the fixed phrase `Verified to rung <N>` -- see
+   `docs/procedures/testing-changes.md`, "Declaring the rung") -- not as
+   a follow-up commit or a second PR after this one merges. Leave it in
+   `in-progress/` only when the task genuinely isn't finished yet (e.g.
+   still needs a real host switch or other later verification), and
+   still commit and open the PR either way.
 9. **Commit and merge** per `docs/GIT_WORKFLOW.md` -- short, human,
    Conventional Commits, including step 8's plan-file move if it
    happened. A `Plan: <date>-<slug>.md` trailer is fine for traceability;

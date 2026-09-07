@@ -191,6 +191,46 @@ plan_unresolved_findings() {
   ' "$1"
 }
 
+# plan_state_body <file> [skip-fences] -- the ## State section's text,
+# without the heading. Returns non-zero if the file has no State heading
+# at all. With a non-empty second argument, fenced blocks inside the
+# section are dropped: quoting the declaration is not making it, and the
+# fence rule lives here once rather than in each caller's own scanner.
+# Shared by the two State-quality checks below so the section's
+# boundaries have one definition.
+#
+# The first heading only, and never one inside a code fence: a plan that
+# *documents* this schema quotes a whole example plan, headings and all,
+# and a reader that re-arms on every match reads the example's State as
+# the file's own -- so a plan with no State section passed both checks
+# below on the strength of a fenced sample.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F12
+plan_state_body() {
+  awk -v skip="${2:-}" '
+    # CommonMark: a fence closes only on the same character, at least as
+    # long as the opener. A toggle on any marker desyncs on a nested
+    # fence and leaves the rest of the file misread in whichever
+    # direction happens to be worse.
+    # Leading whitespace allowed: CommonMark permits three spaces, and a
+    # fence nested in a list item must be indented further. Anchoring at
+    # column 0 left every indented fence invisible, and this repo writes
+    # dozens of them.
+    # plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F17
+    match($0, /^[ \t]*(`{3,}|~{3,})/) {
+      m = substr($0, RSTART, RLENGTH)
+      sub(/^[ \t]+/, "", m)
+      if (!fence) { fence = 1; open = m }
+      else if (substr(m, 1, 1) == substr(open, 1, 1) && length(m) >= length(open)) fence = 0
+      if (skip != "") next
+    }
+    fence && skip != "" { next }
+    !fence && !seen && /^## State$/ { seen = 1; f = 1; next }
+    !fence && /^## /                { f = 0; next }
+    f
+    END { exit seen ? 0 : 1 }
+  ' "$1"
+}
+
 # plan_state_problem <file> -- prints a reason if the ## State section is
 # missing or empty; empty output = present and non-empty. State is the one
 # section rewritten in place rather than appended to (see plan/SKILL.md),
@@ -198,9 +238,63 @@ plan_unresolved_findings() {
 # ever having had content.
 plan_state_problem() {
   local file="$1" body
-  grep -q '^## State$' "$file" || { echo "no '## State' heading found."; return; }
-  body="$(awk '/^## State$/{f=1;next} /^## /{f=0} f' "$file" | tr -d '[:space:]')"
-  [ -n "$body" ] || echo "'## State' section is empty -- summarize the current status before freezing."
+  # Presence comes from the same reader as the content, so a heading
+  # this check accepts cannot be one plan_state_body ignores.
+  # plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F12
+  body="$(plan_state_body "$file")" || { echo "no '## State' heading found."; return; }
+  [ -n "${body//[[:space:]]/}" ] ||
+    echo "'## State' section is empty -- summarize the current status before freezing."
+}
+
+# plan_rung_problem <file> -- prints a reason if ## State declares no
+# verification rung; empty output = declared. Require-declaration, not
+# check: refuses a plan that does not say how far up the evidence ladder
+# (docs/procedures/testing-changes.md) it was verified, without judging
+# the verification itself.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D6
+#
+# Anchored on the blank-line block, not on punctuation: the phrase must
+# open a paragraph or list item. State is hard-wrapped, so a line start
+# means nothing and a sentence start is unrecognizable in prose -- three
+# rounds of widening a preceding-character class each left another way
+# to mention the phrase without declaring it. A blank line survives
+# rewrapping, and a mention never opens the paragraph it sits in.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F3
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F8
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F9
+plan_rung_problem() {
+  # Fenced blocks dropped: a plan documenting this schema quotes the
+  # required form, and a quoted declaration is a mention.
+  # plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F12
+  plan_state_body "$1" skip-fences |
+    awk '
+      function check(   b) {
+        b = block
+        gsub(/[ \t]+/, " ", b)
+        # emphasis deleted outright, backticks never: styling can wrap
+        # any part of a real declaration, while code formatting is how a
+        # doc quotes the phrase instead of claiming it
+        gsub(/[*_]/, "", b)
+        sub(/^ /, "", b)
+        sub(/ $/, "", b)   # a trailing space must not refuse a real one
+        # bullet and quote markers only with their trailing space, so a
+        # "--" clause opening a sentence *about* the phrase is not
+        # mistaken for one
+        sub(/^[0-9]+[.)] /, "", b)      # numbered list item
+        sub(/^[->] /, "", b)            # bullet or blockquote
+        # what follows the rung is punctuation or nothing, never another
+        # word: a mention in subject position ("Verified to rung 3 is the
+        # phrase the gate wants") opens the paragraph too, so position
+        # alone cannot tell it from a claim
+        # plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F13
+        if (tolower(b) ~ /^verified to rung [1-5]( ?[^0-9a-z ].*)?$/) found = 1
+        block = ""
+      }
+      /^[ \t]*$/ { check(); next }
+      { block = (block == "" ? $0 : block " " $0) }
+      END { check(); exit found ? 0 : 1 }
+    ' ||
+    echo "no verification-rung declaration in ## State. Give it its own paragraph, opening with the phrase itself -- 'Verified to rung 3 (ran it locally, output inspected).' -- per docs/procedures/testing-changes.md, 'Declaring the rung'. Mentioning the phrase mid-sentence does not count, and neither does naming a rung you did not reach: declare the highest one you did, then say what you skipped."
 }
 
 plan_checksum() { sha256sum "$1" | awk '{print $1}'; }

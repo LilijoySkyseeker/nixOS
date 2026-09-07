@@ -52,7 +52,18 @@ done
 # plan_code_fingerprint makes -- a brand-new doc or script with a broken
 # citation must not pass the gate just because it was never staged.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F16
-mapfile -d '' -t candidates < <(git ls-files -z --cached --others --exclude-standard -- "${PLAN_TEXT_GLOBS[@]}" "${PLAN_DOC_GLOBS[@]}")
+# Through a file, not a process substitution: `mapfile < <(git ...)`
+# reports mapfile's status and discards git's, so a failed listing became
+# an empty candidate set and the script exited 0 having scanned nothing.
+# A variable cannot carry the -z output, since command substitution
+# strips NUL.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F2
+cand_out="$(mktemp)"
+trap 'rm -f "$cand_out" "${scan_out:-}"' EXIT
+if ! git ls-files -z --cached --others --exclude-standard -- "${PLAN_TEXT_GLOBS[@]}" "${PLAN_DOC_GLOBS[@]}" > "$cand_out"; then
+  plan_die "cannot list the files to scan -- refusing to report OK over a scan that never ran."
+fi
+mapfile -d '' -t candidates < "$cand_out"
 # Tracked-but-absent files are a normal mid-work state (a deletion not yet
 # committed) and have no citations to check, but awk aborts the whole scan
 # on the first one. Filter them out rather than either crashing or, worse,
@@ -64,7 +75,13 @@ scan=()
 for f in "${candidates[@]}"; do
   [ -f "$f" ] && scan+=("./$f")
 done
-[ "${#scan[@]}" -gt 0 ] || exit 0
+# Reported rather than a silent exit 0: "scanned nothing" and "scanned
+# everything and found nothing" are different facts, and only one of them
+# should ever be quiet.
+if [ "${#scan[@]}" -eq 0 ]; then
+  printf 'plan-citations: OK (no files matched the scan set)\n'
+  exit 0
+fi
 
 # One awk over every file rather than awk|grep|sort per file: the per-file
 # form spawned ~650 processes and took 0.4s on a gate that runs before
@@ -116,7 +133,7 @@ skipped_regions=0
 # was discarded and the script still printed OK over a partial scan.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
 scan_out="$(mktemp)"
-trap 'rm -f "$scan_out"' EXIT
+trap 'rm -f "$cand_out" "$scan_out"' EXIT
 awk "$awk_prog" "${scan[@]}" | sort -u > "$scan_out" ||
   plan_die "scan failed -- refusing to report a result over an incomplete scan"
 

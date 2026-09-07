@@ -123,7 +123,10 @@ is rare enough not to need its own mechanic.
 
 `plan-freeze`:
 1. Refuses if already frozen, if the file isn't under `docs/plans/done/`,
-   or if any decision is unresolved (above).
+   if any decision or finding is unresolved (above), if `## State` is
+   missing or empty, or if `## State` declares no verification rung
+   (`Verified to rung <N> ...` -- see
+   `docs/procedures/testing-changes.md`, "Declaring the rung").
 2. Sets `frozen: true`.
 3. Records a `sha256sum`-format line (`<hash>  <relpath>`) in
    `docs/plans/.checksums`, which the git-level `pre-commit` hook

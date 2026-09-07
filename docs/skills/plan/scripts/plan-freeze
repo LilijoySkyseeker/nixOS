@@ -34,6 +34,9 @@ fi
 state_problem="$(plan_state_problem "$root/$rel")"
 [ -n "$state_problem" ] && plan_die "cannot freeze -- $state_problem"
 
+rung_problem="$(plan_rung_problem "$root/$rel")"
+[ -n "$rung_problem" ] && plan_die "cannot freeze -- $rung_problem"
+
 plan_do_freeze "$root" "$rel"
 plan_note "$rel frozen."
 echo "$rel"

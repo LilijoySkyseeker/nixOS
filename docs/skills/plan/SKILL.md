@@ -22,13 +22,13 @@ citation survive the file moving between folders. Never write
 | Script | Purpose |
 |---|---|
 | `plan-new "<title>"` | Create a new plan in `docs/plans/todo/`. Prints its path. |
-| `plan-move <file> in-progress\|done` | Move between folders. Moving to `done` auto-freezes (below) and refuses if any decision is unresolved. |
+| `plan-move <file> in-progress\|done` | Move between folders. Moving to `done` auto-freezes (below) and refuses if any decision or finding is unresolved, or if `## State` is missing, empty, or has no paragraph *opening* with the fixed phrase `Verified to rung <N>` (see `docs/procedures/testing-changes.md`, "Declaring the rung"). |
 | `plan-decide <file> D<N> answered\|discussed\|deferred "<note>"` | Record a decision's status. Only `answered` (from an actual user confirmation) or a `deferred`-then-`plan-carry`'d item let the plan later freeze -- `discussed` alone does not. |
 | `plan-resolve <file> F<N> fixed\|accepted\|moot "<note>"` | Record a finding's resolution. Exactly mirrors `plan-decide` for findings -- see "The three finding states" in `reference.md`. |
 | `plan-carry <file> D<N> ["<new title>"]` | Spin a `deferred` decision into a brand-new `docs/plans/todo/` plan, so it resurfaces as backlog instead of disappearing into a frozen file. |
-| `plan-freeze <file>` | Called automatically by `plan-move ... done`. Marks the file permanently un-editable and records its checksum. Refuses if already frozen, if any decision or finding is unresolved, or if `## State` is missing/empty. |
+| `plan-freeze <file>` | Called automatically by `plan-move ... done`. Marks the file permanently un-editable and records its checksum. Refuses if already frozen, if any decision or finding is unresolved, if `## State` is missing/empty, or if `## State` carries no `Verified to rung <N>` declaration. |
 | `plan-tick <file> <D\|G\|F><N>` | Check off that ID's line in the Progress section. |
-| `plan-lint <file>` | Read-only structural check: frontmatter, required sections (including `## State`), sequential/non-duplicate D/G/F ids, and that every Progress citation resolves to a real heading. Not a gate on anything yet -- run it yourself when unsure a plan is well-formed. |
+| `plan-lint <file>` | Read-only structural check: frontmatter, required sections (including `## State`), sequential/non-duplicate D/G/F ids, and that every Progress citation resolves to a real heading. Run as a blocking gate by the `workflow` skill's `verify-ladder` against the active plan; run it yourself when unsure any other plan is well-formed. |
 | `plan-reject <file> "<reason>"` | For work started and then abandoned or superseded. Moves a `todo/`/`in-progress/` plan to `docs/plans/rejected/` and freezes it. Unlike `plan-move ... done`, does **not** require decisions or findings to be resolved -- abandoning the work legitimately moots open questions. A reason is mandatory instead. |
 
 Every script exits non-zero and prints a clear reason on failure -- read
