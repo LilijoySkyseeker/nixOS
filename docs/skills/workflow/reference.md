@@ -287,8 +287,9 @@ whether the plan content is honest) is still the agent's job.
 ## What this system does not cover yet
 
 **VM-testing is deliberately not part of this roster.** The scriptable
-floor (`verify-ladder`: format, lint, eval, targeted build) is
-hard-gated; booting a VM or running a `runNixOSTest` is not. A single
+floor (`verify-ladder`: the gates' own failure-mode tests, format, lint,
+eval, targeted build) is hard-gated; booting a VM or running a
+`runNixOSTest` is not. A single
 `vm-testing` subagent may be the wrong shape for this — it might need to
 be several subagents (split by boot-check vs. `runNixOSTest`), or folded
 into a broader verification agent. This needs its own research/design

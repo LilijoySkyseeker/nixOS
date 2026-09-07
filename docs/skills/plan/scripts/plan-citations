@@ -133,7 +133,7 @@ skipped_regions=0
 # was discarded and the script still printed OK over a partial scan.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
 scan_out="$(mktemp)"
-trap 'rm -f "$cand_out" "$scan_out"' EXIT
+# no second trap: the one above is single-quoted, so its ${scan_out:-} expands at exit time
 awk "$awk_prog" "${scan[@]}" | sort -u > "$scan_out" ||
   plan_die "scan failed -- refusing to report a result over an incomplete scan"
 

@@ -4,12 +4,12 @@
 # scratch one under $TMPDIR and removes it.
 #
 # The repo had eight VM tests for NixOS behaviour and none for the gates,
-# and the review that produced this found the same defect shape sixteen
+# and the review that produced this found the same defect shape twelve
 # times: a gate that reports the wrong answer rather than one that is
 # missing. So the assertions here are mostly negative -- point a gate at a
 # broken environment and require it to *fail* -- plus a positive control,
 # because a gate nothing can satisfy is the other half of the same defect.
-# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G1
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PLAN_SCRIPTS="$SCRIPT_DIR/../docs/skills/plan/scripts"
@@ -18,7 +18,11 @@ WORKFLOW_SCRIPTS="$SCRIPT_DIR/../docs/skills/workflow/scripts"
 . "$PLAN_SCRIPTS/lib.sh"
 
 pass=0 fail=0 known=0
-scratch="$(mktemp -d)"
+# Checked: unchecked under `set -u` without `-e`, a failed mktemp leaves
+# $scratch empty and every path below roots at / instead.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F9
+scratch="$(mktemp -d)" || { printf 'gate-tests: cannot create a scratch directory\n' >&2; exit 1; }
+[ -n "$scratch" ] && [ -d "$scratch" ] || { printf 'gate-tests: scratch directory is not usable\n' >&2; exit 1; }
 trap 'rm -rf "$scratch"' EXIT
 
 ok()    { pass=$((pass + 1)); printf '  ok    %s\n' "$1"; }
@@ -150,9 +154,24 @@ mkdir -p "$repo"
 git -C "$repo" init -q
 git -C "$repo" config user.email t@t
 git -C "$repo" config user.name t
+# Pinned, so the fixture does not inherit the caller's global git config:
+# a signing key, a hooksPath or a commit template would otherwise decide
+# whether the harness passes.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F8
+git -C "$repo" config commit.gpgsign false
+git -C "$repo" config core.hooksPath /dev/null
+git -C "$repo" config commit.template ""
 mkdir -p "$repo/docs/skills"
 cp -r "$PLAN_SCRIPTS/.." "$repo/docs/skills/plan"
 cp -r "$WORKFLOW_SCRIPTS/.." "$repo/docs/skills/workflow"
+# The copied skills cite this repo's plans, which the fixture does not
+# have, so plan-citations would refuse here for an unrelated reason and
+# the sabotage baseline below would prove nothing. Stripped rather than
+# reproducing ~40 plan files.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+find "$repo/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/d' {} +
+grep -rlZ '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md' "$repo/docs/skills" 2>/dev/null |
+  xargs -0 -r sed -i 's/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md/A-PLAN-NAME/g'
 mkdir -p "$repo/docs/plans/in-progress"
 printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false\n---\n\n# t\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Findings (F)\n' \
   > "$repo/docs/plans/in-progress/example-plan.md"
@@ -162,22 +181,52 @@ printf '{ }\n' > "$repo/a.nix"
 git -C "$repo" add a.nix >/dev/null
 git -C "$repo" commit -qm $'code change\n\nPlan: example-plan.md'
 
-expect_fail() { # <name> <command...>
-  if "${@:2}" >/dev/null 2>&1; then bad "$1" "exited 0; it should have refused"; else ok "$1"; fi
+# <name> <expected-stderr-fragment> <command...>
+# The fragment is load-bearing: "exited non-zero" is satisfied by a
+# refusal for an unrelated reason, so a case written without it goes
+# green once the check it names is deleted. Empty fragment only for a
+# helper that refuses silently by contract.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+expect_fail() {
+  local name="$1" want="$2" out rc
+  shift 2
+  out="$("$@" 2>&1)"; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    bad "$name" "exited 0; it should have refused"
+  elif [ -n "$want" ] && ! printf '%s' "$out" | grep -qF -- "$want"; then
+    bad "$name" "refused, but not for the stated reason: $(printf '%s' "$out" | tail -n 1)"
+  else
+    ok "$name"
+  fi
 }
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F4
-expect_fail "plan-gate refuses an unresolvable base ref" \
+expect_fail "plan-gate refuses an unresolvable base ref" "cannot resolve ref" \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" nosuchref HEAD
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F3
-expect_fail "required-agents refuses an unresolvable range" \
+expect_fail "required-agents refuses an unresolvable range" "cannot diff" \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" nosuchref HEAD
+# A helper refuses silently, so there is no diagnostic to require. The
+# exit code carries the whole assertion instead, and it must be the
+# helper's own 1 -- not bash's 127 for a function that no longer exists,
+# which is what an empty fragment accepted while the helper was deleted.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F7
+expect_rc() { # <name> <want-rc> <command...>
+  local name="$1" want="$2" rc
+  shift 2
+  "$@" >/dev/null 2>&1; rc=$?
+  [ "$rc" -eq "$want" ] && ok "$name" || bad "$name" "exited $rc, want $want"
+}
+# `declare -F` first, so a renamed or deleted helper exits 3 and fails
+# the assertion rather than passing as a refusal.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
-expect_fail "plan_worktree_files refuses a broken GIT_DIR" \
-  env -C "$repo" GIT_DIR=/nonexistent bash -c '. docs/skills/plan/scripts/lib.sh; plan_worktree_files "*.nix"'
+expect_rc "plan_worktree_files refuses a broken GIT_DIR" 1 \
+  env -C "$repo" GIT_DIR=/nonexistent bash -c \
+  '. docs/skills/plan/scripts/lib.sh; declare -F plan_worktree_files >/dev/null || exit 3; plan_worktree_files "*.nix"'
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
-expect_fail "the fingerprint refuses outside a repository" \
-  env -C "$scratch" bash -c ". '$PLAN_SCRIPTS/lib.sh'; plan_code_fingerprint"
+expect_rc "the fingerprint refuses outside a repository" 1 \
+  env -C "$scratch" bash -c \
+  ". '$PLAN_SCRIPTS/lib.sh'; declare -F plan_code_fingerprint >/dev/null || exit 3; plan_code_fingerprint"
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
 fp_root="$(cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_code_fingerprint')"
@@ -189,14 +238,14 @@ else
 fi
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
-expect_fail "required-agents refuses an agent missing from the order" \
+expect_fail "required-agents refuses an agent missing from the order" "missing from PLAN_AGENT_ORDER" \
   env -C "$repo" bash -c '
     sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"spec-check\")/" docs/skills/plan/scripts/lib.sh
     docs/skills/workflow/scripts/required-agents HEAD~1 HEAD'
 git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F64
-expect_fail "plan-gate refuses when no obliged agent is stampable" \
+expect_fail "plan-gate refuses when no obliged agent is stampable" "have drifted apart" \
   env -C "$repo" bash -c '
     sed -i "s/PLAN_STAMPABLE_AGENTS=(\"security\" \"docs-updater\")/PLAN_STAMPABLE_AGENTS=(\"sekurity\" \"docs-updatr\")/" docs/skills/plan/scripts/lib.sh
     sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\" \"sekurity\" \"docs-updatr\")/" docs/skills/plan/scripts/lib.sh
@@ -204,7 +253,7 @@ expect_fail "plan-gate refuses when no obliged agent is stampable" \
 git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F1
-expect_fail "plan-gate refuses a range whose plan is unstamped" \
+expect_fail "plan-gate refuses a range whose plan is unstamped" "carries no completion stamp" \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
 
 section "awkward filenames still oblige review"
@@ -236,7 +285,7 @@ fi
 section "fail-closed: an honest sequence must end green"
 # The other half of the same defect: a gate nothing can satisfy teaches
 # the bypass, so the positive control is not optional.
-# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G1
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
 (
   cd "$repo" || exit 1
   # shellcheck source=/dev/null
@@ -247,10 +296,17 @@ section "fail-closed: an honest sequence must end green"
       >> docs/plans/in-progress/example-plan.md
   done
 )
-if env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD >/dev/null 2>&1; then
-  ok "plan-gate passes a stamped plan with resolved findings"
-else
+# The success *line*, not just rc=0: "nothing to gate" also exits 0, and
+# a control that accepts it stays green while the gate examines nothing.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F7
+control_out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
+if [ $? -ne 0 ]; then
   bad "plan-gate passes a stamped plan with resolved findings" "it refused an honest sequence"
+elif ! printf '%s' "$control_out" | grep -qF 'obliged reviews stamped'; then
+  bad "plan-gate passes a stamped plan with resolved findings" \
+    "exited 0 without examining the plan: $(printf '%s' "$control_out" | tail -n 1)"
+else
+  ok "plan-gate passes a stamped plan with resolved findings"
 fi
 
 # ------------------------------------------------------------- properties
@@ -347,7 +403,7 @@ invariant_quoted
 # require the gate to refuse. Every Class 1 finding was one instance of
 # "a git call failed and the gate reported success anyway", so the general
 # form is worth asserting over the specific ones.
-# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G1
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
 section "sabotage: no gate may report success when a git call underneath it failed"
 
 real_git="$(command -v git)"
@@ -365,8 +421,28 @@ chmod +x "$fakebin/git"
 sabotage_sweep() { # <name> <max-calls> <command...>
   local name="$1" max="$2" n out rc leaked=""
   shift 2
+  # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
+  # gate already refusing for an unrelated reason, and then stays green
+  # whatever the sabotage does.
+  # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+  # Baseline, run through the shim with sabotage disabled, so it proves
+  # two things at once: the gate passes when nothing is broken, and the
+  # shim is actually the git it calls. Without the second, a gate that
+  # invokes git by absolute path is swept zero times and every iteration
+  # reports ok -- verified, indistinguishable from a clean run even with
+  # a fail-open reintroduced.
+  # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F6
+  printf 0 > "$scratch/sabotage.count"
+  if ! PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT=0 "$@" >/dev/null 2>&1; then
+    bad "$name" "the gate already refuses with nothing sabotaged; the sweep would prove nothing"
+    return
+  fi
+  if [ "$(cat "$scratch/sabotage.count")" -eq 0 ]; then
+    bad "$name" "the gate made no git call through the shim; the sweep would sabotage nothing"
+    return
+  fi
   for ((n = 1; n <= max; n++)); do
-    : > "$scratch/sabotage.count"
+    printf 0 > "$scratch/sabotage.count"
     out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT="$n" "$@" 2>&1)"
     rc=$?
     # A gate that never reached call n is fine: nothing was sabotaged.

@@ -180,13 +180,15 @@ of operations — chronology, not evidence:
   matches by path prefix, not by file extension.
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
-  before commit rather than at push time. Runs two plan-file gates
+  before commit rather than at push time. Runs three repo-level gates
   first — `docs/skills/plan/scripts/plan-citations` (blocks on any plan
   citation that no longer resolves; run on every pass, since a citation
-  breaks from the target side) and `docs/skills/plan/scripts/plan-lint`
-  on the active plan (blocks on a missing section, a duplicate or
-  non-sequential `D`/`G`/`F` id, or a `Progress` line citing a heading
-  that does not exist) — then covers lint and rung 3's mechanical half:
+  breaks from the target side), `scripts/gate-tests` (the gate scripts'
+  own failure-mode tests, next bullet), and
+  `docs/skills/plan/scripts/plan-lint` on the active plan (blocks on a
+  missing section, a duplicate or non-sequential `D`/`G`/`F` id, or a
+  `Progress` line citing a heading that does not exist) — then covers
+  lint and rung 3's mechanical half:
   `nixfmt --check`, `nix flake check --no-build`, a targeted
   `nixos-rebuild build --flake .#<host>` for any host whose directory or
   a shared path actually changed, and `statix`/`deadnix` — but
@@ -195,6 +197,20 @@ of operations — chronology, not evidence:
   skill-invoked script, not a git hook, so it only fires when the
   `workflow` skill's sequence is actually followed — it does not
   backstop a commit made outside that skill the way `pre-push` does.
+- **`scripts/gate-tests`** — the failure-mode tests for the gate scripts
+  themselves (`plan-gate`, `required-agents`, `plan-citations`, and
+  `lib.sh`'s fingerprint, file-listing and rung-declaration helpers).
+  Three kinds of check: enumerated broken environments, invariants over
+  generated plan text (rewrap and re-decorate a `## State`, require the
+  verdict not to move), and a sabotage sweep that fails the Nth `git`
+  call and requires the gate to refuse — plus a positive control that an
+  honest sequence still ends green, since a gate nothing can satisfy is
+  the other half of the same defect. Hermetic, network-free, under a
+  second, scratch repos under `$TMPDIR`. This is what rung 3 looks like
+  for a change with no closure to build. Read
+  2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+  before adding cases. Run from `verify-ladder` only — no git hook or CI
+  step runs it yet.
 - **`plan-move ... done` / `plan-freeze`** — refuse to close a plan
   whose `## State` declares no verification rung (see "Declaring the
   rung" above).
