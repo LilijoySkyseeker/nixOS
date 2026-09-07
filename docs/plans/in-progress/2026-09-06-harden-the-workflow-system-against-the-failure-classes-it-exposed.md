@@ -212,15 +212,18 @@ harness. Both plans have every finding resolved, both declare a rung,
 both pass `plan-lint`, and `verify-ladder` passes with `gate-tests`
 wired in.
 
-**The loop is mid-pass, and this is the first thing to finish.**
-`/simplify`'s angle reviews ran over the harness and the two gate fixes;
-`docs-updater` and `security` have not seen them, so `08771c2` is
-committed ahead of its last two reviewers -- the same debt this session
-opened with, deliberately taken again because context ran short rather
-than because the work is done. The active-plan marker points at this
-file, so their stamps land here, which matches the commit's `Plan:`
-trailer. `plan-gate origin/master HEAD` will fail on a stale stamp until
-they run; that is the gate working, not a fault.
+**The loop ran to completion, and stopped on D7's recurrence rule.**
+`/simplify`, `docs-updater` and `security` all ran over the harness;
+their findings became F3 and F5-F13, all resolved. The fix stage for
+F10-F13 changed code after `security` last looked, so one more pass is
+owed by the letter of the loop. It was not run, for the reason D7 gives
+for stopping: F3, F6, F7 and F10 are the *same finding* recurring, and
+the loop was converting one round's fix into the next round's defect.
+Each of the four fixes was instead confirmed by mutation -- break the
+code, watch the assertion go red, restore it -- which is stronger
+evidence than a fifth reading. **Next session: run `security` once over
+`git diff 5a7a400..HEAD` before merging.** `plan-gate` will report a
+stale stamp until then; that is the gate working, not a fault.
 
 **Then:** push the stamps, and merge PR #68 -- the user
 signed that off 2026-09-07, to be done after child 3 lands and *before*
