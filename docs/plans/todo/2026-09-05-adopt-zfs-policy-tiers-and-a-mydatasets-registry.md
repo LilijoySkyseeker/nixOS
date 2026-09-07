@@ -3,9 +3,26 @@ slug: adopt-zfs-policy-tiers-and-a-mydatasets-registry
 created: 2026-09-05
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # adopt ZFS policy tiers and a myDatasets registry
+
+## State
+
+**2026-09-05, not started.** Design fully settled through a grilling
+session; every decision below is answered and no code has been written.
+ADR-0001 is written and is the reference for the model. Next step is the
+`myDatasets` options module — nothing else here can be built before it,
+since the registry is what generates the disko entries, ZFS properties,
+zrepl map, restic list and persistence entries.
+
+Scope is deliberately narrow (D5): the registry plus new datasets only,
+with two existing reclassifications that are pure wins. No existing
+service state is migrated here.
 
 ## Original plan
 
@@ -31,19 +48,6 @@ blocks it:
 (existing services onto per-service datasets) and
 `2026-09-05-migrate-existing-architectural-decisions-into-docs-adr.md`
 (the wider ADR backfill).
-
-## State
-
-**2026-09-05, not started.** Design fully settled through a grilling
-session; every decision below is answered and no code has been written.
-ADR-0001 is written and is the reference for the model. Next step is the
-`myDatasets` options module — nothing else here can be built before it,
-since the registry is what generates the disko entries, ZFS properties,
-zrepl map, restic list and persistence entries.
-
-Scope is deliberately narrow (D5): the registry plus new datasets only,
-with two existing reclassifications that are pure wins. No existing
-service state is migrated here.
 
 ## Progress
 

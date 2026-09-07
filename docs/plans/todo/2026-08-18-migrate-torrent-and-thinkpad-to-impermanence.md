@@ -3,6 +3,10 @@ slug: migrate-torrent-and-thinkpad-to-impermanence
 created: 2026-08-18
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # migrate torrent and thinkpad to impermanence

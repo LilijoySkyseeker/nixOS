@@ -3,6 +3,10 @@ slug: fix-srv-permissions-stop-three-systems-fighting-ov
 created: 2026-08-28
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # fix /srv permissions: stop three systems fighting over the same paths

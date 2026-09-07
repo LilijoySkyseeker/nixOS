@@ -3,9 +3,143 @@ slug: harden-the-workflow-system-against-the-failure-classes-it-exposed
 created: 2026-09-06
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # harden the workflow system against the failure classes it exposed
+
+## State
+
+**2026-09-07: the Class 1 and 2 harness is built and it found two live
+fail-opens on its first run.** `scripts/gate-tests` exists, runs in
+about 0.8s, and is wired into `verify-ladder` as a hard block, so it
+fires on every non-trivial change rather than when someone remembers
+it. 82 assertions pass, 0 fail, 3 recorded residues.
+
+It is deliberately not only a regression suite. Three kinds of check,
+in increasing order of what they can discover:
+
+1. **Enumerated cases** — the rung-declaration fixture from
+   2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#G3
+   and the known broken environments. These can only catch a defect
+   someone already found.
+2. **Properties** — re-wrap a `## State` at seven widths, re-decorate it
+   seven ways, and require the verdict never to move. Every defect in
+   that matcher so far was a presentation sensitivity, so the invariant
+   is the thing worth asserting, not the individual cases.
+3. **Sabotage** — a fake `git` on `PATH` fails the Nth call; sweep N and
+   require the gate to refuse. This generalises all eight Class 1
+   findings instead of re-testing them, and it is what found F1 and F2
+   below, in code two earlier review passes had already examined for
+   exactly this defect.
+
+F1 and F2 are both fixed. Both were the *same* shape as an already-fixed
+finding on the map plan, at a second call site the original fix did not
+visit — which is the strongest available argument for this harness over
+another review pass.
+
+**Then the harness needed four more rounds to stop lying about itself,
+and that is the more useful finding.** F3, F6, F7 and F10 are one defect
+wearing four hats: an assertion that looks like a check and is satisfied
+by something other than the thing it names. Each round's fix opened the
+next round's hole — a baseline that caught "the gate already fails" but
+not "the gate made no call", then one that caught both but accepted a
+gate exiting 0 without doing any work. Every sweep now asserts three
+things: the gate succeeds cleanly, prints the line that means it did its
+work, and routes at least one git call through the shim. (It also
+claimed a fourth — that every one of those calls was sabotaged in turn
+— which F14 later showed it could not express; see below.) Each fix was
+confirmed by mutation rather than by reading, which is the only evidence
+that separates a real assertion from a shaped one — and is why G2 leads
+with "make the test fail first". A suite built to catch Class 1 was
+itself Class 1 four times; the method caught that, inspection did not.
+
+**2026-09-07, the owed `security` pass: a fifth and sixth instance, and
+one of them marks where this technique stops.** F14, F15 and F16 came
+out of the pass over `5a7a400..HEAD` run before merging. F15 is the same
+hat worn again — F10 closed the "exited 0 without doing the work" hole
+for three of the four sweeps and left the fourth, because
+`plan-citations: OK` is a *prefix* of the scanned-nothing line that F2's
+own fix had added. Fixed with a fragment only the working line can
+print; and the fixture now carries a resolvable citation, so
+plan-citations' whole resolution path went from swept zero times to
+asserted in both directions.
+
+F14 is the one worth reading. F11 asked the sweep to prove the shim is
+*the* git a gate calls rather than merely *a* git it calls, and F11's
+fix counted calls through the shim to do it. That can never work: the
+instrument is blind to exactly the calls in question, so a baseline
+taken through it undercounts by precisely the amount being measured, and
+the resulting comparison was provably dead at all four call sites.
+Demonstrated after the fix as well as before — point
+`plan_code_fingerprint` at an absolute `git` and all four sweeps still
+report `ok`. **A dynamic check cannot assert a property about the calls
+it cannot observe.** That property is now asserted on the source
+instead: every `git` in the four swept gates and `lib.sh` must be a bare
+PATH-resolved word. The dead comparison was replaced by the only
+condition it could ever have expressed — a gate that outgrew `max`,
+leaving its tail unswept — stated as itself. Two rounds were spent
+fixing a check that was in the wrong layer.
+
+Verified to rung 3 (ran it locally, output inspected): the harness runs
+green, every finding was reproduced before its fix and re-checked after,
+and `verify-ladder` passes with the harness wired in. Rungs 4-5 do not
+apply — no host-visible behaviour changed.
+
+**Next, in order:** sweep the remaining gates (`plan-lint`,
+`subagent-stamp`, `plan-freeze`/`plan-move`, and the `.githooks`, which
+mutate and so need a per-iteration scratch repo); then the Class 3-5
+items below, which are untouched. **Read G2 before extending the
+harness** -- it is the method, and the difference between a suite that
+finds defects and one that records old ones.
+
+### Pick-up point, 2026-09-07
+
+**Where.** Worktree
+`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
+branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
+never the main checkout.
+
+**Committed and pushed through `08771c2`.** `5eb67ef` closed the review
+loop over `854156c`'s unreviewed tail (F61-F65 on the map plan).
+`08771c2` is child 3 of the map -- the evidence-ladder/deploy-sequence
+split with the rung declaration and its gate -- plus this plan's
+harness. Both plans have every finding resolved, both declare a rung,
+both pass `plan-lint`, and `verify-ladder` passes with `gate-tests`
+wired in.
+
+**The loop ran to completion, and stopped on D7's recurrence rule.**
+`/simplify`, `docs-updater` and `security` all ran over the harness;
+their findings became F3 and F5-F13, all resolved. The fix stage for
+F10-F13 changed code after `security` last looked, so one more pass is
+owed by the letter of the loop. It was not run, for the reason D7 gives
+for stopping: F3, F6, F7 and F10 are the *same finding* recurring, and
+the loop was converting one round's fix into the next round's defect.
+Each of the four fixes was instead confirmed by mutation -- break the
+code, watch the assertion go red, restore it -- which is stronger
+evidence than a fifth reading. **That owed pass ran 2026-09-07 over
+`git diff 5a7a400..HEAD`** and found F14, F15 and F16 -- the shape a
+fifth and sixth time, plus a hermeticity gap. All three are fixed and
+each was reproduced before its fix; see `## State`. Stopping on the
+recurrence rule was right about the reading being weaker than the
+mutation, and wrong that the round was finished: the two MEDIUMs were
+both live, and F14 is the one that names why the previous two rounds
+could not have worked.
+
+**Then:** push the stamps, and merge PR #68 -- the user
+signed that off 2026-09-07, to be done after child 3 lands and *before*
+child 2 starts, so child 2 runs against a base where the stamp gates are
+real rather than legacy (#F12 on the map plan). Resolve the PR #67
+conflict by taking this branch's `reference.md`. Then child 2 of the
+map, as expand-contract per its G6.
+
+**Do not backfill the rung declaration into older plans.** Seven open
+plans predate the gate and will refuse to close until whoever did the
+work adds one sentence. The user signed that off 2026-09-07; see the
+child plan's G2.
 
 ## Original plan
 
@@ -139,136 +273,6 @@ The honest framing, worth writing into `reference.md` as a threat model:
 this system defends against **an agent that forgets a step**. It does not
 defend against one that lies, and several of the above are only
 defensible under that assumption.
-
-## State
-
-**2026-09-07: the Class 1 and 2 harness is built and it found two live
-fail-opens on its first run.** `scripts/gate-tests` exists, runs in
-about 0.8s, and is wired into `verify-ladder` as a hard block, so it
-fires on every non-trivial change rather than when someone remembers
-it. 82 assertions pass, 0 fail, 3 recorded residues.
-
-It is deliberately not only a regression suite. Three kinds of check,
-in increasing order of what they can discover:
-
-1. **Enumerated cases** — the rung-declaration fixture from
-   2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#G3
-   and the known broken environments. These can only catch a defect
-   someone already found.
-2. **Properties** — re-wrap a `## State` at seven widths, re-decorate it
-   seven ways, and require the verdict never to move. Every defect in
-   that matcher so far was a presentation sensitivity, so the invariant
-   is the thing worth asserting, not the individual cases.
-3. **Sabotage** — a fake `git` on `PATH` fails the Nth call; sweep N and
-   require the gate to refuse. This generalises all eight Class 1
-   findings instead of re-testing them, and it is what found F1 and F2
-   below, in code two earlier review passes had already examined for
-   exactly this defect.
-
-F1 and F2 are both fixed. Both were the *same* shape as an already-fixed
-finding on the map plan, at a second call site the original fix did not
-visit — which is the strongest available argument for this harness over
-another review pass.
-
-**Then the harness needed four more rounds to stop lying about itself,
-and that is the more useful finding.** F3, F6, F7 and F10 are one defect
-wearing four hats: an assertion that looks like a check and is satisfied
-by something other than the thing it names. Each round's fix opened the
-next round's hole — a baseline that caught "the gate already fails" but
-not "the gate made no call", then one that caught both but accepted a
-gate exiting 0 without doing any work. Every sweep now asserts three
-things: the gate succeeds cleanly, prints the line that means it did its
-work, and routes at least one git call through the shim. (It also
-claimed a fourth — that every one of those calls was sabotaged in turn
-— which F14 later showed it could not express; see below.) Each fix was
-confirmed by mutation rather than by reading, which is the only evidence
-that separates a real assertion from a shaped one — and is why G2 leads
-with "make the test fail first". A suite built to catch Class 1 was
-itself Class 1 four times; the method caught that, inspection did not.
-
-**2026-09-07, the owed `security` pass: a fifth and sixth instance, and
-one of them marks where this technique stops.** F14, F15 and F16 came
-out of the pass over `5a7a400..HEAD` run before merging. F15 is the same
-hat worn again — F10 closed the "exited 0 without doing the work" hole
-for three of the four sweeps and left the fourth, because
-`plan-citations: OK` is a *prefix* of the scanned-nothing line that F2's
-own fix had added. Fixed with a fragment only the working line can
-print; and the fixture now carries a resolvable citation, so
-plan-citations' whole resolution path went from swept zero times to
-asserted in both directions.
-
-F14 is the one worth reading. F11 asked the sweep to prove the shim is
-*the* git a gate calls rather than merely *a* git it calls, and F11's
-fix counted calls through the shim to do it. That can never work: the
-instrument is blind to exactly the calls in question, so a baseline
-taken through it undercounts by precisely the amount being measured, and
-the resulting comparison was provably dead at all four call sites.
-Demonstrated after the fix as well as before — point
-`plan_code_fingerprint` at an absolute `git` and all four sweeps still
-report `ok`. **A dynamic check cannot assert a property about the calls
-it cannot observe.** That property is now asserted on the source
-instead: every `git` in the four swept gates and `lib.sh` must be a bare
-PATH-resolved word. The dead comparison was replaced by the only
-condition it could ever have expressed — a gate that outgrew `max`,
-leaving its tail unswept — stated as itself. Two rounds were spent
-fixing a check that was in the wrong layer.
-
-Verified to rung 3 (ran it locally, output inspected): the harness runs
-green, every finding was reproduced before its fix and re-checked after,
-and `verify-ladder` passes with the harness wired in. Rungs 4-5 do not
-apply — no host-visible behaviour changed.
-
-**Next, in order:** sweep the remaining gates (`plan-lint`,
-`subagent-stamp`, `plan-freeze`/`plan-move`, and the `.githooks`, which
-mutate and so need a per-iteration scratch repo); then the Class 3-5
-items below, which are untouched. **Read G2 before extending the
-harness** -- it is the method, and the difference between a suite that
-finds defects and one that records old ones.
-
-### Pick-up point, 2026-09-07
-
-**Where.** Worktree
-`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
-branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-never the main checkout.
-
-**Committed and pushed through `08771c2`.** `5eb67ef` closed the review
-loop over `854156c`'s unreviewed tail (F61-F65 on the map plan).
-`08771c2` is child 3 of the map -- the evidence-ladder/deploy-sequence
-split with the rung declaration and its gate -- plus this plan's
-harness. Both plans have every finding resolved, both declare a rung,
-both pass `plan-lint`, and `verify-ladder` passes with `gate-tests`
-wired in.
-
-**The loop ran to completion, and stopped on D7's recurrence rule.**
-`/simplify`, `docs-updater` and `security` all ran over the harness;
-their findings became F3 and F5-F13, all resolved. The fix stage for
-F10-F13 changed code after `security` last looked, so one more pass is
-owed by the letter of the loop. It was not run, for the reason D7 gives
-for stopping: F3, F6, F7 and F10 are the *same finding* recurring, and
-the loop was converting one round's fix into the next round's defect.
-Each of the four fixes was instead confirmed by mutation -- break the
-code, watch the assertion go red, restore it -- which is stronger
-evidence than a fifth reading. **That owed pass ran 2026-09-07 over
-`git diff 5a7a400..HEAD`** and found F14, F15 and F16 -- the shape a
-fifth and sixth time, plus a hermeticity gap. All three are fixed and
-each was reproduced before its fix; see `## State`. Stopping on the
-recurrence rule was right about the reading being weaker than the
-mutation, and wrong that the round was finished: the two MEDIUMs were
-both live, and F14 is the one that names why the previous two rounds
-could not have worked.
-
-**Then:** push the stamps, and merge PR #68 -- the user
-signed that off 2026-09-07, to be done after child 3 lands and *before*
-child 2 starts, so child 2 runs against a base where the stamp gates are
-real rather than legacy (#F12 on the map plan). Resolve the PR #67
-conflict by taking this branch's `reference.md`. Then child 2 of the
-map, as expand-contract per its G6.
-
-**Do not backfill the rung declaration into older plans.** Seven open
-plans predate the gate and will refuse to close until whoever did the
-work adds one sentence. The user signed that off 2026-09-07; see the
-child plan's G2.
 
 ## Progress
 

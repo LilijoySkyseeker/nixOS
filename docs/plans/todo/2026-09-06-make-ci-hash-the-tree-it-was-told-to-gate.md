@@ -3,9 +3,19 @@ slug: make-ci-hash-the-tree-it-was-told-to-gate
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # make CI hash the tree it was told to gate
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` altitude finding. The
+fix is a two-line CI change whose failure mode is fail-open, so it needs
+a real PR to verify rather than a local test.
 
 ## Original plan
 
@@ -88,12 +98,6 @@ Must be tested with real PRs, not reasoned about:
 2. Land an unrelated `.nix` or `flake.lock` commit on master.
 3. Confirm the open PR's stamps do **not** go stale.
 4. Confirm a genuinely stale stamp still blocks.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` altitude finding. The
-fix is a two-line CI change whose failure mode is fail-open, so it needs
-a real PR to verify rather than a local test.
 
 ## Progress
 

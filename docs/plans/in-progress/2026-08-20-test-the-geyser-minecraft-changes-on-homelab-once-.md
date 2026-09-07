@@ -3,6 +3,10 @@ slug: test-the-geyser-minecraft-changes-on-homelab-once-
 created: 2026-08-20
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # test the Geyser/Minecraft changes on homelab once deployed

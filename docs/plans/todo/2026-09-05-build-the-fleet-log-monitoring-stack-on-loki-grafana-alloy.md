@@ -3,9 +3,24 @@ slug: build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy
 created: 2026-09-05
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # build the fleet log monitoring stack on Loki Grafana Alloy
+
+## State
+
+**2026-09-05, not started.** Design fully settled; every decision below
+is answered and no code has been written. Blocked on the ZFS tier plan
+landing first (see Ordering).
+
+The one genuinely unknown quantity is whether Alloy fits on vps
+alongside CrowdSec, Caddy and zram inside 1GB — upstream publishes no
+minimal-footprint number, so this is measured rather than assumed (D16),
+with a pre-agreed fallback if it does not fit (D15).
 
 ## Original plan
 
@@ -26,17 +41,6 @@ this. Two follow-ups are deliberately deferred out of it:
 `2026-09-05-close-deferred-logging-blind-spots-game-ports-nfs-auditd.md`
 (security events that currently produce no log signal at all) and
 application-level alert rules (D13).
-
-## State
-
-**2026-09-05, not started.** Design fully settled; every decision below
-is answered and no code has been written. Blocked on the ZFS tier plan
-landing first (see Ordering).
-
-The one genuinely unknown quantity is whether Alloy fits on vps
-alongside CrowdSec, Caddy and zram inside 1GB — upstream publishes no
-minimal-footprint number, so this is measured rather than assumed (D16),
-with a pre-agreed fallback if it does not fit (D15).
 
 ## Progress
 

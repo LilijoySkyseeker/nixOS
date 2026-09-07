@@ -3,9 +3,19 @@ slug: close-deferred-logging-blind-spots-game-ports-nfs-auditd
 created: 2026-09-05
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # close deferred logging blind spots game ports NFS auditd
+
+## State
+
+**2026-09-05, not started.** All three blind spots are open. Identified
+during the 2026-09-05 fleet exposure analysis; none is a regression, all
+are pre-existing gaps.
 
 ## Original plan
 
@@ -24,12 +34,6 @@ and punted these.
 `2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md`
 being live — there is no value in generating these logs before something
 collects and alerts on them. Blocks nothing.
-
-## State
-
-**2026-09-05, not started.** All three blind spots are open. Identified
-during the 2026-09-05 fleet exposure analysis; none is a regression, all
-are pre-existing gaps.
 
 ## Progress
 

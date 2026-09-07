@@ -3,9 +3,22 @@ slug: track-non-security-ops-blind-spots-found-outside-current-tracking
 created: 2026-08-29
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Track non-security ops blind spots found outside current tracking
+
+## State
+
+**2026-08-29.** F2 (Nix store GC) resolved MOOT on user request to verify
+it — the original claim was wrong, GC is already handled fleet-wide via
+`programs.nh.clean`. 8 findings remain open (F1, F3-F9). F1
+(`stateVersion`) is the one worth checking first — it needs a factual
+answer (when was each host actually first installed, D1) before it can
+even be fixed correctly.
 
 ## Original plan
 
@@ -39,15 +52,6 @@ pruning on purpose), a different problem from unmanaged store generations,
 `zfs-space-guard.nix` really doesn't cover it, but a separate mechanism
 (`programs.nh.clean`) does, and the first pass didn't check for it. See
 G2.
-
-## State
-
-**2026-08-29.** F2 (Nix store GC) resolved MOOT on user request to verify
-it — the original claim was wrong, GC is already handled fleet-wide via
-`programs.nh.clean`. 8 findings remain open (F1, F3-F9). F1
-(`stateVersion`) is the one worth checking first — it needs a factual
-answer (when was each host actually first installed, D1) before it can
-even be fixed correctly.
 
 ## Progress
 - [ ] F1

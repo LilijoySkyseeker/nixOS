@@ -3,9 +3,41 @@ slug: nix-state-zfs-snapshot-dir-is-world-traversable-ex
 created: 2026-08-28
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # /nix/state/.zfs is world-traversable, exposing every secret that ever touched a persisted directory
+
+## State
+
+**2026-09-01.** D1 answered and implemented: `snapdir=disabled` on
+`zroot/local/state` (homelab only), via the new
+`modules/nixos/zfs-dataset-properties.nix` module, build/VM-test-verified
+(`tests/zfs-dataset-properties.nix`), not yet deployed. D2 (extend to the
+PCs) deferred and carried to
+`2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
+**Same day, follow-up:** `hosts/homelab/disko.nix` now reads this
+property (and, further, every zfs-property-shaped value in
+`myZfsDatasetProperties`, including the root-dataset properties in
+`vars.zfsRootFsOptions`) from the same declaration instead of a second
+hand-written literal, so a *fresh* install of homelab gets
+`snapdir=disabled` from `zroot/local/state`'s very first mount — no
+"already-cached automount" window at all. See
+`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`
+for the how; build/VM-verified, not deployed. Doesn't change anything
+about this plan's own remaining scope. Remaining open items are the two
+Progress bullets below — auditing for other secrets that sat in
+persisted dirs at readable modes, and rotating whatever that turns up.
+
+**2026-09-04.** Live-verified on homelab via SSH: `zfs get snapdir
+zroot/local/state` reports `disabled` (source `local`), and
+`/nix/state/.zfs` no longer resolves at all (`No such file or
+directory`) — the fix is deployed and the traversal path is actually
+closed, not just build-verified. Doesn't resolve the two remaining
+Progress items (secret audit, rotation), which are still open.
 
 ## Original plan
 
@@ -38,34 +70,6 @@ internet-reachable service on homelab (vps Caddy + Anubis → wg0 → 8096),
 and its pinned unit sets `ProtectSystem = true` rather than `"strict"`,
 so `/nix/state` is fully readable from inside its sandbox. Code execution
 in jellyfin reads any of it.
-
-## State
-
-**2026-09-01.** D1 answered and implemented: `snapdir=disabled` on
-`zroot/local/state` (homelab only), via the new
-`modules/nixos/zfs-dataset-properties.nix` module, build/VM-test-verified
-(`tests/zfs-dataset-properties.nix`), not yet deployed. D2 (extend to the
-PCs) deferred and carried to
-`2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
-**Same day, follow-up:** `hosts/homelab/disko.nix` now reads this
-property (and, further, every zfs-property-shaped value in
-`myZfsDatasetProperties`, including the root-dataset properties in
-`vars.zfsRootFsOptions`) from the same declaration instead of a second
-hand-written literal, so a *fresh* install of homelab gets
-`snapdir=disabled` from `zroot/local/state`'s very first mount — no
-"already-cached automount" window at all. See
-`2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`
-for the how; build/VM-verified, not deployed. Doesn't change anything
-about this plan's own remaining scope. Remaining open items are the two
-Progress bullets below — auditing for other secrets that sat in
-persisted dirs at readable modes, and rotating whatever that turns up.
-
-**2026-09-04.** Live-verified on homelab via SSH: `zfs get snapdir
-zroot/local/state` reports `disabled` (source `local`), and
-`/nix/state/.zfs` no longer resolves at all (`No such file or
-directory`) — the fix is deployed and the traversal path is actually
-closed, not just build-verified. Doesn't resolve the two remaining
-Progress items (secret audit, rotation), which are still open.
 
 ## Progress
 

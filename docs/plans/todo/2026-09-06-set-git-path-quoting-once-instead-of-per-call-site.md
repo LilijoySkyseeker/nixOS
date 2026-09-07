@@ -3,9 +3,20 @@ slug: set-git-path-quoting-once-instead-of-per-call-site
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # set git path quoting once instead of per call site
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` altitude finding. The
+per-call-site fix is already in place and correct at all seven sites, so
+this is a robustness improvement against the *next* call site, not a
+live defect.
 
 ## Original plan
 
@@ -74,13 +85,6 @@ Create `modules/café-scratch.nix`, confirm `required-agents` names
 lints it rather than skipping it, and confirm the fingerprint moves.
 Repeat with a path containing a literal newline to establish which of the
 two problems the chosen change actually solves.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` altitude finding. The
-per-call-site fix is already in place and correct at all seven sites, so
-this is a robustness improvement against the *next* call site, not a
-live defect.
 
 ## Progress
 

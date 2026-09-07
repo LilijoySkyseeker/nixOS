@@ -3,9 +3,19 @@ slug: extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without
 created: 2026-09-01
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # extend the .zfs snapshot-traversal fix to the PC hosts without breaking backup browsing
+
+## State
+
+**2026-09-01, just opened, nothing decided yet.** Carried from the
+parent plan's D2 so it doesn't rot silently un-tracked. No research done
+yet on the options below beyond naming them.
 
 ## Original plan
 
@@ -24,12 +34,6 @@ The mechanism to apply it, once a decision lands, already exists and
 needs no new code: `modules/nixos/zfs-dataset-properties.nix`
 (`myZfsDatasetProperties`) — set the option on torrent/thinkpad the same
 way homelab does, or don't, depending on what D1 below decides.
-
-## State
-
-**2026-09-01, just opened, nothing decided yet.** Carried from the
-parent plan's D2 so it doesn't rot silently un-tracked. No research done
-yet on the options below beyond naming them.
 
 ## Progress
 

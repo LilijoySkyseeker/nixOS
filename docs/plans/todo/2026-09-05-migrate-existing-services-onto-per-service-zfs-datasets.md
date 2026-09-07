@@ -3,9 +3,20 @@ slug: migrate-existing-services-onto-per-service-zfs-datasets
 created: 2026-09-05
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # migrate existing services onto per-service ZFS datasets
+
+## State
+
+**2026-09-05, not started.** Deferred at creation. No services migrated;
+`zroot/local/state` still holds everything except the two
+reclassifications handled in the tier plan (Jellyfin `cacheDir`,
+`/var/lib/docker`).
 
 ## Original plan
 
@@ -26,13 +37,6 @@ the registry and the recursive restic enumeration in place first). Its
 completion is also what allows the legacy hardcoded restic dataset list
 to be deleted — see that plan's `#D6`. Not urgent: nothing is broken
 today, the current shared dataset simply gives coarser control.
-
-## State
-
-**2026-09-05, not started.** Deferred at creation. No services migrated;
-`zroot/local/state` still holds everything except the two
-reclassifications handled in the tier plan (Jellyfin `cacheDir`,
-`/var/lib/docker`).
 
 ## Progress
 

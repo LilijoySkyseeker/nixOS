@@ -3,6 +3,10 @@ slug: a-manual-deploy-kills-the-in-flight-weekly-restic-
 created: 2026-08-28
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # a manual deploy kills the in-flight weekly restic backup and leaves the repo locked

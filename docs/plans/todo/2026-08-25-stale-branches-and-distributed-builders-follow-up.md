@@ -3,6 +3,10 @@ slug: stale-branches-and-distributed-builders-follow-up
 created: 2026-08-25
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Stale branches and distributed-builders follow-up

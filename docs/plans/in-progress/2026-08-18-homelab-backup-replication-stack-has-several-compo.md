@@ -3,9 +3,31 @@ slug: homelab-backup-replication-stack-has-several-compo
 created: 2026-08-18
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # homelab backup/replication stack has several compounding risks if the box is powered off for an extended period (over a month), surfaced while reasoning through the full backup reset/re-test
+
+## State
+**2026-08-30.** Manually triggered `restic-backups-backblazeWeekly` end to
+end (2026-08-29 22:50 -> 2026-08-30 08:46, 9h56m) to clear the Aug 21
+staleness and check on the Aug 28 failure. Run succeeded, `last-success`
+marker updated, `restic check` reports no errors. Confirmed pruning is
+already automatic (G1) and captured a full timing/throughput benchmark
+(G3) for sizing future backup work. One loose end: G2's orphaned-pack
+warning should be re-checked on the next scheduled run (Fri 2026-09-04)
+to confirm it clears on its own.
+
+**2026-09-04.** Re-checked: it did **not** clear on its own. The
+`restic-backups-backblazeWeekly.service` run at 03:00 today logged the
+same `63 additional files were found in the repo, which likely contain
+duplicate data` message, then `no errors were found` on the integrity
+check — identical to the 2026-08-30 count. Automatic `forget --prune`
+is not reaching these packs. Assumption in G2 below was wrong; a manual
+`restic prune` is the actual fix, not a wait-and-see.
 
 ## Original plan
 
@@ -80,24 +102,6 @@ frozen: false
       Still open: the `--keep-daily 2` history-loss caveat above
       (intentional, just needs to stay documented) and observing the
       `Persistent = false` deploy through an actual long-outage reboot.
-
-## State
-**2026-08-30.** Manually triggered `restic-backups-backblazeWeekly` end to
-end (2026-08-29 22:50 -> 2026-08-30 08:46, 9h56m) to clear the Aug 21
-staleness and check on the Aug 28 failure. Run succeeded, `last-success`
-marker updated, `restic check` reports no errors. Confirmed pruning is
-already automatic (G1) and captured a full timing/throughput benchmark
-(G3) for sizing future backup work. One loose end: G2's orphaned-pack
-warning should be re-checked on the next scheduled run (Fri 2026-09-04)
-to confirm it clears on its own.
-
-**2026-09-04.** Re-checked: it did **not** clear on its own. The
-`restic-backups-backblazeWeekly.service` run at 03:00 today logged the
-same `63 additional files were found in the repo, which likely contain
-duplicate data` message, then `no errors were found` on the integrity
-check — identical to the 2026-08-30 count. Automatic `forget --prune`
-is not reaching these packs. Assumption in G2 below was wrong; a manual
-`restic prune` is the actual fix, not a wait-and-see.
 
 ## Progress
 - [x] G1 -- confirmed pruning is already automatic

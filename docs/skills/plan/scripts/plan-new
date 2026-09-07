@@ -18,34 +18,35 @@ $existing"
 
 rel="docs/plans/todo/${today}-${slug}.md"
 mkdir -p "$root/docs/plans/todo"
+# frontmatter shape; the field vocabularies themselves live in lib.sh
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D4
 cat > "$root/$rel" <<EOF
 ---
 slug: ${slug}
 created: ${today}
 status: todo
 frozen: false
+kind: ${PLAN_DEFAULT_KIND}
+priority: ${PLAN_DEFAULT_PRIORITY}
+blocked_by:
+superseded_by:
 ---
 
 # ${title}
-
-## Original plan
-
-
-## State
-
-
-## Progress
-
-
-## Decisions (D)
-
-
-## Gotchas (G)
-
-
-## Findings (F)
-*(populated by security/docs-updater when invoked)*
 EOF
+
+# headings come from PLAN_SECTIONS, the same list plan-lint checks the order
+# against, so generator and checker cannot drift apart
+for _section in "${PLAN_SECTIONS[@]}"; do
+  printf '\n%s\n' "$_section" >> "$root/$rel"
+  # The placeholder sits directly under its heading, as it does in the 95
+  # corpus files that carry one; every other section gets a blank body.
+  if [ "$_section" = "${PLAN_SECTIONS[-1]}" ]; then
+    printf '*(populated by security/docs-updater when invoked)*\n' >> "$root/$rel"
+  else
+    printf '\n' >> "$root/$rel"
+  fi
+done
 
 git -C "$root" add "$rel"
 plan_mark_touched "$root" "$rel"

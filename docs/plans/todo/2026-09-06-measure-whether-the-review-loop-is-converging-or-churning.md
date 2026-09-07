@@ -3,9 +3,20 @@ slug: measure-whether-the-review-loop-is-converging-or-churning
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # measure whether the review loop is converging or churning
+
+## State
+
+Not started. Filed 2026-09-06 at the user's request, from a question
+asked while the motivating session's own loop was running: "what is the
+best way to track actual progress in the loop, and keep it from looping
+forever?"
 
 ## Original plan
 
@@ -92,13 +103,6 @@ is a follow-up") is a cruder backstop for when the floor is ambiguous.
 Changing the loop's exit condition. Code stability is the correct fixed
 point and this plan does not propose replacing it — only making the
 approach to it visible.
-
-## State
-
-Not started. Filed 2026-09-06 at the user's request, from a question
-asked while the motivating session's own loop was running: "what is the
-best way to track actual progress in the loop, and keep it from looping
-forever?"
 
 ## Progress
 

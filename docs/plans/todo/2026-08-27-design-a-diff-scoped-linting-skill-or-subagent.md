@@ -3,6 +3,10 @@ slug: design-a-diff-scoped-linting-skill-or-subagent
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Design a diff-scoped linting skill or subagent

@@ -3,6 +3,10 @@ slug: route-every-fact-into-one-channel-by-decidability-and-audience
 created: 2026-09-05
 status: in-progress
 frozen: false
+kind: map
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # route every fact into one channel by decidability and audience
@@ -11,99 +15,6 @@ frozen: false
 destination plus child plans with blocking edges, worked one child at a
 time, rather than a single task plan. Until D4's `blocked_by` frontmatter
 exists the edges live in Progress below (see G1).
-
-## Original plan
-
-### Destination
-
-Every fact in this repo lives in **one** channel, chosen by whether a
-machine can decide it and who needs to read it — and the mechanism that
-keeps it there runs without anyone remembering to run it.
-
-Reaching it means: no channel carries a fact another channel already
-carries, every obligation fires on a mechanical trigger rather than on
-judgment, and an outside reader can learn something here without reading
-anything written for an agent.
-
-### Why
-
-Three failures, one cause:
-
-1. Agents do not read `docs/` prose.
-2. Agents do not update it — **78 of 86** plan files still carry the
-   untouched `*(populated by security/docs-updater when invoked)*`
-   placeholder.
-3. There is no concise human-facing layer, though the repo is public
-   under the Unlicense specifically so others can learn from and lift
-   out of it.
-
-The cause is visible in one file. `docs/skills/workflow/SKILL.md` step 6
-mandates `/simplify` for every non-trivial change — done — and
-`security`/`docs-updater` "where relevant" — done ~9% of the time. Same
-skill, same agent, one sentence apart. **Judgment-gated obligations get
-skipped; mechanically-triggered ones do not.** `scripts/doc-host.sh` is
-the control: it fires on "did the diff touch host config", and its
-generated inventory blocks are current.
-
-Volume is a symptom, not the disease. Markdown outruns Nix roughly 4:1,
-but prose nobody reads would be a problem at any size.
-
-### The routing rule (D1)
-
-Ask decidability first, then audience and scope:
-
-| Ask | Channel |
-|---|---|
-| Can a machine decide it? | **Mechanism** |
-| Does an agent need it on *every* task? | **`AGENTS.md`** — auto-loaded, hard budget (~1,290 words) |
-| Does an agent need it *during a specific activity*? | **That activity's skill reference** — loaded on invoke |
-| Otherwise, a person needs to understand it | **Human prose** — `README.md`, explainers, `docs/` |
-
-Decidability leads because it is the only objective question; audience is
-a judgment call, and leading with it makes every routing decision inherit
-that judgment. `AGENTS.md` is both index and rules channel, and its budget
-is exactly what forces the third row to exist.
-
-**No fact is rendered twice, and the unit is the fact, not the topic.**
-ZFS policy tiers spans all four channels without duplication: "tier is
-path segment 2, a dataset declared without one is an eval error" is
-mechanism (`modules/nixos/datasets.nix`); "never point a root service at
-a user-writable path" is an `AGENTS.md`-class standing rule; "how to add
-a dataset to a live host" is a skill reference, because disko will not and
-`zfs create` stays manual; "why exclusion means a separate dataset" is
-human prose, already in
-`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`.
-
-Plans and ADRs are orthogonal to all four — they are the why-record, not
-a delivery channel.
-
-### Notes
-
-Consult on every session working this map: `docs/skills/plan/SKILL.md`,
-`docs/skills/workflow/SKILL.md` and its `reference.md` (trust hierarchy),
-`docs/style-guide.md`, `docs/procedures/testing-changes.md`.
-
-Standing preference for this effort: prefer deleting prose over rewriting
-it, and prefer a generated block over prose describing what could be
-generated.
-
-### Out of scope
-
-Ruled outside this destination; these do not graduate.
-
-- **Adopting the Matt Pocock engineering skill set.** Evaluated and
-  declined: its pipeline assumes a live issue tracker (this repo has 0
-  issues and 86 plan files) and a sub-second test loop (this repo has 8
-  VM tests that boot real machines), and its enforcement is prose where
-  this repo's is hooks. Four ideas were taken and appear as children
-  below — the map shape, expand-contract, two-axis review separation,
-  and the diagnosis goal met by making the trust hierarchy binding.
-  Nothing else from it is in scope.
-- **Rewriting the plan-file schema.** See D4 — a rewrite breaks 86 files
-  and 31 live `# plan:` code citations to buy what a targeted revision
-  already delivers.
-- **Rolling back `docs/adr/`.** See D3.
-- **Deleting any plan, audit, or superseded document.** See D5.
 
 ## State
 
@@ -229,6 +140,99 @@ citations break otherwise), then 7 (unblocked now 3 and 4 are done),
   already subsumes #67's serialization rule (G8).
 - `git stash` is shared across worktrees here; use a WIP commit instead.
 
+## Original plan
+
+### Destination
+
+Every fact in this repo lives in **one** channel, chosen by whether a
+machine can decide it and who needs to read it — and the mechanism that
+keeps it there runs without anyone remembering to run it.
+
+Reaching it means: no channel carries a fact another channel already
+carries, every obligation fires on a mechanical trigger rather than on
+judgment, and an outside reader can learn something here without reading
+anything written for an agent.
+
+### Why
+
+Three failures, one cause:
+
+1. Agents do not read `docs/` prose.
+2. Agents do not update it — **78 of 86** plan files still carry the
+   untouched `*(populated by security/docs-updater when invoked)*`
+   placeholder.
+3. There is no concise human-facing layer, though the repo is public
+   under the Unlicense specifically so others can learn from and lift
+   out of it.
+
+The cause is visible in one file. `docs/skills/workflow/SKILL.md` step 6
+mandates `/simplify` for every non-trivial change — done — and
+`security`/`docs-updater` "where relevant" — done ~9% of the time. Same
+skill, same agent, one sentence apart. **Judgment-gated obligations get
+skipped; mechanically-triggered ones do not.** `scripts/doc-host.sh` is
+the control: it fires on "did the diff touch host config", and its
+generated inventory blocks are current.
+
+Volume is a symptom, not the disease. Markdown outruns Nix roughly 4:1,
+but prose nobody reads would be a problem at any size.
+
+### The routing rule (D1)
+
+Ask decidability first, then audience and scope:
+
+| Ask | Channel |
+|---|---|
+| Can a machine decide it? | **Mechanism** |
+| Does an agent need it on *every* task? | **`AGENTS.md`** — auto-loaded, hard budget (~1,290 words) |
+| Does an agent need it *during a specific activity*? | **That activity's skill reference** — loaded on invoke |
+| Otherwise, a person needs to understand it | **Human prose** — `README.md`, explainers, `docs/` |
+
+Decidability leads because it is the only objective question; audience is
+a judgment call, and leading with it makes every routing decision inherit
+that judgment. `AGENTS.md` is both index and rules channel, and its budget
+is exactly what forces the third row to exist.
+
+**No fact is rendered twice, and the unit is the fact, not the topic.**
+ZFS policy tiers spans all four channels without duplication: "tier is
+path segment 2, a dataset declared without one is an eval error" is
+mechanism (`modules/nixos/datasets.nix`); "never point a root service at
+a user-writable path" is an `AGENTS.md`-class standing rule; "how to add
+a dataset to a live host" is a skill reference, because disko will not and
+`zfs create` stays manual; "why exclusion means a separate dataset" is
+human prose, already in
+`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`.
+
+Plans and ADRs are orthogonal to all four — they are the why-record, not
+a delivery channel.
+
+### Notes
+
+Consult on every session working this map: `docs/skills/plan/SKILL.md`,
+`docs/skills/workflow/SKILL.md` and its `reference.md` (trust hierarchy),
+`docs/style-guide.md`, `docs/procedures/testing-changes.md`.
+
+Standing preference for this effort: prefer deleting prose over rewriting
+it, and prefer a generated block over prose describing what could be
+generated.
+
+### Out of scope
+
+Ruled outside this destination; these do not graduate.
+
+- **Adopting the Matt Pocock engineering skill set.** Evaluated and
+  declined: its pipeline assumes a live issue tracker (this repo has 0
+  issues and 86 plan files) and a sub-second test loop (this repo has 8
+  VM tests that boot real machines), and its enforcement is prose where
+  this repo's is hooks. Four ideas were taken and appear as children
+  below — the map shape, expand-contract, two-axis review separation,
+  and the diagnosis goal met by making the trust hierarchy binding.
+  Nothing else from it is in scope.
+- **Rewriting the plan-file schema.** See D4 — a rewrite breaks 86 files
+  and 31 live `# plan:` code citations to buy what a targeted revision
+  already delivers.
+- **Rolling back `docs/adr/`.** See D3.
+- **Deleting any plan, audit, or superseded document.** See D5.
+
 ## Progress
 
 Frontier (no blockers, takeable now):
@@ -252,9 +256,12 @@ Frontier (no blockers, takeable now):
 
 Blocked:
 
-- [ ] 2. plan-file layout revision — `## State` first, three frontmatter
-      fields, defect G-to-F reclassification — blocked by 5, see D4
-      and G6
+- [ ] 2. plan-file layout revision — `## State` first, four frontmatter
+      fields (`kind`, `priority`, `blocked_by`, `superseded_by`, per D4;
+      this line said three), defect G-to-F reclassification — see D4 and
+      G6. Schema half landed 2026-09-07 as
+      2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md;
+      the G-to-F half is still open
 - [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
       — blocked by 3, 4
 - [ ] 8. `spec-check` subagent — blocked by 4

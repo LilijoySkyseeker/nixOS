@@ -67,6 +67,15 @@ if active_plan="$(plan_active_plan)"; then
     echo "BLOCKED: the active plan is malformed. See the problems above." >&2
     fail=1
   fi
+elif marker_problem="$(plan_active_plan_problem)"; [ -n "$marker_problem" ]; then
+  # A marker naming nothing usable is not the same as no marker, and
+  # plan_active_plan returns 1 for both. A plan deleted or renamed after
+  # plan-new wrote the marker left this pointing at a missing file, and the
+  # lint was skipped under a line that reads like a clean pass -- observed,
+  # not hypothetical.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+  echo "BLOCKED: $marker_problem. Fix or remove the marker." >&2
+  fail=1
 else
   echo "(no active plan this session)"
 fi

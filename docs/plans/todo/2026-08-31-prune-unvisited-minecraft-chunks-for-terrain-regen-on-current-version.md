@@ -3,24 +3,13 @@ slug: prune-unvisited-minecraft-chunks-for-terrain-regen-on-current-version
 created: 2026-08-31
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Prune unvisited Minecraft chunks for terrain regen on current version
-
-## Original plan
-
-Homelab's `minecraft-vanilla-plus` world (`modules/services/minecraft.nix`)
-was created on an old Minecraft version and has large areas of terrain
-generated under old world-gen. Delete chunks that show no meaningful
-player presence so they regenerate under the *current* version's terrain
-generator the next time a player (or the DistantHorizons LOD system)
-approaches them, without touching hand-built/explored areas.
-
-**2026-08-31 addition:** the eventual execution should be a human-runnable
-script, not a one-off sequence of commands typed by hand from this file --
-this is the kind of operation that's plausible to want again after a
-future version bump, and a script also removes the chance of fat-fingering
-a path or flag when actually running the destructive steps. See D4.
 
 ## State
 
@@ -40,6 +29,21 @@ One perishable detail: the downloaded jar and CSV selection files live
 under `/tmp/mcaselector-work` on homelab, which will not survive a reboot
 (see G7) -- check they're still there before reusing the exact commands
 below verbatim.
+
+## Original plan
+
+Homelab's `minecraft-vanilla-plus` world (`modules/services/minecraft.nix`)
+was created on an old Minecraft version and has large areas of terrain
+generated under old world-gen. Delete chunks that show no meaningful
+player presence so they regenerate under the *current* version's terrain
+generator the next time a player (or the DistantHorizons LOD system)
+approaches them, without touching hand-built/explored areas.
+
+**2026-08-31 addition:** the eventual execution should be a human-runnable
+script, not a one-off sequence of commands typed by hand from this file --
+this is the kind of operation that's plausible to want again after a
+future version bump, and a script also removes the chance of fat-fingering
+a path or flag when actually running the destructive steps. See D4.
 
 ## Progress
 

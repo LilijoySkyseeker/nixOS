@@ -215,6 +215,15 @@ printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
 printf -- '# note\n\nCites %s#G1 so the resolution path is under the sweep.\n' \
   "$fixture_plan" > "$repo/docs/note.md"
+# A second, deliberately well-formed plan: plan-lint's sweep needs a baseline
+# that passes, and the example plan above is intentionally partial.
+lint_plan="${fixture_date}-lint-clean.md"
+{
+  printf -- '---\nslug: lint-clean\ncreated: %s\nstatus: in-progress\nfrozen: false\n' "$fixture_date"
+  printf -- 'kind: task\npriority: normal\nblocked_by:\nsuperseded_by:\n---\n\n# lint clean\n'
+  printf -- '\n## State\n\nVerified to rung 1 (documentation).\n'
+  printf -- '\n## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$repo/docs/plans/in-progress/$lint_plan"
 git -C "$repo" add -A >/dev/null
 git -C "$repo" commit -qm base
 printf '{ }\n' > "$repo/a.nix"
@@ -348,6 +357,136 @@ elif ! printf '%s' "$control_out" | grep -qF 'obliged reviews stamped'; then
 else
   ok "plan-gate passes a stamped plan with resolved findings"
 fi
+
+section "plan-lint judges a plan on what it can actually satisfy"
+# plan-lint gained the schema rules, a frozen exemption and two reference
+# checks, and gate-tests covered none of it on a change whose own #F10 was a
+# gate that silently did nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F16
+lint_probe() { # <frontmatter-body> <sections> -- writes a probe plan, prints its path
+  local fm="$1" body="$2" f="$repo/docs/plans/todo/${fixture_date}-probe.md"
+  mkdir -p "$repo/docs/plans/todo"
+  printf -- '---\n%s\n---\n\n# probe\n\n%s\n' "$fm" "$body" > "$f"
+  printf 'docs/plans/todo/%s-probe.md' "$fixture_date"
+}
+lint_full_fm="slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:"
+lint_sections='## State
+
+x
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)'
+
+# A plan may not exempt itself. Only plan-freeze, via the checksum manifest,
+# can make a file frozen -- the field alone used to switch off every rule.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+expect_fail "plan-lint refuses a plan that declares itself frozen" "only plan-freeze may freeze" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: true" "## Progress")"
+
+# Both directions of the fence rule, because each was live: sections that
+# exist only inside a fence must not count, and a correct plan that quotes
+# the template inside State must not be blocked.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
+expect_fail "plan-lint does not count sections quoted inside a fence" "missing required section" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "$lint_full_fm" '```
+## State
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)
+```')"
+# State quotes a *late* heading. A fence-blind reader pins "## Findings (F)"
+# at that quoted line, above the real Decisions and Gotchas, and the order
+# check then reports a correct file as out-of-order -- a hard block nothing
+# can clear. Quoting the template in canonical order does not reproduce it:
+# first-wins keeps the sequence monotonic, which is why this case names the
+# shape that actually breaks rather than the tidy one.
+probe="$(lint_probe "$lint_full_fm" "## State
+
+The last section is:
+
+\`\`\`
+## Findings (F)
+\`\`\`
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)")"
+if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$probe" >/dev/null 2>&1; then
+  ok "plan-lint passes a plan that quotes the template inside State"
+else
+  bad "plan-lint passes a plan that quotes the template inside State" \
+    "a correct file was blocked by its own quoted example"
+fi
+
+# Every entry in a reference list is checked, including the last. Asserted as
+# the invariant rather than as the one dropped-newline bug: the only invalid
+# reference here is the final one, so a reader that stops early goes green.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
+expect_fail "plan-lint checks the last entry of a reference list" "not a plan filename" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+kind: task
+priority: normal
+blocked_by: ${fixture_date}-lint-clean.md, not-a-plan
+superseded_by:" "$lint_sections")"
+rm -f "$repo/docs/plans/todo/${fixture_date}-probe.md"
+
+# The three states of the active-plan marker. verify-ladder itself cannot be
+# run here -- it shells out to nix -- so the decision it makes lives in
+# plan_active_plan_problem and is asserted there instead. Absent and valid
+# must be silent; naming a deleted file must not be, which is the case that
+# was silently skipping the lint.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+marker_problem() { # <marker-contents, or nothing to remove the marker>
+  if [ $# -eq 0 ]; then rm -f "$repo/.claude/.active-plan"
+  else mkdir -p "$repo/.claude"; printf '%s\n' "$1" > "$repo/.claude/.active-plan"; fi
+  ( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_active_plan_problem .' )
+}
+[ -z "$(marker_problem)" ] &&
+  ok "no active-plan marker is not a problem" ||
+  bad "no active-plan marker is not a problem" "reported one"
+[ -n "$(marker_problem "docs/plans/todo/${fixture_date}-gone.md")" ] &&
+  ok "a marker naming a deleted plan is a problem" ||
+  bad "a marker naming a deleted plan is a problem" "reported nothing, so the caller skips its check"
+[ -z "$(marker_problem "docs/plans/in-progress/$lint_plan")" ] &&
+  ok "a marker naming a real plan is not a problem" ||
+  bad "a marker naming a real plan is not a problem" "reported one"
+rm -f "$repo/.claude/.active-plan"
 
 section "plan-citations resolves what exists and refuses what does not"
 # The sweep below asserts that plan-citations refuses when a git call under
@@ -594,6 +733,9 @@ sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
 # make a scanned-nothing run visible -- so the baseline accepted a gate that
 # scanned nothing. Only the working line can print this.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "docs/plans/in-progress/$lint_plan"
 sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
 

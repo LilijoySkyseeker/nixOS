@@ -3,18 +3,13 @@ slug: gpu-accelerate-immich-machine-learning-cuda
 created: 2026-09-03
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # GPU-accelerate Immich machine learning (CUDA)
-
-## Original plan
-
-Follow-up to `2026-09-03-add-immich-tailscale-only-to-homelab.md`, carried
-from that plan's D3. Immich's machine-learning worker (face detection,
-CLIP smart search) runs CPU-only in v1. This plan is to add
-CUDA-accelerated `onnxruntime` for it using homelab's existing Nvidia GTX
-1050 Mobile, once that base service has been live long enough to know
-whether real ML latency actually justifies the build cost.
 
 ## State
 
@@ -24,6 +19,15 @@ except priority; the recipe is known and working (per the NixOS Discourse
 thread cited in F2). Before starting, re-check current per-photo ML
 latency on the live CPU-only install — the whole point of deferring was
 to see whether it's actually worth a multi-hour one-time build.
+
+## Original plan
+
+Follow-up to `2026-09-03-add-immich-tailscale-only-to-homelab.md`, carried
+from that plan's D3. Immich's machine-learning worker (face detection,
+CLIP smart search) runs CPU-only in v1. This plan is to add
+CUDA-accelerated `onnxruntime` for it using homelab's existing Nvidia GTX
+1050 Mobile, once that base service has been live long enough to know
+whether real ML latency actually justifies the build cost.
 
 ## Progress
 - [ ] confirm CPU-only ML latency is actually a problem on the live install (don't build this speculatively)

@@ -3,9 +3,20 @@ slug: shrink-the-ci-trusted-set-by-splitting-lib-sh
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # shrink the CI trusted set by splitting lib.sh
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` altitude finding at the
+close of the session that built the gate. Deferred because it touches the
+CI pinning path, whose failure mode is fail-open and which cannot be
+tested locally.
 
 ## Original plan
 
@@ -71,13 +82,6 @@ must cover each — a missed one takes the workflow's `found=false` path,
 which prints "nothing to gate" and **exits 0**. That is a fail-open, so
 the pinning step needs an assertion that every expected file arrived,
 not just the first.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` altitude finding at the
-close of the session that built the gate. Deferred because it touches the
-CI pinning path, whose failure mode is fail-open and which cannot be
-tested locally.
 
 ## Progress
 

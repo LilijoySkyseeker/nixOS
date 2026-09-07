@@ -3,9 +3,20 @@ slug: make-the-frozen-plan-guard-survive-renames-and-stop-self-certifying
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # make the frozen-plan guard survive renames and stop self-certifying
+
+## State
+
+Not started. Filed 2026-09-06 from `security`'s sixth pass on the
+channel-routing branch, which found both while confirming F45's fixes.
+Neither is a regression from that work: (1) predates it and (2) is a
+property F45 improved without closing.
 
 ## Original plan
 
@@ -65,13 +76,6 @@ does not control the comparison. That is the same argument that puts
 good candidates for the failure-mode harness proposed in
 `2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md`,
 since each is a two-line reproduction.
-
-## State
-
-Not started. Filed 2026-09-06 from `security`'s sixth pass on the
-channel-routing branch, which found both while confirming F45's fixes.
-Neither is a regression from that work: (1) predates it and (2) is a
-property F45 improved without closing.
 
 ## Progress
 

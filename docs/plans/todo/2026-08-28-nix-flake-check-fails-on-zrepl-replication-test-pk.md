@@ -3,6 +3,10 @@ slug: nix-flake-check-fails-on-zrepl-replication-test-pk
 created: 2026-08-28
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # nix flake check fails on zrepl-replication test (pkgs.path context)

@@ -3,9 +3,21 @@ slug: make-plan-gate-survive-a-pr-that-changes-the-fingerprint-algorithm-or
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # make plan-gate survive a PR that changes the fingerprint algorithm or its inputs
+
+## State
+
+Not started. Filed 2026-09-06 as the follow-up to
+`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F14`,
+which the user accepted rather than fixed. Takeable once that branch has
+merged, since reproducing the failure needs a base branch that already
+runs the stamp check.
 
 ## Original plan
 
@@ -71,14 +83,6 @@ F14 is explicit that this must be tested with an **actual stacked PR**
 against a base that carries the stamp check, not by reasoning about the
 scripts. Reproduce the block first, then confirm the chosen fix clears it
 while a genuinely stale stamp still blocks.
-
-## State
-
-Not started. Filed 2026-09-06 as the follow-up to
-`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F14`,
-which the user accepted rather than fixed. Takeable once that branch has
-merged, since reproducing the failure needs a base branch that already
-runs the stamp check.
 
 ## Progress
 

@@ -3,9 +3,19 @@ slug: make-the-fingerprint-cover-symlinks-not-just-their-targets
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # make the fingerprint cover symlinks, not just their targets
+
+## State
+
+Not started. Filed 2026-09-06 from `docs-updater`'s F31, which fixed the
+comment and deliberately left the behaviour to a decision. Narrow gap,
+non-trivial fix, no urgency: review still fires on the affected paths.
 
 ## Original plan
 
@@ -82,12 +92,6 @@ Repoint one skill symlink, then confirm the fingerprint moves and
 `plan-gate` reports the stamp stale. Confirm the unchanged case still
 produces a stable value across locales, per
 `2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G10`.
-
-## State
-
-Not started. Filed 2026-09-06 from `docs-updater`'s F31, which fixed the
-comment and deliberately left the behaviour to a decision. Narrow gap,
-non-trivial fix, no urgency: review still fires on the affected paths.
 
 ## Progress
 

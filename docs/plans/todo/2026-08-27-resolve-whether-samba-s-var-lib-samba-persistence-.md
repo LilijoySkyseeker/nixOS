@@ -3,6 +3,10 @@ slug: resolve-whether-samba-s-var-lib-samba-persistence-
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Resolve whether samba's /var/lib/samba persistence is actually necessary

@@ -29,6 +29,36 @@ PLAN_STAMPABLE_AGENTS=("security" "docs-updater")
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
 PLAN_AGENT_ORDER=("/simplify" "docs-updater" "security" "spec-check")
 
+# the plan-file schema's vocabularies and key sets; plan-new, plan-lint and
+# the skill docs read these lists from here instead of restating them
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D4
+PLAN_KINDS=("task" "map")
+PLAN_PRIORITIES=("low" "normal" "high")
+# which vocabulary governs which field -- plan-lint reports an entry missing
+# here rather than dying on an unbound variable
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F15
+PLAN_VOCAB_FIELDS=("kind" "priority")
+declare -A PLAN_FIELD_VOCAB=([kind]="PLAN_KINDS" [priority]="PLAN_PRIORITIES")
+# what plan-new stamps on a new file; members of the vocabularies above, so a
+# generated plan lints clean
+PLAN_DEFAULT_KIND="task"
+PLAN_DEFAULT_PRIORITY="normal"
+# carried by every plan, including the 50 frozen ones written before the
+# schema grew
+PLAN_CORE_FIELDS=("slug" "created" "status" "frozen")
+# comma-separated bare plan filenames, same citation form as everywhere else,
+# so they survive a file moving between folders
+PLAN_REF_FIELDS=("blocked_by" "superseded_by")
+# added by the map plan's #D4, required of non-frozen plans only -- a frozen
+# file can never be edited to gain them; derived from the two lists above so a
+# field added to one and forgotten in the other cannot half-land
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1
+PLAN_SCHEMA_FIELDS=("${PLAN_VOCAB_FIELDS[@]}" "${PLAN_REF_FIELDS[@]}")
+
+# section order for a non-frozen plan, State first
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D4
+PLAN_SECTIONS=("## State" "## Original plan" "## Progress" "## Decisions (D)" "## Gotchas (G)" "## Findings (F)")
+
 plan_die() { printf 'plan: %s\n' "$*" >&2; exit 1; }
 plan_note() { printf '%s\n' "$*" >&2; }
 
@@ -85,6 +115,95 @@ plan_set_field() {
     }
     { print }
   ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# plan_frontmatter <file> -- every frontmatter key as "key<TAB>value", one
+# per line, value possibly empty. For a caller wanting several keys: one awk
+# instead of one per key, which is what plan-lint used to pay. Presence and
+# value both fall out of the one parse, so there is no separate has-this-key
+# helper -- an absent key has no line, an empty one an empty value.
+# plan_get_field stays the single-key reader every other plan-* script calls.
+plan_frontmatter() {
+  awk '
+    NR==1 && $0=="---" { infm=1; next }
+    infm && $0=="---" { exit }
+    infm {
+      i = index($0, ":")
+      if (i > 1) {
+        k = substr($0, 1, i - 1)
+        # first wins, because plan_get_field stops at its first match; two
+        # readers disagreeing over a duplicated key let one file be frozen to
+        # one caller and editable to the other
+        # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F12
+        if (k in seen) next
+        seen[k] = 1
+        if (k ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
+          v = substr($0, i + 1)
+          sub(/^[ \t]+/, "", v)
+          sub(/[ \t]+$/, "", v)
+          print k "\t" v
+        }
+      }
+    }
+  ' "$1"
+}
+
+# plan_headings <file> -- top-level "## " headings outside fenced code, as
+# "line<TAB>heading". Fence handling is plan_state_body's, and for the same
+# reason: a plain grep counts a heading quoted inside a fence, which both
+# passes a file whose only sections are an example template and blocks a
+# correct file that quotes one
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
+plan_headings() {
+  awk '
+    match($0, /^[ \t]*(`{3,}|~{3,})/) {
+      m = substr($0, RSTART, RLENGTH)
+      sub(/^[ \t]+/, "", m)
+      if (!fence) { fence = 1; open = m }
+      else if (substr(m, 1, 1) == substr(open, 1, 1) && length(m) >= length(open)) fence = 0
+      next
+    }
+    !fence && /^## / { print FNR "\t" $0 }
+  ' "$1"
+}
+
+# plan_active_plan_problem <root> -- prints why the active-plan marker cannot
+# be used, empty if it can or if there is no marker at all. The distinction is
+# the whole point: plan_active_plan returns 1 both for "no marker" and for
+# "marker naming a deleted file", and a caller that cannot tell them apart
+# skips its check under a line that reads like a pass.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+plan_active_plan_problem() {
+  local root="${1:-.}" marker="${1:-.}/$PLAN_ACTIVE_MARKER_RELPATH"
+  [ -s "$marker" ] || return 0
+  plan_active_plan "$root" >/dev/null && return 0
+  printf "%s names '%s', which is not a usable plan file" \
+    "$PLAN_ACTIVE_MARKER_RELPATH" "$(head -n 1 "$marker")"
+}
+
+# plan_manifest_frozen <root> <rel> -- frozen according to the checksum
+# manifest, which is the authority .githooks/pre-commit enforces. The file's
+# own `frozen:` field is self-declared: a todo/ plan can assert it and switch
+# off every rule that applies only to editable files
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+plan_manifest_frozen() {
+  local manifest="$1/$PLAN_CHECKSUMS_RELPATH"
+  [ -f "$manifest" ] || return 1
+  grep -qF "  $2" "$manifest"
+}
+
+# plan_field_refs <file> <key> -- one bare plan filename per line from a
+# comma-separated ref field. Empty output for an empty or absent field.
+plan_field_refs() {
+  local raw
+  raw="$(plan_get_field "$1" "$2")"
+  [ -n "$raw" ] || return 0
+  # printf '%s\n', not '%s': without the trailing newline the last entry
+  # reaches `while read` unterminated, read returns non-zero at EOF, and the
+  # loop body never runs for it -- every ref list silently skipped its final
+  # reference, which is the one a caller is most likely to have just added
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
+  printf '%s\n' "$raw" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d'
 }
 
 plan_is_frozen() {

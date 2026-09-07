@@ -3,9 +3,18 @@ slug: make-the-workflow-hooks-fail-closed-when-hook-lib-sh-is-missing
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # make the workflow hooks fail closed when hook-lib.sh is missing
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` finding. Independent of
+the channel-routing map; takeable any time.
 
 ## Original plan
 
@@ -68,11 +77,6 @@ two. Its failure mode is a missed pull-before-branch rather than an
 ungated commit, so denying every Bash call on a broken checkout may be
 disproportionate — but an inconsistent trio is its own maintenance
 hazard.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` finding. Independent of
-the channel-routing map; takeable any time.
 
 ## Progress
 

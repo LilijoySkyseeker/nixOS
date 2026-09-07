@@ -10,16 +10,79 @@
 - `<slug>`: kebab-case, chosen once by `plan-new`, never renamed. Capped
   at 70 characters, backing up to the last word boundary rather than
   cutting mid-word.
-- Frontmatter mirrors the folder for greppability but is only ever written
-  by the scripts:
+- Frontmatter mirrors the folder for greppability. The scripts write all of
+  it except `blocked_by`/`superseded_by`, which are hand-set (below):
   ```yaml
   ---
   slug: add-tailnet-build-fleet
   created: 2026-08-27
-  status: todo        # todo | in-progress | done | rejected
+  status: todo         # mirrors the folder (todo|in-progress|done|rejected)
   frozen: false        # true only once, set by plan-freeze
+  kind: task
+  priority: normal
+  blocked_by:          # comma-separated bare plan filenames
+  superseded_by:       # a bare plan filename
   ---
   ```
+  The block above is a shape example, not the vocabulary. What `kind` and
+  `priority` may contain, which keys are core and which the map plan's
+  `#D4` added, and which vocabulary governs which field, are the
+  `PLAN_*` arrays in `docs/skills/plan/scripts/lib.sh` — `plan-lint`
+  reads them from there, so read the arrays rather than a prose copy of
+  them. `status` is the exception: it has no array, it is checked
+  against the folder name.
+
+  `superseded_by` has no writer yet — `plan-supersede` and
+  `docs/plans/superseded/` are unbuilt
+  (2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D5).
+  Until one lands, both ref fields are set by hand or left empty.
+
+- `blocked_by` makes a map's dependency edges readable without parsing
+  its Progress prose.
+
+### Which files the schema rules apply to
+
+**The mutable corpus is migrated to the current schema whenever the
+schema changes; frozen files are exempt by definition.** A frozen plan
+cannot be edited, so every rule added after it froze is one it can never
+satisfy, and a gate nothing can clear is what teaches the bypass.
+`plan-lint` therefore checks the section set, the section order and the
+schema fields only where `frozen: false`, and checks the rules that do
+not depend on the era — core frontmatter, status against folder, id
+sequencing, Progress citations — everywhere.
+
+This is the rule to follow at the next schema revision, not a one-off
+for this one. See
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1
+and `#G5`.
+
+## `kind`, and the two shapes a plan comes in
+
+- **`task`** — the default. One piece of work, its own decisions, its own
+  close-out.
+- **`map`** — a plan whose Progress items are *other plans*. Children are
+  created at the frontier rather than all at once, so the map records
+  what is blocked by what and the child records how it was done.
+
+A map child that would break live citations runs as
+**expand—contract**: add the new form beside the old one, migrate the
+references in batches, and remove the old form only once the checker
+reports zero unresolved references for that batch. That ordering is the
+map pattern. It needs no skill of its own: it is a blocking-edge graph,
+and `blocked_by` plus `plan-citations` already supply both halves.
+
+## `G` is a lesson, `F` is a defect
+
+`D` has `plan-decide` and `F` has `plan-resolve`. `G` has neither, which
+is correct for a lesson — something learned, with nothing to drain — and
+wrong for a defect, which needs a terminal state. Record a defect as an
+`F` even when you found it yourself rather than a review agent.
+
+Plans written before this rule carry defects as `G`. Non-frozen ones
+migrate under
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md;
+frozen ones keep `#G` anchors forever, so `#G` stays a valid citation
+form permanently and is not being retired.
 
 ## Why bare-filename citations
 
@@ -169,19 +232,23 @@ slug: add-tailnet-build-fleet
 created: 2026-08-27
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
+superseded_by:
 ---
 
 # Add tailnet-wide distributed Nix builders
-
-## Original plan
-Wire nix.distributedBuilds/buildMachines so homelab/thinkpad/torrent can
-build for each other over Tailscale.
 
 ## State
 **2026-08-27, mid-work.** build-worker.nix landed and is live on homelab.
 build-fleet.nix is drafted but not yet wired into any host (blocked on
 D1, now answered -- next step is applying it). One finding (F1) from the
 `security` subagent is still open.
+
+## Original plan
+Wire nix.distributedBuilds/buildMachines so homelab/thinkpad/torrent can
+build for each other over Tailscale.
 
 ## Progress
 - [x] build-worker.nix drafted
