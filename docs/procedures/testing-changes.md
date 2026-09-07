@@ -77,22 +77,25 @@ full rationale).
 
 ## What's automated vs. what isn't
 
-- **`pre-commit` hook** — two guards. It blocks obviously-plaintext
+- **`pre-commit` hook** — three guards. It blocks obviously-plaintext
   secrets: a `secrets.yaml` without a `sops:` metadata block, or a
   staged file containing a private-key PEM block, an age secret key, or
   something shaped like a live AWS/Slack/GitHub token. Not a full
   secrets scanner, just a last-resort catch for the most common mistake.
   It also refuses to commit a change to a frozen plan under
   `docs/plans/{done,rejected}/`, checked against the recorded checksum.
-  Both read the **index**, not the working tree — see
+  Those two read the **index**, not the working tree — see
   2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
-  for why that distinction is the whole guard.
+  for why that distinction is the whole guard. The third,
+  `scripts/claude-links-check`, blocks a `docs/skills/`/`docs/agents/`
+  entry whose `.claude/` symlink is missing or wrong (see
+  `docs/skills/workflow/reference.md`, "Why a hook at all").
 - **`commit-msg` hook** — enforces Conventional Commits format on the
   subject line (`<type>(<scope>)?: <subject>`), skipping merge/
   fixup/squash commits.
 - **`pre-push` hook** — the main git-level automated layer. For every
   commit being pushed, diffs the range against `hosts/`, `modules/`,
-  `flake.nix`, `flake.lock`; for each host whose own directory changed
+  `files/`, `flake.nix`, `flake.lock`; for each host whose own directory changed
   *or* any of those shared paths changed (`modules/` covers
   `modules/nixos/`, `modules/home-manager/`, `modules/profiles/`,
   `modules/services/`, and `modules/flake/` alike, since they're all

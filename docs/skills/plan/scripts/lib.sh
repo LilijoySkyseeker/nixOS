@@ -251,13 +251,18 @@ plan_active_plan() {
   [ -f "$marker" ] || return 1
   rel="$(cat "$marker")" || return 1
   [ -n "$rel" ] && [ -f "$root/$rel" ] || return 1
-  # Same shape plan_locate rejects: subagent-stamp appends to whatever
-  # this names, so the marker must not be able to point outside
-  # docs/plans/. A real marker is always written by plan_mark_touched.
+  # Same two-arm shape as plan_locate's path guard, and for the same
+  # reason: subagent-stamp appends to whatever this names, so the marker
+  # must not be able to point outside docs/plans/. The '..' arm comes
+  # first because a case `*` matches '/', so the allowlist arm alone
+  # would pass 'docs/plans/../x'. An absolute path fails the allowlist
+  # arm on its own. A real marker is always written by plan_mark_touched,
+  # whose input went through plan_locate, so nothing legitimate is
+  # rejected.
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F59
   case "$rel" in
-    *..* | /*) return 1 ;;
-    docs/plans/*) ;;
+    *..*) return 1 ;;
+    docs/plans/*/*.md) ;;
     *) return 1 ;;
   esac
   printf '%s\n' "$rel"
@@ -276,13 +281,22 @@ plan_existing_files() {
   done
 }
 
-# plan_is_stampable <agent> -- is this agent one subagent-stamp records?
-plan_is_stampable() {
-  local a="$1" x
-  for x in "${PLAN_STAMPABLE_AGENTS[@]}"; do
-    [ "$x" = "$a" ] && return 0
+# plan_in_list <name> <member>... -- exact-string membership. The one
+# definition: the padded-string `case " ${list[*]} "` idiom this replaces
+# was re-derived at three sites, and it is the subtle one -- correct only
+# while no member contains a space.
+plan_in_list() {
+  local n="$1" x
+  shift
+  for x in "$@"; do
+    [ "$x" = "$n" ] && return 0
   done
   return 1
+}
+
+# plan_is_stampable <agent> -- is this agent one subagent-stamp records?
+plan_is_stampable() {
+  plan_in_list "$1" "${PLAN_STAMPABLE_AGENTS[@]}"
 }
 
 # Behavior, not prose: what a change to this file set can alter is what

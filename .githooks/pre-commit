@@ -99,6 +99,8 @@ while IFS= read -r file; do
   # gitattribute: staging a .gitattributes saying `*.pem -diff` beside a
   # .pem holding a private key switched this scan off entirely, verified
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F52
+  # a second `git show`, not `<<<"$content"`: command substitution strips
+  # NUL bytes, so probing $content could never find one
   if git show ":$file" | grep -qaP '\x00'; then
     continue
   fi

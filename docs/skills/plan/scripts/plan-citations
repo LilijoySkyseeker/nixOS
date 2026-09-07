@@ -86,7 +86,7 @@ done
 # closed.
 awk_prog='
 FNR == 1 {
-  if (skip && prev != "") print "UNBALANCED\t" prev
+  if (skip) print "UNBALANCED\t" prev
   skip = 0; prev = FILENAME
 }
 /^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-start/ { skip = 1; regions++; next }
@@ -99,7 +99,7 @@ FNR == 1 {
   }
 }
 END {
-  if (skip && prev != "") print "UNBALANCED\t" prev
+  if (skip) print "UNBALANCED\t" prev
   print "REGIONS\t" regions + 0
 }
 '

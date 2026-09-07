@@ -153,37 +153,38 @@ nothing here needs a switch.
 
 ---
 
-### Pick-up point, 2026-09-06 (end of the review session)
+### Pick-up point, 2026-09-07 (unreviewed tail closed)
 
 **Where.** Worktree
 `/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
 branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-not in the main checkout. Everything is committed and pushed through
-`854156c`; the tree is clean and `plan-gate origin/master HEAD` passes.
+not in the main checkout.
 
 **Children done:** 1, 4, 5, 6. G5, G6 closed; G11 added. D11 answered
 and built.
 
-**Read this before doing anything else: the tail of `854156c` is
-unreviewed.** The user chose to commit rather than run one more loop, so
-`security`'s last stamp predates seven fixes -- F52, F55, F56, F57, F58,
-F59, F60 -- plus the `testing-changes.md` correction. Each has a passing
-reproduction test under the session's scratch directory logic (they are
-described in the findings themselves and are cheap to recreate), but
-none has been adversarially reviewed. **The first task of the next
-session is to close that: run `/simplify`, then `docs-updater`, then
-`security`, over `git diff origin/master...HEAD`.** Only after that
-should new work start. This is not a formality -- of the last three
-review passes, two found a live bypass in code the previous pass had
-already declared fixed.
+**The unreviewed tail of `854156c` is closed.** The 2026-09-07 session
+ran the full loop twice over `git diff origin/master...HEAD` plus the
+working tree, in D7's order. Pass one: `/simplify` (four angles) applied
+six cleanups -- `plan_in_list` replacing three membership idioms,
+`plan_active_plan` tightened to `plan_locate`'s guard shape per F59's
+own prescription, `plan_has_heading` reuse, dead awk guard dropped, and
+the build-trigger set now spelled once per file in `pre-push` and
+`verify-ladder` (equivalence tested case by case); `docs-updater` fixed
+five comment/doc drifts (F61-F63); `security`'s seventh pass
+re-reproduced the F52/F56/F57 fixes as real, proved the new build-set
+selection never under-builds, and found F64 (the coordinated both-arrays
+tamper still green-passed) and F65 (latent glob expansion in the new
+`plan_in_list` call sites). Pass two, after the F64 floor and the array
+conversions landed: all three agents clean, zero findings. F61-F65 all
+resolved fixed.
 
-**The review loop ran to completion.** Six `security` passes, five
-`docs-updater` passes and five `/simplify` rounds produced **60
-findings**, all resolved: 53 fixed, 7 accepted by the user with a
-follow-up plan each. The loop's own shape was settled with the user in
-the process -- see D7's three dated notes for the order, the named fix
-stage, why the read-only reviewers stay serialized, and the narrowed
-restart rule.
+**The full review record.** Eight `security` passes, seven
+`docs-updater` passes and six `/simplify` rounds have produced **65
+findings**: 58 fixed, 7 accepted by the user with a follow-up plan each.
+The loop's own shape was settled with the user along the way -- see D7's
+three dated notes for the order, the named fix stage, why the read-only
+reviewers stay serialized, and the narrowed restart rule.
 
 **What the review actually found, and it is worth reading before
 touching any gate script.** Almost every defect was a gate that *failed
@@ -197,8 +198,8 @@ describing code that had since changed. The classification is
 and its first item -- a failure-mode harness for the gate scripts --
 would have caught eight of them mechanically.
 
-**Twelve follow-up plans are filed** under `docs/plans/todo/`, all dated
-2026-09-06. The ones that block or shape later work here: inverting the
+**Thirteen follow-up plans are filed** under `docs/plans/todo/`, all
+dated 2026-09-06. The ones that block or shape later work here: inverting the
 code set from an allowlist to a denylist; making `plan-gate` survive a
 PR that changes the fingerprint's inputs; making CI hash the tree it was
 told to gate.
@@ -1621,3 +1622,70 @@ _docs-updater finished 2026-09-06T23:19:30Z -- see Findings above._
 _security finished 2026-09-06T23:37:19Z -- see Findings above._
 
 **FIXED 2026-09-06:** the comment now distinguishes the two cases: a stamp this script writes always carries (code ...), so an empty fingerprint reads as malformed and blocks, while legacy is the separate accepted loophole for pre-fingerprint stamps
+
+### F61 — the /simplify rewrite of the build-set selection left two comments describing the regex it deleted
+
+- **File:** `.githooks/pre-push:23-25`; `docs/skills/workflow/scripts/verify-ladder:26`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** the working-tree /simplify pass replaced the per-host alternation `^(hosts/${host}/|modules/|files/|flake\.nix|flake\.lock)` in both build gates with a two-step selection (any changed line outside `hosts/` builds every host; otherwise `^hosts/<host>/` picks the one). Two comments still described the old shape. (1) `pre-push`'s F34 comment said a C-quoted non-ASCII path "would defeat the ^(hosts/...) anchor below and skip the build" — the anchor it names no longer exists, and the stated consequence inverted: a C-quoted `hosts/` path starts with `"`, so it now trips the any-non-`hosts/` test and builds *every* host rather than skipping the affected one. `core.quotePath=false` is still wanted, but to keep the build set precise, not to close a fail-open. (2) `verify-ladder`'s deleted-paths comment still said "The host-detection set further down keeps them" after the same pass renamed the concept to "build-set selection" in the header comment four lines up. Same stale-comment class as F48/F49/F60 — a comment describing the version of the code that was just changed out from under it. Both rewritten in this pass to match shipped behavior.
+
+
+**FIXED 2026-09-06:** both comments rewritten in the same docs-updater pass that found them: pre-push's F34 comment now states the current consequence (a C-quoted hosts/ path over-builds instead of skipping) and verify-ladder's deleted-paths comment names the targeted-build set
+
+### F62 — pre-push's rewritten trigger-set comment re-inlined a sentence of bug history
+
+- **File:** `.githooks/pre-push:48-49` (the F48 comment above the build-set selection, as the /simplify pass left it)
+- **Axis:** channel routing (docs-updater)
+- **Finding:** moved here verbatim, per the style guide's "Why context: the plan file, not comments": "Re-spelling the set as a regex here is how a watched directory got added to one copy and not the other." The comment keeps only the invariant (the diff's pathspec is the trigger set's one spelling; the two build gates must not diverge) plus citations to F48 and this entry. F48 is the fuller record of the same incident class — the deleted alternation was a second spelling of the set, and the pre-dendritic `profiles/`/`services/` drift it hid is quoted there; F58 records the `files/` omission both copies shared.
+
+
+**FIXED 2026-09-06:** the history sentence lives in this entry verbatim; the pre-push comment carries only the invariant plus the F48 and F62 citations
+
+### F63 — `testing-changes.md`'s hook descriptions drifted from both hooks in the same commit that edited the file
+
+- **File:** `docs/procedures/testing-changes.md:80,94-95`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** two stale claims left by `854156c`. (1) The pre-push bullet listed the watched paths as "`hosts/`, `modules/`, `flake.nix`, `flake.lock`" — F58's fix added `files/` to the hook's pathspec in that same commit and the enumeration never got the new member. Same shape as F50: the list *is* the reader's answer, and the member missing from it is the one that just changed. (2) The pre-commit bullet opened "two guards", but the hook runs three: the secret scan, the frozen-plan check, and `scripts/claude-links-check` — the symlink-drift check `workflow/reference.md` already names as a pre-commit extension, present in the hook since before this branch. Both corrected in this pass: `files/` added to the enumeration, and the third guard named with a pointer to reference.md.
+
+_docs-updater finished 2026-09-07T04:15:30Z -- see Findings above._
+
+**FIXED 2026-09-06:** testing-changes.md fixed in the same docs-updater pass: files/ added to the pre-push watched-path enumeration and the pre-commit bullet names all three guards including claude-links-check
+
+### F64 — F55's fix encodes only the subset floor, so the coordinated form of the same typo still green-passes over zero stamp checks
+
+- **File:** `docs/skills/workflow/scripts/plan-gate:86-89`; `docs/skills/plan/scripts/lib.sh:21,30`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — both directions reproduced in a scratch repo against the current scripts
+- **Axis:** hardening
+- **Reachability:** a post-merge editor of `lib.sh` (human or agent) whose agent rename or typo lands in *both* `PLAN_STAMPABLE_AGENTS` and `PLAN_AGENT_ORDER` while `required-agents`' hardcoded literals keep the real names. CI pins `lib.sh` from the base branch, so the PR making the edit is still gated correctly; every PR *after* it merges is gated by a stamp check that examines zero stamps.
+- **Rule:** n/a — same `docs/hardening.md` rule-11 class F55 named: the gate measures the attempt, not how many stamps it examined.
+- **Finding:** F55's FIXED note is accurate about what it claims — `PLAN_STAMPABLE_AGENTS=("sekurity" "docs-updatr")` alone now dies at the new assertion (`BLOCKED: stampable agent 'sekurity' is not in PLAN_AGENT_ORDER`, exit 1, reproduced), where before it green-passed. But F55's own text named two floors, and only the subset assertion shipped. Reproduced the residual: with the same bogus names *also appended to* `PLAN_AGENT_ORDER`, the assertion passes, `required-agents` emits the real names unbothered (its F47 check compares its own literals against `PLAN_AGENT_ORDER`, which still contains them), `plan_is_stampable` filters every obliged agent out, and the gate prints `plan-gate: all cited plans (1) have their findings resolved and their obliged reviews stamped.` with exit 0 over a plan carrying no stamp at all. Every single-array typo is now covered (order-side drift dies in `required-agents`' F47 check, stampable-side drift dies in the new assertion); only this two-array form survives, and nothing asserts the invariant that actually matters — `PLAN_STAMPABLE_AGENTS` ⊆ {names `required-agents` can emit} — which still spans two files with no shared definition.
+- **Fix risk:** exactly what F55 recorded for its second floor: "non-empty obliged but zero stampable checked → die" fires legitimately on a range obliging only `/simplify` — impossible today, since every path that sets `code=1` also emits `security`, but encode the floor only with that invariant checked, or the gate becomes unpassable for such ranges.
+
+
+**FIXED 2026-09-06:** plan-gate now counts the obliged agents the stampable filter keeps and blocks when the range obliged agents but none was stampable. Reproduced: the coordinated both-arrays tamper that green-passed over zero stamp checks now exits 1 naming the drift, and the untampered missing-stamp path still blocks
+
+### F65 — plan_in_list's unquoted call sites add a pathname-expansion behavior the case-pattern idiom they replaced never had
+
+- **File:** `docs/skills/workflow/scripts/required-agents:86,97`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED — the expansion demonstrated directly; the non-reachability checked against every current member
+- **Axis:** hardening
+- **Reachability:** none today — every word reaching the two unquoted `$obliged`/`$emitted` expansions is one of the hardcoded literals `/simplify`, `docs-updater`, `security`, `spec-check`, none containing a glob or IFS character, and `$obliged` is built only from those literals, never from input. Latent only.
+- **Rule:** n/a — recorded for the same "inert here but one refactor from mattering" reason as F32.
+- **Finding:** the /simplify pass replaced `case " $obliged " in *" $a "*` with `plan_in_list "$a" $obliged`, and the comment documents the deliberate word-split. Unquoted expansion also performs *pathname* expansion, which a `case` word never does — demonstrated: with files `secA`/`secB` in the cwd, `lst='sec*'; plan_in_list 'sec*' $lst` returns 1, because the member expanded to `secA secB` and no longer matches itself. `required-agents` runs from the repo root, so a future agent name containing a glob character would be compared against the repo's top-level filenames instead of literally, in both the emit filter and the F47 completeness loop — and the failure direction there is an agent silently not emitted, i.e. the fail-open F47 exists to close. `plan_in_list`'s own comment sells it as the non-subtle replacement for the padded-string idiom; at these two call sites it traded the space caveat for a glob caveat.
+- **Fix risk:** none of consequence — making `obliged`/`emitted` bash arrays removes both unquoted expansions with no behavior change; a `set -f` toggle would also work but leaks into everything else the script runs.
+
+**Checked and clean (security, 2026-09-07, seventh pass).** Reviewed `git diff origin/master...HEAD` plus the full uncommitted working tree, reading current file content rather than diff hunks, with every re-reproduction run in scratch repos under /tmp. **The F52/F56/F57 fixes are real**: staging `.gitattributes` with `*.pem -diff` beside a private-key `.pem` now blocks (`numstat` still answers `-  -  leak.pem`, and the hook no longer asks it); the `k*.txt`-age-key-beside-binary-`k!.txt` pathspec route also blocks (the `:$file` index read resolves the literal name, so the glob sibling cannot shadow it); a synthetic staged gitlink (`update-index --cacheinfo 160000`) commits cleanly while a plaintext age key still blocks; and pre-push fed an unresolvable remote sha prints `BLOCKED: cannot diff ... refusing to decide the build set from a failed diff` and exits 1. The second `git show` in the binary probe is necessary, not redundant — bash's "ignored null byte" warning fired in the repro, confirming `$content` can never carry a NUL. One inherent property, unchanged from the numstat era and from any binary skip: a secret file with a deliberately embedded NUL byte commits silently (reproduced) — same before this branch, and a committer wanting to dodge the backstop already has `--no-verify`. **The new build-set selection cannot under-build relative to the deleted regex**: for every line the pathspec-restricted diff can emit, the new selection's set is a superset of the old alternation's — reproduced host-scoped (`alpha` only), `modules/` (all), `files/`-only (all, F58's fix live), C-quoted `hosts/` path (all — the old regex *skipped* the affected host here, so the inversion is fail-safe), depth-1 `hosts/README.md` (nothing built, byte-for-byte the old behavior; no depth-1 file exists under `hosts/` in the real tree), and an empty range (exit 0). Host names (`homelab isoimage thinkpad torrent vps`) contain no regex metacharacters, and the one case where a pathological host directory name could error the per-host grep is one the old interpolated ERE handled worse. verify-ladder's copy is the same logic over `plan_worktree_files` with a checked exit status; its deleted-paths split (dropped from the lint set, kept in the build set) is right. The new-branch arm's swallowed `merge-base` is unchanged from master and was already flagged as deliberate in F56's fix-risk; its "empty tree" comment predates this branch. **`plan_active_plan`'s tightened guard is strictly stricter**: its accept set (`docs/plans/*/*.md`, no `..`) is a subset of the old one (`docs/plans/*`, no `..`, not absolute — an absolute path cannot match the new allowlist), so nothing the old guard rejected is now accepted; tested accept on all four status folders, reject on depth-1 `docs/plans/p.md` (even when the file exists), `../target.txt`, `/etc/passwd`, embedded `..`, `docs/plansX/`, and a non-`.md` suffix. Residue: `docs/plans/./p.md` and `docs/plans//p.md` still pass the pattern — both resolve inside `docs/plans/`, both were accepted by the old guard too, and the only depth-1 non-`.md` file there (`.checksums`) stays unreachable, so F59's "never outside docs/plans/" claim holds. **F55's primary repro now blocks** (see F64 for the coordinated residual, reproduced both directions). `plan_in_list` itself is correct (empty-list call returns 1 without tripping `set -u`, members with spaces impossible for callers passing `"${array[@]}"`), and its two quoted-array call sites (plan-gate's assertion, `plan_is_stampable`) are hazard-free; the unquoted required-agents sites are F65, latent only. `required-agents` emits `/simplify docs-updater security spec-check` in order in working-tree mode and the first three in range mode; `plan_has_heading` is byte-equivalent to the inline grep it replaced. `plan-citations`' dropped `prev != ""` guard was dead (skip is 0 before the first record, so the FNR==1 and END arms can only fire with a real filename in `prev`), and the live run passes (271 citations, 2 ignored regions). `subagent-stamp`'s corrected comment now matches `plan_stamp_fingerprint`'s actual three-way split (F60), and `testing-changes.md`'s three-guard/`files/` corrections match both hooks as shipped (F63); the "hosts/<name>/README.md still triggers a real build" example survives the selection rewrite. plan-gate over `origin/master..HEAD` still exits 0 with the two expected `legacy` NOTEs, and plan-lint passes on this plan. The range's only `.nix` change remains `tests/zrepl-replication.nix`'s path-concatenation import of nixpkgs' snake-oil test keys — no NixOS module, firewall rule, systemd unit, user, group, capability, or `sops.secrets` reference is touched anywhere in the range or the working tree. No secret was decrypted or read at any point, and no file outside this plan was modified.
+
+_security finished 2026-09-07T05:52:00Z -- see Findings above._
+
+_security finished 2026-09-07T04:30:08Z -- see Findings above._
+
+**FIXED 2026-09-06:** required-agents builds obliged and emitted as arrays and every plan_in_list call quotes the expansion, so no word-splitting or pathname expansion happens at all; both modes verified emitting the correct ordered set
+
+_docs-updater finished 2026-09-07T04:38:20Z -- see Findings above._
+
+**Checked and clean (security, 2026-09-07, eighth pass).** Reviewed only the delta since the seventh-pass stamp — the F64 fix in `plan-gate`, the F65 fix in `required-agents`, and the F61–F65 plan appends — after confirming the rest of the working-tree diff (`pre-commit`, `pre-push`, `verify-ladder`, `plan-citations`, `lib.sh`, `testing-changes.md`) is byte-for-byte the material the seventh pass already examined. All reproductions ran in a scratch repo under the session job dir, against verbatim copies of the current scripts. **The F64 floor genuinely closes the coordinated both-arrays tamper, and every neighboring drift shape fails closed**: bogus names in both `PLAN_STAMPABLE_AGENTS` and `PLAN_AGENT_ORDER` (real names kept so `required-agents`' F47 check passes) now exits 1 at the new outcome floor for both a code-obliging and a docs-only plan-citing range, where before it green-passed over zero stamp checks; `PLAN_STAMPABLE_AGENTS` emptied outright — which sails through the F55 subset loop by iterating zero times — is also caught by the floor; the single-array shapes still die where they always did (stampable-side rename at the F55 assertion, order-side rename at `required-agents`' F47 `plan_die`, which plan-gate surfaces through its status-checked capture). Every legitimate direction still behaves: missing stamps block (both BLOCKED lines, exit 1), stale stamps block (working-tree edit after stamping, exit 1), correctly stamped code and docs ranges pass (exit 0), and an empty obligation set (non-code, non-doc range) passes through both the untampered and the tampered gate without tripping the floor — the `[ ${#obliged_agents[@]} -gt 0 ]` guard is what keeps the tamper detector from false-blocking a range that obliged nothing. **No dodge through the conversions was found**: empty `required-agents` output produces an empty array (the `[ -n "$a" ]` filter drops the herestring's phantom empty line — demonstrated, count 0, no `set -u` trip on bash 5.3, and `"${arr[@]}"` on an empty array is safe on every bash ≥ 4.4, so CI's runner is fine too); a trailing newline is normalized by command substitution before the herestring re-adds exactly one; and hostile member shapes (a glob `sec*` beside matching files, a name with spaces, an embedded blank line) come through the new loop exactly as emitted where the old unquoted `for agent in $obliged` demonstrably expanded the glob against the cwd and split the spaced name into three. **The array forms change no behavior for any real input**: old (HEAD) and new `required-agents` produce byte-identical output and exit status across a no-trigger range, docs-only, code-only, code+docs, and working-tree mode with a D-heading active plan (`/simplify docs-updater security spec-check`, in order); the only divergences are for glob/space member names that cannot currently exist, and each diverges in the strengthening direction F65 named. The F64 comment's fatality argument was checked against the actual trigger sets: in range mode (the only mode plan-gate uses) the possible obliged sets are {}, {docs-updater}, and {/simplify, security, docs-updater}, so every non-empty set contains a stampable agent and the floor cannot false-block today; the /simplify-only caveat is correctly recorded as fix risk in F64's entry. The F61–F65 resolution markers were verified against the shipped diffs and none misstates behavior — F64's marker says "counts" where the code short-circuits a boolean, but the claim that matters (blocks when the range obliged agents and none was stampable; tamper repro exits 1; missing-stamp control still blocks) is exact and was re-reproduced here. Two non-findings for the record: the "no Plan: trailers — nothing to gate" early exit means the drift floor does not run on a non-citing range, which is the gate's documented pre-existing scope (the drift is caught on the next citing range); and all four stamps written during the F61–F65 resolution work carry no `(code ...)` field because the live SubagentStop hook is still merged master's pre-fingerprint copy — the expected state for an unmerged hook, and the resulting legacy-NOTE behavior is exactly what F12 already records. The live worktree runs stay green: `required-agents` emits the correct ordered set in both modes and `plan-gate origin/master HEAD` exits 0 with the two expected legacy NOTEs. Nothing in the delta adds anything but exit-1 paths to plan-gate; no NixOS module, firewall rule, systemd unit, user, capability, or `sops.secrets` reference is touched. No secret was decrypted or read, and no file outside this plan was modified.
+
+_security finished 2026-09-07T04:45:45Z -- see Findings above._

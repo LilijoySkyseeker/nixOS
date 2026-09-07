@@ -20,8 +20,9 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
-  # core.quotePath=false so a non-ASCII path is not C-quoted, which would
-  # defeat the ^(hosts/...) anchor below and skip the build
+  # core.quotePath=false so a non-ASCII hosts/ path is not C-quoted: the
+  # quoted form fails the ^hosts/ selection below and would needlessly
+  # build every host
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F34
   # status checked, not swallowed: an unresolvable range read as "no host
   # config changed" and pushed unbuilt -- the fail-open this branch closed
@@ -43,10 +44,19 @@ fi
 hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
 to_build=""
 
+# The diff's pathspec above is the only spelling of the trigger set: every
+# listed path is a trigger, and any line outside hosts/ (modules/, files/,
+# flake.*) affects all hosts. Same logic as verify-ladder's targeted
+# build, deliberately -- the two build gates must not diverge
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F62
+if echo "$changed_files" | grep -qv '^hosts/'; then
+  global=1
+else
+  global=0
+fi
 for host in $hosts; do
-  # byte-identical to verify-ladder's targeted-build anchor, deliberately
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
-  if echo "$changed_files" | grep -qE "^(hosts/${host}/|modules/|files/|flake\.nix|flake\.lock)"; then
+  if [[ "$global" -eq 1 ]] || echo "$changed_files" | grep -q "^hosts/${host}/"; then
     to_build+=" $host"
   fi
 done

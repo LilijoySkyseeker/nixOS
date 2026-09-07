@@ -55,33 +55,41 @@ while IFS= read -r f; do
   if plan_is_doc_path "$f"; then docs=1; fi
 done <<<"$changed"
 
-obliged=""
+# An array, not a space-joined string: iterating a string means unquoted
+# expansion, and that adds pathname expansion on any member containing a
+# glob character -- latent while every name is a glob-free literal, but a
+# hazard the array form does not have at all.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F65
+obliged=()
 # /simplify and security review code, per PLAN_CODE_GLOBS -- see the
 # rationale there for why the set is wider than Nix.
-[ "$code" = 1 ] && obliged="$obliged /simplify security"
+[ "$code" = 1 ] && obliged+=("/simplify" "security")
 
 # docs-updater keys off code *or* docs: a code change can invalidate a doc
 # without touching that doc, which is exactly the drift it exists to
 # catch, so "only when a .md changed" would miss the case that matters
 # most. Narrowing this to the docs a given file is actually named by needs
 # a doc-to-code index that does not exist yet.
-{ [ "$code" = 1 ] || [ "$docs" = 1 ]; } && obliged="$obliged docs-updater"
+{ [ "$code" = 1 ] || [ "$docs" = 1 ]; } && obliged+=("docs-updater")
 
 # spec-check reads the active plan's Decisions as the spec, which makes it
 # a working-tree notion -- the active-plan marker describes a live
 # session, not a merge range, so range mode cannot answer the question at
 # all.
 if [ $# -eq 0 ] && plan="$(plan_active_plan)"; then
-  grep -qE "$(plan_heading_re 'D[0-9]+')" "$plan" && obliged="$obliged spec-check"
+  plan_has_heading "$plan" 'D[0-9]+' && obliged+=("spec-check")
 fi
 
 # Emitted in PLAN_AGENT_ORDER, never in the order the tests above happen
 # to run: an agent reading this output top-to-bottom must get a sequence
 # it can actually execute, and running security before docs-updater
 # leaves security's stamp stale by construction.
-emitted=""
+emitted=()
 for a in "${PLAN_AGENT_ORDER[@]}"; do
-  case " $obliged " in *" $a "*) echo "$a"; emitted="$emitted $a" ;; esac
+  if plan_in_list "$a" "${obliged[@]}"; then
+    echo "$a"
+    emitted+=("$a")
+  fi
 done
 
 # An obliged agent absent from PLAN_AGENT_ORDER would simply not be
@@ -89,9 +97,7 @@ done
 # One renamed entry silently degrades the whole gate to a no-op behind a
 # green check, so the mismatch is fatal rather than filtered.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
-for a in $obliged; do
-  case " $emitted " in
-    *" $a "*) ;;
-    *) plan_die "'$a' is obliged but missing from PLAN_AGENT_ORDER -- refusing to report an incomplete set" ;;
-  esac
+for a in "${obliged[@]}"; do
+  plan_in_list "$a" "${emitted[@]}" ||
+    plan_die "'$a' is obliged but missing from PLAN_AGENT_ORDER -- refusing to report an incomplete set"
 done

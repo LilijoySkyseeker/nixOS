@@ -74,6 +74,15 @@ obliged="$("$ra" "$base" "$head")" || {
   echo "BLOCKED: required-agents failed for ${base}...${head}; cannot tell which reviews this range obliged." >&2
   exit 1
 }
+# An array from here on, so no consumer iterates an unquoted string --
+# same reasoning as required-agents' own conversion. The string capture
+# above stays because a `mapfile < <(...)` would discard the exit status
+# just checked.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F65
+obliged_agents=()
+while IFS= read -r a; do
+  if [ -n "$a" ]; then obliged_agents+=("$a"); fi
+done <<<"$obliged"
 
 # Every stampable agent must be a real agent. `plan_is_stampable` is used
 # below as a filter, and a filter has no floor: point
@@ -84,11 +93,27 @@ obliged="$("$ra" "$base" "$head")" || {
 # emitter-side check.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F55
 for a in "${PLAN_STAMPABLE_AGENTS[@]}"; do
-  case " ${PLAN_AGENT_ORDER[*]} " in
-    *" $a "*) ;;
-    *) echo "BLOCKED: stampable agent '$a' is not in PLAN_AGENT_ORDER; the stamp check cannot be trusted." >&2; exit 1 ;;
-  esac
+  plan_in_list "$a" "${PLAN_AGENT_ORDER[@]}" ||
+    { echo "BLOCKED: stampable agent '$a' is not in PLAN_AGENT_ORDER; the stamp check cannot be trusted." >&2; exit 1; }
 done
+# The subset check above has a blind side: a PLAN_STAMPABLE_AGENTS whose
+# names sit in PLAN_AGENT_ORDER too but that required-agents never emits
+# passes it, and the plan_is_stampable filter below then discards every
+# obliged agent -- zero stamp checks under a green pass. So the floor is
+# on the outcome: a range that obliged agents, none of them stampable,
+# means the name sets drifted, not that nothing needed review. Fatal is
+# safe: any code-obliging set contains 'security' and a docs-only set
+# contains 'docs-updater', both stampable, so an obliged, all-unstampable
+# set cannot arise legitimately today.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F64
+any_stampable=0
+for agent in "${obliged_agents[@]}"; do
+  if plan_is_stampable "$agent"; then any_stampable=1; break; fi
+done
+if [ "${#obliged_agents[@]}" -gt 0 ] && [ "$any_stampable" -eq 0 ]; then
+  echo "BLOCKED: the range obliges review agents but the stamp check would examine none of them; PLAN_STAMPABLE_AGENTS and required-agents' emitted names have drifted apart." >&2
+  exit 1
+fi
 # The code as it stands now, to compare each stamp's fingerprint against.
 # Checked, like required-agents above: an unreportable fingerprint would
 # otherwise print "the code is now ." and block for a reason whose
@@ -142,7 +167,7 @@ while IFS= read -r p; do
   frozen=0
   plan_is_frozen "$root/$rel" && frozen=1
 
-  for agent in $obliged; do
+  for agent in "${obliged_agents[@]}"; do
     plan_is_stampable "$agent" || continue
     if ! stamped_fp="$(plan_stamp_fingerprint "$root/$rel" "$agent")"; then
       stamp_problem "$rel cites a range that changed files obliging '${agent}', but carries no completion stamp for it."

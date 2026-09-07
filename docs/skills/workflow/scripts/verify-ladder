@@ -23,7 +23,7 @@ fail=0
 # obliging review from required-agents while skipping nixfmt/statix/
 # deadnix here entirely. Deleted-but-not-yet-committed paths are dropped
 # -- the linters below take filenames and would block on a legitimate
-# deletion. The host-detection set further down keeps them, because a
+# deletion. The targeted-build set further down keeps them, because a
 # deleted module still has to rebuild.
 changed_nix="$(plan_worktree_files '*.nix' | plan_existing_files)" || {
   echo "BLOCKED: cannot list working-tree changes; refusing to lint an empty set." >&2
@@ -152,7 +152,7 @@ if ! nix flake check --no-build; then
   fail=1
 fi
 
-# Targeted build: same host-detection pattern as .githooks/pre-push, but
+# Targeted build: same build-set selection as .githooks/pre-push, but
 # against the working tree rather than a push range, since this runs
 # mid-session before a commit even exists. Untracked included, same as
 # the lint set above -- a brand-new hosts/ or modules/ file must trigger
@@ -164,8 +164,18 @@ changed_all="$(plan_worktree_files hosts/ modules/ files/ flake.nix flake.lock)"
 
 if [ -n "$changed_all" ]; then
   to_build=""
+  # The pathspec above is the only spelling of the trigger set: every
+  # listed path is a trigger, and any line outside hosts/ (modules/,
+  # files/, flake.*) affects all hosts. Same logic as .githooks/pre-push,
+  # deliberately -- the two build gates must not diverge
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
+  if printf '%s\n' "$changed_all" | grep -qv '^hosts/'; then
+    global=1
+  else
+    global=0
+  fi
   for host in $(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n'); do
-    if printf '%s\n' "$changed_all" | grep -qE "^(hosts/${host}/|modules/|files/|flake\.nix|flake\.lock)"; then
+    if [ "$global" -eq 1 ] || printf '%s\n' "$changed_all" | grep -q "^hosts/${host}/"; then
       to_build="$to_build $host"
     fi
   done
