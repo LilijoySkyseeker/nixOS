@@ -158,10 +158,24 @@ nothing here needs a switch.
 **Where.** Worktree
 `/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
 branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-not in the main checkout.
+not in the main checkout. Everything is committed and pushed through
+`854156c`; the tree is clean and `plan-gate origin/master HEAD` passes.
 
 **Children done:** 1, 4, 5, 6. G5, G6 closed; G11 added. D11 answered
 and built.
+
+**Read this before doing anything else: the tail of `854156c` is
+unreviewed.** The user chose to commit rather than run one more loop, so
+`security`'s last stamp predates seven fixes -- F52, F55, F56, F57, F58,
+F59, F60 -- plus the `testing-changes.md` correction. Each has a passing
+reproduction test under the session's scratch directory logic (they are
+described in the findings themselves and are cheap to recreate), but
+none has been adversarially reviewed. **The first task of the next
+session is to close that: run `/simplify`, then `docs-updater`, then
+`security`, over `git diff origin/master...HEAD`.** Only after that
+should new work start. This is not a formality -- of the last three
+review passes, two found a live bypass in code the previous pass had
+already declared fixed.
 
 **The review loop ran to completion.** Six `security` passes, five
 `docs-updater` passes and five `/simplify` rounds produced **60
