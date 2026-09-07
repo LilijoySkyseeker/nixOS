@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# plan-citations -- repo-wide citation-integrity checker, read-only.
+# Scans every non-ignored text file in the working tree that could carry
+# a citation (PLAN_TEXT_GLOBS + PLAN_DOC_GLOBS), tracked and untracked,
+# for plan citations of the form
+# <YYYY-MM-DD>-<slug>.md, optionally anchored (#D3/#G1/#F2), and verifies
+# that the file resolves to a real plan under docs/plans/*/ and that the
+# anchor resolves to a real "### <id>" heading inside it. Prints every
+# problem; exits non-zero if any exist.
+#
+# Resolves G31 in 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
+# -- nothing previously verified that a bare-filename citation still hit
+# anything. Bare filenames are what let a plan move between folders
+# without breaking citations (reference.md, "Why bare-filename
+# citations"), but the same property means a rename or a retyped id
+# breaks every inbound reference silently. Commit 8ae2a4a renamed 74 plan
+# files in one commit with nothing to catch it.
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 0 ] || { printf 'usage: plan-citations\n' >&2; exit 1; }
+root="$(plan_repo_root)"
+cd "$root" || plan_die "cannot cd to repo root"
+
+problems=0
+report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
+
+# basename -> path, so a citation resolves regardless of which status
+# folder the plan currently sits in. That folder-independence is the whole
+# point of citing by bare filename. Duplicates are tracked, not
+# last-wins: plan_locate dies on an ambiguous basename, and this map must
+# not quietly resolve what the canonical resolver refuses.
+declare -A plan_path dup
+for f in docs/plans/*/*.md; do
+  [ -e "$f" ] || continue
+  base="${f##*/}"
+  [ -n "${plan_path[$base]:-}" ] && dup["$base"]=1
+  plan_path["$base"]="$f"
+done
+[ "${#plan_path[@]}" -gt 0 ] || plan_die "no plan files found under docs/plans/*/"
+
+# Scripts are in scope, not just .nix/.md: this script's own header cites
+# a plan, as do plan-lint's and required-agents'. Globbing only source and
+# docs left the failure mode alive in the files that fix it
+# plan: 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G31
+# PLAN_TEXT_GLOBS + PLAN_DOC_GLOBS, not the code set
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F30
+# -z, because a path may contain a newline.
+# --cached --others: untracked files are scanned too, same trade
+# plan_code_fingerprint makes -- a brand-new doc or script with a broken
+# citation must not pass the gate just because it was never staged.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F16
+# Through a file, not a process substitution: `mapfile < <(git ...)`
+# reports mapfile's status and discards git's, so a failed listing became
+# an empty candidate set and the script exited 0 having scanned nothing.
+# A variable cannot carry the -z output, since command substitution
+# strips NUL.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F2
+cand_out="$(mktemp)"
+trap 'rm -f "$cand_out" "${scan_out:-}"' EXIT
+if ! git ls-files -z --cached --others --exclude-standard -- "${PLAN_TEXT_GLOBS[@]}" "${PLAN_DOC_GLOBS[@]}" > "$cand_out"; then
+  plan_die "cannot list the files to scan -- refusing to report OK over a scan that never ran."
+fi
+mapfile -d '' -t candidates < "$cand_out"
+# Tracked-but-absent files are a normal mid-work state (a deletion not yet
+# committed) and have no citations to check, but awk aborts the whole scan
+# on the first one. Filter them out rather than either crashing or, worse,
+# reporting OK over a scan that stopped early.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
+# Each path is prefixed with ./ so awk cannot read a filename containing
+# '=' as a variable assignment.
+scan=()
+for f in "${candidates[@]}"; do
+  [ -f "$f" ] && scan+=("./$f")
+done
+# Reported rather than a silent exit 0: "scanned nothing" and "scanned
+# everything and found nothing" are different facts, and only one of them
+# should ever be quiet.
+if [ "${#scan[@]}" -eq 0 ]; then
+  printf 'plan-citations: OK (no files matched the scan set)\n'
+  exit 0
+fi
+
+# One awk over every file rather than awk|grep|sort per file: the per-file
+# form spawned ~650 processes and took 0.4s on a gate that runs before
+# every commit, and it grew with the repo rather than with the plans.
+#
+# Regions between the ignore markers are skipped, because docs that
+# *teach* the citation convention have to contain citations that resolve
+# to nothing -- reference.md's worked example is a whole fictional plan
+# file. That is a permanent category, so it gets an explicit opt-out
+# rather than a file exclusion; real citations in the same file still
+# count. `skip` resets at each file boundary, and a region left open at
+# the end of a file is reported rather than silently muting the rest of
+# it -- an unbalanced marker would otherwise be an undetectable off
+# switch.
+#
+# The markers must appear inside an HTML comment. Matching the bare words
+# meant this script muted itself: the awk program's own match patterns
+# name both markers, `ignore-start` first, so it opened a region it never
+# closed.
+awk_prog='
+FNR == 1 {
+  if (skip) print "UNBALANCED\t" prev
+  skip = 0; prev = FILENAME
+}
+/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-start/ { skip = 1; regions++; next }
+/^[ \t]*<!--[ \t]*plan-citations:[ \t]*ignore-end/   { skip = 0; next }
+!skip {
+  line = $0
+  while (match(line, /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9][a-z0-9-]*\.md(#[DGF][0-9]+)?/)) {
+    print "CITE\t" FILENAME "\t" substr(line, RSTART, RLENGTH)
+    line = substr(line, RSTART + RLENGTH)
+  }
+}
+END {
+  if (skip) print "UNBALANCED\t" prev
+  print "REGIONS\t" regions + 0
+}
+'
+
+# Anchor lookups are memoised: the same plan#id is routinely cited from
+# several files, and re-reading the target for each one re-greps a file
+# already known good.
+declare -A anchor_ok
+checked=0
+skipped_regions=0
+
+# awk's output goes through a file, not a process substitution, so its
+# exit status is actually observed. Via `< <(awk ...)` a mid-scan abort
+# was discarded and the script still printed OK over a partial scan.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F5
+scan_out="$(mktemp)"
+# no second trap: the one above is single-quoted, so its ${scan_out:-} expands at exit time
+awk "$awk_prog" "${scan[@]}" | sort -u > "$scan_out" ||
+  plan_die "scan failed -- refusing to report a result over an incomplete scan"
+
+while IFS=$'\t' read -r kind a b; do
+  case "$kind" in
+    UNBALANCED)
+      report "${a#./}: an opened ignore region was never closed -- the rest of the file went unchecked"
+      continue
+      ;;
+    REGIONS)
+      # Reported even on success: a *balanced* pair mutes its region with
+      # no diagnostic at all, which makes it strictly easier to write than
+      # the unbalanced form this already catches. Surfacing the count is
+      # what stops a muted region from being something you have to go
+      # looking for.
+      # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F6
+      skipped_regions="$a"
+      continue
+      ;;
+    CITE) ;;
+    # Fail closed on anything else: the scanner emits exactly three
+    # record kinds, so a fourth means this reader and the awk program
+    # have drifted apart.
+    *) plan_die "unexpected scan record '${kind}' -- scanner and reader have drifted" ;;
+  esac
+
+  file="${a#./}" cite="$b"
+  fname="${cite%%#*}"
+  anchor=""
+  case "$cite" in *#*) anchor="${cite#*#}" ;; esac
+
+  if [ -n "${dup[$fname]:-}" ]; then
+    report "$file: cites '$fname' -- ambiguous, more than one plan file has that basename under docs/plans/*/"
+    continue
+  fi
+  target="${plan_path[$fname]:-}"
+  if [ -z "$target" ]; then
+    report "$file: cites '$fname' -- no such plan file under docs/plans/*/"
+    continue
+  fi
+
+  if [ -n "$anchor" ]; then
+    key="$fname#$anchor"
+    if [ -z "${anchor_ok[$key]:-}" ]; then
+      if plan_has_heading "$target" "$anchor"; then
+        anchor_ok["$key"]=ok
+      else
+        anchor_ok["$key"]=bad
+      fi
+    fi
+    if [ "${anchor_ok[$key]}" = bad ]; then
+      report "$file: cites '${fname}#${anchor}' -- no '### ${anchor}' heading in $target"
+      continue
+    fi
+  fi
+
+  # Counted only once it has fully resolved, so the total can never
+  # include a citation the run also reported as broken.
+  checked=$((checked + 1))
+done < "$scan_out"
+
+if [ "$problems" -gt 0 ]; then
+  plan_note "plan-citations: $problems broken citation(s). Untracked files are scanned too; if a reported file is scratch, delete or gitignore it."
+  exit 1
+fi
+printf 'plan-citations: OK (%s citations resolve; %s ignored region(s))\n' \
+  "$checked" "$skipped_regions"

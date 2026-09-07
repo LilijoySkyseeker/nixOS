@@ -20,7 +20,18 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
-  files="$(git diff --name-only "$range" -- hosts/ profiles/ modules/ services/ flake.nix flake.lock 2>/dev/null || true)"
+  # core.quotePath=false so a non-ASCII hosts/ path is not C-quoted: the
+  # quoted form fails the ^hosts/ selection below and would needlessly
+  # build every host
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F34
+  # status checked, not swallowed: an unresolvable range read as "no host
+  # config changed" and pushed unbuilt -- the fail-open this branch closed
+  # at every other diff call site
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F56
+  if ! files="$(git -c core.quotePath=false diff --name-only "$range" -- hosts/ modules/ files/ flake.nix flake.lock)"; then
+    echo "BLOCKED: cannot diff $range; refusing to decide the build set from a failed diff." >&2
+    exit 1
+  fi
   changed_files+=$'\n'"$files"
 done
 
@@ -33,8 +44,19 @@ fi
 hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
 to_build=""
 
+# The diff's pathspec above is the only spelling of the trigger set: every
+# listed path is a trigger, and any line outside hosts/ (modules/, files/,
+# flake.*) affects all hosts. Same logic as verify-ladder's targeted
+# build, deliberately -- the two build gates must not diverge
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F62
+if echo "$changed_files" | grep -qv '^hosts/'; then
+  global=1
+else
+  global=0
+fi
 for host in $hosts; do
-  if echo "$changed_files" | grep -qE "^(hosts/${host}/|profiles/|modules/|services/|flake\.nix|flake\.lock)"; then
+  if [[ "$global" -eq 1 ]] || echo "$changed_files" | grep -q "^hosts/${host}/"; then
     to_build+=" $host"
   fi
 done

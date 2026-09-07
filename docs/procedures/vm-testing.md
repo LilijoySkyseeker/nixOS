@@ -4,8 +4,8 @@ Booting a change in a throwaway VM, for when building it proves too
 little. Two different tools live here and they answer different
 questions — pick deliberately, because the second costs minutes.
 
-For where this sits among the cheaper checks (`nixfmt` → `nix flake
-check` → `nixos-rebuild build` → `nvd diff` → switch), see
+This is rung 4 of the evidence ladder — above a local build with its
+output inspected, below an observed switch — see
 [`testing-changes.md`](testing-changes.md).
 
 ## The two kinds

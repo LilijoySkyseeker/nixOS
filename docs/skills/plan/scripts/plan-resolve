@@ -27,7 +27,7 @@ root="$(plan_repo_root)"
 rel="$(plan_locate "$arg" "$root")"
 plan_require_not_frozen "$root/$rel"
 
-heading_re="^### ${id}([[:space:]]|\$)"
+heading_re="$(plan_heading_re "$id")"
 today="$(plan_today)"
 plan_append_under_heading "$root/$rel" "$heading_re" "**${label} ${today}:** ${note}"
 git -C "$root" add "$rel"

@@ -27,7 +27,7 @@ consolidated in one place rather than scattered per-topic.
 - **Validate with `nix flake check --no-build`** when feasible. Compare
   against `git stash`/the previous commit to rule out pre-existing failures
   before attributing a new one to your change. Full detail on which
-  validation layer to reach for: `docs/procedures/testing-changes.md`.
+  evidence-ladder rung to reach for: `docs/procedures/testing-changes.md`.
 
 ## Trust hierarchy
 

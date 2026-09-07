@@ -4,7 +4,9 @@
 # agent_type (e.g. "security", "docs-updater") and cwd. Only acts when
 # agent_type matches one of this repo's named review subagents; appends a
 # timestamped completion stamp to the currently-active plan file (per
-# .claude/.active-plan) as mechanical proof the step actually ran. This is
+# .claude/.active-plan) recording that the step ran, and against which
+# code -- a record that defeats forgetting, not one that resists a lie;
+# see plan_stamp_line in the plan skill's lib.sh. This is
 # what closes the gap where a skill invoking a subagent doesn't reliably
 # block on it (confirmed Claude Code behavior, not an assumption -- see
 # docs/skills/workflow/reference.md).
@@ -12,30 +14,47 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=hook-lib.sh
 . "$SCRIPT_DIR/hook-lib.sh"
+# shellcheck source=../../plan/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
 
 input="$(cat)"
 [ "$(hook_json_str "$input" hook_event_name)" = "SubagentStop" ] || exit 0
 
 agent_type="$(hook_json_str "$input" agent_type)"
-case "$agent_type" in
-  security | docs-updater) ;;
-  *) exit 0 ;;
-esac
+plan_is_stampable "$agent_type" || exit 0
 
 cwd="$(hook_json_str "$input" cwd)"
 root="$(cd "${cwd:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)"
 [ -n "$root" ] || exit 0
 
-active="$root/.claude/.active-plan"
-[ -f "$active" ] || exit 0
-rel="$(cat "$active")"
-[ -n "$rel" ] && [ -f "$root/$rel" ] || exit 0
+rel="$(plan_active_plan "$root")" || exit 0
 
-# Never touch a frozen plan, even for a completion stamp.
-grep -q '^frozen: true' "$root/$rel" && exit 0
+# Never touch a frozen plan, even for a completion stamp. Same test
+# plan-gate reads with -- if the two disagree on "frozen", its
+# NOTE-vs-BLOCKED reasoning (which assumes this script refuses frozen
+# plans) silently breaks.
+plan_is_frozen "$root/$rel" && exit 0
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-printf '\n_%s finished %s -- see Findings above._\n' "$agent_type" "$ts" >> "$root/$rel"
+# Fingerprint the code as it stood when the agent finished, so plan-gate
+# can tell "ran at all" from "ran against this code".
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D11
+# No stamp at all, rather than one naming no code. A stamp this script
+# writes always carries `(code ...)`, so an empty fingerprint would read
+# as `malformed` and block -- not as `legacy`, which is the separate,
+# accepted loophole for stamps written before fingerprints existed. Both
+# block; not writing simply leaves nothing to clean out of the plan file,
+# and the next successful run stamps normally.
+fp="$(cd "$root" && plan_code_fingerprint)" || {
+  # stderr, which Claude Code does not surface for a SubagentStop -- so
+  # this reaches a hook log, not the session. Better than nothing (the
+  # loop is otherwise "run the agent, gate says no stamp, run it again"
+  # with no reason anywhere), but it is not a user-visible signal
+  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F44
+  plan_note "subagent-stamp: cannot compute the code fingerprint; no stamp written for '$agent_type'."
+  exit 0
+}
+printf '\n%s\n' "$(plan_stamp_line "$agent_type" "$ts" "$fp")" >> "$root/$rel"
 git -C "$root" add "$rel" 2>/dev/null || true
 
 exit 0

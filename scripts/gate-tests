@@ -1,0 +1,601 @@
+#!/usr/bin/env bash
+# gate-tests -- failure-mode tests for the scripts that gate every commit.
+# Read-only against this repo: every case that needs a repository builds a
+# scratch one under $TMPDIR and removes it.
+#
+# The repo had eight VM tests for NixOS behaviour and none for the gates,
+# and the review that produced this found the same defect shape twelve
+# times: a gate that reports the wrong answer rather than one that is
+# missing. So the assertions here are mostly negative -- point a gate at a
+# broken environment and require it to *fail* -- plus a positive control,
+# because a gate nothing can satisfy is the other half of the same defect.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PLAN_SCRIPTS="$SCRIPT_DIR/../docs/skills/plan/scripts"
+WORKFLOW_SCRIPTS="$SCRIPT_DIR/../docs/skills/workflow/scripts"
+# shellcheck source=../docs/skills/plan/scripts/lib.sh
+. "$PLAN_SCRIPTS/lib.sh"
+
+# The fixture calls `git init`, `add -A` and `commit`. Inherit a GIT_DIR
+# -- from a hook, or `git rebase --exec` -- and those run against the
+# caller's real repository instead of the scratch one, which is a write
+# outside $scratch by a script that claims not to make any.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F12
+# GIT_TEMPLATE_DIR and the GIT_CONFIG_COUNT/KEY_n/VALUE_n channel belong on
+# the same list and were missed. Both let the caller's environment decide
+# the verdict -- an injected core.excludesFile or an `info/exclude` in a
+# template drops a.nix from `git add -A`, and each turns a clean run into
+# 7 failures. Env-supplied config is also the *last* source git consults,
+# so it outranks GIT_CONFIG_GLOBAL and the repo-local pins below; dropping
+# GIT_CONFIG_COUNT is what makes those pins the last word. KEY_n/VALUE_n
+# are inert once the count is gone.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F16
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_COMMON_DIR \
+  GIT_TEMPLATE_DIR GIT_NAMESPACE GIT_ATTR_NOSYSTEM GIT_CONFIG_COUNT
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+
+pass=0 fail=0 known=0
+# Checked: unchecked under `set -u` without `-e`, a failed mktemp leaves
+# $scratch empty and every path below roots at / instead.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F9
+scratch="$(mktemp -d)" || { printf 'gate-tests: cannot create a scratch directory\n' >&2; exit 1; }
+[ -n "$scratch" ] && [ -d "$scratch" ] || { printf 'gate-tests: scratch directory is not usable\n' >&2; exit 1; }
+trap 'rm -rf "$scratch"' EXIT
+
+ok()    { pass=$((pass + 1)); printf '  ok    %s\n' "$1"; }
+bad()   { fail=$((fail + 1)); printf '  FAIL  %s\n    %s\n' "$1" "$2" >&2; }
+# A residue accepted on the record rather than closed. Asserted anyway, so
+# a later tightening shows up as a change instead of a surprise.
+note()  { known=$((known + 1)); printf '  known %s -- %s\n' "$1" "$2"; }
+
+section() { printf '\n== %s ==\n' "$1"; }
+
+# ---------------------------------------------------------------- rung gate
+
+# plan_state_body and plan_rung_problem decide whether a plan may close,
+# by reading prose. Four review passes found a live defect in that reader
+# each time, and three were reachable only through the previous fix, so
+# the cases below are the fixture that settled it.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#G3
+
+rung_verdict() { # <state-body> -- prints "pass" or "refuse"
+  local f="$scratch/rung.md"
+  printf -- '---\nslug: x\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false\n---\n\n# x\n\n%s\n\n## Progress\n' "$1" > "$f"
+  [ -z "$(plan_rung_problem "$f")" ] && printf 'pass' || printf 'refuse'
+}
+
+rung() { # <name> <pass|refuse> <state-body>
+  local got; got="$(rung_verdict "$3")"
+  [ "$got" = "$2" ] && ok "$1" || bad "$1" "got $got, want $2"
+}
+
+rung_known() { # <name> <current-verdict> <why> <state-body>
+  local got; got="$(rung_verdict "$4")"
+  [ "$got" = "$2" ] && note "$1" "$3" || bad "$1 (recorded residue)" "got $got, want $2"
+}
+
+section "rung declaration: forms that must be accepted"
+rung "own paragraph"            pass "## State"$'\n\n'"Verified to rung 3 (ran it locally, output inspected)."
+rung "wrapped mid-phrase"       pass "## State"$'\n\n'"Verified to rung"$'\n'"3 (ran it locally)."
+rung "bold"                     pass "## State"$'\n\n'"**Verified to rung 4 (VM).** Nothing deployed."
+rung "bold and wrapped"         pass "## State"$'\n\n'"**Verified to rung"$'\n'"4 (VM).** Nothing deployed."
+rung "italic"                   pass "## State"$'\n\n'"_Verified to rung 3 (ran it locally)._"
+rung "emphasis inside phrase"   pass "## State"$'\n\n'"Verified to rung **3** (stray emphasis)."
+rung "dash bullet"              pass "## State"$'\n\n'"- Verified to rung 4 (VM)."
+rung "star bullet"              pass "## State"$'\n\n'"* Verified to rung 4 (VM)."
+rung "numbered item"            pass "## State"$'\n\n'"1. Verified to rung 2 (source code)."
+rung "blockquote"               pass "## State"$'\n\n'"> Verified to rung 2 (source code)."
+rung "two-space indent"         pass "## State"$'\n\n'"  Verified to rung 3 (ran it locally)."
+rung "lowercase"                pass "## State"$'\n\n'"verified to rung 2 (source code)."
+rung "trailing space"           pass "## State"$'\n\n'"Verified to rung 3 "
+rung "no closing punctuation"   pass "## State"$'\n\n'"Verified to rung 3"
+rung "second paragraph"         pass "## State"$'\n\n'"Work finished."$'\n\n'"Verified to rung 3 (ran it locally)."
+rung "declared, skip explained" pass "## State"$'\n\n'"Verified to rung 3 (ran it locally); rung 4 skipped, sops-backed."
+rung "state holds a fence too"  pass "## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n\n'"\`\`\`"$'\n'"nixos-rebuild build"$'\n'"\`\`\`"
+
+section "rung declaration: forms that must be refused"
+rung "no declaration"           refuse "## State"$'\n\n'"Work finished, everything builds."
+rung "negated"                  refuse "## State"$'\n\n'"Not verified to rung 4 -- sops-backed."
+rung "negated, bold"            refuse "## State"$'\n\n'"**Not verified to rung 4** -- sops-backed."
+rung "negated, never"           refuse "## State"$'\n\n'"Never verified to rung 4."
+rung "negation split by wrap"   refuse "## State"$'\n\n'"The change is not"$'\n'"verified to rung 4 yet."
+rung "un- split by wrap"        refuse "## State"$'\n\n'"The work is un-"$'\n'"verified to rung 3."
+rung "rung 12 is not rung 1"    refuse "## State"$'\n\n'"Verified to rung 12 (no such rung)."
+rung "rung 0"                   refuse "## State"$'\n\n'"Verified to rung 0."
+rung "rung 6"                   refuse "## State"$'\n\n'"Verified to rung 6."
+rung "backticked mention"       refuse "## State"$'\n\n'"Rule: \`Verified to rung 3\` opens the paragraph."
+rung "backticked, own para"     refuse "## State"$'\n\n'"\`Verified to rung 3\` is the required phrase."
+rung "not (yet)"                refuse "## State"$'\n\n'"We have not (yet) verified to rung 3."
+rung "after a dash clause"      refuse "## State"$'\n\n'"Nothing ran -- verified to rung 3 is what would be needed."
+rung "after a colon"            refuse "## State"$'\n\n'"Blocked: verified to rung 3 is not yet true."
+rung "after a semicolon"        refuse "## State"$'\n\n'"Builds fine; verified to rung 3 is not claimed."
+rung "html comment"             refuse "## State"$'\n\n'"<!-- Verified to rung 3 -->"
+rung "html comment, multiline"  refuse "## State"$'\n\n'"<!--"$'\n'"Verified to rung 3"$'\n'"-->"
+rung "mid-sentence mention"     refuse "## State"$'\n\n'"The gate wants a paragraph saying Verified to rung 3 somewhere."
+rung "quotes the refusal text"  refuse "## State"$'\n\n'"It said: no verification-rung declaration in ## State."
+rung "subject position"         refuse "## State"$'\n\n'"Verified to rung 3 is the phrase the gate demands; we have not reached it."
+rung "subject position, bold"   refuse "## State"$'\n\n'"**Verified to rung 3** is the line this wants; nothing was run."
+rung "subject position, past"   refuse "## State"$'\n\n'"*Verified to rung 5* was never claimed here."
+rung "subject position, bullet" refuse "## State"$'\n\n'"- Verified to rung 3 would be a lie here."
+rung "rung 3 verified"          refuse "## State"$'\n\n'"Rung 3 verified (ran it locally)."
+rung "verified at rung 3"       refuse "## State"$'\n\n'"Verified at rung 3 (ran it locally)."
+rung "rungs 3 and 4"            refuse "## State"$'\n\n'"Verified to rungs 3 and 4."
+rung "is verified to rung 3"    refuse "## State"$'\n\n'"The work is verified to rung 3."
+rung "paragraph opens with --"  refuse "## State"$'\n\n'"-- verified to rung 3 is what would be needed."
+rung "paragraph opens with ###" refuse "## State"$'\n\n'"### Verified to rung 3"
+
+section "rung declaration: quoting the schema is not declaring it"
+rung "fenced example, outside"  refuse "## State"$'\n\n'"Nothing verified yet."$'\n\n'"## Progress"$'\n\n'"\`\`\`"$'\n'"## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`"
+rung "fenced example, inside"   refuse "## State"$'\n\n'"Nothing verified yet. The gate wants:"$'\n\n'"\`\`\`markdown"$'\n'"## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`"
+rung "fenced, 2-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"  \`\`\`"$'\n'"  Verified to rung 3 (ran it locally)."$'\n'"  \`\`\`"
+rung "fenced, 3-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"   \`\`\`"$'\n'"   Verified to rung 3 (ran it locally)."$'\n'"   \`\`\`"
+rung "fenced inside list item"  refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"- like this:"$'\n\n'"    \`\`\`"$'\n'"    Verified to rung 3 (ran it locally)."$'\n'"    \`\`\`"
+rung "tilde fence"              refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"~~~"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"~~~"
+rung "nested fence, odd count"  refuse "## State"$'\n\n'"Nothing verified yet."$'\n\n'"## Progress"$'\n\n'"\`\`\`\`"$'\n'"outer holding an unbalanced inner:"$'\n'"\`\`\`"$'\n'"## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`\`"
+
+# Residues carried on the record. Both are cases where the text names the
+# rung without claiming it, and neither is decidable by string matching.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#G4
+section "rung declaration: recorded residues"
+rung_known "indented code block, unfenced" pass \
+  "an unfenced indented block is not distinguishable after whitespace collapse" \
+  "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"    Verified to rung 3 (ran it locally)."
+rung_known "self-contradicting declaration" pass \
+  "the phrase opens the claim and a later clause denies it; a lie in the record, not a bypass" \
+  "## State"$'\n\n'"Verified to rung 3 -- we have not actually reached this."
+
+section "State section: presence and boundaries"
+state_problem() { # <body> -- prints the problem, empty if none
+  local f="$scratch/state.md"
+  printf -- '---\nslug: x\n---\n\n# x\n\n%s\n' "$1" > "$f"
+  plan_state_problem "$f"
+}
+[ -n "$(state_problem "## Progress"$'\n\n'"\`\`\`"$'\n'"## State"$'\n\n'"Verified to rung 3."$'\n'"\`\`\`")" ] &&
+  ok "a fenced State heading is not the file's own" ||
+  bad "a fenced State heading is not the file's own" "reported no problem"
+[ -n "$(state_problem "## State"$'\n\n'"   ")" ] &&
+  ok "whitespace-only State reports empty" ||
+  bad "whitespace-only State reports empty" "reported no problem"
+[ -z "$(state_problem "## State"$'\n\n'"Something.")" ] &&
+  ok "a real State reports no problem" ||
+  bad "a real State reports no problem" "reported a problem"
+
+# ------------------------------------------------------- broken environment
+
+# Every case below was a real finding: the gate ran, something underneath
+# it failed, and the gate reported success anyway.
+section "fail-open: a gate must not report success over a check it could not make"
+
+repo="$scratch/repo"
+mkdir -p "$repo"
+git -C "$repo" init -q
+git -C "$repo" config user.email t@t
+git -C "$repo" config user.name t
+# Belt and braces with the global/system pins above: a signing key or a
+# hooksPath must not decide whether the harness passes. These are the last
+# word only because GIT_CONFIG_COUNT is unset above -- env-supplied config
+# outranks both a repo-local `git config` and GIT_CONFIG_GLOBAL. No
+# commit.template -- the fixture commits with -qm, which never reads one.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F8
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F13
+git -C "$repo" config commit.gpgsign false
+git -C "$repo" config core.hooksPath /dev/null
+mkdir -p "$repo/docs/skills"
+cp -r "$PLAN_SCRIPTS/.." "$repo/docs/skills/plan"
+cp -r "$WORKFLOW_SCRIPTS/.." "$repo/docs/skills/workflow"
+# The copied skills cite this repo's plans, which the fixture does not
+# have, so plan-citations would refuse here for an unrelated reason and
+# the sabotage baseline below would prove nothing. Stripped rather than
+# reproducing ~40 plan files.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+find "$repo/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/d' {} +
+grep -rlZ '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md' "$repo/docs/skills" 2>/dev/null |
+  xargs -0 -r sed -i 's/[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[a-z0-9][a-z0-9-]*\.md/A-PLAN-NAME/g'
+mkdir -p "$repo/docs/plans/in-progress"
+# Date-prefixed, because that is the only shape plan-citations recognises
+# as a citation. Named `example-plan` still, so the trailer below reads the
+# way a real one does.
+# Assembled from parts, never written whole: plan-citations scans this
+# script too, and a literal `YYYY-MM-DD-slug.md` here is a citation to a
+# plan that deliberately does not exist. Same category as the ignore
+# markers, whose HTML-comment form cannot be used inside a shell script.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G7
+fixture_date="2026-01-01"
+fixture_plan="${fixture_date}-example-plan.md"
+fixture_absent="${fixture_date}-no-such-plan.md"
+printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false\n---\n\n# t\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Gotchas (G)\n\n### G1 - a heading an anchored citation can resolve to\n\n## Findings (F)\n' \
+  > "$repo/docs/plans/in-progress/$fixture_plan"
+# One deliberately resolvable citation. The strip above removes every
+# citation the copied skills carried, which left plan-citations' whole
+# resolution path -- the basename map, the ambiguity check, the anchor
+# lookup -- exercised zero times: its baseline read `OK (0 citations
+# resolve)` and the sweep proved nothing about any of it.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+printf -- '# note\n\nCites %s#G1 so the resolution path is under the sweep.\n' \
+  "$fixture_plan" > "$repo/docs/note.md"
+git -C "$repo" add -A >/dev/null
+git -C "$repo" commit -qm base
+printf '{ }\n' > "$repo/a.nix"
+git -C "$repo" add a.nix >/dev/null
+git -C "$repo" commit -qm "$(printf 'code change\n\nPlan: %s' "$fixture_plan")"
+
+# <name> <expected-stderr-fragment> <command...>
+# The fragment is load-bearing: "exited non-zero" is satisfied by a
+# refusal for an unrelated reason, so a case written without it goes
+# green once the check it names is deleted. Empty fragment only for a
+# helper that refuses silently by contract.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+expect_fail() {
+  local name="$1" want="$2" out rc
+  shift 2
+  out="$("$@" 2>&1)"; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    bad "$name" "exited 0; it should have refused"
+  elif [ -n "$want" ] && ! printf '%s' "$out" | grep -qF -- "$want"; then
+    bad "$name" "refused, but not for the stated reason: $(printf '%s' "$out" | tail -n 1)"
+  else
+    ok "$name"
+  fi
+}
+
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F4
+expect_fail "plan-gate refuses an unresolvable base ref" "cannot resolve ref" \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" nosuchref HEAD
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F3
+expect_fail "required-agents refuses an unresolvable range" "cannot diff" \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" nosuchref HEAD
+# A helper refuses silently, so there is no diagnostic to require. The
+# exit code carries the whole assertion instead, and it must be the
+# helper's own 1 -- not bash's 127 for a function that no longer exists,
+# which is what an empty fragment accepted while the helper was deleted.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F7
+expect_rc() { # <name> <want-rc> <command...>
+  local name="$1" want="$2" rc
+  shift 2
+  "$@" >/dev/null 2>&1; rc=$?
+  [ "$rc" -eq "$want" ] && ok "$name" || bad "$name" "exited $rc, want $want"
+}
+# `declare -F` first, so a renamed or deleted helper exits 3 and fails
+# the assertion rather than passing as a refusal.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
+expect_rc "plan_worktree_files refuses a broken GIT_DIR" 1 \
+  env -C "$repo" GIT_DIR=/nonexistent bash -c \
+  '. docs/skills/plan/scripts/lib.sh; declare -F plan_worktree_files >/dev/null || exit 3; plan_worktree_files "*.nix"'
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
+expect_rc "the fingerprint refuses outside a repository" 1 \
+  env -C "$scratch" bash -c \
+  ". '$PLAN_SCRIPTS/lib.sh'; declare -F plan_code_fingerprint >/dev/null || exit 3; plan_code_fingerprint"
+
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
+fp_root="$(cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_code_fingerprint')"
+fp_sub="$(cd "$repo/docs/skills" && bash -c '. ../../docs/skills/plan/scripts/lib.sh 2>/dev/null || . '"$repo"'/docs/skills/plan/scripts/lib.sh; plan_code_fingerprint')"
+if [ -n "$fp_root" ] && [ "$fp_root" = "$fp_sub" ]; then
+  ok "the fingerprint does not change with the working directory"
+else
+  bad "the fingerprint does not change with the working directory" "root=$fp_root sub=$fp_sub"
+fi
+
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
+expect_fail "required-agents refuses an agent missing from the order" "missing from PLAN_AGENT_ORDER" \
+  env -C "$repo" bash -c '
+    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"spec-check\")/" docs/skills/plan/scripts/lib.sh
+    docs/skills/workflow/scripts/required-agents HEAD~1 HEAD'
+git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
+
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F64
+expect_fail "plan-gate refuses when no obliged agent is stampable" "have drifted apart" \
+  env -C "$repo" bash -c '
+    sed -i "s/PLAN_STAMPABLE_AGENTS=(\"security\" \"docs-updater\")/PLAN_STAMPABLE_AGENTS=(\"sekurity\" \"docs-updatr\")/" docs/skills/plan/scripts/lib.sh
+    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\" \"sekurity\" \"docs-updatr\")/" docs/skills/plan/scripts/lib.sh
+    docs/skills/workflow/scripts/plan-gate HEAD~1 HEAD'
+git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
+
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F1
+expect_fail "plan-gate refuses a range whose plan is unstamped" "carries no completion stamp" \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+
+section "awkward filenames still oblige review"
+# A reviewable file whose name git has to quote obliged no agent at all
+# until core.quotePath=false landed, and that fix demotes bytes >= 0x80
+# only -- quotes, tabs and newlines are still quoted. Asserted in both
+# directions so the residue is a recorded fact rather than a surprise.
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F34
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
+obliges_security() { # <filename> -- does a new file of this name oblige review?
+  local name="$1" out
+  ( cd "$repo" && printf '{ }\n' > "$name" ) 2>/dev/null || return 2
+  out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" 2>/dev/null)"
+  ( cd "$repo" && rm -f -- "$name" )
+  printf '%s' "$out" | grep -qx security
+}
+
+if obliges_security "$(printf 'caf\303\251.nix')"; then
+  ok "a non-ASCII .nix name obliges review"
+else
+  bad "a non-ASCII .nix name obliges review" "required-agents did not name security"
+fi
+if obliges_security 'quo"te.nix'; then
+  note "a quoted .nix name obliges review" "core.quotePath=false does not demote a literal quote; this passing is the better outcome"
+else
+  note "a quoted .nix name obliges NO review" "recorded residue: git C-quotes it regardless of core.quotePath"
+fi
+
+section "fail-closed: an honest sequence must end green"
+# The other half of the same defect: a gate nothing can satisfy teaches
+# the bypass, so the positive control is not optional.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+(
+  cd "$repo" || exit 1
+  # shellcheck source=/dev/null
+  . docs/skills/plan/scripts/lib.sh
+  fp="$(plan_code_fingerprint)"
+  for agent in "${PLAN_STAMPABLE_AGENTS[@]}"; do
+    printf '\n%s\n' "$(plan_stamp_line "$agent" "2026-01-01T00:00:00Z" "$fp")" \
+      >> "docs/plans/in-progress/$fixture_plan"
+  done
+)
+# The success *line*, not just rc=0: "nothing to gate" also exits 0, and
+# a control that accepts it stays green while the gate examines nothing.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F7
+control_out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
+if [ $? -ne 0 ]; then
+  bad "plan-gate passes a stamped plan with resolved findings" "it refused an honest sequence"
+elif ! printf '%s' "$control_out" | grep -qF 'obliged reviews stamped'; then
+  bad "plan-gate passes a stamped plan with resolved findings" \
+    "exited 0 without examining the plan: $(printf '%s' "$control_out" | tail -n 1)"
+else
+  ok "plan-gate passes a stamped plan with resolved findings"
+fi
+
+section "plan-citations resolves what exists and refuses what does not"
+# The sweep below asserts that plan-citations refuses when a git call under
+# it fails. That says nothing about whether it can tell a good citation
+# from a bad one, and until the fixture carried a resolvable citation it
+# never entered that code at all. Both directions, because a checker that
+# resolves everything and one that resolves nothing are the same defect.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+cite_out="$(env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations" 2>&1)"
+if printf '%s' "$cite_out" | grep -qE 'OK \([1-9][0-9]* citations resolve'; then
+  ok "plan-citations resolves a citation that exists"
+else
+  bad "plan-citations resolves a citation that exists" \
+    "$(printf '%s' "$cite_out" | tail -n 1)"
+fi
+# The cited name arrives as an argument for the same reason it is
+# assembled above, and $? / $rc are the child's, not this shell's.
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a citation to no such plan" "no such plan file" \
+  env -C "$repo" bash -c '
+    printf "Cites %s here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$fixture_absent"
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a citation to no such anchor" "### G9" \
+  env -C "$repo" bash -c '
+    printf "Cites %s#G9 here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$fixture_plan"
+
+# ------------------------------------------------------------- properties
+
+# The cases above can only catch a defect someone already found. These
+# assert *invariants* over generated input instead, which is what finds
+# the next one: every defect in the rung matcher so far (#F3, #F8, #F9,
+# #F13, #F17) was the same bug -- the verdict moved when the text was
+# rewrapped, emphasised or indented, none of which changes what the text
+# says.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#G3
+section "properties: presentation must not change the verdict"
+
+rewrap() { # <width> <text> -- reflow to width, preserving blank lines
+  printf '%s\n' "$2" | awk -v w="$1" '
+    /^[ \t]*$/ { if (line != "") print line; line = ""; print ""; next }
+    {
+      n = split($0, words, /[ \t]+/)
+      for (i = 1; i <= n; i++) {
+        if (words[i] == "") continue
+        if (line == "") line = words[i]
+        else if (length(line) + 1 + length(words[i]) <= w) line = line " " words[i]
+        else { print line; line = words[i] }
+      }
+    }
+    END { if (line != "") print line }'
+}
+
+invariant_rewrap() { # <name> <expected> <text>
+  local w got base
+  base="$(rung_verdict "$3")"
+  if [ "$base" != "$2" ]; then
+    bad "$1 (baseline)" "unwrapped verdict is $base, want $2"
+    return
+  fi
+  for w in 30 40 50 60 72 80 100; do
+    got="$(rung_verdict "$(rewrap "$w" "$3")")"
+    if [ "$got" != "$2" ]; then
+      bad "$1" "verdict changed to $got when rewrapped at width $w"
+      return
+    fi
+  done
+  ok "$1"
+}
+
+invariant_rewrap "a declaration survives any wrap width" pass \
+  "## State"$'\n\n'"Verified to rung 3 (ran it locally, output inspected) and the output was read end to end."
+invariant_rewrap "a bold declaration survives any wrap" pass \
+  "## State"$'\n\n'"**Verified to rung 4 (VM).** Both machines booted and the units started."
+invariant_rewrap "a denial stays refused at any wrap" refuse \
+  "## State"$'\n\n'"The change is not verified to rung 4 yet, because the secret is sops-backed."
+invariant_rewrap "a mention stays refused at any wrap" refuse \
+  "## State"$'\n\n'"The gate wants a paragraph that says Verified to rung 3 and nothing else before it."
+invariant_rewrap "a subject-position mention stays refused" refuse \
+  "## State"$'\n\n'"Verified to rung 3 is the phrase this gate demands of every plan before it closes."
+
+invariant_decoration() { # <name> <expected> <core>
+  local got d
+  for d in "%s" "**%s**" "_%s_" "- %s" "> %s" "  %s" "1. %s"; do
+    # shellcheck disable=SC2059  # $d is a format template, deliberately
+    got="$(rung_verdict "## State"$'\n\n'"$(printf -- "$d" "$3")")"
+    if [ "$got" != "$2" ]; then
+      bad "$1" "verdict changed to $got under decoration '$d'"
+      return
+    fi
+  done
+  ok "$1"
+}
+
+invariant_decoration "a declaration survives any decoration" pass \
+  "Verified to rung 3 (ran it locally)."
+invariant_decoration "a denial survives any decoration" refuse \
+  "Not verified to rung 3 yet."
+
+# Quoting is the one presentation change that *must* flip an accept to a
+# refuse: a doc that shows the required form is not claiming it.
+invariant_quoted() {
+  local got fence
+  for fence in '```' '~~~' '   ```' '````'; do
+    got="$(rung_verdict "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"$fence"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"$fence")"
+    if [ "$got" != refuse ]; then
+      bad "quoting the phrase never declares it" "accepted inside a '$fence' fence"
+      return
+    fi
+  done
+  ok "quoting the phrase never declares it"
+}
+invariant_quoted
+
+# --------------------------------------------------------------- sabotage
+
+# The enumerated broken environments above are the ones already known to
+# have bitten. This sweeps instead: fail the Nth git call a gate makes and
+# require the gate to refuse. Every Class 1 finding was one instance of
+# "a git call failed and the gate reported success anyway", so the general
+# form is worth asserting over the specific ones.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+section "sabotage: no gate may report success when a git call underneath it failed"
+
+real_git="$(command -v git)"
+fakebin="$scratch/fakebin"
+mkdir -p "$fakebin"
+{
+  printf '#!/usr/bin/env bash\n'
+  printf 'c="$(cat "$SABOTAGE_COUNT" 2>/dev/null || echo 0)"\n'
+  printf 'c=$((c + 1)); printf %%s "$c" > "$SABOTAGE_COUNT"\n'
+  printf 'if [ "$c" = "$SABOTAGE_AT" ]; then echo "sabotage: git call $c" >&2; exit 128; fi\n'
+  printf 'exec %s "$@"\n' "$real_git"
+} > "$fakebin/git"
+chmod +x "$fakebin/git"
+
+# The shim below only sees a `git` resolved through PATH. A gate that
+# invokes an absolute binary is swept zero times for those calls while
+# every iteration still reports ok, and no counting inside the shim can
+# detect it -- the baseline is taken through that same blind instrument,
+# so it undercounts by exactly the calls in question. The property has to
+# be asserted on the source instead, which is also the only form that
+# catches the refactor *before* it silently hollows out the sweep.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F14
+swept_gate_sources=(
+  "$PLAN_SCRIPTS/lib.sh"
+  "$PLAN_SCRIPTS/plan-citations"
+  "$WORKFLOW_SCRIPTS/plan-gate"
+  "$WORKFLOW_SCRIPTS/required-agents"
+)
+# Comments stripped first, so prose about absolute paths is not a finding.
+# The three forms that leave PATH: an absolute or relative path ending in
+# /git, a binary captured with `command -v`/`which`, and a $GIT holding
+# either.
+path_git_violations=""
+for _f in "${swept_gate_sources[@]}"; do
+  _hits="$(sed 's/#.*//' "$_f" |
+    grep -nE '(/git([[:space:]]|$|")|command -v git|which git|\$\{?GIT\}?[^A-Z_])')" || continue
+  path_git_violations+="${_f##*/}:$(printf '%s' "$_hits" | tr '\n' ' ') "
+done
+if [ -z "$path_git_violations" ]; then
+  ok "every git the swept gates invoke is resolved through PATH"
+else
+  bad "every git the swept gates invoke is resolved through PATH" \
+    "the sabotage shim cannot see these calls: $path_git_violations"
+fi
+
+sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
+  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count
+  shift 3
+  # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
+  # gate already refusing for an unrelated reason, and then stays green
+  # whatever the sabotage does.
+  # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F3
+  # Baseline, run through the shim with sabotage disabled, so it proves
+  # two things at once: the gate passes when nothing is broken, and the
+  # shim is actually the git it calls. Without the second, a gate that
+  # invokes git by absolute path is swept zero times and every iteration
+  # reports ok -- verified, indistinguishable from a clean run even with
+  # a fail-open reintroduced.
+  # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F6
+  printf 0 > "$scratch/sabotage.count"
+  base_out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT=0 "$@" 2>&1)"
+  rc=$?
+  base_count="$(cat "$scratch/sabotage.count")"
+  # rc=0 is not enough. plan-gate's "nothing to gate" exits 0 too, and a
+  # baseline that accepts it sweeps only the ref-resolution calls and
+  # then reports ok having exercised no stamp check at all -- measured.
+  # The success line is what says the gate did its work.
+  # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F10
+  if [ "$rc" -ne 0 ]; then
+    bad "$name" "the gate already refuses with nothing sabotaged; the sweep would prove nothing"
+    return
+  fi
+  if ! printf '%s' "$base_out" | grep -qF -- "$want"; then
+    bad "$name" "the gate exited 0 without doing its work: $(printf '%s' "$base_out" | tail -n 1)"
+    return
+  fi
+  if [ "$base_count" -eq 0 ]; then
+    bad "$name" "the gate made no git call through the shim; the sweep would sabotage nothing"
+    return
+  fi
+  for ((n = 1; n <= max; n++)); do
+    printf 0 > "$scratch/sabotage.count"
+    out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT="$n" "$@" 2>&1)"
+    rc=$?
+    # A gate that never reached call n is fine: nothing was sabotaged.
+    [ "$(cat "$scratch/sabotage.count" 2>/dev/null || echo 0)" -lt "$n" ] && break
+    if [ "$rc" -eq 0 ]; then
+      leaked="$n"
+      printf '    (call %s failed; gate still exited 0 saying: %s)\n' "$n" "$(printf '%s' "$out" | tail -n 1)" >&2
+      break
+    fi
+  done
+  if [ -n "$leaked" ]; then
+    bad "$name" "reported success with git call $leaked sabotaged"
+  elif [ "$base_count" -gt "$max" ]; then
+    # A gate that outgrew `max`: the loop stops at `max` and everything
+    # after it is never sabotaged. Stated as its own condition because
+    # the previous form -- comparing calls swept against the baseline --
+    # could only ever restate this one. Sabotage fires *at* call n, so a
+    # sabotaged run is identical to the clean run up to that point and
+    # the sweep always reaches exactly min(base_count, max). It is not
+    # the PATH-bypass check either; that is asserted on the source above,
+    # because a count taken through the shim cannot see past it.
+    # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F14
+    bad "$name" "made $base_count git calls but max is $max; the calls past $max were never sabotaged"
+  else
+    ok "$name"
+  fi
+}
+
+sabotage_sweep "plan-gate over a real range" "obliged reviews stamped" 25 \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+sabotage_sweep "required-agents over a real range" "security" 25 \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" HEAD~1 HEAD
+sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents"
+# "citations resolve", not "plan-citations: OK": the latter is a prefix of
+# the "no files matched the scan set" line too -- the one F2's fix added to
+# make a scanned-nothing run visible -- so the baseline accepted a gate that
+# scanned nothing. Only the working line can print this.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
+sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+
+printf '\ngate-tests: %s passed, %s failed, %s recorded residue(s)\n' "$pass" "$fail" "$known"
+[ "$fail" -eq 0 ] || exit 1

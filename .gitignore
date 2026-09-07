@@ -7,6 +7,11 @@ result-*
 # never repo content, see docs/skills/plan/scripts/lib.sh
 .claude/.active-plan
 .claude/.trivial-ack
+# local-only, written by Claude Code on a "don't ask again" grant --
+# never repo content. PLAN_CODE_GLOBS already excludes it from the stamp
+# fingerprint; this line stops it being committed by an `add -A`
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F35
+.claude/settings.local.json
 
 # never track pre-generated host SSH keys (see hosts/vps/README.md,
 # step 1) — these belong outside the repo entirely, this is a backstop

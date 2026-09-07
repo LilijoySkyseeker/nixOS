@@ -27,6 +27,9 @@ root="$(cd "${cwd:-.}" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)
 trivial="$root/.claude/.trivial-ack"
 [ -f "$trivial" ] && exit 0
 
+# hardcoded rather than sourced from lib.sh's PLAN_ACTIVE_MARKER_RELPATH
+# -- keep the two spellings in sync by hand
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F15
 active="$root/.claude/.active-plan"
 if [ -f "$active" ]; then
   rel="$(cat "$active")"
