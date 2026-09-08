@@ -187,14 +187,24 @@ pass, `gate-tests` was 92/0/3 at that commit and is **96/0/3** as of
 2026-09-08, and `verify-ladder` passes end to end with the lint genuinely
 running over this plan.
 
-**One thing blocks the PR, and it is a decision, not work.** `plan-gate`
-refuses on a stale `security` stamp, because fixing `#F18`-`#F22` changed
-code after `security` last looked. By D7's letter a third pass is owed;
-by D7's own recurrence rule this is where sign-off replaces another loop,
-since the same shape has now returned eight times and each fix was
-confirmed by mutation rather than by re-reading. Either run `security`
-once over `git diff 0ca8889..HEAD` and resolve what it finds, or record
-the sign-off. Do not self-issue a stamp.
+**One thing blocks the PR, and it is the same decision as before.**
+`plan-gate` refuses on stale `security` *and* `docs-updater` stamps,
+because fixing `#F34`-`#F40` changed code after both last looked. Branch
+HEAD is `54c67e6`.
+
+`#D1` answered this question once already — run the pass rather than sign
+off — and running it was clearly right: the third `security` pass found
+seven, three MEDIUM, including a path that would have let the freeze
+evidence re-bless a tampered file. So the loop is still earning its cost,
+and it has also produced the next stale stamp. Either run
+`security` and `docs-updater` once more over `git diff 10469cf..HEAD` and
+resolve what they find, or record the sign-off. **Do not self-issue a
+stamp.**
+
+Worth weighing when deciding: this round's findings were more serious than
+the previous round's, not less. Rounds one and two were mostly about the
+harness lying to itself; round three found three live defects in the
+scripts themselves.
 
 **Next, and it is the substance of this plan: the G-to-F
 reclassification.** Nothing has been moved yet. Everything needed to
