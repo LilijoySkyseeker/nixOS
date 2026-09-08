@@ -172,6 +172,211 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-08
+
+**Where.** Worktree
+`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69** (draft), HEAD
+`c9dc933`. Work there, never the main checkout. PR #68 is merged.
+
+**What is done.** The schema half of child 2, plus the user's decisions of
+2026-09-08: `superseded_by` dropped (`#D5`), the bare-filename rule moved
+into `plan-citations` (`#D3`), `plan-repair` built and all 27 malformed
+frozen plans repaired, both freeze doors gated on `plan-lint` (`#D4`).
+Three `/simplify` rounds, two `docs-updater` passes and three `security`
+passes. **40 findings, 40 resolved.** `verify-ladder` passes;
+`gate-tests` 102/0/3; `plan-citations` 389 resolve; corpus lint 18 of 102,
+unchanged from `origin/master`; all 50 frozen checksums verify.
+
+**What blocks the PR, and it is a decision.** `plan-gate` refuses on stale
+`security` *and* `docs-updater` stamps, because fixing `#F34`-`#F40`
+changed code after both last looked. `#D1` answered this once — run the
+pass rather than sign off — and that was right: the third `security` pass
+found seven, three MEDIUM, including a path that let the freeze evidence
+re-bless a tampered file. Either run both over `git diff 10469cf..HEAD`
+and resolve what they find, or record the sign-off. **Never self-issue a
+stamp.**
+
+**The next session's focus is the suite itself, not another loop round.**
+Read `#G12` first: it is the synthesis, and it says the harness has no
+measure of its own strength. 102 assertions passing coexisted with six
+mutations that each restored a just-fixed defect and passed 98 of 98. The
+work is to make "is this suite any good" a measurement rather than an
+argument — a mutation catalogue the suite runs against itself. The
+mutation set is already written down across this plan's findings and the
+harden plan's, and each entry names the case that should break.
+
+**Not started, and still the substance of child 2:** the G-to-F
+reclassification. Design settled in `#G4` (move the body, leave a pointer,
+never two copies), first batch chosen
+(2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md, 42 `G`
+headings), bound recorded in `#G2` (24 of 47 live `#G` citations resolve
+into frozen plans and can never migrate, so contract completes per batch
+and never corpus-wide).
+
+**Open decisions.** `#D2` — where the slow tier runs. Still the user's,
+and it now gates two things: the fast/slow split (`#G8`) and any mutation
+runner, since both cost multiples of the suite. `#G11` has the measurement
+that probably decides it.
+
+**Live traps.**
+
+- `gate-tests` is at 1.26s against a one-second budget (`#G2`). Do not add
+  cases without reading `#G8` and `#G11` first.
+- `plan-lint`, `plan-freeze` and `plan-repair` take "frozen" from
+  `docs/plans/.checksums`, never from the `frozen:` field (`#F11`,
+  `#F34`).
+- `plan-repair` refuses unless the file still matches its recorded
+  checksum (`#F40`), so a dirty working tree makes it refuse rather than
+  certify.
+- A throwaway plan from `plan-new` leaves `.claude/.active-plan` dangling
+  and `verify-ladder` now blocks on it (`#F10`). Remove or repoint it.
+- 17 non-frozen plans predate `## State`; they now cannot be closed *or*
+  rejected without one sentence (`#G10`).
+- `nix flake check` can fail on a garbage-collected derivation with a
+  message naming the wrong culprit — `#G9` has the command.
+
+## Original plan`,
+  each netting exactly +3 lines against `origin/master`, which is what
+  says no file lost content. The 52nd changed file is this plan, which
+  `plan-new` generated in the new shape.
+- **27 of the 50 frozen plans repaired** under `#D4`, each gaining a
+  `## State` heading and a dated note and nothing else: +8 lines, 0
+  deletions, checksums re-recorded by `plan-repair`. `sha256sum -c
+  docs/plans/.checksums` passes on all 50.
+- `reference.md` and `SKILL.md` document `kind`, the expand—contract map
+  pattern, the G-is-a-lesson/F-is-a-defect rule, and which files the
+  schema rules apply to at all.
+
+**Measured before and after, because "the linter got stricter" and "the
+corpus got worse" look identical otherwise.** `plan-lint` failed on 45 of
+101 files before this change, using the old linter on the old corpus. It
+now fails on **18 of 102**. The drop is `#G5`: 27 of those failures were
+frozen files reported for a section they are not permitted to add.
+
+The change is not purely a suppression, and two of the checks got
+stricter rather than looser. The old presence check was a *substring*
+match, so
+2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md passed
+the `## State` requirement on a prose mention mid-sentence while having
+no such section; it is now reported, which closes the residue
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G1
+recorded as accepted. And 16 of the 17 remaining non-frozen failures
+already failed on `origin/master`.
+
+**And it got cheaper.** `plan-lint` reads the frontmatter once and the
+headings once instead of respawning a process per key and three per
+section. Measured here, 100 runs on the largest non-frozen plan, spread
+under 0.02s: **25.5 ms per file on `origin/master`, 21.0 ms now** —
+eight more checks and 18% faster than the code it replaces. The first
+version written this session was worse than either, about 43 ms; an
+earlier draft of this paragraph quoted that version's corpus sweep as the
+"before", which was the wrong baseline.
+
+**The review loop ran in full, twice, and found twenty-two things.** Four
+`/simplify` angles, then `docs-updater`, then `security`, in D7's order.
+All 17 are resolved. Three are worth carrying forward as lessons rather
+than as fixes:
+
+- **`#F10`** — a throwaway plan created to test the generator left
+  `.claude/.active-plan` naming a deleted file, and `verify-ladder`
+  *skipped* the lint under a line that reads like a pass, because
+  `plan_active_plan` returns 1 for a dangling marker exactly as it does
+  for no marker. The gate this repo built to catch that class had the
+  class. Fixed, and the decision now lives in a helper so it is testable.
+- **`#F13`** — the fast single-pass heading reader written to replace
+  twelve greps was fence-blind, re-opening a hole a sibling plan had
+  already closed in `plan_state_body`. The first regression test for it
+  passed under the very mutation it was meant to catch; it took reshaping
+  the case to the shape that actually breaks.
+- **`#F17`** — `plan_field_refs` dropped the last entry of every
+  reference list, and four reviewers read that helper without seeing it.
+  It surfaced only on running the thing with more than one value.
+
+`gate-tests` grew from 82 assertions to **102**, covering `plan-lint`, the
+active-plan marker, both frontmatter readers, the bare-filename rule,
+`plan-repair`, and the lint gate on both doors to freeze; each new case was
+observed failing under the mutation that reintroduces its defect. Measured
+2026-09-08: **1.26s**, over the one-second budget — the `plan-reject`
+cases cost 0.18s between them, and the third `security` pass added six more
+that invoke real gates. See `#G8`, and `#G11` for
+what the budget is worth against `verify-ladder`'s 24s.
+
+The `plan-reject` half-state guard (`#F31`) took **three attempts, and the
+first two asserted nothing**: one passed because the fixture had no
+`rejected/` directory, so `git mv` failed whatever the gate did, and the
+next because the probe file was untracked, so `git mv` failed again. Both
+looked like a passing test of the right thing. Only the third, with the
+directory present and the file staged, goes red when the gate is moved back
+after the move.
+
+**The second `security` pass, owed because the fix stage changed code,
+found five more — and two of them were in the regression tests written
+during the first.** `#F18`: the case guarding `#F11` keyed on the
+self-freeze *warning*, so restoring the bypass in full left the harness
+green; enforcement and warning are now separate assertions. `#F21`: the
+duplicate-key probe read `plan_frontmatter`'s *first* value, so it agreed
+with `plan_get_field` even with first-wins deleted; it now reads the last,
+which is how `plan-lint`'s consumer loop reads it.
+
+**That shape has now occurred eight times across two plans** — `#F3`,
+`#F6`, `#F7` and `#F10` on
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md,
+and `#F10`, `#F13`, `#F18` and `#F21` here — and four of those eight were
+in tests written to catch it. The pattern is stable enough to state as a
+rule: **a test keyed on a diagnostic asserts that the diagnostic exists,
+not that the check ran.** When a defect has several symptoms, key the test
+on the symptom the bypass removes, not the one it preserves. Each of the
+eight was found by mutation and none by reading.
+
+By the letter of D7 a third `security` pass is owed, since fixing
+`#F18`-`#F22` changed code again. It was not run: D7's own recurrence rule
+says to seek sign-off rather than loop when the same finding keeps
+returning, and this is that case. Every one of the five fixes was confirmed
+by mutation instead, which is the evidence a re-read does not produce.
+**That is the user's call, not the agent's** — the PR stays a draft until
+it is made.
+
+**The third `security` pass ran, and it was the right call.** `#D1` asked
+for it rather than a sign-off, and it found seven more: three MEDIUM, and
+none of them cosmetic. `plan-freeze` was still deciding "already frozen"
+from the file's own field, so flipping that field back and re-running would
+have rewritten the recorded checksum to a tampered hash (`#F34`).
+`plan-reject`'s `git mv` was unchecked, so a failed move left the plan
+stamped rejected in `todo/` while the script froze and checksummed whatever
+sat at the destination — and exited 0 (`#F36`). And `plan-repair` could
+launder any unrelated working-tree edit, because it never checked the file
+against its recorded checksum before re-blessing it (`#F40`), which made the
+documented claim that it "cannot edit a word of anyone's text" false.
+
+**`#F35` is the one to read.** Six mutations, each restoring a defect this
+branch had just fixed, all passed the harness 98/98 — including `#F23`'s
+own. `plan-repair` had three cases and no positive control at all, so making
+it a no-op passed. The first replacement control asserted the section
+existed and the checksum verified; that still passed with the insertion
+point moved to another heading. It only became real once it asserted the
+section lands *first*. Every one of the five is now caught, each observed
+failing under the mutation it names.
+
+That is the tenth through fifteenth instance of the shape this plan has been
+tracking, and the pattern in the last three is specific enough to name: a
+test that sets up a fixture is only as strong as the fixture's ability to
+reach the failure. Three separate guards passed because a directory was
+missing, a file was untracked, or a probe already satisfied the check by
+another route — not because the code was right.
+
+Not started: the G-to-F reclassification. Its design is settled in
+`#G4`, its first batch is chosen (the file `#D4` names, 42 `G` items),
+and nothing has been moved yet.
+
+Verified to rung 3 (ran it locally, output inspected): `verify-ladder`
+passes with the lint genuinely running over this plan, `gate-tests` is
+96/0/3 and hermetic, `plan-citations` resolves every citation,
+`sha256sum -c docs/plans/.checksums` passes on all 50 frozen plans, and
+the migration's dry run was read before it was applied. Rungs 4-5 do not
+apply — no host-visible behaviour changed, and the diff contains no
+`.nix` file, no secret and no host.
+
 ### Pick-up point, 2026-09-07
 
 **Where.** Worktree
@@ -622,6 +827,58 @@ runs inside `nix flake check`, which `verify-ladder` already runs last, so
 the tier keeps running locally on every pass and the "nothing runs them at
 all" risk disappears. The number was not in front of `#D2` when it was
 framed, and it probably decides it.
+
+### G12 - the suite has no measure of its own strength, and that is the thing to fix
+
+102 assertions passing told us nothing. In the same session, six mutations
+that each restored a defect the branch had *just fixed* passed the harness
+98 of 98 — including the one for a regression fixed two commits earlier
+(`#F35`). Every real finding this session came from a person or an agent
+mutating code by hand and watching what happened. Nothing in the suite
+measures whether the suite works.
+
+Six principles, each paid for by a specific finding here rather than taken
+from a book:
+
+1. **A test never observed failing has not been tested.** `#G2` on
+   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+   already says this. This session supplied fifteen instances, four of them
+   inside tests written to catch the very shape they missed.
+2. **A test is bounded by what its fixture can reach.** Three separate
+   guards passed because the setup could not produce the failure: no
+   `rejected/` directory, an untracked probe, and a probe already refused
+   by another rule. All three looked like passing tests of the right thing.
+   A negative case should assert that its precondition actually holds
+   before asserting the refusal.
+3. **Key the assertion on the symptom a bypass removes, not the one it
+   preserves** (`#F18`). The self-freeze guard emitted nine reports; the
+   case keyed on the one a full bypass left intact.
+4. **Assert the property, not a proxy for it** (`#F35`). "The section
+   exists and the checksum verifies" passed with the insertion point moved
+   to a different heading. Only "the section lands first" was the property.
+5. **The instrument has to be able to observe the property** (`#F14`). Two
+   rounds went into counting calls through a shim to prove something about
+   calls the shim cannot see. A dynamic check cannot assert a property
+   about what it cannot observe; that one had to move to a static read of
+   the source.
+6. **A negative case without a positive control is half a test.**
+   `plan-repair` shipped with three refusal cases and no control, so making
+   it a no-op passed.
+
+**What follows mechanically.** The suite should run its own mutations. A
+catalogue of (target file, mutation, the case that must go red) executed as
+a meta-test would have caught `#F35` without anyone thinking of it, and it
+turns "is this suite any good" from an argument into a measurement. The
+mutation set is already written down — it is scattered through this plan's
+findings and the harden plan's, and every entry names the case it should
+break.
+
+**Constraints the next session inherits.** A mutation run costs roughly N×
+the suite, so it belongs in a slow tier and not in `verify-ladder`'s
+pre-commit path; that depends on `#D2`, which is open. `gate-tests` is
+already at 1.26s against `#G2`'s one-second budget, and `#G11` measures
+what that budget is worth: the harness is 5% of `verify-ladder`, and
+`nix flake check` is 94%.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
