@@ -172,6 +172,49 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-08 (after the suite work)
+
+**The suite now has a measure of its own strength, and using it found seven
+guards that do not guard.** `scripts/gate-mutants` is `#G12`'s catalogue,
+executable: 39 entries of (target file, mutation, the case that must go
+red), each harvested from a finding in this plan or the harden plan. First
+honest run: **28 caught, 10 escaped**. Seven of the ten were real coverage
+gaps (`#F41`), two were catalogue errors (`#F44` and one case that guards a
+neighbouring property), and one was `#F43`. All closed: the catalogue now
+reports **39 caught, 0 escaped, 0 inert, 0 broken**.
+
+**Three of the ten escapes were only visible because the meta-test was made
+to distrust itself.** Building it reproduced the class it hunts twice over:
+the mutation verbs stripped the executable bit, so six entries were
+"catching" a permission error rather than a defect (`#F42`), and a
+multi-line mutation body truncated the record, so two entries ran with no
+expected case and reported success while asserting nothing (`#F43`). Both
+were caught by controls added on suspicion, not by the run passing —
+`gate-tests`' own diagnostic-fragment rule surfaced the first. `#G13` has
+the four non-`caught` verdicts and why each exists.
+
+**Numbers, measured 2026-09-08 on this host.** `gate-tests` 102 assertions
+to **110**, 1.07s to **1.20s** back to back — eight assertions for 0.13s,
+because five of the seven gaps were closed by repairing a fixture rather
+than adding a case. `gate-mutants` is **7.0s** for 39 mutants across 16
+jobs. `verify-ladder` passes end to end. Both scripts are hermetic: the
+repo is clean after a run and neither leaks a scratch directory.
+
+**The fixture-reachability class now fails under its own name.** `#G12`'s
+principle 2 — a test is bounded by what its fixture can reach — has a verb:
+`precondition` asserts that a fixture can produce the failure the case
+names, and reports as a named assertion when it cannot. It guards the
+`plan-reject` cases, where the class bit three times.
+
+**Still open, and unchanged.** `#D2` — where the slow tier runs — now gates
+three things, since `gate-mutants` is the third thing that costs multiples
+of the suite; `#G11` has the measurement that probably decides it. The
+G-to-F reclassification is still not started and is still child 2's
+substance. `plan-gate` still refuses PR #69 on `security` and
+`docs-updater` stamps that predate the `#F34`-`#F40` fix stage, and this
+session changed code again — **that is the user's decision, and no stamp
+has been self-issued.**
+
 ### Pick-up point, 2026-09-08
 
 **Where.** Worktree
@@ -512,11 +555,19 @@ Decided 2026-09-08 and done in the same session:
 - [x] `#D4` — `plan-freeze` lints before it freezes, which is the root
       cause those 27 came from
 
+Also done 2026-09-08:
+
+- [x] `#G12` — `scripts/gate-mutants`, the mutation catalogue the suite
+      runs against itself; 39 entries, all caught
+- [x] `#F41` — the seven guards it found that do not guard, all closed
+- [x] a `precondition` verb in `gate-tests`, so a fixture that cannot
+      reach the failure its case names fails under its own name
+
 Still open:
 
-- [ ] `#D2` — where the slow tier of `gate-tests` runs. Now blocking:
-      the harness is over budget and cannot be split until this is
-      answered (`#G8`)
+- [ ] `#D2` — where the slow tier of `gate-tests` runs, and now also
+      where `gate-mutants` runs. Blocking: the harness is over budget
+      and cannot be split until this is answered (`#G8`, `#G13`)
 - [ ] extend the sabotage sweep to `subagent-stamp`,
       `plan-freeze`/`plan-move` and `.githooks/*` — blocked by `#G8`
 
@@ -879,6 +930,59 @@ pre-commit path; that depends on `#D2`, which is open. `gate-tests` is
 already at 1.26s against `#G2`'s one-second budget, and `#G11` measures
 what that budget is worth: the harness is 5% of `verify-ladder`, and
 `nix flake check` is 94%.
+
+### G13 - what building the measurement cost, and the three ways a mutation entry lies
+
+`#G12` said the suite should run its own mutations. It now does:
+`scripts/gate-mutants` is a catalogue of (target file, mutation, the case
+that must go red) -- 39 entries, every one harvested from a finding in this
+plan or
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md.
+It builds a throwaway tree holding only `scripts/gate-tests` and
+`docs/skills/{plan,workflow}` -- the suite is relocatable, which is what
+makes this possible without touching the working copy -- applies one
+mutation, runs the whole suite, and requires the named case to fail.
+
+**The first honest run caught 28 of 38 and found seven guards that do not
+guard** (`#F41`). None of the seven was found by reading, and the code
+around four of them had been read by three review passes.
+
+**A catalogue entry is a claim with three parts, and each part can be wrong
+on its own.** Each gets its own verdict rather than folding into pass/fail,
+because each wrong part otherwise reads exactly like success -- which is
+the defect class the catalogue exists to find.
+
+- `UNKNOWN-CASE` -- the named case appears in no clean run. A renamed case
+  would otherwise turn its entry into a permanent silent escape.
+- `INERT` -- the mutation left the file byte-identical. An anchor that has
+  drifted measures nothing, and reports the same as an escape.
+- `BROKEN` -- the mutant no longer parses, so its red cases say nothing
+  about the defect, and if the named case is among them it reads as a
+  catch. Asserted with `bash -n` on the mutated file rather than inferred
+  from how many cases went red: a mutation that broke `lib.sh` outright
+  still printed a summary line and 71 of 113 red, so a summary-line check
+  alone missed it.
+- `ESCAPED` -- the finding.
+
+Each of the four was verified to fire, against deliberately bad entries in
+a throwaway copy, before the catalogue's own verdict was believed. A run
+also flags any mutation that reddens more than a quarter of the suite,
+since a catch under those conditions is probably a catch for some other
+reason.
+
+**Cost, measured 2026-09-08:** 39 mutants, **7.0s** wall across 16 jobs
+(~46s of CPU). Roughly N x the suite by construction, which is why it is
+not in `verify-ladder`'s pre-commit path; where it runs server-side is the
+same open question as the fast/slow split, `#D2`. `gate-tests` itself went
+102 assertions to **110**, and 1.07s to **1.20s** measured back to back on
+this host -- eight new assertions for 0.13s, and five of the seven gaps
+closed by repairing a fixture rather than by adding a case.
+
+**The rule this leaves behind:** a finding that names the case which should
+have caught it *is* a catalogue entry, and belongs in `gate-mutants` in the
+same change. The whole mutation set was already written down across two
+plans' findings before any of it was executable.
+
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
@@ -2306,3 +2410,157 @@ was spent on gate correctness, per the brief.
 _security finished 2026-09-08T19:25:24Z (code 94fdc82c1dc7e8e7) -- see Findings above._
 
 **FIXED 2026-09-08:** plan-repair refuses unless the file still matches its recorded checksum, so it cannot certify an edit it did not make -- which is what makes the docs' 'it cannot edit a word of anyone's text' true rather than merely intended
+
+### F41 — seven guards in `scripts/gate-tests` do not guard what they name
+
+- **File:** `scripts/gate-tests` — the rung fixtures (`:129-149`), the
+  presentation invariants (`:755-800`), the `plan-lint` section
+  (`:361-500`), the `plan-repair`/`plan-reject` section (`:523-660`)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — each found by `scripts/gate-mutants`
+  reintroducing the named defect and observing the named case stay green,
+  and each re-run red after the fix
+- **Axis:** needed-used
+- **Reachability:** anyone touching `lib.sh` or a `plan-*` script. The
+  harness is `verify-ladder`'s step-4 hard gate, so a green run is what the
+  workflow reads as "the gates still refuse what they must".
+- **Rule:** n/a — this is `#G12`'s six principles applied mechanically for
+  the first time, and the seven are instances of principles 2 and 4.
+- **Finding:** enumerated, mutation then fix.
+  1. **`nested fence, odd count`** closed `## State` with a `## Progress`
+     *before* the fence, so the declaration was already out of scope and the
+     case refused whatever the fence logic did. Replacing
+     `plan_state_body`'s length-and-character close rule with a toggle on
+     any marker — the exact `#F17` defect on
+     2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md
+     — changed no verdict. The nest now sits inside `## State`.
+  2. **`a denial stays refused at any wrap`** used "... not verified to rung
+     4 yet, because ...". The trailing word refuses that paragraph on its
+     own, so deleting the matcher's leading `^` anchor — which accepts every
+     denial — left the invariant green. The fixture now ends the sentence at
+     the rung.
+  3. **`a denial survives any decoration`** had the same shape ("... rung 3
+     yet."), and the same fix.
+  4. **`quoting the phrase never declares it`** was satisfied by the
+     backtick rule, not the fence rule: with no blank line inside the fence,
+     the fence markers join the declaration's block and the backticks refuse
+     it. Dropping `skip-fences` from `plan_rung_problem` entirely left it
+     green. Blank lines inside the fence now make the declaration its own
+     paragraph, so the case tests the property it is named for.
+  5. **Nothing asserted that `plan-lint` enforces section order.** The only
+     order-adjacent case was a *positive* one (a correct file that quotes the
+     template must pass), which stays green with the order check deleted. A
+     negative case was added: every section present, one pair swapped.
+  6. **Nothing asserted the freeze manifest is keyed on a whole path.** All
+     three of `#F20` (reader matched anywhere in the line), `#F24` (writer
+     deleted any line the path appeared in) and `#F39` (writer skipped the
+     `./` normalisation the reader applied) were invisible to every case.
+     Three assertions added, at the library level, with no `git` in two of
+     them; the `#F20` case is the strict-prefix reproduction that finding
+     records.
+  7. **`plan-repair`'s fence-aware title matcher was unguarded** (`#F38`).
+     The fixture had no fence, so a bare `/^# /` found the same line; and the
+     positive control located `## State` with `grep`, which calls a section
+     spliced *inside* a fence the first one. The fixture gained a fenced H1
+     before the real title, and the control now reads headings through
+     `plan_headings`.
+  Two further entries escaped for a reason that is not a suite defect and
+  were corrected in the catalogue instead: one named a case that guards a
+  different property (`mid-sentence mention` turns on the `^` anchor, not on
+  the trailing-word rule), and one is recorded under `#F44`.
+- **Fix risk:** low, and mostly paid in fixtures rather than assertions —
+  five of the seven were closed by making an existing case's fixture able to
+  reach the failure, at no runtime cost. The three additions cost 0.13s
+  total against `#G8`'s budget; see `#G13` and `#G11` for what that budget is
+  worth.
+
+**FIXED 2026-09-08:** all seven closed, each verified by `gate-mutants`
+observing the named case go red under the mutation that restores the defect.
+`gate-tests` 110/0/3; the catalogue is 39 caught, 0 escaped
+
+### F42 — `gate-mutants`' own mutation verbs cleared the executable bit, so six entries reported CAUGHT on "cannot execute"
+
+- **File:** `scripts/gate-mutants` (the four mutation verbs)
+- **Severity:** HIGH — against the meta-test's whole purpose
+- **Confidence:** CONFIRMED by reproduction: a hand-applied mutation of
+  `plan-reject` produced `env: '.../plan-reject': Permission denied`
+- **Axis:** needed-used
+- **Reachability:** every catalogue entry targeting an executable, which is
+  all but the `lib.sh` ones.
+- **Rule:** n/a — it is principle 3 in `#G12` ("key the assertion on the
+  symptom a bypass removes"), turned on the instrument itself.
+- **Finding:** each verb wrote its output to a temporary and `mv`'d it over
+  the target. `mv` replaces the inode, so the mutant arrived mode 644 and
+  every gate script mutation became "the script cannot be run" rather than
+  the defect it names. The first full run reported 28 caught; the red counts
+  give it away in hindsight — `plan-lint` entries showed *6 of 105 red*
+  where the honest number is 1, because six cases invoke a `plan-*` script
+  by path. `gate-tests` did catch it, through the diagnostic fragment
+  `expect_fail` requires: the case reported "refused, but not for the stated
+  reason", which is exactly what `#F3` on
+  2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+  installed that check for.
+- **Fix risk:** low. The verbs now `cp` into the existing file, which keeps
+  the destination's mode, and the worker asserts mode parity against the
+  pristine copy before running anything — so this cannot recur silently even
+  if a future verb writes some other way. Note this is the opposite choice
+  from `#F37`, which required `mv` over `cat >` in `plan-repair`: there the
+  hazard was a partial write reported as success, here it is a lost mode, and
+  the two files have different failure costs.
+
+**FIXED 2026-09-08:** verbs write through `mut_write` (`cp` into place); the
+worker reports BROKEN if a pristine-executable target comes back
+non-executable. Re-run honest: 28 caught, 10 escaped, and the inflated red
+counts collapsed to 1
+
+### F43 — a multi-line mutation body truncated the catalogue record, so two entries reported CAUGHT while asserting nothing
+
+- **File:** `scripts/gate-mutants` (record splitting in `--run-one`)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — both entries printed `0 case(s)` in their own
+  detail line
+- **Axis:** needed-used
+- **Reachability:** any entry whose mutation takes more than one verb, which
+  is how the `#F31` "gate runs after the move" mutation has to be written.
+- **Rule:** n/a.
+- **Finding:** a catalogue record is `id`, target, mutation code and then one
+  field per expected case, joined by `US`. It was split with
+  `IFS="$US" read -r -a rec`, and `read` stops at the first newline — so for
+  the two entries with a multi-line mutation body, every case name after it
+  was dropped. The worker then looped over an empty expectation array,
+  missed nothing, and printed CAUGHT. **The meta-test had the defect it
+  exists to find**, and it was visible only because the detail line prints
+  the count. Split with `read -r -d ''` now, and an entry naming no case is
+  refused as `NO-CASE` in the parent rather than dispatched.
+- **Fix risk:** low. With it fixed, `plan-reject/gate-after-move` — the
+  entry for the defect that took three attempts to guard — reports honestly,
+  and is caught.
+
+**FIXED 2026-09-08:** `read -r -d ''`, plus a `NO-CASE` verdict so an entry
+that claims nothing can never be counted as a catch
+
+### F44 — an unnumbered anchor mutated the first of three identical sites, and the entry read as an escape
+
+- **File:** `scripts/gate-mutants` (`lib/state-body-fence-toggle`)
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by reading the three sites and re-running with
+  the occurrence numbered
+- **Axis:** needed-used
+- **Reachability:** any anchor text that appears more than once in a target.
+- **Rule:** n/a — new-rule candidate: a literal anchor that is not unique in
+  its file must name its occurrence, or the entry is about a different
+  function than the one it names.
+- **Finding:** the CommonMark fence close rule
+  (`else if (substr(m, 1, 1) == substr(open, 1, 1) && ...)`) appears verbatim
+  three times in `lib.sh` and `plan-repair`. The entry named
+  `plan_state_body`; occurrence 1 is `plan_headings`, some 180 lines earlier.
+  So the mutation applied — not `INERT` — to a function whose behaviour the
+  named case does not depend on, and the entry reported `ESCAPED`. The
+  suite was not at fault; the catalogue was. Worth recording because the
+  failure is silent in the direction that costs time: it looks exactly like
+  a real coverage gap, and the fix for a real gap (write a new case) would
+  have been wasted work.
+- **Fix risk:** low; the entry now names occurrence 2 and is caught.
+
+**FIXED 2026-09-08:** occurrence numbered, and the hazard noted in the
+catalogue beside the entry

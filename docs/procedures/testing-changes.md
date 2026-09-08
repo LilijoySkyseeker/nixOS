@@ -210,12 +210,33 @@ of operations — chronology, not evidence:
   verdict not to move), and a sabotage sweep that fails the Nth `git`
   call and requires the gate to refuse — plus a positive control that an
   honest sequence still ends green, since a gate nothing can satisfy is
-  the other half of the same defect. Hermetic, network-free, under a
-  second, scratch repos under `$TMPDIR`. This is what rung 3 looks like
-  for a change with no closure to build. Read
+  the other half of the same defect. A negative case whose fixture has to
+  reach a particular failure asserts that it can, under its own name:
+  three guards here once passed because `git mv` failed for reasons that
+  had nothing to do with the gate. Hermetic, network-free, scratch repos
+  under `$TMPDIR`; measured 1.20s, knowingly over the one-second budget
+  and recorded as such rather than kept under it by dropping cases. This
+  is what rung 3 looks like for a change with no closure to build. Read
   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
-  before adding cases. Run from `verify-ladder` only — no git hook or CI
-  step runs it yet.
+  before adding cases, and run `scripts/gate-mutants` after. Run from
+  `verify-ladder` only — no git hook or CI step runs it yet.
+- **`scripts/gate-mutants`** — the measure of whether `gate-tests` works,
+  because the suite counting its own assertions does not: 102 of them
+  passed in the same session in which six mutations, each restoring a
+  defect the branch had just fixed, passed 98 of 98. A catalogue of
+  (target file, mutation, the case that must go red), every entry taken
+  from a recorded finding: it reintroduces one defect, runs the whole
+  suite against the mutant, and requires the named case to fail. Four
+  verdicts besides `caught`, because an entry can be wrong in ways that
+  otherwise read as success — `UNKNOWN-CASE` (no clean run prints that
+  case, so a rename has turned the entry into a permanent silent
+  escape), `INERT` (the mutation matched nothing and measured nothing),
+  `BROKEN` (the mutant no longer parses, so its red cases say nothing
+  about the defect), and `ESCAPED`, which is the finding. Costs roughly
+  N× the suite — 39 entries, about 7s across 16 jobs — so it is not in
+  `verify-ladder`'s pre-commit path; run it by hand when you touch a gate
+  script or add a case. Where it belongs server-side is open as
+  2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D2.
 - **`plan-move ... done` / `plan-freeze`** — refuse to close a plan
   whose `## State` declares no verification rung (see "Declaring the
   rung" above).

@@ -52,6 +52,20 @@ note()  { known=$((known + 1)); printf '  known %s -- %s\n' "$1" "$2"; }
 
 section() { printf '\n== %s ==\n' "$1"; }
 
+# A negative case is bounded by what its fixture can reach. Three guards in
+# this file passed because `git mv` failed for a reason that had nothing to do
+# with the gate -- rejected/ did not exist, the probe was untracked, and a
+# probe was already refused by another rule -- and all three read as passing
+# tests of the right thing. So a fixture's ability to reach the failure is
+# asserted rather than assumed, and it fails under its own name.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G12
+precondition() { # <name> <command...>
+  local name="$1"
+  shift
+  if "$@" >/dev/null 2>&1; then ok "$name"
+  else bad "$name" "the case that follows cannot reach the failure it names"; fi
+}
+
 # ---------------------------------------------------------------- rung gate
 
 # plan_state_body and plan_rung_problem decide whether a plan may close,
@@ -133,7 +147,13 @@ rung "fenced, 2-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$
 rung "fenced, 3-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"   \`\`\`"$'\n'"   Verified to rung 3 (ran it locally)."$'\n'"   \`\`\`"
 rung "fenced inside list item"  refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"- like this:"$'\n\n'"    \`\`\`"$'\n'"    Verified to rung 3 (ran it locally)."$'\n'"    \`\`\`"
 rung "tilde fence"              refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"~~~"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"~~~"
-rung "nested fence, odd count"  refuse "## State"$'\n\n'"Nothing verified yet."$'\n\n'"## Progress"$'\n\n'"\`\`\`\`"$'\n'"outer holding an unbalanced inner:"$'\n'"\`\`\`"$'\n'"## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`\`"
+# The whole nest sits *inside* State. The earlier form closed the section with
+# a "## Progress" before the fence, so the declaration was out of scope
+# already and the case refused whatever the fence logic did -- it stayed green
+# with the length-and-character close rule replaced by a toggle on any marker,
+# which is the defect it names.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F17
+rung "nested fence, odd count"  refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"\`\`\`\`"$'\n'"outer holding an unbalanced inner:"$'\n'"\`\`\`"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`\`"
 
 # Residues carried on the record. Both are cases where the text names the
 # rung without claiming it, and neither is decidable by string matching.
@@ -496,6 +516,24 @@ frozen: false
 kind: task
 priority: normal
 blocked_by: ${fixture_date}-lint-clean.md, not-a-plan" "$lint_sections")"
+# Order, as its own negative case. Every section is present, so the presence
+# check is satisfied and only the order rule can refuse this -- and until it
+# existed, deleting that rule outright changed no verdict in this file.
+expect_fail "plan-lint reports required sections that appear out of order" "required order is" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "$lint_full_fm" '## State
+
+x
+
+## Progress
+
+## Original plan
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)')"
 rm -f "$repo/docs/plans/todo/${fixture_date}-probe.md"
 
 # The three states of the active-plan marker. verify-ladder itself cannot be
@@ -566,7 +604,12 @@ rm -f "$repo/docs/plans/done/$frozen_tamper"
 # re-record all passed -- three of the six mutations #F35 names.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F35
 frozen_gap="${fixture_date}-frozen-gap.md"
-printf -- '---\nslug: frozen-gap\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen gap\n\n## Original plan\n\nx\n\n## Progress\n' \
+# A fenced H1 *before* the real title. plan-repair finds its insertion point
+# with a fence-aware read; a bare /^# / matches this one first and splices the
+# section inside the code block, then re-blesses the checksum over it. Without
+# a fence in the fixture that mutation changes nothing observable.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F38
+printf -- '---\nslug: frozen-gap\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n```\n# an example title, not this file\n```\n\n# frozen gap\n\n## Original plan\n\nx\n\n## Progress\n' \
   "$fixture_date" > "$repo/docs/plans/done/$frozen_gap"
 {
   printf '%s  docs/plans/done/%s\n' \
@@ -577,11 +620,13 @@ printf -- '---\nslug: frozen-gap\ncreated: %s\nstatus: done\nfrozen: true\n---\n
 # Position, not just presence: an insertion point moved to any other heading
 # still leaves exactly one `## State` and a valid checksum, so a control that
 # only counts the heading passes with the section spliced anywhere.
+# Read through plan_headings, not grep: a section spliced inside a fence is
+# still the first line matching /^## /, so a grep-based check calls it first
+# and green. Only a fence-aware read can say the section is real.
 if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" "docs/plans/done/$frozen_gap" >/dev/null 2>&1 &&
-   [ "$(grep -cxF '## State' "$repo/docs/plans/done/$frozen_gap")" = 1 ] &&
-   gap_state_line="$(grep -nxF '## State' "$repo/docs/plans/done/$frozen_gap" | head -1 | cut -d: -f1)" &&
-   gap_first_sec="$(grep -nE '^## ' "$repo/docs/plans/done/$frozen_gap" | head -1 | cut -d: -f1)" &&
-   [ "$gap_state_line" = "$gap_first_sec" ] &&
+   gap_heads="$( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_headings "docs/plans/done/'"$frozen_gap"'" | cut -f2-' )" &&
+   [ "$(printf '%s\n' "$gap_heads" | grep -cxF '## State')" = 1 ] &&
+   [ "$(printf '%s\n' "$gap_heads" | head -n 1)" = '## State' ] &&
    ( cd "$repo" && awk '{print $1"  "$2}' docs/plans/.checksums | sha256sum -c --quiet ); then
   ok "plan-repair adds the missing section and re-records the checksum"
 else
@@ -636,6 +681,9 @@ printf -- '---\nslug: reject-me\ncreated: %s\nstatus: todo\nfrozen: false\nkind:
 # a reason unrelated to the gate -- the second way this case passed while
 # asserting nothing.
 git -C "$repo" add "docs/plans/todo/$reject_bad" >/dev/null 2>&1
+precondition "the rejection fixture is tracked and rejected/ exists, so git mv could succeed" \
+  env -C "$repo" bash -c '[ -d docs/plans/rejected ] && git ls-files --error-unmatch "$1"' _ \
+  "docs/plans/todo/$reject_bad"
 # One invocation, two assertions about it: that it refuses, and that the
 # refusal left nothing behind. Running plan-reject twice to ask two questions
 # about the same action costs a second set of git calls for no more coverage.
@@ -660,6 +708,87 @@ git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$reject_bad" >/d
 rm -f "$repo/docs/plans/todo/$reject_bad"
 
 rm -f "$repo/docs/plans/done/$frozen_bad" "$repo/docs/plans/done/$frozen_ok" "$repo/docs/plans/.checksums"
+
+# The move itself must fail closed. #F31 fixed the *ordering* -- the gate now
+# runs before anything is written -- but an unchecked `git mv` failing after
+# it still left the plan stamped REJECTED in todo/ while the script went on to
+# freeze and checksum whatever sat at the destination, and exited 0 saying so.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F36
+mv_probe="${fixture_date}-mv-blocked.md"
+mkdir -p "$repo/docs/plans/rejected" "$repo/docs/plans/todo"
+# A tracked file already at the destination: `git mv` refuses without -f, which
+# is the one failure this case needs. Both files are well-formed, so nothing
+# else in plan-reject can be what refuses.
+for mv_dir in todo rejected; do
+  {
+    printf -- '---\nslug: mv-blocked\ncreated: %s\nstatus: %s\nfrozen: false\n' "$fixture_date" "$mv_dir"
+    printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# mv blocked\n\n'
+    printf -- '%s\n' "$lint_sections"
+  } > "$repo/docs/plans/$mv_dir/$mv_probe"
+done
+git -C "$repo" add "docs/plans/todo/$mv_probe" "docs/plans/rejected/$mv_probe" >/dev/null 2>&1
+precondition "the git-mv fixture lints clean, so only the move can refuse it" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "docs/plans/todo/$mv_probe"
+expect_fail "plan-reject refuses when the move fails, rather than freezing the destination" "cannot move" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-reject" "docs/plans/todo/$mv_probe" "abandoned"
+# The exit code is only half of it: the defect was freezing and checksumming
+# the occupant, which is permanent and which a refusal alone does not undo.
+if [ ! -f "$repo/docs/plans/.checksums" ] ||
+   ! grep -qF "docs/plans/rejected/$mv_probe" "$repo/docs/plans/.checksums"; then
+  ok "a failed move freezes nothing at the destination"
+else
+  bad "a failed move freezes nothing at the destination" \
+    "the file already at the destination was stamped rejected and checksummed"
+fi
+git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$mv_probe" "docs/plans/rejected/$mv_probe" >/dev/null 2>&1
+rm -f "$repo/docs/plans/todo/$mv_probe" "$repo/docs/plans/rejected/$mv_probe" "$repo/docs/plans/.checksums"
+
+section "the freeze manifest is keyed on the whole path, not a substring of it"
+# Three ways the same lookup degrades into a substring search, each of them a
+# live finding and none of them observable through any gate's output: the
+# reader matched anywhere in the line (#F20), the writer deleted any line the
+# path appeared in (#F24), and the writer skipped the `./` normalisation the
+# reader applied, so one spelling appended a second entry and the file could
+# never be committed again (#F39). The positive direction -- that a recorded
+# path *is* reported frozen -- is carried by the plan-repair and plan-freeze
+# cases above, which all refuse or proceed on this reader's answer.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F20
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F39
+mf_probe="${fixture_date}-manifest-probe.md"
+mf_rel="docs/plans/done/$mf_probe"
+printf -- '# manifest probe\n' > "$repo/$mf_rel"
+mf() { ( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; '"$1" ); }
+# One entry, whose path has the probe's path as a strict prefix. That is the
+# reproduction #F20 records; it has to exist in the manifest, not on disk.
+printf '%s  %s.bak.md\n' "$(printf 'x' | sha256sum | cut -d' ' -f1)" "$mf_rel" \
+  > "$repo/docs/plans/.checksums"
+if mf "plan_manifest_frozen . \"$mf_rel\"" >/dev/null 2>&1; then
+  bad "a plan is not frozen because a longer path begins with its path" \
+    "plan_manifest_frozen matched an entry that is not this file's"
+else
+  ok "a plan is not frozen because a longer path begins with its path"
+fi
+mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1
+if grep -qF "  $mf_rel.bak.md" "$repo/docs/plans/.checksums"; then
+  ok "recording one path leaves an entry that merely begins with it alone"
+else
+  bad "recording one path leaves an entry that merely begins with it alone" \
+    "plan_record_checksum deleted an unrelated manifest entry"
+fi
+# Same file, spelled with a `./`. Two entries means the manifest disagrees
+# with itself and .githooks/pre-commit blocks the file for good.
+rm -f "$repo/docs/plans/.checksums"
+mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1
+mf "plan_record_checksum . \"./$mf_rel\"" >/dev/null 2>&1
+if [ "$(grep -c . "$repo/docs/plans/.checksums")" = 1 ]; then
+  ok "the same file spelled two ways gets one manifest entry"
+else
+  bad "the same file spelled two ways gets one manifest entry" \
+    "the manifest holds $(grep -c . "$repo/docs/plans/.checksums") entries for one file"
+fi
+git -C "$repo" rm -q --cached --ignore-unmatch "$mf_rel" "docs/plans/.checksums" >/dev/null 2>&1
+rm -f "$repo/$mf_rel" "$repo/docs/plans/.checksums"
 
 section "plan-citations resolves what exists and refuses what does not"
 # The sweep below asserts that plan-citations refuses when a git call under
@@ -748,8 +877,12 @@ invariant_rewrap "a declaration survives any wrap width" pass \
   "## State"$'\n\n'"Verified to rung 3 (ran it locally, output inspected) and the output was read end to end."
 invariant_rewrap "a bold declaration survives any wrap" pass \
   "## State"$'\n\n'"**Verified to rung 4 (VM).** Both machines booted and the units started."
+# The rung ends the sentence. With a trailing clause ("... rung 4 yet,
+# because ...") the next word refuses the paragraph on its own, so dropping
+# the matcher's leading anchor -- which accepts every denial -- left this
+# green. The property is the anchor; the fixture has to depend on it.
 invariant_rewrap "a denial stays refused at any wrap" refuse \
-  "## State"$'\n\n'"The change is not verified to rung 4 yet, because the secret is sops-backed."
+  "## State"$'\n\n'"The change to the sops-backed secret is not verified to rung 4."
 invariant_rewrap "a mention stays refused at any wrap" refuse \
   "## State"$'\n\n'"The gate wants a paragraph that says Verified to rung 3 and nothing else before it."
 invariant_rewrap "a subject-position mention stays refused" refuse \
@@ -771,14 +904,18 @@ invariant_decoration() { # <name> <expected> <core>
 invariant_decoration "a declaration survives any decoration" pass \
   "Verified to rung 3 (ran it locally)."
 invariant_decoration "a denial survives any decoration" refuse \
-  "Not verified to rung 3 yet."
+  "Not verified to rung 3."
 
 # Quoting is the one presentation change that *must* flip an accept to a
 # refuse: a doc that shows the required form is not claiming it.
 invariant_quoted() {
   local got fence
   for fence in '```' '~~~' '   ```' '````'; do
-    got="$(rung_verdict "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"$fence"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"$fence")"
+    # Blank lines inside the fence, so the declaration forms a paragraph of
+    # its own. Without them the fence markers join the declaration's block and
+    # the backtick rule refuses it -- which is a different property, and left
+    # this case green with fenced content no longer skipped at all.
+    got="$(rung_verdict "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"$fence"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n\n'"$fence")"
     if [ "$got" != refuse ]; then
       bad "quoting the phrase never declares it" "accepted inside a '$fence' fence"
       return
