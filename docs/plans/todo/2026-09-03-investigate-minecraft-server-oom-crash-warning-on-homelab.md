@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # Investigate Minecraft server OOM-crash warning on homelab

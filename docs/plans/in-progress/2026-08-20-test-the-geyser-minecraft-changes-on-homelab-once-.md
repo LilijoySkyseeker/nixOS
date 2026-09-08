@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # test the Geyser/Minecraft changes on homelab once deployed

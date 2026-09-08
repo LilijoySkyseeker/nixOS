@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # verify Android SMB share end-to-end

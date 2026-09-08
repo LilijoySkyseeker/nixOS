@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # invert the reviewable code set from an allowlist to a denylist

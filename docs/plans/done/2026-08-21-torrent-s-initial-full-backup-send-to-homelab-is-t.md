@@ -7,6 +7,14 @@ frozen: true
 
 # torrent's initial full backup send to homelab is throughput-limited to ~20-40MB/s — root-caused while it was in progress. RESOLVED 2026-08-23 in hardware
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-21: torrent's initial full backup send to homelab is

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# plan-repair <path-or-filename> -- add a missing required section to a plan
+# that was frozen before that section existed, and re-record its checksum.
+#
+# The one script permitted to write into a frozen file, so it is deliberately
+# narrow: it refuses a plan that is not frozen and refuses a section that
+# already exists, which leaves adding an absent heading as the only thing it
+# can do. The inserted text says so, dated, and the checksum is rewritten so
+# the manifest stays true.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4
+set -u
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+[ $# -eq 1 ] || { printf 'usage: plan-repair <path-or-filename>\n' >&2; exit 1; }
+root="$(plan_repo_root)"
+rel="$(plan_locate "$1" "$root")"
+file="$root/$rel"
+
+plan_manifest_frozen "$root" "$rel" ||
+  plan_die "$rel is not frozen. An editable plan needs no repair -- just edit it."
+
+# The one repair this script knows how to make. Widening the list means
+# widening what a frozen file can become, so it is deliberately explicit.
+missing="## State"
+plan_headings "$file" | cut -f2- | grep -qxF "$missing" &&
+  plan_die "$rel already has a '$missing' section. This script only ever adds a missing one."
+
+# Inserted directly under the H1, which is where the current schema puts it.
+# Nothing else moves, so no existing section changes position relative to
+# any other.
+tmp="$(mktemp)" || plan_die "cannot create a temporary file"
+trap 'rm -f "$tmp"' EXIT
+awk -v today="$(plan_today)" -v sec="$missing" '
+  !done_ins && /^# / { print; print ""; print sec; print "";
+    print "**Section added " today " by `plan-repair`.** This plan was frozen";
+    print "before `## State` existed, so it never had one. Only the heading and";
+    print "this note were added; no word of the original was changed, and the";
+    print "status was not reconstructed -- read `## Progress` and the sections";
+    print "below for what happened.";
+    done_ins = 1; next }
+  { print }
+  END { exit(done_ins ? 0 : 1) }
+' "$file" > "$tmp" || plan_die "$rel has no '# ' title to insert beneath."
+cat "$tmp" > "$file"
+
+# Re-record the checksum, or the manifest now says this file was tampered
+# with -- which is exactly what .githooks/pre-commit would report. Deliberately
+# not plan_do_freeze: that also calls plan_mark_touched, which would repoint
+# .claude/.active-plan at a frozen done/ plan.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+plan_record_checksum "$root" "$rel"
+plan_note "$rel: added '$missing' and re-recorded its checksum."
+echo "$rel"

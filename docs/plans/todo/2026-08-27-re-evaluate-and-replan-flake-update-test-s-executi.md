@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # Re-evaluate and replan flake-update-test's execution model (D11)

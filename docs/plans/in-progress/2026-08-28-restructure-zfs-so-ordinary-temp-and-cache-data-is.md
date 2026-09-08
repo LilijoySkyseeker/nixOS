@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # restructure ZFS so ordinary temp and cache data is not snapshotted or replicated

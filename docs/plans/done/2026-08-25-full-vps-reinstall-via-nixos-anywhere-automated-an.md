@@ -7,6 +7,14 @@ frozen: true
 
 # full vps reinstall via nixos-anywhere, automated and documented
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-25: full vps reinstall via nixos-anywhere, automated and

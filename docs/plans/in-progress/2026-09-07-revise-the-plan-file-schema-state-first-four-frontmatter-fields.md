@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # revise the plan-file schema: State first, four frontmatter fields, defects become F
@@ -31,11 +30,15 @@ Landed:
   array and watching a generated file still lint clean.
 - `plan-lint` checks the new fields, the section order, and each
   reference's shape, reading the frontmatter once and the headings once.
-- **51 non-frozen plans migrated** — four keys added, `## State` moved
-  above `## Original plan`, each netting exactly +4 lines, which is what
+- **51 non-frozen plans migrated** — three keys added (four until `#D5`
+  dropped `superseded_by`), `## State` moved above `## Original plan`,
+  each netting exactly +3 lines against `origin/master`, which is what
   says no file lost content. The 52nd changed file is this plan, which
-  `plan-new` generated in the new shape. The 50 frozen ones are untouched
-  by construction, and `sha256sum -c` still passes on all of them.
+  `plan-new` generated in the new shape.
+- **27 of the 50 frozen plans repaired** under `#D4`, each gaining a
+  `## State` heading and a dated note and nothing else: +8 lines, 0
+  deletions, checksums re-recorded by `plan-repair`. `sha256sum -c
+  docs/plans/.checksums` passes on all 50.
 - `reference.md` and `SKILL.md` document `kind`, the expand—contract map
   pattern, the G-is-a-lesson/F-is-a-defect rule, and which files the
   schema rules apply to at all.
@@ -85,11 +88,22 @@ than as fixes:
   reference list, and four reviewers read that helper without seeing it.
   It surfaced only on running the thing with more than one value.
 
-`gate-tests` grew from 82 assertions to **92**, covering `plan-lint`, the
-active-plan marker and the two frontmatter readers; each new case was
-observed failing under the mutation that reintroduces its defect. It runs
-in about 1.0s against a one-second budget — see `#G8`, which is now the
-next thing to do to it, not a later one.
+`gate-tests` grew from 82 assertions to **98**, covering `plan-lint`, the
+active-plan marker, both frontmatter readers, the bare-filename rule,
+`plan-repair`, and the lint gate on both doors to freeze; each new case was
+observed failing under the mutation that reintroduces its defect. Measured
+2026-09-08: **1.15s**, over the one-second budget again — the two
+`plan-reject` cases cost 0.18s between them, because that script does a
+`git mv`, a `git add` and a `plan-lint` spawn. See `#G8`, and `#G11` for
+what the budget is worth against `verify-ladder`'s 24s.
+
+The `plan-reject` half-state guard (`#F31`) took **three attempts, and the
+first two asserted nothing**: one passed because the fixture had no
+`rejected/` directory, so `git mv` failed whatever the gate did, and the
+next because the probe file was untracked, so `git mv` failed again. Both
+looked like a passing test of the right thing. Only the third, with the
+directory present and the file staged, goes red when the gate is moved back
+after the move.
 
 **The second `security` pass, owed because the fix stage changed code,
 found five more — and two of them were in the regression tests written
@@ -124,7 +138,7 @@ and nothing has been moved yet.
 
 Verified to rung 3 (ran it locally, output inspected): `verify-ladder`
 passes with the lint genuinely running over this plan, `gate-tests` is
-90/0/3 and hermetic, `plan-citations` resolves every citation,
+96/0/3 and hermetic, `plan-citations` resolves every citation,
 `sha256sum -c docs/plans/.checksums` passes on all 50 frozen plans, and
 the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
@@ -141,8 +155,9 @@ there, never the main checkout. The previous branch,
 **Committed and pushed through `08996f3`.** `0ca8889` is the schema
 change and the 51-file migration; `08996f3` closes the second `security`
 pass. Every finding here is resolved, `plan-lint` and `plan-citations`
-pass, `gate-tests` is 92/0/3, and `verify-ladder` passes end to end with
-the lint genuinely running over this plan.
+pass, `gate-tests` was 92/0/3 at that commit and is **96/0/3** as of
+2026-09-08, and `verify-ladder` passes end to end with the lint genuinely
+running over this plan.
 
 **One thing blocks the PR, and it is a decision, not work.** `plan-gate`
 refuses on a stale `security` stamp, because fixing `#F18`-`#F22` changed
@@ -240,9 +255,120 @@ for a batch:
 - [ ] drop the pointer headings for migrated batches
 - [ ] remaining batches of the 25 non-frozen files with `G` headings
 
+Decided 2026-09-08 and done in the same session:
+
+- [x] `#D5` — `superseded_by` removed from the schema, both scripts,
+      the docs and all 52 files; `priority` kept, because its reader is
+      the user
+- [x] `#D3` — the bare-filename rule moved into `plan-citations`, which
+      scans every `*.md` and script rather than one frontmatter field, and
+      the 8 reachable path-form citations rewritten. Frozen files are
+      exempt, since they cannot be edited to comply
+- [x] `#D4` — `plan-repair` added, and all 27 frozen plans that predated
+      `## State` repaired: +216 lines, 0 deletions
+- [x] `#D4` — `plan-freeze` lints before it freezes, which is the root
+      cause those 27 came from
+
+Still open:
+
+- [ ] `#D2` — where the slow tier of `gate-tests` runs. Now blocking:
+      the harness is over budget and cannot be split until this is
+      answered (`#G8`)
+- [ ] extend the sabotage sweep to `subagent-stamp`,
+      `plan-freeze`/`plan-move` and `.githooks/*` — blocked by `#G8`
+
 
 ## Decisions (D)
 
+### D1 - run the third security pass, or sign off on stopping?
+
+`plan-gate` refuses PR #69 on a stale `security` stamp, because the
+`#F18`-`#F22` fix stage changed code after `security` last looked. D7's
+letter says run it again; D7's recurrence rule says seek sign-off when the
+same finding keeps returning, and the shape had returned eight times.
+
+The argument for running it: the previous two passes each found live
+defects, and two of those were in the regression tests written during the
+pass before. The argument for stopping: every fix was already confirmed by
+mutation, which is stronger evidence than a re-read.
+
+
+**ANSWERED 2026-09-08:** the user (LilijoySkyseeker) chose 2026-09-08 to run the third security pass rather than sign off on stopping
+
+### D2 - where does `gate-tests` run server-side?
+
+`#F4` on
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+is accepted-for-now: `gate-tests` runs only from `verify-ladder`, which is
+agent discipline. The case where a gate is broken is exactly the case where
+`verify-ladder` may not be run.
+
+Three homes, judged against the user's stated goal of depending on GitHub
+less:
+
+- **A `checks.*` entry in `modules/flake/checks.nix`.** Runs under
+  `nix flake check`, so it runs on any machine, in any CI, and locally. The
+  enforcement lives in the repo rather than in a vendor's YAML. Needs
+  `git` in the check's inputs and `verify-ladder`'s direct call dropped in
+  the same change, or the harness runs twice per pass.
+- **A CI step beside `plan-gate.yml`.** Ties the gate to GitHub Actions,
+  which is the dependency to reduce.
+- **A git hook.** Runs on a developer machine, not a server, and
+  `--no-verify` switches it off. It is not server-side enforcement at all.
+
+
+**DISCUSSED 2026-09-08:** the user wants to depend on GitHub less and asked for the best option, not the quickest; still open, see the three homes above
+
+### D3 - does the bare-filename rule move into `plan-citations`?
+
+`plan-lint` checks that `blocked_by` names a bare filename and never a
+path. `SKILL.md` states that rule repo-wide, but only these two frontmatter
+fields enforce it, and they are the least likely place to break it.
+`plan-citations` scans every `*.md` and every script, which is where the
+rule would actually bite.
+
+~~Measured before proposing it: **60 path-form plan references exist in the
+repo today**, a mix of real citations and ordinary prose paths. Moving the
+rule fails all 60 until they are sorted.~~
+
+**Corrected 2026-09-08:** that count was wrong, and it was the number the
+decision was taken on. 50 of the 60 were lines of
+`docs/plans/.checksums`, which is a manifest of paths by design and is not
+in the citation scan set at all; the `grep -v` meant to exclude it did not
+match the output format. The real figure is **11 occurrences in 7 files**,
+of which 8 are reachable and 3 sit in frozen plans. The decision is
+unaffected and cheaper than it looked.
+
+
+**ANSWERED 2026-09-08:** yes -- the user (LilijoySkyseeker) agreed 2026-09-08 to move the bare-filename rule into plan-citations and sort the 60 path-form references
+
+### D4 - can a frozen plan file ever be repaired?
+
+27 frozen plans are malformed: they predate `## State` and have no such
+section. No gate checks a plan at the moment it freezes, which is how they
+got that way, and `plan-freeze`'s contract means no script will touch them
+again. So the count can only grow.
+
+The freeze contract exists for a good reason: a frozen plan is citeable
+evidence, and its checksum is what proves it did not change. Any repair
+path has to keep that property rather than punch a hole in it.
+
+
+**ANSWERED 2026-09-08:** yes -- the user (LilijoySkyseeker) asked 2026-09-08 for a deliberate one-time repair path for the already-frozen malformed plans, rather than leaving them permanently broken
+
+### D5 - do `priority` and `superseded_by` both stay?
+
+Neither field has a reader or a writer today. `plan-supersede` is unbuilt
+(item 9 on the map plan), so nothing writes `superseded_by`; nothing sorts
+or filters on `priority`. Two `/simplify` angles and the altitude review
+all argued to add each field with the tool that uses it, rather than ahead
+of it.
+
+The counter-argument is that `priority` is not for a tool. It is for the
+user to read.
+
+
+**ANSWERED 2026-09-08:** keep priority, drop superseded_by -- the user (LilijoySkyseeker) decided 2026-09-08 that priority is for their own reference and so has a reader, while superseded_by has none and should land with plan-supersede
 
 ## Gotchas (G)
 
@@ -351,28 +477,113 @@ disproved by running it.
 What plan-citations genuinely cannot catch is the path form, because its
 regex matches the bare filename *inside* the path and resolves that. The
 deeper fix is to move the never-write-a-path rule into plan-citations, where
-`SKILL.md` already states it repo-wide. Measured before proposing it: **60
-path-form references exist in the repo today**, a mix of real citations and
-ordinary prose paths. Moving the rule would fail all 60, so it needs its own
-decision and a pass over them, not a ride-along in a cleanup.
+`SKILL.md` already states it repo-wide. Measured before proposing it: 11 path-form references exist in the repo
+today (an earlier count of 60 wrongly included the 50-line checksum
+manifest). Moving the rule fails all of them, so it needs its own decision
+and a pass over them, not a ride-along in a cleanup. Done 2026-09-08 under
+`#D3`.
 
-### G8 - gate-tests is now at 0.98s against a one-second budget, with no margin
+### G8 - gate-tests is over its one-second budget, and the split is blocked on D2
 
-The harness grew from 82 assertions to 90 covering `plan-lint` and the
-active-plan marker, and from 0.81s to 0.98s. `2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2`
-sets the budget at "under a second", because `verify-ladder` runs this before
-every non-trivial commit and a gate people learn to bypass is worse than no
-gate.
+The harness went 82 assertions to ~~97~~ **96** (re-counted from the
+harness's own summary line, 2026-09-08), and 0.81s to **1.06s**. It now
+covers `plan-lint`, the active-plan marker, both frontmatter readers, the
+bare-filename rule, `plan-repair` and `plan-freeze`'s new lint gate.
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+sets the budget at "under a second", because `verify-ladder` runs this
+before every non-trivial commit and a gate people learn to bypass is worse
+than no gate. It is over.
 
-It is still under. It will not survive the next addition, and the sweep of
-`subagent-stamp`, `plan-freeze`/`plan-move` and `.githooks/*` is still owed.
-`#G2` already names the remedy — split a fast tier from a slow one rather
-than letting the whole thing get skipped — and that split is the next thing
-to do to this harness, before more cases go in.
+`#G2` names the remedy: split a fast tier from a slow one. **That split
+cannot be made safely until `#D2` is answered.** The slow tier is the
+sabotage sweeps, which is the part that finds real defects; moving them out
+of `verify-ladder` with no server-side home means nothing runs them at all,
+which is strictly worse than 1.06s. So the order is: answer `#D2`, give the
+slow tier a home, then split, then extend the sweep to `subagent-stamp`,
+`plan-freeze`/`plan-move` and `.githooks/*`.
 
-The cost is concentrated in the sabotage sweeps: each runs the gate once for
-the baseline and once per git call, so a gate making eight calls costs nine
-invocations. `plan-gate` alone is nine.
+Until then the budget is knowingly exceeded rather than silently, and no
+case has been dropped to hide it. 1.06s is not yet the number that teaches
+bypassing; four more swept gates would be.
+
+The cost is concentrated in the sweeps: each runs its gate once for the
+baseline and once per git call, so a gate making eight calls costs nine
+invocations. `plan-gate` alone is nine, and is 22% of the whole harness.
+
+**Corrected 2026-09-08, three times over.** ~~The harness is over budget.~~
+~~It is back under, at 0.97s.~~ It is over again at **1.15s**, because the
+`#F31` guard on `plan-reject` costs 0.18s. That is the honest number and it
+is not being hidden by dropping a case; `#G11` is why it is being accepted
+rather than chased. The middle claim held only briefly: the sabotage shim read its counter with `$(cat)` on
+every git call the swept gates make, and `read` instead removed about 100
+forks. And "concentrated in the sweeps" is only half true — they are the
+largest block at 42%, but 58% of the runtime is outside them, so splitting
+them out lands at ~0.60s rather than anywhere near zero. More importantly
+`#G11` measures what the budget is actually being defended against:
+`gate-tests` is 4% of `verify-ladder`, and `nix flake check` is 90%.
+
+### G9 - `nix flake check` fails on a garbage-collected derivation, and the error names the wrong culprit
+
+`verify-ladder` blocked mid-session on
+`error: path 'ihrfigy8...-base16-schemes-0-unstable-2026-01-15.drv' is not
+valid`, with a stack trace pointing at home-manager's firefox module. None
+of that is where the problem is.
+
+**It is not a repo fault.** The diff contained no `.nix` file, and a
+pristine `origin/master` checkout reproduced it identically. Nix had
+garbage-collected a derivation that evaluation still needs, and the eval
+cache was not the cause — clearing
+`~/.cache/nix/eval-cache-v6` changed nothing.
+
+**The fix is to re-instantiate the package**, which restores the `.drv`:
+
+```
+nix build --no-link --impure --expr \
+  '(builtins.getFlake (toString /path/to/repo)).inputs.nixpkgs-unstable.legacyPackages.x86_64-linux.base16-schemes'
+```
+
+Note `nixpkgs-unstable`, not `nixpkgs` — this flake has no input by that
+name, and the obvious spelling fails with "attribute 'nixpkgs' missing".
+
+Worth knowing because it will recur: any GC that removes a derivation
+evaluation needs produces this, the message names the derivation rather
+than the input that wants it, and `verify-ladder` hard-blocks on it. The
+separate todo plan
+2026-08-28-nix-flake-check-fails-on-zrepl-replication-test-pk.md is about a
+*different* cause, which PR #68 fixed; it is stale and probably closable.
+
+### G10 - there are two doors to freeze, and only one was guarded
+
+`#G6` said "nothing runs plan-lint at freeze time" and the fix went into
+`plan-freeze`. `plan-reject` also freezes, by calling `plan_do_freeze`
+directly, and it was still unguarded — so the backlog `plan-repair` exists
+to clear could keep growing through `rejected/`.
+
+Both doors now lint. The counter-argument is real and worth recording rather
+than leaving as an unstated choice: `plan-reject` deliberately waives the
+decision and finding gates, because abandoning work legitimately moots open
+questions, and the same reasoning could extend to structure — refusing to
+file away an abandoned half-written plan is a gate that teaches the bypass.
+
+It was resolved the other way because a rejected plan is still citeable
+evidence forever, and the structural bar is six headings a `plan-new` file
+already has. The friction is real but bounded: **17 non-frozen plans predate
+`## State` and would now need one sentence before they can be rejected.**
+That is the same friction the user accepted for the rung declaration.
+
+### G11 - gate-tests is 4% of what verify-ladder actually costs
+
+`#G8` treats the harness's second as the budget to defend. Measured end to
+end on this worktree, `verify-ladder` takes **26.0s**, of which
+`nix flake check --no-build` is **23.5s** and `gate-tests` is 1.0s. The
+sabotage sweeps — the part `#G8` proposes to move — are 0.46s, which is
+smaller than the run-to-run variance of the step they would move into.
+
+This bears directly on `#D2`. If the slow tier becomes a `checks.*` entry it
+runs inside `nix flake check`, which `verify-ladder` already runs last, so
+the tier keeps running locally on every pass and the "nothing runs them at
+all" risk disappears. The number was not in front of `#D2` when it was
+framed, and it probably decides it.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
@@ -715,7 +926,8 @@ invocations. `plan-gate` alone is nine.
 - **Fix risk:** the cheapest close is a shape check in `plan-lint` — the
   value must match the plan-filename form — which is local and needs no
   cross-file resolution. Doing it in `plan-citations` instead is what `#G7`
-  already measured as failing 60 existing path-form references.
+  already measured as failing 60 existing path-form references (that count
+  was wrong; see `#D3` -- the real figure is 11).
 
 
 **FIXED 2026-09-07:** plan-lint checks each reference against the canonical date-slug filename shape, so a value neither it nor plan-citations could resolve is reported rather than sitting there looking checked
@@ -1173,3 +1385,271 @@ Verified positively, not merely read, on commit `0ca8889`:
 _security finished 2026-09-07T23:27:30Z (code 832e3b086c764756) -- see Findings above._
 
 **FIXED 2026-09-07:** the citations-fragment comment moved back onto the plan-citations sweep it explains
+
+### F23 — the frozen exemption for path-form citations stopped resolving them at all
+
+- **File:** `docs/skills/plan/scripts/plan-citations` (the `PATHFORM` arm)
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by reading both branches against the loop they
+  sit in, and by the record count.
+- **Axis:** needed-used
+- **Reachability:** no adversary. Every citation written in path form,
+  which after `#D3` is the frozen half of the corpus only.
+- **Rule:** n/a — a coverage regression introduced by this branch.
+- **Finding:** the `PATHFORM` arm ended both of its paths with `continue`,
+  which leaves the `while` loop before the resolution code below it. So a
+  path-form citation was no longer checked for whether the plan it names
+  exists, or whether its anchor exists. For a non-frozen file that is
+  merely redundant with the report it does emit; for a frozen file, where
+  the arm exits silently, the citation stopped being verified at all.
+  That is the wrong half of the corpus to stop watching: `#G2` records
+  that 24 of the 47 live `#G` citations resolve *into* frozen plans, which
+  is exactly where a stale reference accumulates with no way to repair it.
+  Nothing is broken today — the one affected record resolves — but the
+  check that would have said so was removed.
+- **Fix risk:** none. Dropping the `continue` falls through to the
+  resolution the arm was skipping, and the frozen case counts rather than
+  reports, which is the treatment `#F6` on the map plan already prescribed
+  for a silently muted region in this same file: a mute with no diagnostic
+  is easier to create than the noisy form the checker already catches.
+
+**FIXED 2026-09-08:** the PATHFORM arm falls through to resolution instead of returning early, so a path-form citation is still checked for existence and anchor; the frozen case increments a counter that plan-citations prints on its OK line rather than exiting silently
+
+### F24 — the manifest write had two homes, and the weaker path match was in both
+
+- **File:** `docs/skills/plan/scripts/lib.sh` (`plan_do_freeze`),
+  `docs/skills/plan/scripts/plan-repair`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by reading both against each other.
+- **Axis:** needed-used
+- **Reachability:** no adversary; whoever next corrects the manifest
+  writer. There is an open plan to do exactly that
+  (2026-09-06-make-the-frozen-plan-guard-survive-renames-and-stop-self-certifying.md).
+- **Rule:** n/a.
+- **Finding:** `plan-repair` reproduced `plan_do_freeze`'s nine-line
+  manifest rewrite — checksum, `mktemp`, delete the old entry, append,
+  `sort -k2`, `git add`. Both deleted the old entry with
+  `grep -vF "  $rel"`, an unanchored substring match on a line, which is
+  the same weaker-than-necessary comparison `#F20` had just replaced with
+  an exact path test inside `plan_manifest_frozen`. So the fix for one
+  would have had to be made twice, in two files, by someone who had no
+  reason to look in the second. The two copies had already drifted:
+  `plan_do_freeze` created the manifest if absent, `plan-repair` did not.
+- **Fix risk:** low. `plan_record_checksum` is now the single writer and
+  compares the path field exactly; `plan_do_freeze` and `plan-repair` both
+  call it. `plan-repair` deliberately does *not* call `plan_do_freeze`
+  itself, because that also runs `plan_mark_touched`, which would repoint
+  `.claude/.active-plan` at a frozen `done/` plan — the marker class
+  `#F10` is about. Separately, `plan-lint`'s `*/*|*..*` case arm was dead:
+  every string it matched was already rejected by the filename regex below
+  it, so it only ever changed the wording. Folded into one rule with one
+  message. Manifest re-verified after the change: all 50 entries pass.
+
+**FIXED 2026-09-08:** plan_record_checksum is the single manifest writer, matches the path field exactly, and is called by both plan_do_freeze and plan-repair; plan-lint's dead case arm folded into the regex it duplicated. All 50 frozen checksums still verify
+
+### F25 — every number `## State` and `#G8` quote for the harness is one or more sessions old
+
+- **File:** this plan's `## State` (the `gate-tests` paragraph, the
+  migration bullet, the rung declaration, the pick-up point) and `#G8`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** re-measured on this worktree, five runs. The harness is
+  **96 passed, 0 failed, 3 recorded residues** in **0.97s** (975-979 ms,
+  spread 5 ms). `## State` said 92 assertions and "about 1.0s", its rung
+  declaration said 90/0/3, its pick-up point said 92/0/3, and `#G8` said
+  the harness "went 82 assertions to **97**" — four different counts for
+  one number, none of them current, and 97 was never what the summary
+  line printed. The migration bullet was stale in two further ways after
+  `#D5` and `#D4`: it said "four keys added ... each netting exactly +4
+  lines" when the shipped schema adds three (+3 against `origin/master`,
+  verified by `--numstat`), and "the 50 frozen ones are untouched by
+  construction" when 27 of them have since been repaired.
+- **Fixed** in `## State`, which is the one section a later pass may
+  rewrite: 96 assertions, 0.97s, 96/0/3, three keys, +3 lines, and a new
+  bullet for the 27 repaired frozen plans (+8 lines each, 0 deletions,
+  216 total, `sha256sum -c` green on all 50). `#G8`'s count is corrected
+  in place with a strikethrough, per append-only. Cross-checked while
+  there: `verify-ladder` end to end is **24.3s**, of which
+  `nix flake check --no-build` is **22.9s** and `gate-tests` 0.97s — so
+  `#G11`'s "4% of `verify-ladder`" holds and its 26.0s/23.5s are within
+  run-to-run variance. The corpus sweep is still **18 of 102** failing.
+
+
+**FIXED 2026-09-08:** re-measured on this worktree 2026-09-08: 96/0/3 in 0.97s over five runs, verify-ladder 24.3s of which nix flake check 22.9s. State's counts, key count and line deltas corrected; G8's 97 struck through to 96
+
+### F26 — the freeze contract is stated as absolute in three places, and `plan-repair` is the exception it does not admit
+
+- **File:** `docs/skills/plan/SKILL.md:36`, `docs/skills/plan/SKILL.md`'s
+  `plan-lint` row, `docs/skills/plan/reference.md` ("Which files the
+  schema rules apply to"), `docs/skills/plan/scripts/plan-lint:50-53`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** `SKILL.md` closed its script table with "All of them
+  refuse to touch a frozen file" — the row directly above it is
+  `plan-repair`, which refuses everything *except* a frozen file. The
+  same file's `plan-lint` row and `reference.md`'s frozen-exemption
+  paragraph both justify reading the manifest rather than the `frozen:`
+  field with "only `plan-freeze` writes the manifest", and
+  `plan-repair` now writes it too via `plan_record_checksum` (`#F24`) —
+  in `reference.md` that claim sits two paragraphs above the new
+  paragraph saying `plan-repair` re-records the checksum, so the file
+  contradicted itself on one screen. `plan-lint`'s own comment carried
+  the third copy.
+- **Fixed:** all four now name both writers, and the closing line excepts
+  `plan-repair` while restating its bound (it can only add an absent
+  section). The justification is unaffected: what makes the manifest
+  authoritative is that no *plan* writes it about itself.
+
+
+**FIXED 2026-09-08:** SKILL.md, reference.md and plan-lint's comment now name plan-freeze and plan-repair as the manifest's writers, and the script table's closing line excepts plan-repair with its bound restated
+
+### F27 — the two new lint gates are documented in `SKILL.md` and nowhere else
+
+- **File:** `docs/skills/plan/reference.md` ("Freeze mechanics",
+  "Rejecting a plan"), `docs/skills/plan/SKILL.md`'s `plan-reject` row
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** `reference.md`'s "Freeze mechanics" enumerates what
+  `plan-freeze` refuses, in order, and is the long-form reference the
+  `SKILL.md` table points at; it did not mention the `plan-lint` gate
+  added under `#D4`. Its "Rejecting a plan" bullet list, whose whole
+  point is which gates `plan-reject` waives, did not mention the gate it
+  gained under `#G10` — so the only statement of the reject-side rule was
+  a trailing clause on the *`plan-freeze`* row of the skill table, where
+  a reader looking up `plan-reject` never arrives.
+- **Fixed:** both lists now carry the lint refusal with its plan anchor,
+  and the `plan-reject` row says it lints, with `rejected/` being as
+  permanent as `done/` as the reason.
+
+
+**FIXED 2026-09-08:** reference.md's Freeze mechanics and Rejecting-a-plan lists both carry the plan-lint refusal with its anchor, and plan-reject's SKILL.md row says it lints
+
+### F28 — the bare-filename rule became blocking, and no doc that states the rule says so
+
+- **File:** `docs/skills/plan/SKILL.md` ("The rule"),
+  `docs/skills/plan/reference.md` ("Why bare-filename citations"),
+  `docs/skills/workflow/SKILL.md` step 4,
+  `docs/procedures/testing-changes.md`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** after `#D3`, `plan-citations` reports a path-form citation
+  in every `*.md` and script it scans, and `verify-ladder` runs it on
+  every pass — so writing `docs/plans/todo/x.md` in prose now blocks a
+  commit. Every doc that states the rule still described it as a
+  convention, and every doc that describes the gate still said
+  `plan-citations` blocks only on a citation that no longer *resolves*.
+  An agent hitting the new refusal had no doc to reconcile it against.
+- **Fixed:** the rule statement in both skill docs now names the enforcer
+  and the frozen-file exemption; `verify-ladder`'s description in
+  `workflow/SKILL.md` and `testing-changes.md` names the second thing it
+  blocks on.
+
+
+**FIXED 2026-09-08:** plan/SKILL.md, plan/reference.md, workflow/SKILL.md and testing-changes.md all name plan-citations as the enforcer of the bare-filename rule and the frozen-file exemption
+
+### F29 — `testing-changes.md`'s gate descriptions predate three sessions of harness growth
+
+- **File:** `docs/procedures/testing-changes.md`, the `verify-ladder` and
+  `gate-tests` bullets
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** the `gate-tests` bullet listed its coverage as
+  "`plan-gate`, `required-agents`, `plan-citations`, and `lib.sh`'s
+  fingerprint, file-listing and rung-declaration helpers". It also covers
+  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, both frontmatter
+  readers and the active-plan marker — thirteen sections, five swept
+  gates. The `verify-ladder` bullet described `plan-lint` as blocking on
+  "a missing section, a duplicate or non-sequential id, or a Progress
+  line citing a heading that does not exist", which predates the schema
+  fields and the section-order rule, and said nothing about the dangling
+  `.claude/.active-plan` marker now blocking (`#F10`) — the one new
+  refusal a reader is most likely to meet without understanding it. Its
+  "under a second" claim survives: 0.97s measured.
+- **Fixed:** both bullets rewritten to what the scripts do now. Not
+  changed: "Run from `verify-ladder` only — no git hook or CI step runs
+  it yet", which is still true and is exactly what `#D2` is about.
+
+
+**FIXED 2026-09-08:** gate-tests' coverage list and verify-ladder's plan-lint description rewritten to current behaviour, including the dangling active-plan marker block
+
+### F30 — the map plan's `#D4` still specifies a four-field schema
+
+- **File:**
+  2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md,
+  `### D4`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** `#D5` here dropped `superseded_by`, and the map plan's
+  Progress item 2 was struck through and corrected to match. Its `### D4`
+  — the decision text that item implements, and the anchor this plan and
+  `reference.md` both cite as the authority for the schema — still reads
+  "Frontmatter gains `priority`, `blocked_by`, `superseded_by`, and
+  `kind`". A reader arriving at the anchor rather than at the checklist
+  gets the pre-`#D5` schema.
+- **Fixed:** a dated `**Corrected 2026-09-08:**` note appended to `D4`'s
+  body, above its `ANSWERED` marker, naming three fields and pointing at
+  `#D5`. Append-only respected — nothing was deleted.
+
+
+**FIXED 2026-09-08:** dated correction appended to the map plan's D4 naming three fields and citing D5; the four-field text is left in place per append-only
+
+### F31 — `plan-reject` moves and re-stamps the plan *before* it lints, so a refused rejection leaves the file half-rejected
+
+- **File:** `docs/skills/plan/scripts/plan-reject:29-47`
+- **Axis:** docs accuracy (docs-updater), reported not fixed
+- **Finding:** the gate added under `#G10` sits after the `REJECTED`
+  marker is appended, after `git mv` to `docs/plans/rejected/`, and after
+  `plan_set_field ... status rejected`. When it fires, `plan_die` exits
+  with the plan already in `rejected/`, already stamped `status:
+  rejected`, and not frozen — a state no script put it in and none will
+  clear, and the same disagreement class `#F11` and `#F20` are about.
+  `plan-freeze` does not have this shape: it lints before
+  `plan_do_freeze` and mutates nothing first. The docs say `plan-reject`
+  "moves ... and freezes it"; on the refusal path it moves and does not
+  freeze. `SKILL.md` and `reference.md` were updated to say it lints
+  (`#F27`), which is true of both orderings, so no doc asserts the
+  ordering either way.
+- **Not fixed:** whether to lint before the move (cheap, since `plan-lint`
+  reads `status` against the folder, so a pre-move lint judges the plan
+  against `todo/`/`in-progress/` and would need the folder it is going to)
+  or to roll back on refusal is a code decision with a real tradeoff, and
+  picking one silently is what this pass is meant not to do.
+
+
+**FIXED 2026-09-08:** the lint runs before the REJECTED marker, the git mv and the status field, so a refusal leaves the plan exactly where it was. Verified both ways in a scratch repo and guarded in gate-tests -- and the guard took three attempts: the first passed because the fixture had no rejected/ directory so git mv failed anyway, the second because the probe file was untracked so git mv failed anyway. Only the third, with the directory present and the file staged, goes red when the gate is moved back after the move
+
+### F32 — extracting `plan_record_checksum` left `plan_do_freeze`'s docblock sitting on the new function
+
+- **File:** `docs/skills/plan/scripts/lib.sh:436-441` before the fix
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** `#F24`'s extraction inserted `plan_record_checksum` and its
+  comment *between* `plan_do_freeze`'s docblock and `plan_do_freeze`. The
+  two blocks ran together with no blank line, so the file read as one
+  five-line comment describing freezing followed by four lines describing
+  the checksum writer, above a function that is only the second of those;
+  `plan_do_freeze` itself was left undocumented two definitions further
+  down. This is `#F6`'s shape exactly — the frozen-exemption comment that
+  sat on the wrong declaration — reintroduced by the refactor that
+  followed it, in the same file.
+- **Fixed:** the `plan_do_freeze` docblock moved onto `plan_do_freeze`,
+  and its body corrected while there: it now delegates the checksum write
+  and also calls `plan_mark_touched`, which the old text did not mention
+  and which is the reason `plan-repair` deliberately does not call it.
+
+**FIXED 2026-09-08:** the plan_do_freeze docblock moved back onto plan_do_freeze and updated to name plan_mark_touched; plan_record_checksum keeps its own
+
+### F33 — `plan-repair` is documented as adding "a required section"; it can only ever add `## State`
+
+- **File:** `docs/skills/plan/SKILL.md` (`plan-repair` row),
+  `docs/skills/plan/reference.md` ("The one exception, and its limits"),
+  against `docs/skills/plan/scripts/plan-repair:27-30`
+- **Axis:** docs accuracy (docs-updater)
+- **Finding:** both docs describe the script as adding "a required
+  section that is missing", which reads as a general repair tool taking a
+  section. The script hardcodes `missing="## State"`, takes exactly one
+  argument (the plan), and its own comment says widening the list means
+  widening what a frozen file can become. The overstatement is the kind
+  that gets acted on: a reader with a frozen plan missing `## Findings
+  (F)` would reach for a capability that does not exist, and the natural
+  next step — adding a section argument — is precisely the decision the
+  script is written to force into the open.
+- **Fixed:** both now name `## State` as the one repair, say the section
+  is hardcoded rather than an argument, and keep the two refusals.
+
+**FIXED 2026-09-08:** SKILL.md and reference.md now say plan-repair adds ## State specifically, hardcoded rather than an argument
+
+_docs-updater finished 2026-09-08T19:05:54Z (code c4bab0aafd59760a) -- see Findings above._

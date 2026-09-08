@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # Tighten Minecraft/Factorio mod-supply auto-update (three items)

@@ -47,8 +47,11 @@ PLAN_DEFAULT_PRIORITY="normal"
 # schema grew
 PLAN_CORE_FIELDS=("slug" "created" "status" "frozen")
 # comma-separated bare plan filenames, same citation form as everywhere else,
-# so they survive a file moving between folders
-PLAN_REF_FIELDS=("blocked_by" "superseded_by")
+# so they survive a file moving between folders. superseded_by is not here:
+# it has no writer until plan-supersede exists, and a field nothing sets is
+# a lint rule enforced for nobody
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5
+PLAN_REF_FIELDS=("blocked_by")
 # added by the map plan's #D4, required of non-frozen plans only -- a frozen
 # file can never be edited to gain them; derived from the two lists above so a
 # field added to one and forgotten in the other cannot half-land
@@ -429,26 +432,37 @@ plan_rung_problem() {
 
 plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 
-# plan_do_freeze <root> <rel> -- the mechanical half of freezing, shared by
-# plan-freeze (done/, gated on resolved decisions) and plan-reject
-# (rejected/, gated on a mandatory reason instead): sets frozen: true,
-# records the checksum. Does not check which folder <rel> is in or
-# anything about decisions -- callers do their own gating first.
-plan_do_freeze() {
+# plan_record_checksum <root> <rel> -- record this file's current checksum in
+# the manifest, replacing any entry it already has. The one writer, called by
+# plan_do_freeze and plan-repair; the path field is compared exactly, as in
+# plan_manifest_frozen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
+plan_record_checksum() {
   local root="$1" rel="$2" sum checksums tmp
-  plan_set_field "$root/$rel" frozen true
   sum="$(plan_checksum "$root/$rel")"
-
   checksums="$root/$PLAN_CHECKSUMS_RELPATH"
   mkdir -p "$(dirname "$checksums")"
   touch "$checksums"
-  tmp="$(mktemp)"
-  grep -vF "  $rel" "$checksums" > "$tmp" 2>/dev/null || true
+  tmp="$(mktemp)" || plan_die "cannot create a temporary file"
+  awk -v want="$rel" '
+    { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) next }
+    { print }
+  ' "$checksums" > "$tmp"
   printf '%s  %s\n' "$sum" "$rel" >> "$tmp"
   sort -k2 "$tmp" > "$checksums"
   rm -f "$tmp"
-
   git -C "$root" add "$rel" "$PLAN_CHECKSUMS_RELPATH"
+}
+
+# plan_do_freeze <root> <rel> -- the mechanical half of freezing, shared by
+# plan-freeze (done/, gated on resolved decisions) and plan-reject
+# (rejected/, gated on a mandatory reason instead): sets frozen: true,
+# records the checksum, marks the plan touched. Does not check which folder
+# <rel> is in or anything about decisions -- callers do their own gating.
+plan_do_freeze() {
+  local root="$1" rel="$2"
+  plan_set_field "$root/$rel" frozen true
+  plan_record_checksum "$root" "$rel"
   plan_mark_touched "$root" "$rel"
 }
 

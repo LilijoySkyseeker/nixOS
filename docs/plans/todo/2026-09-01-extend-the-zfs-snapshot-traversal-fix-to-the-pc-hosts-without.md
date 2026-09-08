@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # extend the .zfs snapshot-traversal fix to the PC hosts without breaking backup browsing

@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # /nix/state/.zfs is world-traversable, exposing every secret that ever touched a persisted directory

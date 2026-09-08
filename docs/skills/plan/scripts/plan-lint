@@ -47,12 +47,9 @@ folder="$(basename "$(dirname "$rel")")"
 status="${fm_val[status]:-}"
 [ "$status" = "$folder" ] || report "frontmatter status '$status' does not match folder '$folder'"
 
-# The manifest, not the file's own `frozen:` field, decides. The field is
-# self-declared -- a todo/ plan asserting `frozen: true` would otherwise
-# switch off every rule below for itself -- while the manifest is written
-# only by plan-freeze and is what .githooks/pre-commit enforces. Reported
-# when the two disagree, because either direction is a plan in a state no
-# script put it in.
+# The manifest decides, not the file's own self-declared `frozen:` field;
+# written only by plan-freeze and plan-repair, enforced by
+# .githooks/pre-commit. A disagreement is reported in either direction.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 frozen_field="${fm_val[frozen]:-}"
 if plan_manifest_frozen "$root" "$rel"; then
@@ -112,18 +109,12 @@ if [ "$frozen" -eq 0 ]; then
   for key in "${PLAN_REF_FIELDS[@]}"; do
     while IFS= read -r ref; do
       [ -n "$ref" ] || continue
-      case "$ref" in
-        */*|*..*)
-          report "frontmatter $key cites '$ref' -- must be a bare filename, never a path"
-          continue ;;
-      esac
-      # The canonical <date>-<slug>.md shape, which is also the only form
-      # plan-citations recognises. Anything else -- a capitalised name, a
-      # bare slug, a note to self -- resolves for neither tool and would sit
-      # there looking checked.
-      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F14
+      # One rule, one message. A path, a `..`, a bare slug and a note to
+      # self all fail the same regex, so a separate case arm for the path
+      # form only ever changed the wording.
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
       [[ "$ref" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]*\.md$ ]] ||
-        report "frontmatter $key cites '$ref' -- not a plan filename (<date>-<slug>.md)"
+        report "frontmatter $key cites '$ref' -- must be a bare plan filename <date>-<slug>.md, never a path"
     done < <(plan_field_refs "$file" "$key")
   done
 fi

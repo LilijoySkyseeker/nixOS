@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # homelab's /etc/nixos has diverged from origin with an unpushed auto-update commit

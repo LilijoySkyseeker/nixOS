@@ -29,7 +29,6 @@ frozen: false
 kind: ${PLAN_DEFAULT_KIND}
 priority: ${PLAN_DEFAULT_PRIORITY}
 blocked_by:
-superseded_by:
 ---
 
 # ${title}

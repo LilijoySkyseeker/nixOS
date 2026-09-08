@@ -7,6 +7,14 @@ frozen: true
 
 # reorganize `modules/home-manager/tooling.nix` — it's wholesale-applied to every server host's root profile via `modules/profiles/server.nix`, but mixes universal CLI tools (fzf, zoxide, git, helix, bat, eza, fish) in with desktop-only GUI apps: `services.kdeconnect` (phone-sync daemon), `programs.obs-studio` (screen recording), `programs.obsidian` (notes app), and `programs.firefox` (a whole browser) — all pulled onto headless servers for no reason. Noticed live via `nix why-depends` while sanity-checking vps's actual built closure during its reinstall (traced kdeconnect-kde/qtspeech/ktextwidgets to exactly this path); confirmed with the user this is a real problem worth fixing, not just a decision point — applies identically to homelab, predates this session's changes. Fix direction: split `tooling.nix` into a CLI-only piece (safe for `server.nix` to keep using) and a desktop-GUI piece (kdeconnect/obs-studio/obsidian/firefox, kept only in `modules/profiles/PC.nix`'s home-manager import list). Not done as part of the vps reinstall itself — real refactor across the fleet, needs its own branch and a rebuild-check on every affected host (server.nix hosts *and* PC.nix hosts) before merging
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-25: reorganize `modules/home-manager/tooling.nix` — it's

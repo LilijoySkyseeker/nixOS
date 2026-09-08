@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # build and test a full restore suite (scripts + procedures) against real data — out of scope of the zrepl migration itself

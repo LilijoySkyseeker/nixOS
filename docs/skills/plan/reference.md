@@ -11,7 +11,7 @@
   at 70 characters, backing up to the last word boundary rather than
   cutting mid-word.
 - Frontmatter mirrors the folder for greppability. The scripts write all of
-  it except `blocked_by`/`superseded_by`, which are hand-set (below):
+  it except `blocked_by`, which is hand-set (below):
   ```yaml
   ---
   slug: add-tailnet-build-fleet
@@ -21,7 +21,6 @@
   kind: task
   priority: normal
   blocked_by:          # comma-separated bare plan filenames
-  superseded_by:       # a bare plan filename
   ---
   ```
   The block above is a shape example, not the vocabulary. What `kind` and
@@ -32,10 +31,13 @@
   them. `status` is the exception: it has no array, it is checked
   against the folder name.
 
-  `superseded_by` has no writer yet — `plan-supersede` and
-  `docs/plans/superseded/` are unbuilt
+  There is no `superseded_by` field. It was in the first draft of this
+  schema and came out again: nothing writes it until `plan-supersede` and
+  `docs/plans/superseded/` exist, and both are unbuilt
   (2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D5).
-  Until one lands, both ref fields are set by hand or left empty.
+  It lands with that tool, not ahead of it. `priority` stays on different
+  grounds — its reader is the person triaging the backlog, not a
+  script (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5).
 
 - `blocked_by` makes a map's dependency edges readable without parsing
   its Progress prose.
@@ -44,10 +46,10 @@
 
 **The mutable corpus is migrated to the current schema whenever the
 schema changes; frozen files are exempt by definition.** "Frozen" means
-recorded in `docs/plans/.checksums`, which only `plan-freeze` writes and
-which `.githooks/pre-commit` enforces — not the file's own `frozen:`
-field, which a plan could otherwise set about itself to switch off every
-rule below. `plan-lint` reports the two disagreeing in either direction. A frozen plan
+recorded in `docs/plans/.checksums`, which only `plan-freeze` and
+`plan-repair` write and which `.githooks/pre-commit` enforces — not the
+file's own `frozen:` field, which a plan could otherwise set about itself
+to switch off every rule below. `plan-lint` reports the two disagreeing in either direction. A frozen plan
 cannot be edited, so every rule added after it froze is one it can never
 satisfy, and a gate nothing can clear is what teaches the bypass.
 `plan-lint` therefore checks the section set, the section order and the
@@ -55,6 +57,16 @@ schema fields only on a plan `docs/plans/.checksums` does not record as
 frozen, and checks the rules that do
 not depend on the era — core frontmatter, status against folder, id
 sequencing, Progress citations — everywhere.
+
+**The one exception, and its limits.** `plan-repair` may add `## State`
+to an already-frozen plan that has none, and re-record its checksum. That
+section is hardcoded, not an argument: it refuses a plan that is not
+frozen and refuses one that already has the section, so it can only ever
+add a heading nobody wrote — it cannot edit a word of anyone's text. It exists because 27
+`done/` plans were frozen before `## State` existed, and nothing checked a
+plan at the moment it stopped being fixable. Both freeze doors now lint
+first (`plan-freeze` and `plan-reject`), so the backlog it was written to
+clear cannot grow again.
 
 This is the rule to follow at the next schema revision, not a one-off
 for this one. See
@@ -105,6 +117,12 @@ forever, regardless of where the file currently sits. Resolving one is a
 single `git grep -rl '2026-08-27-foo.md'` or an editor's "quick open."
 
 <!-- plan-citations: ignore-end -->
+
+`plan-citations` enforces this: a plan cited by path is reported, in every
+`*.md` and script it scans, not just in frontmatter. Frozen files are
+exempt, since they cannot be edited to comply -- it counts them on its OK
+line instead
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3).
 
 ## The three decision states, precisely
 
@@ -179,6 +197,10 @@ superseded by a different approach. `plan-reject <file> "<reason>"`:
 - Does **not** require every decision to be resolved first, unlike
   `plan-move ... done` -- abandoning the work legitimately moots open
   questions rather than obligating them to be answered.
+- Runs `plan-lint` first and refuses a malformed plan, exactly like
+  `plan-freeze` -- `rejected/` is as permanent, and the file stays
+  citeable evidence
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10).
 - Freezes the file permanently, exactly like `done/` (same checksum
   manifest, same git-level enforcement).
 
@@ -192,9 +214,12 @@ is rare enough not to need its own mechanic.
 `plan-freeze`:
 1. Refuses if already frozen, if the file isn't under `docs/plans/done/`,
    if any decision or finding is unresolved (above), if `## State` is
-   missing or empty, or if `## State` declares no verification rung
+   missing or empty, if `## State` declares no verification rung
    (`Verified to rung <N> ...` -- see
-   `docs/procedures/testing-changes.md`, "Declaring the rung").
+   `docs/procedures/testing-changes.md`, "Declaring the rung"), or if
+   `plan-lint` reports the file malformed -- freezing makes a structural
+   fault permanent, and `plan-repair` is the only way back
+   (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4).
 2. Sets `frozen: true`.
 3. Records a `sha256sum`-format line (`<hash>  <relpath>`) in
    `docs/plans/.checksums`, which the git-level `pre-commit` hook
@@ -240,7 +265,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # Add tailnet-wide distributed Nix builders

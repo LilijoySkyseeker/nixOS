@@ -37,6 +37,14 @@ state_problem="$(plan_state_problem "$root/$rel")"
 rung_problem="$(plan_rung_problem "$root/$rel")"
 [ -n "$rung_problem" ] && plan_die "cannot freeze -- $rung_problem"
 
+# structure, checked at the one moment it stops being fixable; run before
+# the freeze, so the file is still judged as editable
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4
+if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
+  plan_die "cannot freeze -- $rel is malformed, and freezing makes that permanent:
+$lint_out"
+fi
+
 plan_do_freeze "$root" "$rel"
 plan_note "$rel frozen."
 echo "$rel"

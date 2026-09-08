@@ -7,6 +7,14 @@ frozen: true
 
 # homelab's host firewall has no real protection against its own already-public IPv6 address — currently only saved by the ISP router's own (undocumented, unconfigured-by-this- repo) inbound IPv6 firewall
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-26: homelab's host firewall has no real protection

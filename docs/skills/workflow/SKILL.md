@@ -30,7 +30,8 @@ stays short on purpose (progressive disclosure).
    for what slips through, not the primary mechanism.
 4. **Run the scriptable verification floor**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
-   `plan-citations` (any plan citation that no longer resolves),
+   `plan-citations` (any plan citation that no longer resolves, or any
+   cited by path instead of bare filename),
    `scripts/gate-tests` (the gate scripts' own failure-mode tests --
    a gate that no longer refuses what it must, or no longer passes an
    honest sequence), `plan-lint` on the active plan (duplicate or

@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # split testing-changes into an evidence ladder and a deploy sequence
@@ -332,7 +331,7 @@ _security finished 2026-09-07T18:49:58Z -- see Findings above._
 
 ### F7 — the case matrix is cited with two different sizes across this plan
 
-- **File:** `docs/plans/in-progress/2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md` (G3 heading; `## State`; F3's resolution stamp)
+- **File:** `2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md` (G3 heading; `## State`; F3's resolution stamp)
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** G3's heading calls it "the 24-case matrix", while `## State` and F3's `FIXED` stamp both say "a 20-case matrix". Since G3 exists precisely because the matrix was discarded rather than committed, the number in the plan is the only surviving record of its size, and it disagrees with itself. Not fixed here: G entries, resolution stamps and `## State` are all off-limits to this pass. Whoever ran it should correct whichever number is wrong.
 

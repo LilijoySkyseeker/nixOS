@@ -111,7 +111,15 @@ FNR == 1 {
 !skip {
   line = $0
   while (match(line, /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9][a-z0-9-]*\.md(#[DGF][0-9]+)?/)) {
-    print "CITE\t" FILENAME "\t" substr(line, RSTART, RLENGTH)
+    # What precedes the filename decides whether this is a citation or a
+    # path. A citation is bare, so it survives the file moving between
+    # folders; a path form goes stale the moment plan-move runs and nothing
+    # would report it, because the basename still resolves.
+    pre = substr(line, 1, RSTART - 1)
+    if (pre ~ /docs\/plans\/[a-z-]+\/$/)
+      print "PATHFORM\t" FILENAME "\t" substr(line, RSTART, RLENGTH)
+    else
+      print "CITE\t" FILENAME "\t" substr(line, RSTART, RLENGTH)
     line = substr(line, RSTART + RLENGTH)
   }
 }
@@ -127,6 +135,7 @@ END {
 declare -A anchor_ok
 checked=0
 skipped_regions=0
+muted_pathforms=0
 
 # awk's output goes through a file, not a process substitution, so its
 # exit status is actually observed. Via `< <(awk ...)` a mid-scan abort
@@ -152,6 +161,22 @@ while IFS=$'\t' read -r kind a b; do
       # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F6
       skipped_regions="$a"
       continue
+      ;;
+    PATHFORM)
+      # the rule SKILL.md states repo-wide, enforced where it bites rather
+      # than on one frontmatter field
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
+      if plan_manifest_frozen "$root" "${a#./}"; then
+        # a frozen file can neither comply nor carry an ignore marker, so
+        # counted on the OK line rather than reported or silently dropped
+        # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1
+        # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F6
+        muted_pathforms=$((muted_pathforms + 1))
+      else
+        report "${a#./}: cites 'docs/plans/.../${b}' -- cite a plan by bare filename, never by path, so the citation survives the file moving between folders"
+      fi
+      # no `continue`: the citation still has to resolve below
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F23
       ;;
     CITE) ;;
     # Fail closed on anything else: the scanner emits exactly three
@@ -199,5 +224,5 @@ if [ "$problems" -gt 0 ]; then
   plan_note "plan-citations: $problems broken citation(s). Untracked files are scanned too; if a reported file is scratch, delete or gitignore it."
   exit 1
 fi
-printf 'plan-citations: OK (%s citations resolve; %s ignored region(s))\n' \
-  "$checked" "$skipped_regions"
+printf 'plan-citations: OK (%s citations resolve; %s ignored region(s); %s path-form in frozen plans)\n' \
+  "$checked" "$skipped_regions" "$muted_pathforms"

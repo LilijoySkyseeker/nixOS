@@ -150,7 +150,8 @@ file.
   than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** ~~the 2026-08-26 entry at the top of `TODO.md`~~ —
-  now `docs/plans/in-progress/2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md`
+  now the in-progress plan
+  `2026-08-26-do-a-full-security-audit-hardening-pass-on-homelab.md`
   (TODO.md retired 2026-08-28)
 - **homelab is on gen 358** as of the sixth session (2026-08-28), vps
   redeployed the same day; the lines below record earlier sessions' state
@@ -246,7 +247,7 @@ Nine commits. Six of the fourteen decisions were answered by the user.
   `alpha` while the version resolved at `release`.
 - **D11 — deliberately NOT answered.** The user asked for a
   re-evaluation and replan with a benefits/risk analysis instead; that is
-  now `docs/plans/todo/2026-08-27-re-evaluate-and-replan-flake-update-test-s-executi.md`.
+  now the plan `2026-08-27-re-evaluate-and-replan-flake-update-test-s-executi.md`.
   ~~**It fires Wed Sep 2.**~~ — **it does not fire.** That clock assumed
   the schedules were armed; `scheduleEnable = false` fleet-wide means
   `flake-update-test` has no timer. Corrected 2026-08-28; nothing is on a

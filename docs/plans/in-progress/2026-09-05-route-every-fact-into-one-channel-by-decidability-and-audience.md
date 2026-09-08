@@ -6,7 +6,6 @@ frozen: false
 kind: map
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # route every fact into one channel by decidability and audience
@@ -232,10 +231,13 @@ Frontier (no blockers, takeable now):
 
 Blocked:
 
-- [ ] 2. plan-file layout revision — `## State` first, four frontmatter
+- [ ] 2. plan-file layout revision — `## State` first, ~~four frontmatter
       fields (`kind`, `priority`, `blocked_by`, `superseded_by`, per D4;
-      this line said three), defect G-to-F reclassification — see D4 and
-      G6. Schema half landed 2026-09-07 as
+      this line said three)~~ **three frontmatter fields as of 2026-09-08**
+      (`kind`, `priority`, `blocked_by`; `superseded_by` was dropped and
+      lands with `plan-supersede` at item 9 instead — see
+      2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5),
+      defect G-to-F reclassification — see D4 and G6. Schema half landed 2026-09-07 as
       2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md;
       the G-to-F half is still open
 - [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
@@ -333,6 +335,11 @@ is used. `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md`
 holds 40 G items of which 33 are open defects, arriving ~5/day and
 draining ~0.9/day, because nothing can resolve them. G returns to meaning
 lesson and needs no drain.
+
+**Corrected 2026-09-08:** the field list above is three, not four.
+`superseded_by` was dropped before it shipped and lands with
+`plan-supersede` at Progress item 9
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5).
 
 
 **ANSWERED 2026-09-05:** revise the plan-file schema, do not rewrite it
@@ -1311,7 +1318,7 @@ _security finished 2026-09-06T22:06:28Z -- see Findings above._
 
 ### F38 — the `malformed` half of the fingerprint-less-stamp fix landed this round, and the todo plan filed for it still describes it as unbuilt
 
-- **File:** `docs/plans/todo/2026-09-06-enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has.md:11-14,44-48,89`, `docs/skills/workflow/scripts/plan-gate:135-139`
+- **File:** `2026-09-06-enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has.md:11-14,44-48,89`, `docs/skills/workflow/scripts/plan-gate:135-139`
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** the todo plan was written against a `plan-gate` that downgraded both `legacy` and `malformed` to a non-blocking NOTE — "treats a stamp with no `(code <fp>)` field as `legacy` and a stamp with an empty one as `malformed`, and downgrades **both** to a non-blocking NOTE regardless of whether the cited plan is frozen" — and proposes, as its change and its third Progress item, routing both through `stamp_problem`. The same round that filed it already routed `malformed` through `stamp_problem`, so an empty-fingerprint stamp now BLOCKS on a non-frozen plan. Half the plan's stated work is done and its premise sentence is false. The cost is not cosmetic: this plan's whole reason for existing is an entry condition that must hold before the change is safe, and a reader picking it up would either re-do the `malformed` half or, worse, conclude from the premise that a hand-written fingerprint-less stamp still passes the gate — which is the loophole the plan exists to close and which is now closed for the `malformed` form. This is the branch's recurring defect (text describing a version the same pass changed) reaching a plan file rather than a comment; the plan file is where an agent goes for the *state* of a deferred fix, so a stale premise there is more durable than a stale comment. Fixed in `## State`, the only section append-only rules let a later pass rewrite — "Original plan" and "The change" are left as written, per `plan/SKILL.md`'s append-only rule, with `## State` now carrying which arm landed and which remains.
 
@@ -1476,7 +1483,7 @@ _security finished 2026-09-06T22:46:21Z -- see Findings above._
 
 ### F51 — the lib.sh-split plan tells its implementer to move "the four arrays"; there are six
 
-- **File:** `docs/plans/todo/2026-09-06-shrink-the-ci-trusted-set-by-splitting-lib-sh.md:33`
+- **File:** `2026-09-06-shrink-the-ci-trusted-set-by-splitting-lib-sh.md:33`
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** `constants.sh`'s contents are specified as "the four arrays, the relpaths, `plan_path_matches`, `plan_is_code_path` / `plan_is_doc_path`, and the derived-set logic". `lib.sh` defines six `PLAN_*` arrays — `STAMPABLE_AGENTS`, `AGENT_ORDER`, `CODE_GLOBS`, `DOC_GLOBS`, `NONTEXT_GLOBS` and the derived `TEXT_GLOBS` (`lib.sh:21,30,285,308,316,333`). The count reads as pre-`PLAN_AGENT_ORDER`, which landed in the same round the plan was filed. It matters because the plan's failure mode is a partial move: `plan-gate` reads `PLAN_STAMPABLE_AGENTS` and `required-agents` reads `PLAN_AGENT_ORDER`, so an implementer who moves four arrays and leaves the two agent lists behind gets a `constants.sh` the CI-pinned entry points cannot run on. Named rather than counted, so the list cannot go stale again the next time an array is added.
 

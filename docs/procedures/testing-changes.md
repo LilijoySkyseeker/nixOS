@@ -182,12 +182,15 @@ of operations — chronology, not evidence:
   skill's step-4 hard gate for any non-trivial agentic change, run
   before commit rather than at push time. Runs three repo-level gates
   first — `docs/skills/plan/scripts/plan-citations` (blocks on any plan
-  citation that no longer resolves; run on every pass, since a citation
-  breaks from the target side), `scripts/gate-tests` (the gate scripts'
-  own failure-mode tests, next bullet), and
-  `docs/skills/plan/scripts/plan-lint` on the active plan (blocks on a
-  missing section, a duplicate or non-sequential `D`/`G`/`F` id, or a
-  `Progress` line citing a heading that does not exist) — then covers
+  citation that no longer resolves, and on any plan cited by path rather
+  than by bare filename, outside frozen plans; run on every pass, since a
+  citation breaks from the target side), `scripts/gate-tests` (the gate
+  scripts' own failure-mode tests, next bullet), and
+  `docs/skills/plan/scripts/plan-lint` on the active plan (blocks on
+  missing or misordered sections, missing frontmatter, a duplicate or
+  non-sequential `D`/`G`/`F` id, or a `Progress` line citing a heading
+  that does not exist — and on a `.claude/.active-plan` marker naming a
+  file that is gone, which is not the same as no marker) — then covers
   lint and rung 3's mechanical half:
   `nixfmt --check`, `nix flake check --no-build`, a targeted
   `nixos-rebuild build --flake .#<host>` for any host whose directory or
@@ -198,8 +201,10 @@ of operations — chronology, not evidence:
   `workflow` skill's sequence is actually followed — it does not
   backstop a commit made outside that skill the way `pre-push` does.
 - **`scripts/gate-tests`** — the failure-mode tests for the gate scripts
-  themselves (`plan-gate`, `required-agents`, `plan-citations`, and
-  `lib.sh`'s fingerprint, file-listing and rung-declaration helpers).
+  themselves (`plan-gate`, `required-agents`, `plan-citations`,
+  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, and `lib.sh`'s
+  fingerprint, file-listing, rung-declaration, frontmatter, heading and
+  active-plan-marker helpers).
   Three kinds of check: enumerated broken environments, invariants over
   generated plan text (rewrap and re-decorate a `## State`, require the
   verdict not to move), and a sabotage sweep that fails the Nth `git`

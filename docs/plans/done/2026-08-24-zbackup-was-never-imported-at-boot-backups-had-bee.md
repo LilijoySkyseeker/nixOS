@@ -7,6 +7,14 @@ frozen: true
 
 # `zbackup` was never imported at boot — backups had been silently dead for ~23h. Fixed declaratively
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-24: `zbackup` was never imported at boot — backups had

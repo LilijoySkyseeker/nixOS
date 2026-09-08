@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # nix flake check fails on zrepl-replication test (pkgs.path context)

@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # homelab backup/replication stack has several compounding risks if the box is powered off for an extended period (over a month), surfaced while reasoning through the full backup reset/re-test

@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # Track NixOS ecosystem functionality survey (Uncharted NixOS)

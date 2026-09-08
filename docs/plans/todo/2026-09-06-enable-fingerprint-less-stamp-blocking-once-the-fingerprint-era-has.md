@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # enable fingerprint-less stamp blocking once the fingerprint era has landed

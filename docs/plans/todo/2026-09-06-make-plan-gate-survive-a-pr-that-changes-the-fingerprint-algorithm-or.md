@@ -6,7 +6,6 @@ frozen: false
 kind: task
 priority: normal
 blocked_by:
-superseded_by:
 ---
 
 # make plan-gate survive a PR that changes the fingerprint algorithm or its inputs

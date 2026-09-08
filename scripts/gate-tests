@@ -220,7 +220,7 @@ printf -- '# note\n\nCites %s#G1 so the resolution path is under the sweep.\n' \
 lint_plan="${fixture_date}-lint-clean.md"
 {
   printf -- '---\nslug: lint-clean\ncreated: %s\nstatus: in-progress\nfrozen: false\n' "$fixture_date"
-  printf -- 'kind: task\npriority: normal\nblocked_by:\nsuperseded_by:\n---\n\n# lint clean\n'
+  printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# lint clean\n'
   printf -- '\n## State\n\nVerified to rung 1 (documentation).\n'
   printf -- '\n## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
 } > "$repo/docs/plans/in-progress/$lint_plan"
@@ -375,8 +375,7 @@ status: todo
 frozen: false
 kind: task
 priority: normal
-blocked_by:
-superseded_by:"
+blocked_by:"
 lint_sections='## State
 
 x
@@ -471,8 +470,7 @@ frozen: false
 frozen: true
 kind: task
 priority: normal
-blocked_by:
-superseded_by:" "$lint_sections")"
+blocked_by:" "$lint_sections")"
 dup_readers="$( cd "$repo" && bash -c '
   . docs/skills/plan/scripts/lib.sh
   printf "%s|%s" \
@@ -489,7 +487,7 @@ fi
 # the invariant rather than as the one dropped-newline bug: the only invalid
 # reference here is the final one, so a reader that stops early goes green.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
-expect_fail "plan-lint checks the last entry of a reference list" "not a plan filename" \
+expect_fail "plan-lint checks the last entry of a reference list" "must be a bare plan filename" \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
   "$(lint_probe "slug: probe
 created: ${fixture_date}
@@ -497,8 +495,7 @@ status: todo
 frozen: false
 kind: task
 priority: normal
-blocked_by: ${fixture_date}-lint-clean.md, not-a-plan
-superseded_by:" "$lint_sections")"
+blocked_by: ${fixture_date}-lint-clean.md, not-a-plan" "$lint_sections")"
 rm -f "$repo/docs/plans/todo/${fixture_date}-probe.md"
 
 # The three states of the active-plan marker. verify-ladder itself cannot be
@@ -523,6 +520,78 @@ marker_problem() { # <marker-contents, or nothing to remove the marker>
   bad "a marker naming a real plan is not a problem" "reported one"
 rm -f "$repo/.claude/.active-plan"
 
+section "a frozen plan may be repaired, but only by adding what is absent"
+# a hole in the freeze contract, so what it refuses matters more than what
+# it does
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4
+expect_fail "plan-repair refuses a plan that is not frozen" "is not frozen" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" \
+  "docs/plans/in-progress/$lint_plan"
+
+mkdir -p "$repo/docs/plans/done"
+frozen_ok="${fixture_date}-frozen-complete.md"
+{
+  printf -- '---\nslug: frozen-complete\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen complete\n\n' "$fixture_date"
+  printf -- '%s\n' "$lint_sections"
+} > "$repo/docs/plans/done/$frozen_ok"
+printf '%s  docs/plans/done/%s\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_ok" | cut -d" " -f1)" "$frozen_ok" \
+  > "$repo/docs/plans/.checksums"
+expect_fail "plan-repair refuses to touch a section that already exists" "already has" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" \
+  "docs/plans/done/$frozen_ok"
+
+# The root cause: nothing checked a plan at the moment it stopped being
+# fixable. plan-freeze now lints first.
+frozen_bad="${fixture_date}-freeze-me.md"
+printf -- '---\nslug: freeze-me\ncreated: %s\nstatus: done\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# freeze me\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/done/$frozen_bad"
+expect_fail "plan-freeze refuses a malformed plan, because freezing makes it permanent" "is malformed" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-freeze" "docs/plans/done/$frozen_bad"
+# Removed here *and* by the EXIT trap: every later section's
+# plan_manifest_frozen reads this path, so a fixture manifest left behind by
+# an early return would make a later case pass for the wrong reason.
+# plan-reject is the other door to freeze, and its refusal must leave the
+# plan exactly where it was. The marker, the git mv and the status field all
+# used to happen before the gate, so a refusal stranded the plan in rejected/
+# stamped rejected and unfrozen -- a state no script clears.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F31
+reject_bad="${fixture_date}-reject-me.md"
+# rejected/ must exist, or `git mv` fails and the plan stays in todo/ for a
+# reason that has nothing to do with the gate -- which is how the first
+# version of this case passed with the gate moved back after the move.
+mkdir -p "$repo/docs/plans/todo" "$repo/docs/plans/rejected"
+printf -- '---\nslug: reject-me\ncreated: %s\nstatus: todo\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# reject me\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/todo/$reject_bad"
+# Tracked, or `git mv` fails on an untracked path and the plan stays put for
+# a reason unrelated to the gate -- the second way this case passed while
+# asserting nothing.
+git -C "$repo" add "docs/plans/todo/$reject_bad" >/dev/null 2>&1
+# One invocation, two assertions about it: that it refuses, and that the
+# refusal left nothing behind. Running plan-reject twice to ask two questions
+# about the same action costs a second set of git calls for no more coverage.
+reject_out="$(env -C "$repo" "$repo/docs/skills/plan/scripts/plan-reject" \
+  "docs/plans/todo/$reject_bad" "abandoned" 2>&1)"
+reject_rc=$?
+if [ "$reject_rc" -eq 0 ]; then
+  bad "plan-reject refuses a malformed plan" "it accepted one, and freezing makes that permanent"
+elif ! printf '%s' "$reject_out" | grep -qF "is malformed"; then
+  bad "plan-reject refuses a malformed plan" "refused, but not for the stated reason: $(printf '%s' "$reject_out" | tail -n 1)"
+else
+  ok "plan-reject refuses a malformed plan"
+fi
+if [ -f "$repo/docs/plans/todo/$reject_bad" ] && [ ! -e "$repo/docs/plans/rejected/$reject_bad" ]; then
+  ok "a refused rejection leaves the plan untouched"
+else
+  bad "a refused rejection leaves the plan untouched" "the plan was moved or restamped before the gate ran"
+fi
+# The index entry goes too: later sections sweep required-agents over this
+# fixture, and a staged-then-deleted path changes what they see.
+git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$reject_bad" >/dev/null 2>&1
+rm -f "$repo/docs/plans/todo/$reject_bad"
+
+rm -f "$repo/docs/plans/done/$frozen_bad" "$repo/docs/plans/done/$frozen_ok" "$repo/docs/plans/.checksums"
+
 section "plan-citations resolves what exists and refuses what does not"
 # The sweep below asserts that plan-citations refuses when a git call under
 # it fails. That says nothing about whether it can tell a good citation
@@ -537,6 +606,17 @@ else
   bad "plan-citations resolves a citation that exists" \
     "$(printf '%s' "$cite_out" | tail -n 1)"
 fi
+# the bare-filename rule: a path form resolves by basename, so nothing
+# reported it and it went stale the moment plan-move ran. The bare form of
+# the same citation must still pass, which the case above requires.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a plan cited by path" "never by path" \
+  env -C "$repo" bash -c '
+    printf "See docs/plans/in-progress/%s here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$lint_plan"
+
 # The cited name arrives as an argument for the same reason it is
 # assembled above, and $? / $rc are the child's, not this shell's.
 # shellcheck disable=SC2016
@@ -654,7 +734,11 @@ fakebin="$scratch/fakebin"
 mkdir -p "$fakebin"
 {
   printf '#!/usr/bin/env bash\n'
-  printf 'c="$(cat "$SABOTAGE_COUNT" 2>/dev/null || echo 0)"\n'
+  # `read`, not `$(cat)`: the shim runs once per git call the swept gates
+  # make, and a command substitution forks twice each time. No `|| c=0` --
+  # the counter has no trailing newline, so read assigns and *then* returns
+  # 1 at EOF, and a `||` clause would wipe the value it just set.
+  printf 'c=0; read -r c < "$SABOTAGE_COUNT" 2>/dev/null\n'
   printf 'c=$((c + 1)); printf %%s "$c" > "$SABOTAGE_COUNT"\n'
   printf 'if [ "$c" = "$SABOTAGE_AT" ]; then echo "sabotage: git call $c" >&2; exit 128; fi\n'
   printf 'exec %s "$@"\n' "$real_git"
@@ -693,7 +777,7 @@ else
 fi
 
 sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
-  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count
+  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count seen_calls
   shift 3
   # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
   # gate already refusing for an unrelated reason, and then stays green
@@ -709,7 +793,7 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
   printf 0 > "$scratch/sabotage.count"
   base_out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT=0 "$@" 2>&1)"
   rc=$?
-  base_count="$(cat "$scratch/sabotage.count")"
+  base_count=0; read -r base_count < "$scratch/sabotage.count" 2>/dev/null
   # rc=0 is not enough. plan-gate's "nothing to gate" exits 0 too, and a
   # baseline that accepts it sweeps only the ref-resolution calls and
   # then reports ok having exercised no stamp check at all -- measured.
@@ -732,7 +816,8 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT="$n" "$@" 2>&1)"
     rc=$?
     # A gate that never reached call n is fine: nothing was sabotaged.
-    [ "$(cat "$scratch/sabotage.count" 2>/dev/null || echo 0)" -lt "$n" ] && break
+    seen_calls=0; read -r seen_calls < "$scratch/sabotage.count" 2>/dev/null
+    [ "$seen_calls" -lt "$n" ] && break
     if [ "$rc" -eq 0 ]; then
       leaked="$n"
       printf '    (call %s failed; gate still exited 0 saying: %s)\n' "$n" "$(printf '%s' "$out" | tail -n 1)" >&2
