@@ -939,7 +939,14 @@ real_git="$(command -v git)"
 fakebin="$scratch/fakebin"
 mkdir -p "$fakebin"
 {
-  printf '#!/usr/bin/env bash\n'
+  # $BASH, not `#!/usr/bin/env bash`: this shim is written at runtime, so
+  # nothing can rewrite its shebang the way a checked-in script's gets
+  # rewritten. In a build sandbox there is no /usr/bin/env, the shim then
+  # fails to exec, every swept gate refuses at baseline, and all five sweeps
+  # report "the gate already refuses with nothing sabotaged" -- found by
+  # running this suite as a flake check.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F45
+  printf '#!%s\n' "$BASH"
   # `read`, not `$(cat)`: the shim runs once per git call the swept gates
   # make, and a command substitution forks twice each time. No `|| c=0` --
   # the counter has no trailing newline, so read assigns and *then* returns

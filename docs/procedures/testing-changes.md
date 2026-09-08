@@ -218,8 +218,12 @@ of operations — chronology, not evidence:
   and recorded as such rather than kept under it by dropping cases. This
   is what rung 3 looks like for a change with no closure to build. Read
   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
-  before adding cases, and run `scripts/gate-mutants` after. Run from
-  `verify-ladder` only — no git hook or CI step runs it yet.
+  before adding cases, and run `scripts/gate-mutants` after. Runs from
+  `verify-ladder` before every non-trivial commit, and as
+  `checks.gate-tests` under `nix flake check` — on any machine, in any CI,
+  with the enforcement in the flake rather than in a workflow file. Both,
+  deliberately: `verify-ladder` passes `--no-build`, which does not build
+  checks, so the check alone would never run before a commit.
 - **`scripts/gate-mutants`** — the measure of whether `gate-tests` works,
   because the suite counting its own assertions does not: 102 of them
   passed in the same session in which six mutations, each restoring a
@@ -234,9 +238,10 @@ of operations — chronology, not evidence:
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
   N× the suite — 39 entries, about 7s across 16 jobs — so it is not in
-  `verify-ladder`'s pre-commit path; run it by hand when you touch a gate
-  script or add a case. Where it belongs server-side is open as
-  2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D2.
+  `verify-ladder`'s pre-commit path. It is the slow tier, and it runs as
+  `checks.gate-mutants` under `nix flake check`; run it by hand
+  (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)
+  when you touch a gate script or add a case.
 - **`plan-move ... done` / `plan-freeze`** — refuse to close a plan
   whose `## State` declares no verification rung (see "Declaring the
   rung" above).

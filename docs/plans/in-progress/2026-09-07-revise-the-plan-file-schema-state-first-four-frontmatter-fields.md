@@ -172,6 +172,54 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-08 (after the checks.* wiring)
+
+**`#D2` is built.** `checks.gate-tests` and `checks.gate-mutants` both exist,
+through one shared `tests/gate-script-check.nix`, and both build green:
+110/0/3 and 39 caught / 0 escaped, inside the sandbox. The gates are now
+enforced by the flake rather than by an agent remembering to run them, on
+any machine and in any CI, with no GitHub Actions file involved.
+
+They live in a new `modules/flake/gate-checks.nix`, not in
+`modules/flake/checks.nix` as `#D2` assumed. That file's header says its
+checks boot real VMs to catch what only breaks at runtime, and these boot
+nothing — they run the gate scripts against their own fixtures. Splitting
+them also gives each file one `checks` key instead of a repeated one, which
+is what `statix` reports on the two lines a single file would have added.
+The alternative was restructuring `checks.nix`'s eight existing entries into
+one attrset purely to satisfy that lint, which is the trade this repo has
+already decided against.
+
+**The implementation note attached to `#D2` was wrong, and following it
+would have removed a gate** (`#F46`). It said to drop `verify-ladder`'s
+direct `gate-tests` call "or the harness runs twice per pass".
+`verify-ladder` runs `nix flake check --no-build`, and nix documents
+`--no-build` as "Do not build checks" — it evaluates them and stops. So the
+direct call is the only thing that runs the suite before a commit, and it
+stays. The decision itself stands: `checks.*` beat a workflow file.
+
+**The split is not the one `#G8` proposed, and `#G11` is why.** The sabotage
+sweeps stay in the fast tier: they cost 0.46s of a 24s ladder and they are
+the part that finds real defects. The real boundary was already there —
+`gate-tests` at 1.2s on every pass, `gate-mutants` at ~40x that — and the
+slow side now has a home. The one-second budget is no longer defended, and
+says so.
+
+**Running the suite in a sandbox found a defect the suite could not find at
+home** (`#F45`). The sabotage shim wrote its own `#!/usr/bin/env bash` at
+run time, so `patchShebangs` never saw it and the sandbox has no
+`/usr/bin/env`; the shim failed to exec, every swept gate refused at
+baseline, and all five sweeps went red. They went red rather than green
+only because of the baseline check `#F3` on
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+added. The shim now uses `$BASH`.
+
+**Next.** Extend the sabotage sweep to `subagent-stamp`,
+`plan-freeze`/`plan-move` and `.githooks/*` — nothing blocks it now. Then
+the contract step for batch 1, and batches 2 onward of the G-to-F move.
+`plan-gate` still refuses PR #69 on the `security` and `docs-updater`
+stamps, and that is still the user's call.
+
 ### Pick-up point, 2026-09-08 (after batch 1 of the G-to-F migration)
 
 **Batch 1 is expanded and its citations are migrated.**
@@ -619,12 +667,12 @@ Also done 2026-09-08:
       `modules/flake/checks.nix`, not a GitHub Actions step. This also
       settles where `gate-mutants` runs (`#G13`)
 
-Still open:
+- [x] built the `checks.*` entries `#D2` chose, and split the fast tier
+      from the slow one (`#G8`). `checks.gate-tests` and
+      `checks.gate-mutants`, both via `tests/gate-script-check.nix`.
+      `verify-ladder`'s direct call stays, and `#F46` is why
 
-- [ ] build the `checks.*` entry `#D2` chose, and split the fast tier
-      from the slow one (`#G8`). One change, because the check needs
-      `git` in its inputs and `verify-ladder`'s direct `gate-tests` call
-      must go in the same commit, or the harness runs twice per pass
+Still open:
 - [ ] extend the sabotage sweep to `subagent-stamp`,
       `plan-freeze`/`plan-move` and `.githooks/*`. No longer blocked by a
       decision; it waits on the split above, because four more swept
@@ -877,6 +925,16 @@ largest block at 42%, but 58% of the runtime is outside them, so splitting
 them out lands at ~0.60s rather than anywhere near zero. More importantly
 `#G11` measures what the budget is actually being defended against:
 `gate-tests` is 4% of `verify-ladder`, and `nix flake check` is 90%.
+
+**Settled 2026-09-08.** The split landed, and it is not the one this item
+proposed. The sabotage sweeps stay in the fast tier: `#G11` prices them at
+0.46s of a 24s ladder, and they are the part that finds real defects, so
+moving them out buys 2% of the ladder for the loss of the only sweep that
+runs before a commit. The real fast/slow boundary was already there --
+`scripts/gate-tests` at 1.2s every pass, `scripts/gate-mutants` at ~40x
+that -- and `#D2`'s answer gave the slow side a home as
+`checks.gate-mutants`. The one-second budget is not defended any more, and
+is recorded as knowingly exceeded rather than met by dropping cases.
 
 ### G9 - `nix flake check` fails on a garbage-collected derivation, and the error names the wrong culprit
 
@@ -2626,3 +2684,66 @@ that claims nothing can never be counted as a catch
 
 **FIXED 2026-09-08:** occurrence numbered, and the hazard noted in the
 catalogue beside the entry
+
+### F45 — the sabotage shim's shebang is written at runtime, so the suite cannot run anywhere without `/usr/bin/env`
+
+- **File:** `scripts/gate-tests` (the `fakebin/git` shim)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — the first build of `checks.gate-tests`
+  reported 105 passed, 5 failed, and the five were exactly the sabotage
+  sweeps
+- **Axis:** needed-used
+- **Reachability:** any environment without `/usr/bin/env`, which is every
+  Nix build sandbox — so it blocked the very thing `#D2` decided to build.
+- **Rule:** n/a — new-rule candidate: a file a test *generates* is not
+  covered by whatever rewrites the shebangs of files the repo checks in.
+- **Finding:** the shim is written with
+  `printf '#!/usr/bin/env bash\n'` at run time. `patchShebangs` rewrites
+  checked-in scripts before the suite starts and cannot see a file that does
+  not exist yet, and the sandbox provides `/bin/sh` but not `/usr/bin/env`.
+  The shim therefore failed to exec on every git call, each swept gate
+  refused with nothing sabotaged, and all five sweeps reported
+  `the gate already refuses with nothing sabotaged; the sweep would prove
+  nothing`. That message is the `#F3` baseline check on
+  2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+  doing its job: without it the sweeps would have reported `ok` five times
+  over an instrument that never intercepted anything, which is `#F6` on that
+  same plan exactly.
+- **Fix risk:** low. The shim now takes `$BASH`, the absolute path of the
+  interpreter already running the suite, which is defined in every bash and
+  needs no external resolution.
+
+**FIXED 2026-09-08:** `printf '#!%s\n' "$BASH"`. `checks.gate-tests` builds
+green at 110/0/3 in the sandbox, and the suite is unchanged outside it
+
+### F46 — `#D2`'s chosen option says to drop `verify-ladder`'s direct `gate-tests` call, which would have left nothing running the suite before a commit
+
+- **File:** this plan's `#D2` — its first option, and the `ANSWERED` note
+  restating it — and `docs/skills/workflow/scripts/verify-ladder`
+- **Severity:** MEDIUM — it would have removed a gate while reading as
+  wiring one up
+- **Confidence:** CONFIRMED — `nix flake check --help` documents
+  `--no-build` as "Do not build checks", and `verify-ladder` passes it
+- **Axis:** needed-used
+- **Reachability:** whoever implemented `#D2` as written, which was the next
+  session's stated task.
+- **Rule:** n/a.
+- **Finding:** both `#D2`'s option text and `#G11`'s argument for it rest on
+  "it runs inside `nix flake check`, which `verify-ladder` already runs
+  last, so the tier keeps running locally on every pass". `verify-ladder`
+  runs `nix flake check --no-build`, which evaluates checks and does not
+  build them. So a `checks.*` entry runs in CI and on a full `nix flake
+  check`, and never before a commit. Dropping the direct call "or the
+  harness runs twice per pass" would have traded one run for zero — the
+  "nothing runs them at all" outcome `#G8` names as strictly worse than
+  being over budget. The decision itself is unaffected: `checks.*` over a
+  GitHub Actions step was the right call and is what landed. Only the
+  implementation note attached to it was wrong.
+- **Fix risk:** low, and it is the cheaper direction: keep the direct call
+  and add the checks. The cost is one extra 1.2s run in the rare case
+  someone runs a full `nix flake check` in the same session as
+  `verify-ladder`.
+
+**FIXED 2026-09-08:** `verify-ladder` keeps its direct call, with the
+`--no-build` reason recorded beside it; `checks.gate-tests` and
+`checks.gate-mutants` added. Both build green

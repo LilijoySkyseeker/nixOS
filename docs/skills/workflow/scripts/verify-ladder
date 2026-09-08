@@ -48,9 +48,15 @@ fi
 echo "== gate-tests =="
 # The gates' own failure-mode tests, run unconditionally for the same
 # reason plan-citations is: a gate breaks from the *library* side, so the
-# edit that breaks it need not touch the script being tested. Under a
-# second, no network, scratch repos under TMPDIR.
+# edit that breaks it need not touch the script being tested. ~1.2s, no
+# network, scratch repos under TMPDIR.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+#
+# Called directly even though `checks.gate-tests` now runs the same suite.
+# That is not a double run: the flake-check step below passes --no-build,
+# which nix documents as "Do not build checks" -- it evaluates them and
+# stops. Drop this call and nothing runs the suite before a commit.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F46
 if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
   echo "BLOCKED: a gate script no longer fails where it must, or no longer passes an honest sequence. See above." >&2
   fail=1
