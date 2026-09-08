@@ -189,15 +189,21 @@ plan_active_plan_problem() {
 # own `frozen:` field is self-declared: a todo/ plan can assert it and switch
 # off every rule that applies only to editable files
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
-plan_manifest_frozen() {
-  local manifest="$1/$PLAN_CHECKSUMS_RELPATH" rel="$2"
-  [ -f "$manifest" ] || return 1
-  # plan_locate passes a caller-supplied path through as given, so the same
-  # frozen file can arrive spelled `docs/plans/./done/x.md`. Left unnormalised
-  # that misses the manifest and the file is then accused of self-freezing.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F20
-  rel="${rel#./}"
+# plan_normalise_rel <rel> -- collapse leading and embedded ./ segments, so
+# the same file spelled two ways compares equal. Shared, because a reader that
+# normalises and a writer that does not will disagree about which entry they
+# are talking about.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F39
+plan_normalise_rel() {
+  local rel="${1#./}"
   while [ "$rel" != "${rel//\/.\//\/}" ]; do rel="${rel//\/.\//\/}"; done
+  printf '%s' "$rel"
+}
+
+plan_manifest_frozen() {
+  local manifest="$1/$PLAN_CHECKSUMS_RELPATH" rel
+  rel="$(plan_normalise_rel "$2")"
+  [ -f "$manifest" ] || return 1
   # Exact match on the path field, not a substring of the line: `grep -F`
   # matched any entry this path is a suffix of.
   awk -v want="$rel" '
@@ -438,7 +444,8 @@ plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 # plan_manifest_frozen.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
 plan_record_checksum() {
-  local root="$1" rel="$2" sum checksums tmp
+  local root="$1" rel sum checksums tmp
+  rel="$(plan_normalise_rel "$2")"
   sum="$(plan_checksum "$root/$rel")"
   checksums="$root/$PLAN_CHECKSUMS_RELPATH"
   mkdir -p "$(dirname "$checksums")"

@@ -43,7 +43,12 @@ printf '\n**REJECTED %s:** %s\n' "$today" "$reason" >> "$root/$rel"
 
 base="$(basename "$rel")"
 new_rel="docs/plans/rejected/${base}"
-git -C "$root" mv "$rel" "$new_rel"
+# Checked: an unchecked mv left the plan in todo/ already stamped REJECTED
+# while the script went on to freeze and checksum whatever sat at the
+# destination, and still exited 0 saying "rejected and frozen".
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F36
+git -C "$root" mv "$rel" "$new_rel" ||
+  plan_die "cannot move $rel to $new_rel -- the REJECTED marker has been written but nothing else was done; re-run once the move can succeed."
 plan_set_field "$root/$new_rel" status rejected
 
 plan_do_freeze "$root" "$new_rel"

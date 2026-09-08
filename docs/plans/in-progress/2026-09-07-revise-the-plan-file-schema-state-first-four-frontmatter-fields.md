@@ -88,13 +88,13 @@ than as fixes:
   reference list, and four reviewers read that helper without seeing it.
   It surfaced only on running the thing with more than one value.
 
-`gate-tests` grew from 82 assertions to **98**, covering `plan-lint`, the
+`gate-tests` grew from 82 assertions to **102**, covering `plan-lint`, the
 active-plan marker, both frontmatter readers, the bare-filename rule,
 `plan-repair`, and the lint gate on both doors to freeze; each new case was
 observed failing under the mutation that reintroduces its defect. Measured
-2026-09-08: **1.15s**, over the one-second budget again — the two
-`plan-reject` cases cost 0.18s between them, because that script does a
-`git mv`, a `git add` and a `plan-lint` spawn. See `#G8`, and `#G11` for
+2026-09-08: **1.26s**, over the one-second budget — the `plan-reject`
+cases cost 0.18s between them, and the third `security` pass added six more
+that invoke real gates. See `#G8`, and `#G11` for
 what the budget is worth against `verify-ladder`'s 24s.
 
 The `plan-reject` half-state guard (`#F31`) took **three attempts, and the
@@ -131,6 +131,34 @@ returning, and this is that case. Every one of the five fixes was confirmed
 by mutation instead, which is the evidence a re-read does not produce.
 **That is the user's call, not the agent's** — the PR stays a draft until
 it is made.
+
+**The third `security` pass ran, and it was the right call.** `#D1` asked
+for it rather than a sign-off, and it found seven more: three MEDIUM, and
+none of them cosmetic. `plan-freeze` was still deciding "already frozen"
+from the file's own field, so flipping that field back and re-running would
+have rewritten the recorded checksum to a tampered hash (`#F34`).
+`plan-reject`'s `git mv` was unchecked, so a failed move left the plan
+stamped rejected in `todo/` while the script froze and checksummed whatever
+sat at the destination — and exited 0 (`#F36`). And `plan-repair` could
+launder any unrelated working-tree edit, because it never checked the file
+against its recorded checksum before re-blessing it (`#F40`), which made the
+documented claim that it "cannot edit a word of anyone's text" false.
+
+**`#F35` is the one to read.** Six mutations, each restoring a defect this
+branch had just fixed, all passed the harness 98/98 — including `#F23`'s
+own. `plan-repair` had three cases and no positive control at all, so making
+it a no-op passed. The first replacement control asserted the section
+existed and the checksum verified; that still passed with the insertion
+point moved to another heading. It only became real once it asserted the
+section lands *first*. Every one of the five is now caught, each observed
+failing under the mutation it names.
+
+That is the tenth through fifteenth instance of the shape this plan has been
+tracking, and the pattern in the last three is specific enough to name: a
+test that sets up a fixture is only as strong as the fixture's ability to
+reach the failure. Three separate guards passed because a directory was
+missing, a file was untracked, or a probe already satisfied the check by
+another route — not because the code was right.
 
 Not started: the G-to-F reclassification. Its design is settled in
 `#G4`, its first batch is chosen (the file `#D4` names, 42 `G` items),
@@ -1653,3 +1681,361 @@ _security finished 2026-09-07T23:27:30Z (code 832e3b086c764756) -- see Findings 
 **FIXED 2026-09-08:** SKILL.md and reference.md now say plan-repair adds ## State specifically, hardcoded rather than an argument
 
 _docs-updater finished 2026-09-08T19:05:54Z (code c4bab0aafd59760a) -- see Findings above._
+
+### F34 — `plan-freeze`'s already-frozen guard reads the self-declared field, so a frozen plan can be edited and re-checksummed; only one untested `plan-lint` line stops it
+
+- **File:** `docs/skills/plan/scripts/plan-freeze:20`
+  (`plan_is_frozen "$root/$rel" && plan_die`), against
+  `docs/skills/plan/scripts/lib.sh:192-207` (`plan_manifest_frozen`) and
+  `docs/skills/plan/scripts/plan-lint:55-63`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced end to end in a throwaway clone)
+- **Axis:** hardening
+- **Reachability:** any principal that can write the checkout — a
+  contributor, or a Claude Code session, since `plan/SKILL.md`'s
+  `allowed-tools` pre-approves `Bash(${CLAUDE_SKILL_DIR}/scripts/plan-freeze *)`
+  with no further prompt. Path: open a `docs/plans/done/*.md`, flip
+  `frozen: true` to `frozen: false` in the frontmatter (an ordinary file
+  edit), change any body text, run `plan-freeze <file>`. Line 20's guard
+  is `plan_is_frozen`, which reads the *field* — the field the edit just
+  cleared — so it does not fire, and `plan_do_freeze` rewrites the
+  `docs/plans/.checksums` entry to the tampered content.
+  `.githooks/pre-commit` then compares the tampered file against the
+  rewritten entry and passes.
+- **Rule:** n/a (this repo's own freeze contract, `docs/skills/plan/reference.md`,
+  "The mutable corpus is migrated ...")
+- **Finding:** `#F11` moved `plan-lint` from the field to the manifest
+  because "the field is self-declared". `plan-freeze:20` was not moved
+  with it and still asks the file about itself. What actually blocks the
+  laundering today is a *side effect* of this branch's new lint gate:
+  `plan-lint:57-58` reports "frontmatter says frozen 'false' but
+  docs/plans/.checksums records this file as frozen", `plan-freeze:43`
+  now refuses on any lint failure, and the freeze is declined. Verified:
+  with the branch as it stands, the attempt above fails with that exact
+  message and `pre-commit` still reports `BLOCKED`. But that is one
+  `report` line carrying the whole contract, and nothing tests it —
+  replacing `plan-lint:57-58` with `:` leaves `scripts/gate-tests` at
+  **98 passed, 0 failed**, and the same laundering attempt then succeeds:
+  `plan-freeze` exits 0, the manifest entry is rewritten to the tampered
+  hash, and `.githooks/pre-commit` exits 0 with zero `BLOCKED` lines.
+  These plan files are where the 2026-08-26 fleet audit's findings and
+  every subsequent security review are recorded; the manifest is the only
+  evidence they have not been rewritten after the fact.
+- **Fix risk:** moving line 20 to `plan_manifest_frozen` changes
+  `plan-freeze`'s behaviour for a plan whose manifest entry exists but
+  whose field is false — today that is a refusal via lint, after the fix
+  it is a refusal via the already-frozen guard, so the message changes
+  and any test matching "is malformed" for that case would need
+  rewording. `plan-move ... done` `exec`s `plan-freeze` on a file it has
+  just created in `done/`, which has no manifest entry, so the happy path
+  is unaffected. Needs a gate-tests case that asserts the *enforcement*
+  (attempt the flip-edit-refreeze and require the manifest entry
+  unchanged), not the warning — the same distinction `#F18` drew.
+
+
+**FIXED 2026-09-08:** plan-freeze's already-frozen guard reads the checksum manifest instead of the file's self-declared frozen field, so flipping that field back and re-running cannot rewrite the recorded hash to a tampered one. Guarded in gate-tests by a probe that is the tamper itself -- recorded in the manifest with frozen: false and otherwise valid -- because a probe still saying frozen: true is refused by both guards and distinguishes nothing
+
+### F35 — six mutations that each restore a defect this branch fixed still pass `scripts/gate-tests` 98/98
+
+- **File:** `scripts/gate-tests:523-593` (the new `plan-repair` /
+  `plan-freeze` / `plan-reject` section) and `:609-616` (the new
+  path-form case)
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (each mutation applied to a throwaway clone,
+  `gate-tests` re-run, behaviour change confirmed separately)
+- **Axis:** needed-used
+- **Reachability:** the next agent or human to touch these scripts. The
+  harness is `verify-ladder`'s step-4 hard gate, so a green run is what
+  the workflow treats as "the gates still refuse what they must". Six
+  ways to reintroduce a fixed defect are invisible to it.
+- **Rule:** n/a — but it is the defect class `#G2` on
+  2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md
+  and `#F18`/`#F21` in this file already named, now at fifteen instances.
+- **Finding:** enumerated, each verified to change real behaviour:
+  1. **`#F23`'s fix is unguarded.** Putting `continue` back into
+     `plan-citations`' `PATHFORM` arm (line 178) — the exact defect
+     `#F23` records — passes 98/98. Demonstrated live: with a path-form
+     citation to a nonexistent plan inside a frozen `done/` file, HEAD
+     reports `no such plan file under docs/plans/*/` and exits 1, the
+     mutant prints `plan-citations: OK (379 citations resolve; ...; 2
+     path-form in frozen plans)` and exits 0. The new case
+     ("plan-citations refuses a plan cited by path") uses a *non-frozen*
+     file citing an *existing* plan, so it exercises neither the frozen
+     exemption nor the still-resolves property — the two halves `#F23`
+     is about.
+  2. **`plan-repair` has no positive control at all.** Both its cases are
+     `expect_fail`. Making its awk print the file unchanged while still
+     exiting 0 passes 98/98: the harness cannot tell `plan-repair` from a
+     no-op. `gate-tests`' own header says why this matters ("plus a
+     positive control, because a gate nothing can satisfy is the other
+     half of the same defect").
+  3. **The insertion point is unguarded.** Changing `/^# /` to
+     `/^## Progress/` (so `## State` lands *after* `## Original plan` and
+     `## Progress`, violating `PLAN_SECTIONS` order) passes 98/98.
+  4. **`plan-repair`'s checksum re-record is unguarded.** Deleting
+     `plan_record_checksum "$root" "$rel"` (plan-repair:53) passes 98/98,
+     and that is the line that keeps the manifest true — without it every
+     repaired plan is permanently un-committable.
+  5. **`#F24`'s exact path match is unguarded.** Reverting
+     `plan_record_checksum`'s awk to the old
+     `grep -vF "  $rel" ... || true` passes 98/98.
+  6. **`#F11`'s enforcement is unguarded** — see `#F34`.
+  For contrast, the mutations that *are* caught: dropping `plan-freeze`'s
+  lint gate, dropping either `plan-repair` refusal, dropping the
+  `PATHFORM` classification, and moving `plan-reject`'s gate back after
+  the `git mv` each produce exactly one FAIL. So the new cases are not
+  worthless — they cover the refusals and nothing else.
+- **Fix risk:** each added case costs runtime on a harness `#G8` already
+  records as over budget at 1.15s (measured 1.25s on this host). Items 1
+  and 2 are cheap (no `git` calls, no sweep); item 6 needs a fixture
+  manifest and must clean it up, since `gate-tests:576` already warns
+  that a leftover `docs/plans/.checksums` makes later cases pass for the
+  wrong reason.
+
+
+**FIXED 2026-09-08:** the five mutations named for plan-repair and F23 are now all caught: a no-op write, a dropped checksum re-record, a moved insertion point, a dropped checksum precondition, and putting continue back in the PATHFORM arm. plan-repair has a positive control that asserts the section lands first, not merely that it exists -- the version asserting presence alone passed with the insertion point moved. F34's guard is covered too. 102 assertions
+
+### F36 — `plan-reject` still leaves a half-state and exits 0 when `git mv` fails; `#F31` fixed the ordering, not the failure
+
+- **File:** `docs/skills/plan/scripts/plan-reject:42-51`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced in a throwaway clone)
+- **Reachability:** anyone running `plan-reject` — a contributor or an
+  agent, `plan-reject *` being pre-approved in `plan/SKILL.md`'s
+  `allowed-tools`. `git mv` fails when the destination already exists (a
+  same-basename plan already in `rejected/`, which `plan_locate` does not
+  catch for a path-form argument), when the source is untracked (a plan
+  file written by hand or by an agent's Write rather than by `plan-new`),
+  or when the index is locked by a concurrent git.
+- **Axis:** hardening
+- **Rule:** n/a — but it is `docs/hardening.md` rule 11's shape ("a guard
+  that declines to act must be watched by something that measures the
+  outcome, not the attempt") applied to a script instead of a unit.
+- **Finding:** the script is `set -u` with no `set -e` and no `||` on
+  line 46, so a failed `git mv` does not stop it. Reproduced with a
+  placeholder file pre-placed at the destination: `git mv` printed
+  `fatal: destination exists`, and `plan-reject` then went on to
+  (a) leave the real plan in `todo/` carrying a
+  `**REJECTED 2026-09-08:** abandoned` marker appended at line 42
+  *before* the move, still `status: todo`, still `frozen: false`;
+  (b) run `plan_do_freeze` against the unrelated placeholder, recording
+  *its* checksum in `docs/plans/.checksums` — so a file no gate ever saw
+  is now frozen as far as `plan_manifest_frozen` and
+  `.githooks/pre-commit` are concerned; (c) repoint
+  `.claude/.active-plan` at that placeholder; and (d) **exit 0**, printing
+  `... rejected and frozen.` and echoing the destination path, so a caller
+  or agent reads it as success. `#F31` moved the lint gate ahead of the
+  marker, which closes the *refusal* path; the *failure* path still
+  produces exactly the half-state `#F31`'s comment says it prevents ("a
+  state no script put it in and none clears"). Note `plan-move:49` has
+  the same unchecked `git mv`, but no prior file mutation, so it fails
+  less destructively.
+- **Fix risk:** adding `|| plan_die` after the `git mv` still leaves the
+  REJECTED marker appended to the source; the marker append wants to move
+  after the successful `git mv` (it is append-only either way), or the
+  whole sequence needs an unwind. Test: reject with the destination
+  occupied, with an untracked source, and the ordinary happy path;
+  `gate-tests`' sabotage sweep does not currently cover `plan-reject` or
+  `plan-freeze` at all, which `#G8` lists as still owed and which is
+  exactly the sweep that would have caught this.
+
+
+**FIXED 2026-09-08:** plan-reject checks its git mv and dies with the state named, instead of freezing and checksumming whatever sat at the destination and exiting 0
+
+### F37 — `plan-repair` writes with an unchecked `cat > "$file"`, then reports success and re-records the checksum even when nothing was written
+
+- **File:** `docs/skills/plan/scripts/plan-repair:46,53-55`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (reproduced: `chmod a-w` on the target)
+- **Axis:** hardening
+- **Reachability:** whoever runs `plan-repair` on a target the process
+  cannot fully write — a read-only file (the 50 frozen plans are exactly
+  the files most likely to be chmod-protected by a cautious operator), a
+  full filesystem, or an interrupted write.
+- **Rule:** n/a
+- **Finding:** every other writer in this library renames a tempfile into
+  place (`plan_set_field:120`, `plan_append_under_heading:294` both use
+  `mv "$tmp" "$file"`). `plan-repair` alone truncates the target with a
+  redirect and streams into it, and does not check the result. With the
+  target read-only, the run prints
+  `plan-repair: line 46: ...: Permission denied`, then
+  `... added '## State' and re-recorded its checksum.`, echoes the path,
+  and **exits 0** — having added nothing. `plan_record_checksum` runs
+  regardless, so on a partial write (ENOSPC, SIGINT during `cat`) the
+  manifest is updated to bless whatever truncated content is on disk and
+  `git add`s it, which is the one outcome the freeze manifest exists to
+  make impossible. `mv "$tmp" "$file"` would be atomic and would fail
+  loudly; the `trap 'rm -f "$tmp"' EXIT` already in place makes the
+  change free.
+- **Fix risk:** none functional — `mv` across the same filesystem is a
+  rename; `mktemp` uses `$TMPDIR`, which may be a different filesystem
+  from the repo, in which case `mv` falls back to a copy and can still
+  fail partway, so the status check is the load-bearing part, not the
+  `mv`. Add a positive `gate-tests` case (see `#F35` item 2) that would
+  notice.
+
+
+**FIXED 2026-09-08:** plan-repair writes with mv, not cat, so a failed write is a failure rather than a success message over an unchanged file
+
+### F38 — `plan-repair`'s title matcher is fence-blind, so it can insert `## State` inside a code fence, re-bless the checksum, and do it again on the next run
+
+- **File:** `docs/skills/plan/scripts/plan-repair:35-45`, against
+  `docs/skills/plan/scripts/lib.sh:160-171` (`plan_headings`, used two
+  lines earlier at plan-repair:27)
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (reproduced in a throwaway clone)
+- **Axis:** hardening
+- **Reachability:** an operator running `plan-repair` on a frozen plan
+  whose first `^# `-anchored line is not its title — a shell comment at
+  column 0 inside a fenced block, in a plan with no H1. Not reachable
+  against today's corpus: all 50 frozen plans have an H1 immediately
+  after the frontmatter (verified), and all 27 repairs landed exactly two
+  lines below it (verified). This is about the script that stays in the
+  repo, not about the 27.
+- **Rule:** n/a — but it is the same defect class as `#F13` in this file,
+  which is why the sibling reader was made fence-aware.
+- **Finding:** line 27 asks `plan_headings` — deliberately fence-aware,
+  per `#F13` — whether `## State` already exists. Line 36 then finds the
+  insertion point with a bare `/^# /`, which is fence-blind *and*
+  frontmatter-blind (it starts at line 1, so a `#` comment in the
+  frontmatter would match too). Reproduced: on a frozen plan whose body
+  opens with a fenced `sh` block whose first line is the shell comment
+  `# a shell comment, not a title`, and no H1, `plan-repair` exits 0, splices the heading and its note into
+  the middle of the code block, and re-records the checksum so
+  `pre-commit` accepts the corruption. Because `plan_headings` correctly
+  refuses to see a heading inside a fence, the "already has a section"
+  refusal at line 27 does not fire on a re-run: running it a second time
+  produced two `## State` headings and two notes, unbounded on repeat.
+  The inserted note's own text — "no word of the original was changed" —
+  and `SKILL.md`'s "it can only ever add a heading nobody wrote" are both
+  false in this case; it changed the meaning of a code block.
+- **Fix risk:** making the matcher fence-aware (reuse `plan_headings`'
+  fence state machine, or reject any `# ` line before the frontmatter's
+  closing `---`) would refuse a plan whose title is genuinely absent —
+  which is already the intended behaviour, since line 45 exists to say
+  so. Test against all 50 frozen plans to confirm the refusal set does
+  not grow.
+
+
+**FIXED 2026-09-08:** plan-repair finds its insertion point with the same fence-and-frontmatter-aware scan its guard already used, so the section cannot be spliced into a code block and then checksummed over
+
+### F39 — `plan_record_checksum` does not normalise the path `plan_manifest_frozen` normalises, so one `./` in the argument writes a duplicate manifest entry and permanently blocks the file
+
+- **File:** `docs/skills/plan/scripts/lib.sh:440-455` vs `:192-207`;
+  `docs/skills/plan/scripts/plan-repair:21`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (reproduced in a throwaway clone)
+- **Axis:** needed-used
+- **Reachability:** anyone invoking `plan-repair`, `plan-freeze` or
+  `plan-reject` with a path containing a `.` segment — the exact spelling
+  `#F20` names as arriving in practice
+  (`docs/plans/./done/x.md`), which `plan_locate` passes through
+  unchanged because its `case` glob's `*` matches `/`.
+- **Rule:** n/a
+- **Finding:** `#F20` fixed the *reader*: `plan_manifest_frozen` strips
+  `./` and collapses `/./` before matching. `#F24` extracted the *writer*
+  and its comment claims "the path field is compared exactly, as in
+  `plan_manifest_frozen`" — but it compares against the raw `$rel` with
+  no normalisation. So with a `./` argument the reader finds the
+  canonical entry (the file is frozen, the repair proceeds) while the
+  writer fails to match it and appends a second line. Reproduced: after
+  one `plan-repair "docs/plans/./done/<x>.md"` the manifest holds both
+  `docs/plans/./done/<x>.md` (new hash) and `docs/plans/done/<x>.md`
+  (stale hash). `.githooks/pre-commit:29` matches `$2==f` with git's
+  canonical path, so it reads the stale entry and prints
+  `BLOCKED: ... is frozen`, permanently — and `plan-repair` now refuses a
+  second run because the section exists, so the only remedy is the
+  hand-edit of `docs/plans/.checksums` that having a single writer was
+  supposed to remove. Separately, `plan_record_checksum` leaves both its
+  `awk ... > "$tmp"` and its `sort -k2 "$tmp" > "$checksums"` unchecked:
+  a failure of either truncates or thins the freeze manifest, and a
+  thinned manifest fails *open* — `plan_manifest_frozen` returns false
+  and every affected plan silently stops being frozen.
+- **Fix risk:** the normalisation is three lines already written at
+  `lib.sh:199-200`; lift them into a `plan_norm_rel` both functions call,
+  or normalise once in `plan_locate` so every caller gets it. Normalising
+  in `plan_locate` changes what `plan-lint`/`plan-gate` echo back, which
+  a test matching the argument verbatim would notice.
+
+
+**FIXED 2026-09-08:** plan_normalise_rel is shared by plan_manifest_frozen and plan_record_checksum, so the reader and the writer agree on which manifest entry a path names
+
+### F40 — `plan-repair` never checks that the file still matches its recorded checksum, so it launders any other edit sitting in the working tree
+
+- **File:** `docs/skills/plan/scripts/plan-repair:21-53`;
+  `docs/skills/plan/reference.md`, "The one exception, and its limits";
+  `docs/skills/plan/SKILL.md`, the `plan-repair` row
+- **Severity:** INFO
+- **Confidence:** CONFIRMED (observed as a side effect of the `#F37`
+  reproduction: a stripped `## State` section was re-blessed into the
+  manifest even though the repair write itself had failed)
+- **Axis:** hardening
+- **Reachability:** not reachable against today's corpus — all 50 frozen
+  plans now have `## State`, so `plan-repair` refuses every one of them
+  (verified by running it against all 50: 50 refusals, 0 repairs). It
+  becomes reachable the moment any frozen plan lacks the section again,
+  which `#F33`/`#G6` note is what a future `PLAN_SECTIONS` addition
+  produces.
+- **Rule:** n/a
+- **Finding:** both docs state the refusals as making the script safe —
+  "it refuses a plan that is not frozen and refuses one that already has
+  the section, which means it can only ever add a heading nobody wrote",
+  "it cannot edit a word of anyone's text". Neither refusal looks at
+  content. `plan-repair` reads the file, inserts, and re-records — so any
+  *other* modification present in the working tree at that moment is
+  re-blessed into the manifest along with the repair, and
+  `.githooks/pre-commit` will then accept it. The claim that should be
+  made is narrower: it can only add a heading, *to the content that is
+  there when it runs*. Comparing `plan_checksum "$root/$rel"` against the
+  manifest entry before writing would make the stated claim true, and
+  costs one `sha256sum` on a script that runs 27 times in its life.
+- **Fix risk:** the pre-check would refuse a plan whose recorded checksum
+  is already stale for an unrelated reason (e.g. after `#F39` has
+  happened), turning one broken state into a refusal — which is the right
+  direction but needs a message that says which of the two problems it
+  is.
+
+**Checked and clean (third `security` pass, `#D1`, over `39ac74f..10469cf`).**
+Verified positively rather than merely read: the 27 `docs/plans/done/*.md`
+repairs really are +8/-0 each, byte-identical in the seven inserted lines,
+and every one landed with `## State` exactly two lines below an `# ` title
+that is itself two lines below the frontmatter's closing `---` — no plan
+was damaged and no existing section moved relative to another
+(mechanically checked across all 27). `docs/plans/.checksums` changed by
+exactly 27 modified lines and no additions or deletions. `superseded_by`
+was removed from exactly 52 files and nothing else; no script, hook,
+workflow or doc still reads, writes or requires it, and
+`PLAN_SCHEMA_FIELDS` derives from `PLAN_REF_FIELDS` so `plan-lint` and
+`plan-new` could not half-land the removal. `plan-freeze`'s new lint gate
+sits after the rung check and before `plan_do_freeze`, and the file is
+correctly still judged as editable at that point because its manifest
+entry does not yet exist. `plan-reject`'s gate genuinely runs before the
+marker append, the `git mv` and the status change — a refused rejection
+leaves the plan byte-identical in `todo/` (confirmed against a live
+malformed plan; 17 of 52 non-frozen plans fail lint today, matching
+`#G10`'s count). `plan-citations` at HEAD resolves 379 citations with 3
+ignored regions and 2 muted path-forms, and a path-form citation to a
+missing plan is still reported from both a frozen and a non-frozen file.
+The `PATHFORM` prefix test matches the leading-`./`, markdown-link and
+`../` spellings; its `[a-z-]+` folder class covers every folder that
+exists today and the planned `superseded/`. `plan_record_checksum`'s awk
+handles a path containing two consecutive spaces correctly (the first
+double-space is the separator and `substr(i+2)` takes the rest of the
+line), and prefix/suffix path relationships between entries do not
+collide under the exact comparison. `plan_do_freeze`'s behaviour is
+unchanged for `plan-freeze`, `plan-move ... done` and `plan-reject`: same
+three steps in the same order, `plan_mark_touched` still last.
+`scripts/gate-tests` is 98 passed / 0 failed / 3 known residues, 1.25s on
+this host. Nine mutations were applied and re-run: four are caught
+(`#F35` lists them), six are not.
+
+**Hardening axis: empty, and stated plainly.** The diff contains no
+`.nix` file, no host or module directory, no systemd unit, no firewall
+rule, no `.sops.yaml` and no `secrets/*` — verified by pathspec over the
+whole range. Nothing under `docs/hardening.md`'s eleven standing rules is
+reachable from this change, and no secret was decrypted or read. The pass
+was spent on gate correctness, per the brief.
+
+_security finished 2026-09-08T19:25:24Z (code 94fdc82c1dc7e8e7) -- see Findings above._
+
+**FIXED 2026-09-08:** plan-repair refuses unless the file still matches its recorded checksum, so it cannot certify an edit it did not make -- which is what makes the docs' 'it cannot edit a word of anyone's text' true rather than merely intended

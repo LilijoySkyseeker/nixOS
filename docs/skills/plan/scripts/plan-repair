@@ -23,6 +23,17 @@ plan_manifest_frozen "$root" "$rel" ||
 
 # The one repair this script knows how to make. Widening the list means
 # widening what a frozen file can become, so it is deliberately explicit.
+# The file must still be what the manifest says it is. Without this the
+# script re-blesses any other working-tree edit that happens to be sitting in
+# the file, which makes the "it cannot edit a word of anyone's text" claim
+# false: it would not edit them, it would certify them.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F40
+recorded="$(awk -v want="$rel" '
+  { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) { print substr($0, 1, i - 1); exit } }
+' "$root/$PLAN_CHECKSUMS_RELPATH")"
+[ "$recorded" = "$(plan_checksum "$file")" ] ||
+  plan_die "$rel does not match its recorded checksum. Repairing would certify a change this script did not make; resolve the difference first."
+
 missing="## State"
 plan_headings "$file" | cut -f2- | grep -qxF "$missing" &&
   plan_die "$rel already has a '$missing' section. This script only ever adds a missing one."
@@ -32,18 +43,38 @@ plan_headings "$file" | cut -f2- | grep -qxF "$missing" &&
 # any other.
 tmp="$(mktemp)" || plan_die "cannot create a temporary file"
 trap 'rm -f "$tmp"' EXIT
-awk -v today="$(plan_today)" -v sec="$missing" '
-  !done_ins && /^# / { print; print ""; print sec; print "";
+# The insertion point is found the same fence-aware way the guard above reads
+# headings. A bare /^# / matches inside a fenced block and inside frontmatter,
+# so the section could be spliced into a code example and the checksum
+# re-blessed over it.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F38
+title_line="$(awk '
+  NR==1 && $0=="---" { infm=1; next }
+  infm && $0=="---" { infm=0; next }
+  infm { next }
+  match($0, /^[ \t]*(`{3,}|~{3,})/) {
+    m = substr($0, RSTART, RLENGTH); sub(/^[ \t]+/, "", m)
+    if (!fence) { fence = 1; open = m }
+    else if (substr(m, 1, 1) == substr(open, 1, 1) && length(m) >= length(open)) fence = 0
+    next
+  }
+  !fence && /^# / { print FNR; exit }
+' "$file")"
+[ -n "$title_line" ] || plan_die "$rel has no '# ' title outside a fenced block to insert beneath."
+awk -v today="$(plan_today)" -v sec="$missing" -v at="$title_line" '
+  FNR == at { print; print ""; print sec; print "";
     print "**Section added " today " by `plan-repair`.** This plan was frozen";
     print "before `## State` existed, so it never had one. Only the heading and";
     print "this note were added; no word of the original was changed, and the";
     print "status was not reconstructed -- read `## Progress` and the sections";
     print "below for what happened.";
-    done_ins = 1; next }
+    next }
   { print }
-  END { exit(done_ins ? 0 : 1) }
-' "$file" > "$tmp" || plan_die "$rel has no '# ' title to insert beneath."
-cat "$tmp" > "$file"
+' "$file" > "$tmp" || plan_die "cannot rewrite $rel"
+# mv, not `cat >`: a read-only target makes cat fail *after* the script has
+# already decided it succeeded, so it reported the repair and wrote nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F37
+mv "$tmp" "$file" || plan_die "cannot write $rel"
 
 # Re-record the checksum, or the manifest now says this file was tampered
 # with -- which is exactly what .githooks/pre-commit would report. Deliberately

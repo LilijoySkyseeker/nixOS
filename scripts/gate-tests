@@ -541,6 +541,75 @@ expect_fail "plan-repair refuses to touch a section that already exists" "alread
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" \
   "docs/plans/done/$frozen_ok"
 
+# Re-freezing must be refused on the manifest's word, not the file's own
+# frozen: field -- flipping that field back and re-running plan-freeze would
+# otherwise rewrite the recorded checksum to whatever the file now contains.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F34
+# The probe is the tamper itself: recorded in the manifest, but with its own
+# `frozen:` field flipped back to false, and otherwise valid enough that the
+# manifest guard is the only thing that can refuse it. Using a file that
+# still says `frozen: true` proves nothing -- both guards refuse that one.
+frozen_tamper="${fixture_date}-frozen-tamper.md"
+{
+  printf -- '---\nslug: frozen-tamper\ncreated: %s\nstatus: done\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# frozen tamper\n\n' "$fixture_date"
+  printf -- '## State\n\nVerified to rung 1 (documentation).\n\n## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$repo/docs/plans/done/$frozen_tamper"
+printf '%s  docs/plans/done/%s\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_tamper" | cut -d' ' -f1)" "$frozen_tamper" \
+  >> "$repo/docs/plans/.checksums"
+expect_fail "plan-freeze refuses a plan the manifest already records" "already frozen" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-freeze" "docs/plans/done/$frozen_tamper"
+rm -f "$repo/docs/plans/done/$frozen_tamper"
+
+# The positive control this section did not have. Without it, making
+# plan-repair a no-op, moving its insertion point, or deleting its checksum
+# re-record all passed -- three of the six mutations #F35 names.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F35
+frozen_gap="${fixture_date}-frozen-gap.md"
+printf -- '---\nslug: frozen-gap\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen gap\n\n## Original plan\n\nx\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/done/$frozen_gap"
+{
+  printf '%s  docs/plans/done/%s\n' \
+    "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_gap" | cut -d' ' -f1)" "$frozen_gap"
+  printf '%s  docs/plans/done/%s\n' \
+    "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_ok" | cut -d' ' -f1)" "$frozen_ok"
+} > "$repo/docs/plans/.checksums"
+# Position, not just presence: an insertion point moved to any other heading
+# still leaves exactly one `## State` and a valid checksum, so a control that
+# only counts the heading passes with the section spliced anywhere.
+if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" "docs/plans/done/$frozen_gap" >/dev/null 2>&1 &&
+   [ "$(grep -cxF '## State' "$repo/docs/plans/done/$frozen_gap")" = 1 ] &&
+   gap_state_line="$(grep -nxF '## State' "$repo/docs/plans/done/$frozen_gap" | head -1 | cut -d: -f1)" &&
+   gap_first_sec="$(grep -nE '^## ' "$repo/docs/plans/done/$frozen_gap" | head -1 | cut -d: -f1)" &&
+   [ "$gap_state_line" = "$gap_first_sec" ] &&
+   ( cd "$repo" && awk '{print $1"  "$2}' docs/plans/.checksums | sha256sum -c --quiet ); then
+  ok "plan-repair adds the missing section and re-records the checksum"
+else
+  bad "plan-repair adds the missing section and re-records the checksum" \
+    "it reported success without adding the section first, or left the manifest stale"
+fi
+# And it must refuse once the file no longer matches what the manifest says,
+# or it certifies an edit it did not make.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F40
+printf 'tampered\n' >> "$repo/docs/plans/done/$frozen_gap"
+expect_fail "plan-repair refuses a frozen file that no longer matches its checksum" "does not match" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" "docs/plans/done/$frozen_gap"
+rm -f "$repo/docs/plans/done/$frozen_gap"
+
+# A frozen file's path-form citation is muted, but the citation itself must
+# still resolve. Putting `continue` back into that arm stops checking whether
+# the cited plan exists at all, in the half of the corpus that can never be
+# repaired.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F23
+printf -- '---\nslug: frozen-cite\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen cite\n\nSee docs/plans/done/%s-gone-forever.md here.\n' \
+  "$fixture_date" "$fixture_date" > "$repo/docs/plans/done/${fixture_date}-frozen-cite.md"
+printf '%s  docs/plans/done/%s-frozen-cite.md\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/${fixture_date}-frozen-cite.md" | cut -d' ' -f1)" "$fixture_date" \
+  >> "$repo/docs/plans/.checksums"
+expect_fail "a muted path-form citation in a frozen plan is still resolved" "no such plan file" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+rm -f "$repo/docs/plans/done/${fixture_date}-frozen-cite.md"
+
 # The root cause: nothing checked a plan at the moment it stopped being
 # fixable. plan-freeze now lints first.
 frozen_bad="${fixture_date}-freeze-me.md"
