@@ -615,13 +615,20 @@ Also done 2026-09-08:
 - [x] a `precondition` verb in `gate-tests`, so a fixture that cannot
       reach the failure its case names fails under its own name
 
+- [x] `#D2` — answered: the slow tier becomes a `checks.*` entry in
+      `modules/flake/checks.nix`, not a GitHub Actions step. This also
+      settles where `gate-mutants` runs (`#G13`)
+
 Still open:
 
-- [ ] `#D2` — where the slow tier of `gate-tests` runs, and now also
-      where `gate-mutants` runs. Blocking: the harness is over budget
-      and cannot be split until this is answered (`#G8`, `#G13`)
+- [ ] build the `checks.*` entry `#D2` chose, and split the fast tier
+      from the slow one (`#G8`). One change, because the check needs
+      `git` in its inputs and `verify-ladder`'s direct `gate-tests` call
+      must go in the same commit, or the harness runs twice per pass
 - [ ] extend the sabotage sweep to `subagent-stamp`,
-      `plan-freeze`/`plan-move` and `.githooks/*` — blocked by `#G8`
+      `plan-freeze`/`plan-move` and `.githooks/*`. No longer blocked by a
+      decision; it waits on the split above, because four more swept
+      gates is what makes the one-second limit teach the bypass (`#G8`)
 
 
 ## Decisions (D)
