@@ -172,6 +172,56 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-08 (after batch 1 of the G-to-F migration)
+
+**Batch 1 is expanded and its citations are migrated.**
+2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md held 42
+catalogue items; they are now **36 `### F<N>` defects and 6 `### G<N>`
+lessons**, with every migrated `G` reduced to a one-line pointer at its
+successor, exactly the shape `#G4` specifies. No item's text was rewritten
+— each body was relocated within the same file, which is what makes the
+move auditable rather than a re-authoring.
+
+**The six that stay `G` are lessons with nothing to drain:** `G13` and
+`G21` are limits already accepted and documented as such, `G20` is a
+property of skill auto-invocation rather than of this repo, and
+`G34`-`G36` are index pointers to plans of their own. The other 36 all
+needed a terminal state, which is the whole test the rule states.
+
+**Nine of the 36 are resolved on arrival — eight FIXED, one MOOT.** Six
+were already recorded as resolved in their own bodies and are now restated
+in the schema `plan-resolve` and `plan-freeze` can actually read; three
+were verified against the code as it stands (`plan-lint`, `gate-tests` and
+`plan-citations` all exist and gate now). Nothing was marked ACCEPTED:
+that needs the user's own sign-off, and no agent may issue it. **27 remain
+open**, which is what that file has always been — a deliberately
+over-inclusive catalogue, not a queue.
+
+**Contract is unblocked for this batch, and that was not expected.** `#G2`
+sets the bound at "24 of 47 live `#G` citations resolve into frozen plans
+and can never migrate", but *this file* had exactly one anchored inbound
+citation — `#G42`, from three files, **all three non-frozen**. All three
+now cite `#F36`, and `plan-citations` reports zero `#G` citations into the
+batch. So the 36 pointers can be deleted whenever the contract step runs;
+the only remaining work is renumbering the six surviving lessons to
+`G1`-`G6`. The bound in `#G2` still holds corpus-wide — it just did not
+bind here.
+
+**Two corrections to what this plan said.** ~~The first batch has 42 `G`
+headings.~~ It has **42 items in 40 headings**: one heading covered `G34,
+G35, G36` together, which is why `plan-lint`'s sequence check reported a
+gap at `G35` and three `Progress` citations resolved to nothing. Split
+into three headings as part of the migration. And ~~25 non-frozen files
+carry `G` headings~~ — it is **26**.
+
+**That file now passes `plan-lint`, and it did not before.** It was one of
+the 18 corpus failures, on three counts: no `## State` (it is one of the
+17 `#G10` names), the `G34`-`G36` sequence gap, and the three unresolvable
+`Progress` citations. All three are closed by this change, so the corpus
+is **17 of 102**. The `## State` it gained declares no verification rung,
+deliberately: the rung is a closing gate, and this plan is a live
+catalogue that is not eligible to close.
+
 ### Pick-up point, 2026-09-08 (after the suite work)
 
 **The suite now has a measure of its own strength, and using it found seven
@@ -531,15 +581,17 @@ Expand, in this order:
       carry the old one — see `#G1`
 - [x] document `kind` and the expand—contract map pattern in the `plan`
       skill's `reference.md`
-- [ ] G-to-F expand for the first batch, the file `#D4` names, with the
+- [x] G-to-F expand for the first batch, the file `#D4` names, with the
       old `### G<N>` left as a resolving pointer
-- [ ] migrate the citations of that batch
+- [x] migrate the citations of that batch
 
 Contract, only once `plan-citations` reports zero unresolved references
 for a batch:
 
 - [ ] drop the pointer headings for migrated batches
-- [ ] remaining batches of the 25 non-frozen files with `G` headings
+- [ ] remaining batches of the 26 non-frozen files with `G` headings,
+      of which batch 1 is now expanded (its pointers are what contract
+      removes)
 
 Decided 2026-09-08 and done in the same session:
 
@@ -612,6 +664,9 @@ less:
 
 
 **DISCUSSED 2026-09-08:** the user wants to depend on GitHub less and asked for the best option, not the quickest; still open, see the three homes above
+
+
+**ANSWERED 2026-09-08:** a checks.* entry in modules/flake/checks.nix -- the user (LilijoySkyseeker) chose 2026-09-08 the option that keeps enforcement in the repo rather than in GitHub Actions. #G11 is why it is affordable: the tier runs inside nix flake check, which verify-ladder already runs last and which is 94% of the ladder, so the slow tier keeps running locally on every pass and the 'nothing runs them at all' risk that blocked the split disappears. Wiring it is a separate change: the check needs git in its inputs, and verify-ladder's direct gate-tests call must be dropped in the same commit or the suite runs twice per pass
 
 ### D3 - does the bare-filename rule move into `plan-citations`?
 

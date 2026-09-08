@@ -28,7 +28,7 @@ one identical tree. The stamp then reads stale, re-running the agent
 re-stamps with the PR's algorithm, and the block is unfixable in-system
 on a non-frozen plan -- the cheapest escape being the `Plan:` trailer
 drop recorded as
-`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G42`,
+`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#F36`,
 which disables the whole gate.
 
 Raised as

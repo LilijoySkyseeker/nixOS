@@ -219,7 +219,7 @@ tests for the scripts that gate every commit.
 
 Four instances. Equally damaging, because the escape is always the same:
 drop the `Plan:` trailer and the whole gate switches off
-(`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G42`).
+(`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#F36`).
 
 - `#F1` — a frozen plan plus a stale fingerprint. `plan-move done`
   freezes the plan, `subagent-stamp` refuses to write to a frozen plan,
