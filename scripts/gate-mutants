@@ -383,6 +383,10 @@ mutant lib/require-not-frozen-trusts-the-field "$LIB" \
 # is defence in depth and a clearer message, not the load-bearing check, so a
 # mutation of it is equivalent and would escape by construction.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+mutant lib/manifest-problem-ignores-uncovered "$LIB" \
+  'mut_subst "  [ -z \"\$uncovered\" ] ||" "  true ||"' \
+  "a frozen plan with no manifest entry is a problem, though the entries left all verify"
+
 mutant lib/manifest-problem-ignores-mismatch "$LIB" \
   'mut_subst "  [ -z \"\$bad\" ] ||" "  true ||"' \
   "a frozen plan that no longer matches its hash is a problem"

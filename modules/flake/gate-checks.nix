@@ -26,8 +26,8 @@ in
       # non-trivial commit -- not a double run, see the note there.
       gate-tests = gateCheck "scripts/gate-tests";
 
-      # The slow tier: ~40x the suite, because it re-runs the whole thing
-      # once per mutation. Never in verify-ladder's pre-commit path.
+      # The slow tier: one whole run of the suite per catalogue entry.
+      # Never in verify-ladder's pre-commit path.
       # 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G13
       gate-mutants = gateCheck "scripts/gate-mutants";
     };

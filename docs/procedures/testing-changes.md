@@ -180,19 +180,22 @@ of operations — chronology, not evidence:
   matches by path prefix, not by file extension.
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
-  before commit rather than at push time. Runs three repo-level gates
+  before commit rather than at push time. Runs four repo-level gates
   first — `docs/skills/plan/scripts/plan-citations` (blocks on any plan
   citation that no longer resolves, and on any plan cited by path rather
   than by bare filename, outside frozen plans; run on every pass, since a
   citation breaks from the target side), `scripts/gate-tests` (the gate
-  scripts' own failure-mode tests, next bullet), and
-  `docs/skills/plan/scripts/plan-lint` on the active plan (blocks on
-  missing or misordered sections, missing frontmatter, a duplicate or
-  non-sequential `D`/`G`/`F` id, or a `Progress` line citing a heading
-  that does not exist — and on a `.claude/.active-plan` marker naming a
-  file that is gone, which is not the same as no marker) — then covers
-  lint and rung 3's mechanical half:
-  `nixfmt --check`, `nix flake check --no-build`, a targeted
+  scripts' own failure-mode tests, next bullet), the freeze manifest
+  (`sha256sum -c` over `docs/plans/.checksums`, the only thing that runs
+  it — an entry that no longer matches, or a manifest emptied outright,
+  blocks; the entries present, not the corpus, so a *dropped* entry still
+  passes), and `docs/skills/plan/scripts/plan-lint` on the active plan
+  (blocks on missing or misordered sections, missing frontmatter, a
+  duplicate or non-sequential `D`/`G`/`F` id, or a `Progress` line citing
+  a heading that does not exist — and on a `.claude/.active-plan` marker
+  naming a file that is gone, which is not the same as no marker) — then
+  covers lint and rung 3's mechanical half: `nixfmt --check`,
+  `nix flake check --no-build`, a targeted
   `nixos-rebuild build --flake .#<host>` for any host whose directory or
   a shared path actually changed, and `statix`/`deadnix` — but
   diff-scoped, so only *newly introduced* issues on changed lines block;
@@ -202,9 +205,10 @@ of operations — chronology, not evidence:
   backstop a commit made outside that skill the way `pre-push` does.
 - **`scripts/gate-tests`** — the failure-mode tests for the gate scripts
   themselves (`plan-gate`, `required-agents`, `plan-citations`,
-  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, and `lib.sh`'s
-  fingerprint, file-listing, rung-declaration, frontmatter, heading and
-  active-plan-marker helpers).
+  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`,
+  `.githooks/pre-commit`, and `lib.sh`'s fingerprint, file-listing,
+  rung-declaration, frontmatter, heading, active-plan-marker and
+  freeze-manifest helpers).
   Three kinds of check: enumerated broken environments, invariants over
   generated plan text (rewrap and re-decorate a `## State`, require the
   verdict not to move), and a sabotage sweep that fails the Nth `git`
@@ -214,7 +218,7 @@ of operations — chronology, not evidence:
   reach a particular failure asserts that it can, under its own name:
   three guards here once passed because `git mv` failed for reasons that
   had nothing to do with the gate. Hermetic, network-free, scratch repos
-  under `$TMPDIR`; 114 assertions, measured 1.59s, knowingly over the
+  under `$TMPDIR`; 121 assertions, measured 1.72s, knowingly over the
   one-second budget and recorded as such rather than kept under it by
   dropping cases. This is what rung 3 looks like for a change with no
   closure to build. Read
@@ -244,7 +248,7 @@ of operations — chronology, not evidence:
   escape), `INERT` (the mutation matched nothing and measured nothing),
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
-  N× the suite — 46 entries, about 10s across 16 jobs — so it is not in
+  N× the suite — 51 entries, about 13s across 16 jobs — so it is not in
   `verify-ladder`'s pre-commit path. It is the slow tier, and it runs as
   `checks.gate-mutants` under `nix flake check`; run it by hand
   (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)

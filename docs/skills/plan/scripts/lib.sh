@@ -213,20 +213,49 @@ plan_manifest_frozen() {
 }
 
 # plan_manifest_problem <root> -- prints why the freeze manifest cannot be
-# trusted, empty if it can. A helper rather than inline in verify-ladder for
-# the reason #F10 gives: a decision a gate makes is only testable where it can
-# be called, and this one is the difference between "no frozen plan changed"
-# and "nothing checked".
+# trusted, empty if it can. Three things, because each fails independently:
+# the manifest exists and is non-empty, every entry's file still hashes to
+# what it records, and every file in done/ and rejected/ has an entry at all.
+# The third is the one a hash check cannot see -- drop an entry and what is
+# left verifies perfectly, while the plan it covered becomes editable.
+# A helper rather than inline in verify-ladder for the reason #F10 gives: a
+# decision a gate makes is only testable where it can be called, and this one
+# is the difference between "no frozen plan changed" and "nothing checked".
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
 plan_manifest_problem() {
   local root="${1:-.}" manifest="${1:-.}/$PLAN_CHECKSUMS_RELPATH" bad
-  # Empty is not "nothing is frozen": `sha256sum -c` exits 0 on an empty
-  # file, so an emptied manifest verifies vacuously and reads as a clean run.
+  # empty is not "nothing is frozen" but every frozen plan with its evidence
+  # gone -- a clearer message than the "no properly formatted checksum lines"
+  # sha256sum -c gives for the same case, not a case it would miss
   [ -s "$manifest" ] ||
     { printf '%s is missing or empty, so every frozen plan is unverifiable' "$PLAN_CHECKSUMS_RELPATH"; return 0; }
   bad="$(cd "$root" && sha256sum -c "$PLAN_CHECKSUMS_RELPATH" 2>&1 | grep -v ': OK$')"
   [ -z "$bad" ] ||
     { printf '%s no longer matches:\n%s' "$PLAN_CHECKSUMS_RELPATH" "$bad"; return 0; }
+  # Completeness, both directions. Everything above verifies the entries the
+  # manifest *has* and says nothing about the ones it should have: delete 49
+  # of 50 lines and what remains verifies perfectly, after which
+  # .githooks/pre-commit accepts edits to the other 49, because it skips a
+  # staged plan with no entry by design. The set that must be covered is not
+  # the manifest's own -- it is every file in the two permanent folders.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
+  local uncovered
+  uncovered="$(cd "$root" && find docs/plans/done docs/plans/rejected -maxdepth 1 -name '*.md' 2>/dev/null |
+    awk -v mf="$PLAN_CHECKSUMS_RELPATH" '
+      BEGIN { while ((getline l < mf) > 0) { i = index(l, "  "); if (i > 0) have[substr(l, i + 2)] = 1 } }
+      !($0 in have) { print "  " $0 }
+    ')"
+  [ -z "$uncovered" ] ||
+    { printf 'these frozen plans have no %s entry, so nothing proves they have not changed:\n%s' \
+        "$PLAN_CHECKSUMS_RELPATH" "$uncovered"; return 0; }
+  # No check for an entry whose file is gone: `sha256sum -c` already reports
+  # that as `FAILED open or read` and is caught above, so a separate one can
+  # never be the guard that fires. It was written, and gate-mutants proved it
+  # unreachable by escaping -- removing a check nothing can reach is the same
+  # measurement working in the other direction.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
   return 0
 }
 

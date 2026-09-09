@@ -791,7 +791,8 @@ else
 fi
 
 # plan_manifest_problem is verify-ladder's decision, in a place it can be
-# called. An empty manifest must be a problem: `sha256sum -c` exits 0 on one.
+# called. An emptied manifest is every frozen plan with its evidence gone, so
+# it must report a problem rather than an empty corpus verifying.
 [ -z "$(ev 'plan_manifest_problem .')" ] &&
   ok "a manifest whose entries all verify reports no problem" ||
   bad "a manifest whose entries all verify reports no problem" "it reported one"
@@ -799,12 +800,36 @@ fi
 [ -n "$(ev 'plan_manifest_problem .')" ] &&
   ok "an emptied manifest is a problem, not a vacuous pass" ||
   bad "an emptied manifest is a problem, not a vacuous pass" \
-    "sha256sum -c exits 0 on an empty file, so this must not be silent"
-printf '%s  docs/plans/done/%s\n' "$(printf 'not-the-hash' | sha256sum | cut -d" " -f1)" "$ev_a" \
-  > "$ev_repo/docs/plans/.checksums"
+    "an emptied manifest leaves every frozen plan unverifiable; it must not read as a clean run"
+# A *complete* manifest with one hash that no longer matches, because the
+# file changed after it was recorded. Complete on purpose: a manifest missing
+# an entry is reported by the coverage check below, so a fixture that is both
+# incomplete and mismatched cannot say which guard fired.
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+printf 'tampered\n' >> "$ev_repo/docs/plans/done/$ev_a"
 [ -n "$(ev 'plan_manifest_problem .')" ] &&
   ok "a frozen plan that no longer matches its hash is a problem" ||
   bad "a frozen plan that no longer matches its hash is a problem" "it reported none"
+
+# Completeness, and it is the direction a hash check cannot see: drop one
+# plan's entry and what remains still verifies, while that plan becomes
+# editable -- pre-commit skips a staged file with no entry by design.
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+awk -v drop="docs/plans/done/$ev_b" '
+  { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == drop) next } { print }
+' "$ev_repo/docs/plans/.checksums" > "$ev_repo/trimmed" &&
+  mv "$ev_repo/trimmed" "$ev_repo/docs/plans/.checksums"
+if ( cd "$ev_repo" && sha256sum -c --quiet docs/plans/.checksums >/dev/null 2>&1 ); then
+  [ -n "$(ev 'plan_manifest_problem .')" ] &&
+    ok "a frozen plan with no manifest entry is a problem, though the entries left all verify" ||
+    bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
+      "the trimmed manifest verifies and nothing reported the plan it stopped covering"
+else
+  bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
+    "the fixture is wrong: the trimmed manifest should still verify, or the case proves nothing"
+fi
 rm -rf "$ev_repo"
 
 section "the freeze manifest is keyed on the whole path, not a substring of it"

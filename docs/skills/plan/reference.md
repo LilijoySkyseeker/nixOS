@@ -232,6 +232,16 @@ is rare enough not to need its own mechanic.
    uses to detect any later attempt to modify a frozen file, from any
    tool or human.
 
+The manifest, not the file's own `frozen:` field, is what every script
+that edits a plan asks -- `plan-move`, `plan-reject`, `plan-decide`,
+`plan-resolve` and `plan-tick` all refuse on a manifest entry, so setting
+`frozen: false` by hand buys nothing
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56).
+Two things guard the manifest itself: `pre-commit` blocks a commit that
+stages its deletion, and `verify-ladder` runs `sha256sum -c` over it on
+every pass. Neither checks that every frozen plan still *has* an entry
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60).
+
 ## Citeable IDs
 
 `D1, D2, …` decisions; `G1, G2, …` gotchas/lessons; `F1, F2, …` findings

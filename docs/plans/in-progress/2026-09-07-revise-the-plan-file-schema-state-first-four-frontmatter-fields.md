@@ -3310,3 +3310,99 @@ decrypted at any point in this review.
 _security finished 2026-09-09T17:07:21Z (code d9389c184df201a9) -- see Findings above._
 
 **FIXED 2026-09-09:** the decision now lives in plan_manifest_problem, which verify-ladder calls as a hard gate -- the F10 pattern, a helper so the decision is testable where gate-tests can reach it. One correction to this finding as written: GNU sha256sum -c exits 1 on a file with no checksum lines, so an empty manifest does not pass vacuously. The empty check is a clearer message and defence in depth, not the load-bearing test, and gate-mutants carries a note saying why it has no entry of its own
+
+### F58 — the freeze-manifest step is not in any doc that enumerates what `verify-ladder` blocks on, and both harness counts were a session old again
+
+- **File:** `docs/procedures/testing-changes.md:183,218,248`;
+  `docs/skills/workflow/SKILL.md:31-40`;
+  `docs/skills/workflow/scripts/verify-ladder:2-12,51`;
+  `modules/flake/gate-checks.nix:29`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by measurement on this host — `gate-tests` 121
+  assertions in 1.72s, `gate-mutants` 51 entries in 12.6s across 16 jobs
+  (`nproc` = 16).
+- **Axis:** doc-code
+- **Reachability:** anyone reading what the pre-commit floor covers, or
+  deciding whether there is budget to add a case. Three separate places
+  enumerate `verify-ladder`'s steps and all three stopped at three.
+- **Rule:** n/a — `#F25`/`#F51` recurring a third time, one commit after
+  `#F51` corrected the same two figures. The enumeration half is new: a
+  gate that grows a step leaves every list of its steps wrong.
+- **Finding:** `99aa7ef` added a `== freeze manifest ==` step that can set
+  `fail=1`, and none of `testing-changes.md` ("Runs three repo-level gates
+  first"), `docs/skills/workflow/SKILL.md`'s step 4, or `verify-ladder`'s
+  own header listed it. `gate-tests`' coverage list in `testing-changes.md`
+  also omitted `.githooks/pre-commit` and the freeze-manifest helpers, both
+  of which it now exercises.
+- **Fix risk:** low, prose and comments only.
+
+**FIXED 2026-09-09:** the step named in all three enumerations, the two
+harness figures re-measured (121/1.72s, 51/~13s), `verify-ladder`'s ~1.6s
+comment corrected, and `gate-tests`' documented coverage list extended to
+what it actually exercises. `gate-checks.nix`'s "~40x the suite" restated
+as one run per catalogue entry, so it does not go stale per entry added
+
+### F59 — two comments state that `sha256sum -c` exits 0 on an empty file, which the same session's own correction and a direct measurement both contradict
+
+- **File:** `docs/skills/plan/scripts/lib.sh:223-224` before the fix;
+  `scripts/gate-tests:794,803` before the fix
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by measurement — `: > f && sha256sum -c f` on
+  coreutils 9.11 prints `no properly formatted checksum lines found` and
+  exits **1**.
+- **Axis:** doc-code
+- **Reachability:** anyone deciding whether `plan_manifest_problem`'s
+  `[ -s "$manifest" ]` guard is load-bearing. Told that `sha256sum -c`
+  passes vacuously on an empty file, a reader concludes removing the guard
+  reopens `#F54`'s silent path; it does not.
+- **Rule:** n/a — the same claim appears three times in this branch and the
+  three disagree: `scripts/gate-mutants:377-381` and `#F57`'s own FIXED note
+  both carry the correction, while `lib.sh` and `gate-tests` kept the
+  original wording from `#F54`'s body.
+- **Finding:** the belief came from `#F54` ("`sha256sum -c` passes vacuously
+  on an empty manifest") and was corrected while `gate-mutants` was written
+  — that is why that file explains why it has *no* entry for the guard —
+  but the two comments the correction did not reach still assert it. Both
+  sit directly above the code a reader would change.
+- **Fix risk:** low, comments and one fixture failure message; no assertion
+  renamed, so no `gate-mutants` entry can go `UNKNOWN-CASE`.
+
+**FIXED 2026-09-09:** both comments now say what the empty check is for —
+a clearer message for a case `sha256sum -c` also reports, not a case it
+would miss — matching `gate-mutants`' note and `#F57`'s correction
+
+### F60 — `plan_manifest_problem` verifies the entries the manifest has, and its docblock and `verify-ladder`'s step comment both read as though it verified the corpus
+
+- **File:** `docs/skills/plan/scripts/lib.sh:215-232`;
+  `docs/skills/workflow/scripts/verify-ladder:65-79`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by reading the code — the function tests
+  `[ -s "$manifest" ]` and `sha256sum -c` over the manifest's own lines, and
+  nothing enumerates `docs/plans/{done,rejected}/*.md` to find a plan with
+  no entry.
+- **Axis:** doc-code
+- **Reachability:** anyone reading `#F57` as closed. The docblock says
+  "prints why the freeze manifest cannot be trusted, empty if it can", the
+  step comment gives "a manifest that lost entries" as its motivation, and
+  the success line prints "N frozen plan(s) verify" where N is however many
+  lines the manifest happens to hold.
+- **Rule:** n/a — the residue of `#F57`, which named three gaps (checksums
+  verified, every frozen plan has an entry, every entry names a file that
+  exists). Two are closed: `sha256sum -c` covers the hashes and reports a
+  missing file as `No such file or directory`. The middle one is not, and
+  `plan_record_checksum`'s shrink guard only catches a manifest that loses
+  entries *through that function* — a hand edit or a bad merge does not go
+  through it.
+- **Finding:** delete 49 of 50 lines from `docs/plans/.checksums` and
+  `verify-ladder` prints `docs/plans/.checksums: 1 frozen plan(s) verify.`
+  and passes; `.githooks/pre-commit` then accepts any edit to the other 49,
+  since it skips a staged plan with no manifest entry by design.
+- **Not fixed:** only the two comments and `reference.md` were corrected to
+  state what is and is not checked. Closing the gap means a check over the
+  real `docs/plans/` corpus rather than a fixture, which `#F57` itself
+  notes is a new shape for `gate-tests` and probably belongs in
+  `modules/flake/gate-checks.nix` — a decision, not a doc edit.
+
+_docs-updater finished 2026-09-09T17:33:30Z (code 12a1595177f8a204) -- see Findings above._
+
+**FIXED 2026-09-09:** closed rather than left recorded: plan_manifest_problem now checks coverage too -- every file in docs/plans/done/ and rejected/ must have an entry, verified against the manifest's exact path field in one awk pass. The invariant holds exactly today (50 entries, 50 done/ files, 0 rejected/, none uncovered). The reverse direction was written and then removed: sha256sum -c already reports an entry whose file is gone as FAILED open or read, so a separate check can never be the guard that fires, and gate-mutants proved it unreachable by escaping. verify-ladder blocks on all of it

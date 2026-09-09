@@ -34,12 +34,14 @@ stays short on purpose (progressive disclosure).
    cited by path instead of bare filename),
    `scripts/gate-tests` (the gate scripts' own failure-mode tests --
    a gate that no longer refuses what it must, or no longer passes an
-   honest sequence), `plan-lint` on the active plan (duplicate or
-   non-sequential `D`/`G`/`F` ids, a `Progress` line citing a heading
-   that does not exist), `nixfmt --check`, `nix flake check --no-build`,
-   a targeted `nixos-rebuild build`, and any *newly introduced*
-   statix/deadnix issue
-   (pre-existing debt elsewhere in a touched file never blocks). This is
+   honest sequence), the freeze manifest (`sha256sum -c` over
+   `docs/plans/.checksums` -- a frozen plan that no longer matches its
+   recorded hash, or a manifest emptied outright), `plan-lint` on the
+   active plan (duplicate or non-sequential `D`/`G`/`F` ids, a `Progress`
+   line citing a heading that does not exist), `nixfmt --check`,
+   `nix flake check --no-build`, a targeted `nixos-rebuild build`, and any
+   *newly introduced* statix/deadnix issue (pre-existing debt elsewhere in
+   a touched file never blocks). This is
    independent of VM-testing, which is not yet part of this system -- see
    reference.md.
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
