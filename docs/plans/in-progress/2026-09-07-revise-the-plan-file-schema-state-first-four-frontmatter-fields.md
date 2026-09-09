@@ -281,6 +281,18 @@ still had to be fixed, because parking them would have blocked the merge
 just as the stale stamps did. **The user stopped the loop rather than let
 it continue.** PR #69 is open and red on exactly this.
 
+**This apparatus was built without reference to any outside practice, and
+that is the largest single gap in the evidence.** Every rule in it was
+derived from this repo's own incidents. Nothing here was checked against
+how other projects govern changes, or against the research on whether
+these mechanisms work. The assessment should establish that first: what
+comparable projects actually do, and what the literature says about code
+review yield, mutation testing in practice, and the cost of heavyweight
+change-approval. If the answer is that this repo reinvented something
+standard, badly, that is worth knowing. If it is that this repo built
+something the literature says does not pay, that is worth knowing too --
+and so is the reverse.
+
 **Do not assume the answer is "delete it".** The corpus is 102 plan files
 holding real, hard-won operational knowledge — a fleet security audit, a
 USB/UAS data-corruption investigation, ZFS layout decisions. Whatever
