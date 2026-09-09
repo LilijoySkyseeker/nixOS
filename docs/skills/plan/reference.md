@@ -49,22 +49,22 @@ schema changes; frozen files are exempt by definition.** "Frozen" means
 recorded in `docs/plans/.checksums`, which only `plan-freeze` and
 `plan-repair` write and which `.githooks/pre-commit` enforces — not the
 file's own `frozen:` field, which a plan could otherwise set about itself
-to switch off every rule below. `plan-lint` reports the two disagreeing in either direction. A frozen plan
-cannot be edited, so every rule added after it froze is one it can never
-satisfy, and a gate nothing can clear is what teaches the bypass.
-`plan-lint` therefore checks the section set, the section order and the
-schema fields only on a plan `docs/plans/.checksums` does not record as
-frozen, and checks the rules that do
-not depend on the era — core frontmatter, status against folder, id
-sequencing, Progress citations — everywhere.
+to switch off every rule below. `plan-lint` reports the two disagreeing,
+in either direction. A frozen plan cannot be edited, so every rule added
+after it froze is one it can never satisfy, and a gate nothing can clear
+is what teaches the bypass. `plan-lint` therefore checks the section set,
+the section order and the schema fields only on a plan
+`docs/plans/.checksums` does not record as frozen, and checks the rules
+that do not depend on the era — core frontmatter, status against folder,
+id sequencing, Progress citations — everywhere.
 
 **The one exception, and its limits.** `plan-repair` may add `## State`
 to an already-frozen plan that has none, and re-record its checksum. That
 section is hardcoded, not an argument: it refuses a plan that is not
 frozen and refuses one that already has the section, so it can only ever
-add a heading nobody wrote — it cannot edit a word of anyone's text. It exists because 27
-`done/` plans were frozen before `## State` existed, and nothing checked a
-plan at the moment it stopped being fixable. Both freeze doors now lint
+add a heading nobody wrote — it cannot edit a word of anyone's text. It
+exists because 27 `done/` plans were frozen before `## State` existed, and
+nothing checked a plan at the moment it stopped being fixable. Both freeze doors now lint
 first (`plan-freeze` and `plan-reject`), so the backlog it was written to
 clear cannot grow again.
 
@@ -83,10 +83,16 @@ and `#G5`.
 
 A map child that would break live citations runs as
 **expand—contract**: add the new form beside the old one, migrate the
-references in batches, and remove the old form only once the checker
-reports zero unresolved references for that batch. That ordering is the
-map pattern. It needs no skill of its own: it is a blocking-edge graph,
-and `blocked_by` plus `plan-citations` already supply both halves.
+references in batches, and drop a batch's old form only once *every form
+the reference is written in* has been checked. `plan-citations` green is
+not that test — it resolves `<file>.md#anchor` and is blind to the bare
+`` `G<N>` `` a plan uses for its own items, which is the form contracting
+breaks
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G4
+sets out the three steps). That ordering is the map pattern. It needs no
+skill of its own: it is a blocking-edge graph, and `blocked_by` plus
+`plan-citations` supply the mechanical half; the prose references are
+classified by hand, one at a time.
 
 ## `G` is a lesson, `F` is a defect
 

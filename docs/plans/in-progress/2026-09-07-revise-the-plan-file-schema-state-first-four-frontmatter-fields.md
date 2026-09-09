@@ -679,9 +679,10 @@ for a batch:
 - [x] drop the pointer headings for migrated batches — done for batch 1;
       `#F49` records what the check for "no reference remains" misses, and
       `#G4` now carries the three steps a later batch must follow
-- [ ] remaining batches of the 26 non-frozen files with `G` headings,
-      of which batch 1 is now expanded (its pointers are what contract
-      removes)
+- [x] remaining batches — closed, not skipped. All four of the biggest
+      files were classified item by item and all 23 items correctly stay
+      `G`; the other 21 files were surveyed at heading level with the same
+      result. The premise held for one file, which is done. `#G15`
 
 Decided 2026-09-08 and done in the same session:
 
@@ -1208,6 +1209,46 @@ An exemption with no test is indistinguishable from an oversight, so
 `gate-tests` asserts the reason instead of the behaviour: a `known` residue
 that checks the `|| true` and the `exit 0` paths are still there, and turns
 into a failure if they go. `gate-mutants` carries the matching entry.
+
+### G15 - the G-to-F reclassification was one file's job, not the corpus's
+
+Batch 1 is done and the migration is closed. Not because the remaining 25
+files were skipped, but because reading them showed there is nothing there
+to move.
+
+**The four biggest were classified item by item: all 23 stay `G`.** The
+minecraft plan's seven are a world layout, a headless-CLI finding that
+contradicts an open upstream issue, measured chunk counts, an
+`InhabitedTime` blind spot, a backup procedure, verified CLI syntax and a
+`/tmp` warning — lessons, every one. The ZFS plan's four are constraints to
+respect. The Loki plan's eight are design drivers, and the two that read
+like defects say so themselves: `G1` ends "it is also why D7 raises the
+limit", and `G5` scopes `D13`/`D17`. The `/etc/nixos` plan's `G3` opens
+"the durable lesson is not about this one commit".
+
+**The other 21 were surveyed at heading level, all 80 of them**, and the
+pattern holds: discovered facts, measurements, constraints, corrections of
+record.
+
+**Why the premise held for exactly one file.** 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
+was written as a deliberately over-inclusive catalogue of weak points, at a
+time when `F` had no meaning — so its defects were recorded as `G` because
+there was nowhere else to put them. Every other plan used `G` the way the
+rule now defines it. Batch 1 was not the first of 26 batches; it was the
+whole job.
+
+**Converting a correct `G` is not free**, which is why "migrate everything"
+would have been the wrong call rather than merely a slow one: it renumbers
+anchors, and it creates an unresolved finding that blocks `plan-move ...
+done` and `plan-gate` for any commit citing that plan. The one arguable
+candidate — `#G2` in the `/etc/nixos` plan, a real `--ff-only` breakage —
+is left as `G` for exactly that reason: its remedy belongs to the
+pipeline-rebuild plan, so an `F` here would be an obligation this plan
+cannot discharge.
+
+`#G4` keeps the procedure written down for any future file that does need
+it.
+
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
@@ -2960,3 +3001,114 @@ three `gate-mutants` entries restore them individually
 two deliberately left, the missed `#G31` citation corrected, six lessons
 renumbered `G1`-`G6` with the old numbers recorded in the file. The rule for
 later batches is written into `#G4`
+
+### F50 — `reference.md` still gave `plan-citations` green as the contract phase's completeness test, which `#G4`'s own amendment had just withdrawn
+
+- **File:** `docs/skills/plan/reference.md:87-92` (the expand—contract
+  paragraph under "`kind`, and the two shapes a plan comes in")
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED by reading the paragraph against `#G4` as
+  amended 2026-09-09 and against `#F49`.
+- **Axis:** doc-code
+- **Reachability:** every future contract batch. `reference.md` is the
+  document an agent reads to learn the pattern; `#G4` is the one it would
+  only reach by following a citation the paragraph did not carry.
+- **Rule:** n/a — the same rule `#F49` proposes: a migration's completeness
+  check must cover every form the thing being migrated is written in.
+- **Finding:** the paragraph read "remove the old form only once the
+  checker reports zero unresolved references for that batch ... `blocked_by`
+  plus `plan-citations` already supply both halves." `#F49` established, by
+  contracting batch 1, that `plan-citations` resolves `<file>.md#anchor` and
+  is blind to the bare `` `G<N>` `` a plan uses for its own items — seven of
+  which would have been silently pointed at deleted headings with the
+  checker green. `#G4` was amended to spell out the three-step check;
+  `reference.md` was not, so the only reader-facing statement of the pattern
+  still named the test that does not measure what the phase risks.
+- **Fix risk:** low, documentation only.
+
+**FIXED 2026-09-09:** the paragraph now says a batch's old form goes only
+once every form the reference is written in has been checked, names
+`plan-citations` green explicitly as *not* that test, and cites `#G4` for the
+three steps. The "both halves" claim is narrowed to the mechanical half
+
+### F51 — every harness number in `testing-changes.md` and `verify-ladder` was a session old again, and `gate-mutants`' header still called its own home blocked
+
+- **File:** `docs/procedures/testing-changes.md:218,248`;
+  `docs/skills/workflow/scripts/verify-ladder:51`; `scripts/gate-mutants:36-38`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by measurement on this host — `gate-tests` 1.57s,
+  1.59s, 1.59s over three runs and 114 assertions; `gate-mutants` 46 entries,
+  9.8s across 16 jobs.
+- **Axis:** doc-code
+- **Reachability:** anyone deciding whether they have budget to add a case,
+  or where the slow tier runs. `#G8`'s budget argument is made from these
+  figures.
+- **Rule:** n/a — this is `#F25` recurring one branch later, which is the
+  point: a measured number written into prose goes stale at the next commit
+  that adds a case.
+- **Finding:** `testing-changes.md` said `gate-tests` measured 1.20s (it is
+  1.59s) and `gate-mutants` had 39 entries costing about 7s (it is 46 and
+  about 10s); `verify-ladder`'s comment said ~1.2s. Separately,
+  `gate-mutants`' header still said "its server-side home is blocked on
+  `#D2` alongside the fast/slow split" — `#D2` was answered, and the same
+  branch wired the script up as `checks.gate-mutants` in
+  `modules/flake/gate-checks.nix`, so the header described the script as
+  unhomed in the commit that homed it.
+- **Fix risk:** low, comments and prose only.
+
+**FIXED 2026-09-09:** the three figures re-measured and corrected, the
+assertion count added beside the timing so the two stale together,
+and `gate-mutants`' header now states where it runs instead of what it is
+blocked on
+
+### F52 — `plan_manifest_frozen`'s docblock was stranded above `plan_normalise_rel`, leaving the function it describes undocumented
+
+- **File:** `docs/skills/plan/scripts/lib.sh:187-197` before the fix
+- **Severity:** LOW
+- **Confidence:** CONFIRMED by reading the file — the block ending
+  `# plan: ...#F11` sat directly above `plan_normalise_rel() {`, and
+  `plan_manifest_frozen() {` six lines below had no comment at all.
+- **Axis:** doc-code
+- **Reachability:** anyone reading `lib.sh` to find out which authority
+  decides frozen. The stranded block is the only place that says it is the
+  manifest and not the self-declared field.
+- **Rule:** n/a — third instance in this plan of the same shape (`#F6`,
+  `#F15`, `#F32`): a function inserted between a docblock and its
+  definition silently reassigns the docblock.
+- **Finding:** `plan_normalise_rel` was extracted during `#F39` and inserted
+  between `plan_manifest_frozen`'s docblock and `plan_manifest_frozen`
+  itself. The result reads as one function documented twice, under two
+  names, with two plan citations — and `plan_manifest_frozen`, the reader
+  every era-gated lint rule depends on, documented nowhere.
+- **Fix risk:** low, comment move only; no code touched.
+
+**FIXED 2026-09-09:** the `plan_manifest_frozen` block moved down onto its
+own definition, leaving `plan_normalise_rel` with the `#F39` block that
+describes it
+
+### F53 — `vm-testing.md`'s "Adding a check" recipe sends a non-VM check to the wrong registration file
+
+- **File:** `docs/procedures/vm-testing.md:97-98` ("register it in
+  `modules/flake/checks.nix`")
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — this branch added `tests/gate-script-check.nix`,
+  which boots no VM and registers in `modules/flake/gate-checks.nix`, while
+  the only doc that says where a `tests/` file gets registered names
+  `checks.nix` unconditionally.
+- **Axis:** doc-code
+- **Reachability:** the next person adding anything to `tests/`. Following
+  the recipe would collide with `gate-checks.nix`'s stated reason for
+  existing — one `checks` key per file.
+- **Rule:** n/a
+- **Finding:** `vm-testing.md` is scoped to `runNixOSTest` throughout, so
+  nothing in it is false, but `tests/` is no longer VM-tests-only and the
+  document is the only map of that directory. `#D2` put the gate checks in
+  their own file deliberately; that split was recorded in
+  `gate-checks.nix`'s own header and in `testing-changes.md`, and in neither
+  place a reader of `tests/` would look.
+- **Fix risk:** low, documentation only.
+
+**FIXED 2026-09-09:** one paragraph added under "Adding a check" naming
+`gate-checks.nix` as the home for a check that boots nothing, and the reason
+
+_docs-updater finished 2026-09-09T16:53:59Z (code 29bbbe5005a7873b) -- see Findings above._

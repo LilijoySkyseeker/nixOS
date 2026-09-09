@@ -184,11 +184,6 @@ plan_active_plan_problem() {
     "$PLAN_ACTIVE_MARKER_RELPATH" "$(head -n 1 "$marker")"
 }
 
-# plan_manifest_frozen <root> <rel> -- frozen according to the checksum
-# manifest, which is the authority .githooks/pre-commit enforces. The file's
-# own `frozen:` field is self-declared: a todo/ plan can assert it and switch
-# off every rule that applies only to editable files
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 # plan_normalise_rel <rel> -- collapse leading and embedded ./ segments, so
 # the same file spelled two ways compares equal. Shared, because a reader that
 # normalises and a writer that does not will disagree about which entry they
@@ -200,6 +195,11 @@ plan_normalise_rel() {
   printf '%s' "$rel"
 }
 
+# plan_manifest_frozen <root> <rel> -- frozen according to the checksum
+# manifest, which is the authority .githooks/pre-commit enforces. The file's
+# own `frozen:` field is self-declared: a todo/ plan can assert it and switch
+# off every rule that applies only to editable files
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 plan_manifest_frozen() {
   local manifest="$1/$PLAN_CHECKSUMS_RELPATH" rel
   rel="$(plan_normalise_rel "$2")"

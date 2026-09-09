@@ -214,9 +214,10 @@ of operations — chronology, not evidence:
   reach a particular failure asserts that it can, under its own name:
   three guards here once passed because `git mv` failed for reasons that
   had nothing to do with the gate. Hermetic, network-free, scratch repos
-  under `$TMPDIR`; measured 1.20s, knowingly over the one-second budget
-  and recorded as such rather than kept under it by dropping cases. This
-  is what rung 3 looks like for a change with no closure to build. Read
+  under `$TMPDIR`; 114 assertions, measured 1.59s, knowingly over the
+  one-second budget and recorded as such rather than kept under it by
+  dropping cases. This is what rung 3 looks like for a change with no
+  closure to build. Read
   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
   before adding cases, and run `scripts/gate-mutants` after. The sabotage
   sweep covers the gates that write as well — `plan-move`, `plan-freeze`
@@ -225,8 +226,7 @@ of operations — chronology, not evidence:
   the next one's verdict. `subagent-stamp` is deliberately exempt: every
   failure path in it ends `exit 0`, which is correct for a hook that runs
   after every subagent, and the exemption is asserted rather than assumed.
-  Runs from
-  `verify-ladder` before every non-trivial commit, and as
+  Runs from `verify-ladder` before every non-trivial commit, and as
   `checks.gate-tests` under `nix flake check` — on any machine, in any CI,
   with the enforcement in the flake rather than in a workflow file. Both,
   deliberately: `verify-ladder` passes `--no-build`, which does not build
@@ -244,7 +244,7 @@ of operations — chronology, not evidence:
   escape), `INERT` (the mutation matched nothing and measured nothing),
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
-  N× the suite — 39 entries, about 7s across 16 jobs — so it is not in
+  N× the suite — 46 entries, about 10s across 16 jobs — so it is not in
   `verify-ladder`'s pre-commit path. It is the slow tier, and it runs as
   `checks.gate-mutants` under `nix flake check`; run it by hand
   (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)
