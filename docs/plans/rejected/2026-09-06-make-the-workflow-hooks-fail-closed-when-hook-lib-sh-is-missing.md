@@ -1,8 +1,8 @@
 ---
 slug: make-the-workflow-hooks-fail-closed-when-hook-lib-sh-is-missing
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -95,3 +95,5 @@ hazard.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: further hardening of the local prompt-level hooks ended with the blocking tier; their disposition is the D4 probation in 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md

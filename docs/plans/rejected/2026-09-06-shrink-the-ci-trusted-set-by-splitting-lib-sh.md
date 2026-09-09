@@ -1,8 +1,8 @@
 ---
 slug: shrink-the-ci-trusted-set-by-splitting-lib-sh
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -100,3 +100,5 @@ not just the first.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: same program as make-ci-hash-the-tree -- the CI trusted set guards two narrow checks now, and shrinking it further is not worth a lib split; ADR-0002, 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md

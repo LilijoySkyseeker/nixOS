@@ -1,8 +1,8 @@
 ---
 slug: set-git-path-quoting-once-instead-of-per-call-site
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -100,3 +100,5 @@ two problems the chosen change actually solves.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: a refactor motivated by keeping many blocking call sites consistent; the surviving call sites are few and covered by gate-tests -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md

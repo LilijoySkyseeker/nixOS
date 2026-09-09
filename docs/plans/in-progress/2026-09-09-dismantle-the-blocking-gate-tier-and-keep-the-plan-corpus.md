@@ -12,14 +12,51 @@ blocked_by:
 
 ## State
 
-**2026-09-09, not started.** Filed from the first-principles assessment the
-user commissioned in
-2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md
-("Pick-up point, 2026-09-09"), run by a session that built none of the
-machinery. Every number in that handoff reproduced (see `G4` for the
-baseline). Nothing has been dismantled; every decision below is open and
-`D1`-`D6` are the user's calls. PR #69 is still open and red on two stale
-stamps.
+**2026-09-09, stages 1-8 all executed** on branch `worktree-gate-teardown`
+(based on PR #69's branch head, deliberately — see the transition note
+under `G5`), the same day the plan was filed and the user ratified D1-D5
+("proceed with the recommendations", D5 refined to option (b) in
+discussion). What exists now:
+
+- `plan-gate` blocks on exactly two rules — an unresolved CRITICAL/HIGH
+  security finding in a cited plan, and any modification/deletion under
+  `done/` or `rejected/` — and prints everything else as NOTEs. Stamps,
+  required-agents obligations and ordinary findings no longer gate.
+- The checksum manifest, `plan-repair`, `plan_record_checksum` and the
+  manifest audit are deleted; frozen-by-residence is enforced at
+  pre-commit, verify-ladder and the plan-gate CI range check.
+- `gate-mutants` and its flake check are deleted; `pre-push` builds hosts
+  only. `gate-tests` went 1,432 → 1,055 lines and 136 → 108 assertions —
+  larger than the "couple hundred lines" this plan sketched, deliberately:
+  the rung/State/lint/citation sections encode four sessions of real
+  regressions in readers that still gate freezing, so they stayed; only
+  the sections testing deleted machinery went. Suite green locally and as
+  `checks.gate-tests` in the sandbox.
+- `plan-lint`/`plan-citations` are warn-only in verify-ladder;
+  `plan-freeze`/`plan-move done` hard-gate only on State, the rung
+  declaration and critical findings (decisions and ordinary findings
+  warn); the freeze-time lint subprocess was removed outright — the
+  ladder already warns, and an advisory call inside a write-path gate
+  made its git failures look like the gate's own (caught by the sabotage
+  sweep).
+- ADR-0002 (`0002-reviews-advise-two-checks-block.md`) records the
+  governance decision. The docs pass covered both skills, testing-changes,
+  GIT_WORKFLOW and both agent definitions; `security`'s brief now says
+  its `**Severity:**` rating carries the one blocking rule.
+- Twelve 2026-09-06 gate-hardening plans are rejected with reasons citing
+  this file; the provenance plan stayed (G3's note).
+
+Verified to rung 3 (ran it locally, output inspected): `gate-tests`
+108/0/4 both direct and via `nix build .#checks.x86_64-linux.gate-tests`;
+`verify-ladder` green end-to-end at ~25s; `plan-citations` resolves all
+citations; the new plan-gate exercised against a critical-finding
+fixture (blocks), a parked-finding fixture (passes with NOTE), a
+tampered done/ file (blocks) and PR #69's formerly-red range (passes
+with NOTEs). Rungs 4-5 do not apply: no host-visible behaviour changed
+— the only `.nix` diffs delete a flake check.
+
+**Open: D6 only** (PR #69's disposition), plus merging the teardown PR
+itself. Note the sequencing constraint recorded in `G5`.
 
 ## Original plan
 
@@ -91,14 +128,20 @@ conventions, and the `security`/`docs-updater` agents themselves.
 ## Progress
 
 - [ ] Stage 0: user answers `D1`-`D6`; scope is ratified
-- [ ] Stage 1: plan-gate advisory on stamps; findings parkable — see D1
-- [ ] Stage 2: done/-immutability check replaces freeze checksums — see D2
-- [ ] Stage 3: gate-mutants tier deleted
-- [ ] Stage 4: gate-tests shrunk to a smoke test
-- [ ] Stage 5: plan-lint / plan-citations warn-only or deleted — see D4
-- [ ] Stage 6: ADR migration started; D/G/F frozen for new plans — see D5
-- [ ] Stage 7: docs pass over AGENTS.md, skills, procedures, agents
-- [ ] Stage 8: mooted gate plans plan-reject'ed with reasons — see G3
+      *(D1-D5 answered 2026-09-09; D6 still open, so this line stays
+      unticked)*
+- [x] Stage 1: plan-gate advisory on stamps; findings parkable — see D1
+- [x] Stage 2: done/-immutability check replaces freeze checksums — see D2
+- [x] Stage 3: gate-mutants tier deleted
+- [x] Stage 4: gate-tests shrunk to a smoke test
+      *(landed at 1,055 lines, not ~250 — see State for why)*
+- [x] Stage 5: plan-lint / plan-citations warn-only or deleted — see D4
+- [x] Stage 6: ADR migration started; D/G/F frozen for new plans — see D5
+      *(as refined: ADR-0002 written, notation stays optional-not-frozen;
+      the 0005 backfill plan remains its own todo item)*
+- [x] Stage 7: docs pass over AGENTS.md, skills, procedures, agents
+- [x] Stage 8: mooted gate plans plan-reject'ed with reasons — see G3
+      *(12 rejected; the provenance plan stayed, see G3's note)*
 - [ ] PR #69 disposition executed — see D6
 
 ## Decisions (D)
@@ -237,6 +280,28 @@ lines, 0 in fleet config; 81/81 schema-plan findings about the apparatus;
 apparatus itself. If a future session doubts the teardown, re-measure
 these before re-litigating.
 
+### G5 — the teardown branch is stacked on PR #69, and merge order matters
+
+`worktree-gate-teardown` was branched from PR #69's head, not master:
+the teardown deletes and rewrites the same gate scripts #69 hardened, so
+branching from master would have manufactured conflicts against work the
+user may still merge, and building on the freshest machinery state made
+the deletions clean. Consequences:
+
+- Until #69 merges, a PR from this branch shows #69's commits plus the
+  teardown's. **Merging #69 first is the clean sequencing**: the
+  teardown PR then reduces to its own eight commits.
+- The new frozen-by-residence range check flags #69's own range — it
+  edited 27 done/ plans through the now-deleted `plan-repair` mechanism,
+  legally under the checksum regime. That is another reason #69 merges
+  *before* the teardown, not after.
+- CI pins `plan-gate` from the base branch, so both PRs are judged by
+  master's *old* blocking gate until the teardown lands. #69 stays red
+  on its stale stamps unless merged past the check (the teardown cannot
+  un-red it retroactively); the teardown's own commits carry no `Plan:`
+  trailers, which the old gate treats as nothing-to-gate — the exact
+  F36 shape its own weak-points catalogue documented. After the teardown
+  merges, the advisory gate judges everything that follows.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

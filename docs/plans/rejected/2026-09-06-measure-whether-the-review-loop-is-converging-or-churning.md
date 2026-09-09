@@ -1,8 +1,8 @@
 ---
 slug: measure-whether-the-review-loop-is-converging-or-churning
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -119,3 +119,5 @@ approach to it visible.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: the review loop it would have measured no longer exists -- one pass and park, per 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md (ADR-0002)

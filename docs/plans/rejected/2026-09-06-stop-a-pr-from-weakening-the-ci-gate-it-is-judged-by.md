@@ -1,8 +1,8 @@
 ---
 slug: stop-a-pr-from-weakening-the-ci-gate-it-is-judged-by
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -101,3 +101,5 @@ sufficient — the resolution behavior is the whole subject.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: the workflow-file self-weakening risk is accepted under ADR-0002's trust model -- the gate blocks two narrow rules and the operator reviews every PR; 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md
