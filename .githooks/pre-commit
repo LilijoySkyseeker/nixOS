@@ -113,7 +113,11 @@ if [[ -n "$manifest" ]]; then
   if [[ -n "$staged_done" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      recorded="$(awk -v f="$f" '$2==f{print $1}' <<<"$manifest")"
+      # Exact path field, like plan_manifest_frozen and the guard above it.
+      # `$2==f` field-splits, so a frozen plan whose name contains a space
+      # never matched its own entry and was silently skipped.
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+      recorded="$(awk -v want="$f" '{ i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) { print substr($0, 1, i - 1); exit } }' <<<"$manifest")"
       [[ -z "$recorded" ]] && continue # not a frozen file plan-freeze knows about
       actual="$(git show ":$f" | sha256sum | awk '{print $1}')"
       if [[ "$actual" != "$recorded" ]]; then

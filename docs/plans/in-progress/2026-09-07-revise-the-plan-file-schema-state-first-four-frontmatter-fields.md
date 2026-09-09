@@ -3890,3 +3890,291 @@ build.
 _docs-updater finished 2026-09-09T18:15:55Z (code 5cf9e1bed22ecb09) -- see Findings above._
 
 **FIXED 2026-09-09:** the session-narrative sentence moved out of .githooks/pre-commit; the rev-parse rc mechanics it introduced stay, because those explain the code
+
+### F73 — `.githooks/pre-push` swallows `git merge-base`'s status, so a range it cannot resolve collapses to a working-tree diff and *both* the host build and the new gate-mutants build silently skip
+
+- **File:** `.githooks/pre-push:18-19` (the fallback), `:32-35` and `:42-45`
+  (the two checked diffs that consume it), `:59-66` (the gate block).
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — reproduced twice in scratch repos with `nix`
+  and `nixos-rebuild` stubbed on `PATH`.
+- **Axis:** hardening
+- **Reachability:** anyone pushing a branch whose merge-base with
+  `origin/master` cannot be computed. Two no-sabotage paths: an orphan or
+  otherwise unrelated-history branch (`merge-base` exits 1 with no output),
+  and any clone or worktree where the ref `origin/master` is simply absent
+  (remote renamed, `--single-branch` of another branch, a second remote, a
+  fetch that has not happened yet). Neither needs `--no-verify` and neither
+  prints anything.
+- **Rule:** new-rule candidate. It is the same fail-open class this range
+  closed at every other diff call site — and `.githooks/pre-push:28-31`, the
+  comment three lines below the defect, asserts it is closed: "an
+  unresolvable range read as 'no host config changed' and pushed unbuilt --
+  the fail-open this branch closed at every other diff call site".
+- **Finding:** `range="$(git merge-base origin/master "$local_sha"
+  2>/dev/null || true)..$local_sha"` discards merge-base's exit status. When
+  it produces nothing the guard on the next line rewrites `range` to the bare
+  `$local_sha`, and `git diff --name-only <sha> -- <paths>` is not a range at
+  all — it is *working tree vs that commit*, which on a clean checkout is the
+  empty set and exits 0. Both diffs then succeed with no output, so neither
+  `if !` fires, `gate_files` is empty so the mutation catalogue is not built,
+  `changed_files` is empty so the hook returns at `:68-70`, and the push is
+  accepted. Measured: a new branch adding both `hosts/h/c.nix` and
+  `scripts/gate-tests` gave `hook rc=0` with the `nix` and `nixos-rebuild`
+  stubs never invoked, in both the missing-`origin/master` case and the
+  orphan-branch case; the same fixture with `origin/master` present ran
+  `build --no-link .#checks.x86_64-linux.gate-mutants` and `build --flake
+  .#h` as intended. The comment at `:17` also mis-describes the fallback as
+  diffing "against empty tree if master itself", which `git diff <sha>` does
+  not do.
+- **Fix risk:** checking the status and blocking converts today's silent pass
+  into a hard refusal for anyone whose `origin/master` ref is missing, which
+  is a real local state (a fresh worktree before the first fetch), so the fix
+  needs a message that says which ref is missing rather than a bare BLOCKED.
+  If the intended empty-tree fallback is wanted it has to be spelled
+  explicitly (`git diff --name-only $(git hash-object -t tree /dev/null)
+  <sha>`), not by dropping the left-hand side. Test with the stub-`PATH`
+  fixture above: missing ref, orphan branch, and the working positive
+  control, since only the third passes today for the right reason.
+
+
+**FIXED 2026-09-09:** pre-push checks git merge-base's status instead of swallowing it with || true. It discriminates: 1 means no common ancestor and falls back to the empty tree, so the whole branch is examined, and anything else blocks. The defect predated the gate-mutants block and disabled it too -- a collapsed range makes both diffs working-tree diffs, empty on a clean checkout
+
+### F74 — the gate-mutants trigger pathspec omits the two files that decide whether `checks.gate-mutants` runs anything
+
+- **File:** `.githooks/pre-push:42` (`scripts/ docs/skills/ .githooks/`),
+  `tests/gate-script-check.nix:37-48`, `modules/flake/gate-checks.nix:23-33`,
+  `docs/skills/workflow/scripts/verify-ladder:195` and `:205`.
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — pathspecs read directly; `nix flake check
+  --help` on the pinned nix confirms `--no-build` is "Do not build checks";
+  `nix eval .#checks.x86_64-linux.gate-mutants.drvPath` resolves, so the
+  check exists and only `pre-push` ever builds it.
+- **Axis:** needed-used
+- **Reachability:** an agent or contributor editing the check *plumbing*
+  rather than a gate script. `tests/gate-script-check.nix` is the file whose
+  `bash ${script}` line is the entire execution of the catalogue; it appears
+  in neither pre-push pathspec (`hosts/ modules/ files/ flake.nix flake.lock`
+  for the host build, `scripts/ docs/skills/ .githooks/` for the gate build)
+  and in neither of verify-ladder's (`changed_all` uses the host set), so a
+  commit that changes it to `bash ${script} || true` builds nothing, runs
+  nothing, and passes every gate — `nix flake check --no-build` evaluates the
+  derivation and stops. Once landed, the next gate-touching push runs the
+  neutered check and reports green. `modules/flake/gate-checks.nix` is
+  half-covered: `modules/` triggers full host builds, which never build a
+  flake check, so repointing `gate-mutants` at `scripts/gate-tests` has the
+  same property.
+- **Rule:** n/a — same family as `#F68`, which established that a check
+  nothing builds is not a gate.
+- **Finding:** the trigger set for the slow tier names the *scripts* and not
+  the two files that decide what the slow tier executes, so the one thing
+  that runs the catalogue can be switched off without ever running it.
+- **Fix risk:** low. Adding `tests/` and `modules/flake/` to the gate
+  pathspec costs the ~16s build on pushes that touch them; `modules/` already
+  triggers a full host build, so the marginal cost there is nil. Check
+  nothing else under `tests/` is edited often enough to make the hook
+  annoying — `tests/` currently holds VM checks that already gate elsewhere.
+
+
+**FIXED 2026-09-09:** the gate pathspec gained tests/ and modules/flake/, where the check derivation and its registration live
+
+### F75 — the runner of the mutation catalogue is the one gate with no `gate-tests` case and no `gate-mutants` entry
+
+- **File:** `.githooks/pre-push:59-66`; `scripts/gate-tests` (no occurrence
+  of `pre-push`); `scripts/gate-mutants:51` (`TREE_PATHS`) and `:123-127`
+  (the target list).
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — `grep -n pre-push scripts/gate-tests
+  scripts/gate-mutants` returns nothing; the suite's own run reports 128
+  assertions, none naming `pre-push`.
+- **Axis:** needed-used
+- **Reachability:** anyone editing `.githooks/pre-push`, including a future
+  pass of this same loop. Every other enforcement point in this system —
+  `plan-gate`, `required-agents`, `plan-citations`, `plan-lint`,
+  `plan-freeze`, `plan-repair`, the six plan writers, `.githooks/pre-commit`
+  — has both a failure-mode case and a mutant. `pre-push` has neither, so
+  rewriting `if [[ -n "$gate_files" ]]` to `if false` leaves the suite at 128
+  passed and the catalogue at 0 escapes, while `checks.gate-mutants` returns
+  to being run by nothing.
+- **Rule:** n/a — new-rule candidate: "the runner of a gate is part of the
+  gate", the same reasoning `#F68` used to give the catalogue a runner at
+  all.
+- **Finding:** `.githooks` is inside `TREE_PATHS`, so the mutation harness
+  copies `pre-push` and would fingerprint it, but no catalogue entry mutates
+  it and no test invokes it. The gate that decides whether the mutation
+  catalogue runs is the only one whose own failure modes are unmeasured.
+- **Fix risk:** a test has to feed the hook push refs on stdin and stub `nix`
+  and `nixos-rebuild` on `PATH` (both were straightforward in a scratch repo
+  while writing `#F73`); a sabotage sweep over it needs the same stubs, or it
+  measures nix rather than git.
+
+
+**FIXED 2026-09-09:** gate-tests now covers pre-push, with nix and nixos-rebuild stubbed onto PATH and the assertion being whether they were reached: a positive control over an ordinary range, and the F73 case over a range whose merge base cannot be computed. gate-mutants carries the merge-base mutant
+
+### F76 — of the three manifest guards `#F63` produced, the drop check is the one with neither a test nor a mutant
+
+- **File:** `.githooks/pre-commit:50-86` (the guard),
+  `scripts/gate-tests:1296-1316` (cases for its two siblings),
+  `scripts/gate-mutants:406-420` (mutants for its two siblings).
+- **Severity:** INFO
+- **Confidence:** CONFIRMED — no string from the guard's message ("drops
+  entries", "restore the lines") appears anywhere under `scripts/`; the two
+  siblings are asserted by name.
+- **Axis:** needed-used
+- **Reachability:** anyone editing `.githooks/pre-commit`. The guard itself
+  is correct — verified in a scratch repo across five cases: dropping an
+  entry for a live plan blocks, dropping one whose plan is deleted in the
+  same commit passes, truncating the manifest blocks and names every plan,
+  tampering with a covered plan still blocks on the frozen check, and a
+  `git mv` of a frozen plan with a matching manifest rewrite blocks (the
+  conservative direction). So this is coverage, not correctness.
+- **Rule:** n/a.
+- **Finding:** `#F63` named three ways to neuter the manifest in the same
+  commit — emptying it, dropping one entry, replacing it with a symlink. Two
+  of the three fixes got a `gate-tests` case *and* a `gate-mutants` entry;
+  the drop check, which is the largest and the only one with non-trivial awk,
+  got neither. The sabotage sweep does exercise the block's four new git
+  calls (and `sabotage_sweep` fails when `base_count > max`, so the block
+  cannot have outgrown its budget of 30 unnoticed), but nothing asserts the
+  decision the awk makes.
+- **Fix risk:** none. The case is the same six lines as the symlink one
+  beside it: `mreset`, drop a line from the staged manifest, `expect_fail
+  ... "drops entries"`, plus the mirror case that a drop paired with a staged
+  deletion passes.
+
+
+**FIXED 2026-09-09:** the drop check has a case and a mutant now, matching its two siblings
+
+### F77 — `.githooks/pre-commit`'s frozen check is the last manifest reader keyed on `$2`, so a frozen plan whose path contains a space is skipped by the only always-on enforcement
+
+- **File:** `.githooks/pre-commit:116` (`awk -v f="$f" '$2==f{print $1}'`)
+  against `.githooks/pre-commit:74-75`,
+  `docs/skills/plan/scripts/lib.sh:210` (`plan_manifest_frozen`), `:247`
+  (`plan_manifest_problem`), `:528` and `:547` (`plan_record_checksum`).
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — demonstrated end to end in a scratch repo: a
+  frozen plan named `docs/plans/done/a b.md`, recorded in the manifest and
+  reported `FROZEN` by `plan_manifest_frozen`, was tampered with, staged, and
+  `.githooks/pre-commit` exited 0.
+- **Axis:** hardening
+- **Reachability:** any plan file whose name contains a space and is later
+  frozen. `plan-new` slugifies, but nothing forces a plan to be created by
+  `plan-new` — `plan_locate` accepts any `docs/plans/*/*.md`, and
+  `plan-freeze`/`plan-move ... done` will record whatever path it is given.
+  After that, the manifest reader that every *script* consults calls the file
+  frozen and refuses, while the hook that is the one unconditional gate on
+  every commit by every tool silently skips it: `$2` is the first
+  whitespace-delimited token of the path, so it never equals the full name
+  and `recorded` comes back empty, which line 117 treats as "not a frozen
+  file plan-freeze knows about". The same line skips any entry whose hash
+  field is empty (see `#F78`).
+- **Rule:** n/a — it is `#F20`'s own rule, "exact match on the path field,
+  not a substring/field of the line", applied to `plan_manifest_frozen`,
+  `plan_record_checksum`, `plan_manifest_problem`, `plan-repair` and this
+  same hook's new drop guard, and not applied here.
+- **Finding:** this range left three different parsers of one file. Two use
+  `index($0, "  ")` and agree; the third decides whether a commit is allowed
+  and does not. Under `core.quotePath=false` a path with a space is emitted
+  unquoted by `git diff --name-only`, so nothing upstream normalises it away.
+- **Fix risk:** low. Rewriting `:116` in the `index($0, "  ")` form the other
+  readers use is behaviour-identical for all 50 current entries (all verify
+  before and would after), and it closes the empty-hash skip at the same
+  time. Worth a `gate-tests` case using a fixture filename with a space, or
+  the change certifies itself.
+
+
+**FIXED 2026-09-09:** pre-commit looks the manifest entry up by exact path field, like plan_manifest_frozen and the guard above it. The fixture gained a frozen plan whose name contains a space, which is what awk's default field splitting could not match
+
+### F78 — `plan_checksum` swallows `sha256sum`'s failure, so `plan_record_checksum`'s first step is the one step it does not check
+
+- **File:** `docs/skills/plan/scripts/lib.sh:499` (`plan_checksum`), `:507-509`
+  (the unchecked call), `:520-526` (the docblock claiming "Every step
+  checked").
+- **Severity:** LOW
+- **Confidence:** CONFIRMED for the mechanics: `s="$(plan_checksum
+  /nonexistent/x.md 2>/dev/null)"` measured `rc=0 val=[]`, because the
+  pipeline's status is `awk`'s; no plan script sets `-e` or `pipefail`
+  (checked across all 20 under `docs/skills/*/scripts/`), so nothing upstream
+  catches it either. The trigger is an I/O condition rather than an
+  adversary.
+- **Axis:** hardening
+- **Reachability:** not adversary-driven — the plan file unreadable or gone
+  at the instant of the freeze (a concurrent `plan-move`, ENOSPC, a mode
+  change between `plan_set_field` and here). What follows is the part worth
+  recording: `printf '%s  %s\n' "" "$rel"` writes a hash-less entry `␣␣<path>`,
+  and that entry *satisfies* `plan_manifest_frozen` (`index` finds the
+  separator at 1, the path field matches) and *satisfies*
+  `plan_manifest_problem`'s new coverage arm (same parse), so the plan reads
+  as covered and frozen everywhere. `.githooks/pre-commit:116` skips it
+  (`$2` is empty), so the commit gate does not protect that plan. The one
+  thing that does catch it is `sha256sum -c`'s "WARNING: 1 line is improperly
+  formatted", which `plan_manifest_problem` captures via `2>&1` and
+  `verify-ladder` blocks on — measured, including that a manifest of one
+  hash-less line exits 1 with "no properly formatted checksum lines found".
+  So the net today is: verify-ladder blocks, pre-commit does not, and the
+  loss guard cannot see it because no path was lost.
+- **Rule:** n/a — the same "checked, not swallowed" rule `#F54`, `#F47` and
+  `#F48` applied to every other step of this function.
+- **Finding:** the function whose docblock is "Every step checked" does not
+  check the step that produces the value the manifest exists to record.
+- **Fix risk:** small but not zero-effort: `sum="$(plan_checksum ...)" ||
+  plan_die` does not work as written, because `plan_checksum`'s
+  `sha256sum | awk` already returns 0. The fix is in `plan_checksum` —
+  drop the pipe (`read`-and-cut, or `set -o pipefail` inside a subshell) —
+  and every other caller of `plan_checksum` (`plan-repair:34`) inherits the
+  new failure mode, so check that a missing file there still produces the
+  intended "does not match its recorded checksum" refusal rather than a die
+  with a worse message.
+
+**Checked and clean (security, third pass, 2026-09-09).** Reviewed the whole
+`cfe6106..b19b424` range with attention to what landed after the second pass
+(`99aa7ef..HEAD`). Verified independently, not from the diff's own claims:
+all 50 `docs/plans/.checksums` entries verify (`50 OK`, 0 not-OK), `done/`
+holds exactly 50 `.md` files and `rejected/` 0, so
+`plan_manifest_problem`'s coverage arm has nothing uncovered; every
+`docs/plans/done/` file touched in the range is touched by exactly the
+8-line `plan-repair` insertion with zero deleted lines, and no frozen plan
+changed at all since `99aa7ef`; `scripts/gate-tests` runs 128 passed / 0
+failed / 4 recorded residues, matching what `testing-changes.md` now claims;
+`plan-citations` reports 448 citations resolving; the worktree is clean after
+both runs. `nix eval .#checks.x86_64-linux.gate-mutants.drvPath` resolves,
+and the pinned `nix flake check --help` confirms `--no-build` is documented
+as "Do not build checks", so `verify-ladder`'s claim that its flake-check
+step does not run the suite is correct and `pre-push` really is the only
+runner. Examined and found sound: `.githooks/pre-commit`'s three manifest
+guards, exercised against five hand-built scratch-repo cases (drop-with-live-
+plan blocks, drop-with-staged-deletion passes, truncation blocks naming every
+plan, symlink mode blocks, tampered covered plan blocks) — the guard logic is
+right, only its test coverage is not (`#F76`); the `head_rc` discrimination,
+which correctly separates unborn HEAD (1) from git failure (>1);
+`plan_record_checksum` end to end, whose `local` list is now complete, whose
+temporaries are same-directory so the `mv` is a real rename, whose mode is
+carried by `chmod --reference` with a 644 fallback, and whose loss guard is
+correctly keyed on `FILENAME` rather than `NR == FNR` and correctly compares
+*paths* rather than line counts (a duplicated path collapsing is not refused,
+verified by the suite's own case); `plan_manifest_problem`'s coverage `find`
++ `awk`, including that a `cd` failure cannot reach it (the `-s` test above
+would have fired first), that an unreadable manifest makes `getline` return
+-1 and reports every plan uncovered rather than none, and that the removed
+reverse-direction check really is unreachable because `sha256sum -c` reports
+a missing file as `FAILED open or read`; `plan-carry`'s new
+`plan_require_not_frozen` call, placed after `plan_locate` and before the
+first write; `plan-gate` and `subagent-stamp` switching to
+`plan_manifest_frozen`, which is right in both directions — in `plan-gate`
+"frozen" *relaxes* the stamp requirement, so reading a self-declared field
+there was a one-line self-exemption. On the two agent briefs I was asked to
+judge: `docs/agents/security.md` and `docs/agents/docs-updater.md` are
+correct as changed — the manifest is what `plan-gate`, `subagent-stamp`,
+`plan_require_not_frozen`'s first arm, `plan-repair` and `.githooks/pre-commit`
+all consult, and both cite the plan by bare filename so `plan-citations`
+stays green. One narrowing to be aware of rather than a defect:
+`plan_require_not_frozen` refuses on the manifest entry *or* the `frozen:`
+field, so the briefs now state a rule slightly narrower than the tooling
+enforces. Nothing diverges today — no `todo/` or `in-progress/` plan declares
+`frozen: true`, and all 50 `done/` plans both declare it and have an entry —
+so the two answers agree on every current file. No secret was decrypted or
+read, no file outside this plan was written, and no host was rebuilt.
+
+_security finished 2026-09-09T18:28:51Z (code 330be557084f24d8) -- see Findings above._
+
+**FIXED 2026-09-09:** plan_checksum checks sha256sum's status rather than returning awk's, and plan_record_checksum refuses rather than writing an entry with no hash

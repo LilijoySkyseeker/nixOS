@@ -839,6 +839,21 @@ else
   bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
     "the fixture is wrong: the trimmed manifest should still verify, or the case proves nothing"
 fi
+# An unreadable file must not become a manifest entry. sha256sum's status was
+# swallowed by the pipeline, so an unhashable file yielded rc 0 and an empty
+# hash, and that entry then read as covered and frozen everywhere.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78
+ev_before_missing="$(grep -c . "$ev_repo/docs/plans/.checksums" 2>/dev/null || echo 0)"
+if ev "plan_record_checksum . docs/plans/done/${fixture_date}-not-here.md" >/dev/null 2>&1; then
+  bad "a file that cannot be hashed does not become a manifest entry" \
+    "plan_record_checksum reported success for a file it could not read"
+elif [ "$(grep -c . "$ev_repo/docs/plans/.checksums" 2>/dev/null || echo 0)" != "$ev_before_missing" ]; then
+  bad "a file that cannot be hashed does not become a manifest entry" \
+    "it refused, but wrote an entry anyway"
+else
+  ok "a file that cannot be hashed does not become a manifest entry"
+fi
+
 # plan-carry is the sixth writer, and it had no guard at all: it appended a
 # CARRIED marker to a frozen plan, staged it and exited 0.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62
@@ -1261,9 +1276,18 @@ git -C "$mpristine" commit -qm base
 # reason.
 frozen_ev="${fixture_date}-frozen-evidence.md"
 printf -- '# frozen evidence\n' > "$mpristine/docs/plans/done/$frozen_ev"
-printf '%s  docs/plans/done/%s\n' \
-  "$(sha256sum "$mpristine/docs/plans/done/$frozen_ev" | cut -d' ' -f1)" "$frozen_ev" \
-  > "$mpristine/docs/plans/.checksums"
+# A second frozen plan whose name contains a space. Not a name plan-new can
+# produce, but the hook is a gate: an entry it cannot match is one it skips
+# silently, and awk's default field splitting is what made that happen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+frozen_sp="${fixture_date}-frozen spaced.md"
+printf -- '# frozen spaced\n' > "$mpristine/docs/plans/done/$frozen_sp"
+{
+  printf '%s  docs/plans/done/%s\n' \
+    "$(sha256sum "$mpristine/docs/plans/done/$frozen_ev" | cut -d' ' -f1)" "$frozen_ev"
+  printf '%s  docs/plans/done/%s\n' \
+    "$(sha256sum "$mpristine/docs/plans/done/$frozen_sp" | cut -d' ' -f1)" "$frozen_sp"
+} > "$mpristine/docs/plans/.checksums"
 git -C "$mpristine" add -A >/dev/null
 git -C "$mpristine" commit -qm manifest
 # Staged but never committed, so every restored copy hands pre-commit
@@ -1315,6 +1339,77 @@ precondition "the manifest is staged as a symlink, so the hook has something to 
 expect_fail ".githooks/pre-commit refuses a freeze manifest staged as a symlink" "not as a regular file" \
   env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
 SWEEP_RESET=""
+
+# The third of F63's manifest guards, and the only one that had neither a
+# case nor a mutant: an entry dropped for a plan that is not itself being
+# deleted. What remains verifies perfectly, which is the point.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F76
+mreset
+( cd "$mrepo" && awk '!/frozen-evidence/' docs/plans/.checksums > .m && mv .m docs/plans/.checksums &&
+  git add docs/plans/.checksums ) >/dev/null 2>&1
+precondition "the fixture drops a manifest entry while the plan stays, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -f docs/plans/done/'"$frozen_ev"' ] && ! grep -q frozen-evidence docs/plans/.checksums'
+expect_fail ".githooks/pre-commit refuses a manifest that drops an entry for a plan that stays" "drops entries" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# A frozen plan whose name has a space, tampered with and staged. The hook
+# looked its entry up with awk's `$2`, which splits on that space, so it
+# matched nothing and took the "not a frozen file" branch.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+mreset
+printf 'tampered\n' >> "$mrepo/docs/plans/done/$frozen_sp"
+git -C "$mrepo" add "docs/plans/done/$frozen_sp" >/dev/null 2>&1
+precondition "the spaced frozen plan is staged and altered, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only -- "docs/plans/done/'"$frozen_sp"'")" ]'
+expect_fail ".githooks/pre-commit refuses a tampered frozen plan whose name contains a space" "is frozen" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# .githooks/pre-push is the only runner of the mutation catalogue, and it had
+# no case and no mutant -- the gate that measures the other gates was the one
+# gate nothing measured. It shells out to `nix build` and `nixos-rebuild`, so
+# both are stubbed onto PATH and the assertion is whether they were reached.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F75
+section "pre-push decides what to build, and must not decide it from a failed range"
+pp_bin="$scratch/ppbin"; mkdir -p "$pp_bin"
+for stub in nix nixos-rebuild; do
+  { printf '#!%s\n' "$BASH"; printf 'printf "%%s\\n" "$0" >> "$PP_RAN"\nexit 0\n'; } > "$pp_bin/$stub"
+  chmod +x "$pp_bin/$stub"
+done
+pp_run() { # <local-sha> <remote-sha> -- prints the hook's rc, records stub calls
+  : > "$scratch/pp.ran"
+  printf 'refs/heads/x %s refs/heads/x %s\n' "$1" "$2" |
+    env -C "$mrepo" PATH="$pp_bin:$PATH" PP_RAN="$scratch/pp.ran" \
+    bash "$mrepo/.githooks/pre-push" >/dev/null 2>&1
+  printf '%s' "$?"
+}
+mreset
+# A second commit that touches a *gate* path, so the range owes a
+# gate-mutants build. Touching anything else proves nothing: the hook
+# legitimately builds nothing for a range with no gate and no host in it.
+printf '\n# touched by the pre-push fixture\n' >> "$mrepo/docs/skills/plan/scripts/lib.sh"
+git -C "$mrepo" add docs/skills/plan/scripts/lib.sh >/dev/null 2>&1
+git -C "$mrepo" commit -qm second >/dev/null 2>&1
+pp_head="$(git -C "$mrepo" rev-parse HEAD)"
+pp_prev="$(git -C "$mrepo" rev-parse HEAD~1)"
+precondition "the pre-push fixture has a gate file in its range, so a build is owed" \
+  env -C "$mrepo" bash -c 'git diff --name-only HEAD~1 HEAD -- docs/skills/ | grep -q .'
+pp_rc="$(pp_run "$pp_head" "$pp_prev")"
+if [ "$pp_rc" = 0 ] && grep -q . "$scratch/pp.ran"; then
+  ok "pre-push reaches its build over an ordinary range"
+else
+  bad "pre-push reaches its build over an ordinary range" \
+    "rc=$pp_rc and the stubs were invoked $(grep -c . "$scratch/pp.ran") time(s)"
+fi
+# A new branch whose merge base cannot be computed: origin/master does not
+# exist in this fixture. The range must not collapse to a working-tree diff,
+# which is empty on a clean checkout and skips every build while exiting 0.
+pp_rc="$(pp_run "$pp_head" "0000000000000000000000000000000000000000")"
+if [ "$pp_rc" != 0 ] || grep -q . "$scratch/pp.ran"; then
+  ok "pre-push does not skip its build when the merge base cannot be computed"
+else
+  bad "pre-push does not skip its build when the merge base cannot be computed" \
+    "it exited 0 having built nothing; the range collapsed to a working-tree diff"
+fi
 
 # subagent-stamp is deliberately not swept, and this records that rather
 # than leaving it looking un-done. Every failure path in it ends `exit 0`

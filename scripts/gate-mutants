@@ -419,6 +419,28 @@ mutant pre-commit/manifest-deletion-unnoticed "$PRECOMMIT" \
   'mut_subst "    staged_manifest_delete=\"\$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)\"" "    staged_manifest_delete=\"\""' \
   ".githooks/pre-commit refuses a staged deletion of the freeze manifest"
 
+PREPUSH=.githooks/pre-push
+
+# The gate that runs this catalogue, which had no mutant of its own.
+mutant pre-push/merge-base-swallowed "$PREPUSH" \
+  'mut_subst "    base=\"\$(git merge-base origin/master \"\$local_sha\" 2>/dev/null)\" || mb_rc=\$?" "    base=\"\$(git merge-base origin/master \"\$local_sha\" 2>/dev/null || true)\"; mb_rc=0"' \
+  "pre-push does not skip its build when the merge base cannot be computed"
+
+# No entry for pre-push's gate-diff status check on its own: nothing sabotages
+# a git call inside pre-push, so leaving that read unchecked changes no
+# verdict any case can see. It is guarded by review, not by this catalogue.
+mutant pre-commit/entry-drop-unnoticed "$PRECOMMIT" \
+  'mut_subst "      if [[ -n \"\$dropped\" ]]; then" "      if false; then"' \
+  ".githooks/pre-commit refuses a manifest that drops an entry for a plan that stays"
+
+mutant pre-commit/manifest-lookup-field-split "$PRECOMMIT" \
+  'mut_subst "if (i > 0 && substr(\$0, i + 2) == want) { print substr(\$0, 1, i - 1); exit }" "if (\$2 == want) { print \$1; exit }"' \
+  ".githooks/pre-commit refuses a tampered frozen plan whose name contains a space"
+
+mutant lib/checksum-swallows-failure "$LIB" \
+  'mut_subst "  sum=\"\$(sha256sum \"\$1\")\" || return 1" "  sum=\"\$(sha256sum \"\$1\" 2>/dev/null || true)\""' \
+  "a file that cannot be hashed does not become a manifest entry"
+
 # ------------------------------------------------------------------- machinery
 
 build_tree() { # <dest>

@@ -496,7 +496,16 @@ plan_rung_problem() {
     echo "no verification-rung declaration in ## State. Give it its own paragraph, opening with the phrase itself -- 'Verified to rung 3 (ran it locally, output inspected).' -- per docs/procedures/testing-changes.md, 'Declaring the rung'. Mentioning the phrase mid-sentence does not count, and neither does naming a rung you did not reach: declare the highest one you did, then say what you skipped."
 }
 
-plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
+# Checked: `sha256sum "$1" | awk ...` returns awk's status, so an unreadable
+# file yielded rc 0 and an empty hash -- and that empty hash then went into
+# the manifest as a real entry, reading as covered and frozen everywhere
+# while matching nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78
+plan_checksum() {
+  local sum
+  sum="$(sha256sum "$1")" || return 1
+  printf '%s' "${sum%% *}"
+}
 
 # plan_record_checksum <root> <rel> -- record this file's current checksum in
 # the manifest, replacing any entry it already has. The one writer, called by
@@ -506,7 +515,7 @@ plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 plan_record_checksum() {
   local root="$1" rel sum checksums tmp out lost
   rel="$(plan_normalise_rel "$2")"
-  sum="$(plan_checksum "$root/$rel")"
+  sum="$(plan_checksum "$root/$rel")" || plan_die "cannot hash $rel; refusing to record an entry with no checksum."
   checksums="$root/$PLAN_CHECKSUMS_RELPATH"
   mkdir -p "$(dirname "$checksums")"
   touch "$checksums"

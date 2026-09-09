@@ -14,9 +14,25 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   [[ "$local_sha" == "$zero" ]] && continue # deleting a ref, nothing to build
 
   if [[ "$remote_sha" == "$zero" ]]; then
-    # New branch: diff against master, or against empty tree if master itself.
-    range="$(git merge-base origin/master "$local_sha" 2>/dev/null || true)..$local_sha"
-    [[ -z "${range%%..*}" ]] && range="$local_sha"
+    # New branch: diff against master, or against the empty tree if there is
+    # no common ancestor. Checked, not swallowed: `|| true` collapsed the
+    # range to a bare sha, which makes the diffs below *working-tree* diffs
+    # -- empty on a clean checkout, exit 0 -- so neither the host build nor
+    # the gate-mutants build ran, on exactly the new-branch push this arm
+    # exists for. merge-base answers 1 for "no common ancestor" and 128 when
+    # git itself fails.
+    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73
+    mb_rc=0
+    base="$(git merge-base origin/master "$local_sha" 2>/dev/null)" || mb_rc=$?
+    case "$mb_rc" in
+      0) ;;
+      1) base="$(git hash-object -t tree /dev/null)" ;;
+      *)
+        echo "BLOCKED: cannot compute a merge base for $local_sha (git exited $mb_rc); refusing to decide the build set from a failed range." >&2
+        exit 1
+        ;;
+    esac
+    range="$base..$local_sha"
   else
     range="$remote_sha..$local_sha"
   fi
@@ -39,7 +55,12 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   # decides the host build set, so a change to a gate script never appears in
   # it. Checked for the same reason it is.
   # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68
-  if ! gfiles="$(git -c core.quotePath=false diff --name-only "$range" -- scripts/ docs/skills/ .githooks/)"; then
+  # tests/ and modules/flake/ are in the set because that is where the check
+  # derivation and its registration live: a commit that edits only
+  # tests/gate-script-check.nix changes how the catalogue runs while touching
+  # nothing this pathspec would otherwise see.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F74
+  if ! gfiles="$(git -c core.quotePath=false diff --name-only "$range" -- scripts/ docs/skills/ .githooks/ tests/ modules/flake/)"; then
     echo "BLOCKED: cannot diff $range; refusing to decide whether the gates changed from a failed diff." >&2
     exit 1
   fi
