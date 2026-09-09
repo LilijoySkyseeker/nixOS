@@ -1,8 +1,8 @@
 ---
 slug: split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence
 created: 2026-09-06
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -16,6 +16,13 @@ the design is settled there as
 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D6.
 
 ## State
+
+**2026-09-09: closed.** The evidence ladder, the "Declaring the rung"
+gate and the deploy sequence are in master, and the rung declaration
+survived the gate teardown intact — it is one of the few close-out gates
+that still hard-blocks (2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md,
+ADR-0002). This plan needs no forward correction beyond that; its work
+stands as built.
 
 **2026-09-06: built and tested.** `plan_rung_problem` lives in `lib.sh`
 beside `plan_state_problem`, both reading the section through the shared

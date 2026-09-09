@@ -1,8 +1,8 @@
 ---
 slug: harden-the-workflow-system-against-the-failure-classes-it-exposed
 created: 2026-09-06
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -11,6 +11,14 @@ blocked_by:
 # harden the workflow system against the failure classes it exposed
 
 ## State
+
+**2026-09-09: closed.** `scripts/gate-tests` was built and is in master.
+Read this as history: it was built to make the *blocking* gates safe to
+trust, and the gate teardown days later
+(2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md,
+ADR-0002) made most of those gates advisory and deleted the mutation
+tier that measured this suite. `gate-tests` survives, shrunk to cover
+what still gates (108 assertions). The account below stood when written.
 
 **2026-09-07: the Class 1 and 2 harness is built and it found two live
 fail-opens on its first run.** `scripts/gate-tests` exists, runs in
