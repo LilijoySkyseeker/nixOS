@@ -12,6 +12,20 @@ blocked_by:
 
 ## State
 
+**2026-09-09: contracted.** The 36 `### G<N>` pointers are gone. Nothing
+cited them: the file's only anchored inbound citation was `#G42`, from
+three non-frozen files, all migrated to `#F36`. The six remaining lessons
+are renumbered `G1`-`G6`; the old numbers are recorded under
+`## Gotchas (G)` for anyone reading an older revision.
+
+The step that was not in the plan: **seven cross-references in the item
+bodies named this file's own `G` ids in prose**, which `plan-citations`
+cannot see -- it resolves `<file>.md#anchor`, not a bare `` `G17` ``.
+Contracting without migrating those would have left seven references
+pointing at headings that no longer exist, silently. Two more were left
+alone deliberately, because they name a *different* plan's ids or quote
+historical text.
+
 **2026-09-08: reclassified, not rewritten.** The 42 catalogue items were
 split into **36 defects and 6 lessons** under the `G` is a lesson, `F` is a
 defect rule
@@ -21,9 +35,9 @@ one-line pointer to its successor, kept so existing `#G` citations keep
 resolving until the contract phase removes it. No item's text was edited --
 only relocated within this file.
 
-The six that stay `G` are lessons with nothing to drain: `G13` and `G21`
-are limits accepted and documented as such, `G20` is a property of skill
-auto-invocation rather than of this repo, and `G34`-`G36` are index
+The six that stay `G` are lessons with nothing to drain: `G1` and `G3`
+are limits accepted and documented as such, `G2` is a property of skill
+auto-invocation rather than of this repo, and `G4`-`G6` are index
 pointers to plans of their own.
 
 **Nine of the 36 defects are resolved** (eight FIXED, one MOOT): six were
@@ -71,15 +85,15 @@ every line below is currently unstarted.
 - [ ] F10 — `docs/plans/.checksums` is a single shared file with no locking
 - [x] F11 — `plan-carry`/`plan-reject` default titles can collide after 50-char slug truncation
 - [ ] F12 — no automated test suite for the plan/workflow scripts
-- [ ] G13 — `plan-touch-guard` can't verify the *right* plan was touched, only *a* plan
+- [ ] G1 — `plan-touch-guard` can't verify the *right* plan was touched, only *a* plan
 - [ ] F13 — `footer-guard`'s pattern list isn't exhaustive
 - [ ] F14 — `verify-ladder`'s diff-scoped lint precision silently degrades without `jq`
 - [ ] F15 — diff-scoped line-range logic untested against renamed files
 - [x] F16 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
 - [ ] F17 — `plan-reject`'s mandatory reason has no substance check
 - [ ] F18 — no retention/archival story for `done/`/`rejected/` at scale
-- [x] G20 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
-- [ ] G21 — every hook in this system is bypassable (`--no-verify`, direct payload crafting) by design, not just in theory
+- [x] G2 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
+- [ ] G3 — every hook in this system is bypassable (`--no-verify`, direct payload crafting) by design, not just in theory
 - [ ] F19 — `security`/`docs-updater` both hold `Bash`, which can fully defeat a "read-only" intent at the tool-restriction level
 - [ ] F20 — no verification that a subagent actually stayed in its intended scope
 - [ ] F21 — `mark-trivial` has no usage audit trail; nothing stops it being used as a blanket bypass
@@ -92,9 +106,9 @@ every line below is currently unstarted.
 - [ ] F28 — no repo-wide citation-integrity checker confirming every bare-filename citation actually resolves
 - [ ] F29 — no chain-of-custody view for multi-hop `plan-carry`/supersession chains
 - [ ] F30 — `hook-lib.sh`'s no-`jq` awk fallback path has never actually been exercised
-- [ ] G34 — see `2026-08-27-design-the-vm-testing-subagent-s.md` (tabled separately)
-- [ ] G35 — see `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md` (tabled separately)
-- [ ] G36 — see `2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md` (tabled separately)
+- [ ] G4 — see `2026-08-27-design-the-vm-testing-subagent-s.md` (tabled separately)
+- [ ] G5 — see `2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md` (tabled separately)
+- [ ] G6 — see `2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md` (tabled separately)
 - [ ] F31 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
 - [ ] F32 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
 - [x] F33 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
@@ -106,91 +120,20 @@ every line below is currently unstarted.
 
 ## Gotchas (G)
 
-Every `### G<N>` below that reads "Reclassified as a defect" is a pointer,
-not content: its body now lives under the `### F<N>` it names. The pointers
-exist so inbound `#G<N>` citations keep resolving through the expand phase,
-and are deleted in the contract phase once no reference remains.
+The 36 defects this file used to carry as `G` items now live under
+`## Findings (F)`. Their `### G<N>` pointers are gone -- nothing cites them
+any more -- and the six lessons below are renumbered `G1`-`G6`. The old
+numbers, for anyone reading an older revision: G13, G20, G21 and G34-G36
+respectively.
 
-### G1 — no `plan-find`/citation-resolver helper
-
-Reclassified as a defect: see `#F1`.
-
-### G2 — no index/dashboard view across all plans
-
-Reclassified as a defect: see `#F2`.
-
-### G3 — `plan-tick`'s ID matching is line-bound and fragile
-
-Reclassified as a defect: see `#F3`.
-
-### G4 — heading-regex mismatches fail silently with no linter
-
-Reclassified as a defect: see `#F4`.
-
-### G5 — no structural validator ("plan-lint") for a plan file
-
-Reclassified as a defect: see `#F5`.
-
-### G6 — near-duplicate plan detection is judgment-only, not hardcoded
-
-Reclassified as a defect: see `#F6`.
-
-### G7 — `subagent-stamp`'s `agent_type` allowlist is a hardcoded, easy-to-forget list
-
-Reclassified as a defect: see `#F7`.
-
-### G8 — host-build detection logic is duplicated between `pre-push` and `verify-ladder`
-
-Reclassified as a defect: see `#F8`.
-
-### G9 — no reverse index from a plan file to the commit(s) that landed it
-
-Reclassified as a defect: see `#F9`.
-
-### G10 — `docs/plans/.checksums` is a single shared file with no locking
-
-Reclassified as a defect: see `#F10`.
-
-### G11 — `plan-carry`/`plan-reject` default titles can collide after 50-char slug truncation
-
-Reclassified as a defect: see `#F11`.
-
-### G12 — no automated test suite for the plan/workflow scripts
-
-Reclassified as a defect: see `#F12`.
-
-### G13 — `plan-touch-guard` can't verify the *right* plan was touched, only *a* plan
+### G1 — `plan-touch-guard` can't verify the *right* plan was touched, only *a* plan
 Documented as a known, accepted limit already (`workflow/reference.md`,
 "Why a hook at all"), restated here for the consolidated list: the hook
 only checks that *some* `docs/plans/` file was touched this session. It
 cannot detect "this commit's actual content has nothing to do with the
 plan file that satisfied the gate."
 
-### G14 — `footer-guard`'s pattern list isn't exhaustive
-
-Reclassified as a defect: see `#F13`.
-
-### G15 — `verify-ladder`'s diff-scoped lint precision silently degrades without `jq`
-
-Reclassified as a defect: see `#F14`.
-
-### G16 — diff-scoped line-range logic untested against renamed files
-
-Reclassified as a defect: see `#F15`.
-
-### G17 — `plan-new`'s 50-character slug truncation produces awkward, sometimes-ambiguous filenames
-
-Reclassified as a defect: see `#F16`.
-
-### G18 — `plan-reject`'s mandatory reason has no substance check
-
-Reclassified as a defect: see `#F17`.
-
-### G19 — no retention/archival story for `done/`/`rejected/` at scale
-
-Reclassified as a defect: see `#F18`.
-
-### G20 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
+### G2 — `workflow`'s auto-invocation is inherently unreliable, and nothing gates *mid-task* drift before a commit is attempted
 Confirmed via this session's own research: skill auto-invocation is
 documented as missing roughly half the time when it overlaps a trained
 behavior. The *only* hard backstop is the commit-time hook, which fires
@@ -213,7 +156,7 @@ auto-invocation itself is unreliable or that ungated mid-task drift before
 any commit is attempted goes uncaught. Still open for anything that isn't
 "does the plan cited by this merge have unresolved findings."
 
-### G21 — every hook in this system is bypassable by design, not just in theory
+### G3 — every hook in this system is bypassable by design, not just in theory
 `git commit --no-verify` skips the git-level hooks; a sufficiently
 sophisticated or careless agent session could in principle craft tool
 calls that don't trigger `PreToolUse` matching, or a differently-configured
@@ -222,95 +165,20 @@ harness might not load `.claude/settings.json` hooks at all. This mirrors
 sandbox" caveat — worth stating explicitly for this system too rather than
 leaving it implicit.
 
-### G22 — `security`/`docs-updater` both hold `Bash`, which can fully defeat a "read-only" intent at the tool-restriction level
-
-Reclassified as a defect: see `#F19`.
-
-### G23 — no verification that a subagent actually stayed in its intended scope
-
-Reclassified as a defect: see `#F20`.
-
-### G24 — `mark-trivial` has no usage audit trail; nothing stops it being used as a blanket bypass
-
-Reclassified as a defect: see `#F21`.
-
-### G25 — `.claude/.active-plan`/`.trivial-ack` are single-slot markers; concurrent plans/subagents in one session can cross-contaminate
-
-Reclassified as a defect: see `#F22`.
-
-### G26 — no recovery ("plan-doctor") for a plan left mid-operation by an interrupted `plan-freeze`/`plan-move`
-
-Reclassified as a defect: see `#F23`.
-
-### G27 — the whole system exists on one unpushed/unmerged branch; multi-machine drift risk until it lands
-
-Reclassified as a defect: see `#F24`.
-
-### G28 — no CI validation independent of local hooks
-
-Reclassified as a defect: see `#F25`.
-
-### G29 — `security` subagent vs. the landed `docs/skills/security-audit/` skill: overlapping domain, unreconciled, incompatible ID schemes
-
-Reclassified as a defect: see `#F26`.
-
-### G30 — `docs/agents/security/reference.md` is a copied/adapted rubric, not single-sourced from the audit's own reference material
-
-Reclassified as a defect: see `#F27`.
-
-### G31 — no repo-wide citation-integrity checker confirming every bare-filename citation actually resolves
-
-Reclassified as a defect: see `#F28`.
-
-### G32 — no chain-of-custody view for multi-hop `plan-carry`/supersession chains
-
-Reclassified as a defect: see `#F29`.
-
-### G33 — `hook-lib.sh`'s no-`jq` awk fallback path has never actually been exercised
-
-Reclassified as a defect: see `#F30`.
-
-### G34 — already tracked as its own plan
-
+### G4 — already tracked as its own plan
 Listed here only as an index pointer, not duplicated: the VM-testing
 subagent's shape is tracked in
 2026-08-27-design-the-vm-testing-subagent-s.md.
 
-### G35 — already tracked as its own plan
-
+### G5 — already tracked as its own plan
 Listed here only as an index pointer, not duplicated: a generalized
 diff-scoped-linting skill is tracked in
 2026-08-27-design-a-diff-scoped-linting-skill-or-subagent.md.
 
-### G36 — already tracked as its own plan
-
+### G6 — already tracked as its own plan
 Listed here only as an index pointer, not duplicated: the unresolved samba
 persistence conflict is tracked in
 2026-08-27-resolve-whether-samba-s-var-lib-samba-persistence-.md.
-
-### G37 — `plan-new`/`plan-move` run before `EnterWorktree` strand an orphaned, untracked plan file in the shared checkout
-
-Reclassified as a defect: see `#F31`.
-
-### G38 — `workflow`'s step sequence has no guidance for validating an unmerged branch on a live target host without building on that host
-
-Reclassified as a defect: see `#F32`.
-
-### G39 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
-
-Reclassified as a defect: see `#F33`.
-
-### G40 — no priority signal on a plan file or in any index
-
-Reclassified as a defect: see `#F34`.
-
-### G41 — `/simplify` is mandated unconditionally in step 6, even for docs-only changes
-
-Reclassified as a defect: see `#F35`.
-
-### G42 — `plan-gate` can't tell a legitimately untrailered commit from a forgotten `Plan:` trailer
-
-Reclassified as a defect: see `#F36`.
 
 ## Findings (F)
 
@@ -340,7 +208,7 @@ scripts (`plan-new`/`plan-move`/`plan-tick`/`plan-decide`) so the index
 self-updates on every change instead of needing a separate invocation
 someone has to remember to run. Where the one-sentence blurb comes from —
 first line of "Original plan", a dedicated frontmatter field, or
-author-supplied text at `plan-new` time — is still open. See also `G40`
+author-supplied text at `plan-new` time — is still open. See also `F34`
 (priority tag), proposed as a field this same index would surface.
 
 ### F3 — `plan-tick`'s ID matching is line-bound and fragile
@@ -427,7 +295,7 @@ but a real latent bug, not a hypothetical one.
 truncate into an unexpected or colliding slug for a sufficiently long
 original name — untested against this edge case.
 
-**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` (same underlying `plan_slugify` change as `G17`) — cap raised to 70 chars, doesn't eliminate collisions in principle but meaningfully widens the room before they'd occur.
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` (same underlying `plan_slugify` change as `F16`) — cap raised to 70 chars, doesn't eliminate collisions in principle but meaningfully widens the room before they'd occur.
 
 **FIXED 2026-09-08:** carried over from this item's own 2026-08-28 resolution note above: `plan_slugify`'s cap raised to 70 chars in 2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md
 
@@ -466,7 +334,7 @@ currently a collision risk (the date suffix still disambiguates in
 practice), but the truncation point is arbitrary and can make a filename
 citation less self-descriptive than intended.
 
-**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan_slugify`'s cap raised from 50 to 70 chars and truncation now backs up to the last word boundary instead of cutting mid-word. The filename above is left as historical evidence of the bug (this plan is append-only) and was not re-slugified — only reordered to date-first by the same fix's migration (see `G39` below).
+**RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan_slugify`'s cap raised from 50 to 70 chars and truncation now backs up to the last word boundary instead of cutting mid-word. The filename above is left as historical evidence of the bug (this plan is append-only) and was not re-slugified — only reordered to date-first by the same fix's migration (see `F33` below).
 
 **FIXED 2026-09-08:** carried over from this item's own 2026-08-28 resolution note above: truncation now backs up to a word boundary, fixed in 2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md
 
@@ -659,7 +527,7 @@ proper home instead of a footnote on `workflow`.
 
 ### F33 — plan filenames are `<slug>-<date>.md`; date-first would let plain directory listings sort chronologically
 `plan-new` names files `<slug>-<created-date>.md` (slug first, date as a
-disambiguating suffix — see `G17`). Because the date sits at the *end*,
+disambiguating suffix — see `F16`). Because the date sits at the *end*,
 `ls docs/plans/<status>/` and most file pickers sort entries
 alphabetically by slug, not by creation order — there's no way to eyeball
 "what's newest" without opening each file's frontmatter or reaching for
@@ -671,7 +539,7 @@ skill docs, every existing bare-filename citation across the repo,
 `plan-new`'s slugify/naming logic, and — since existing files would need
 renaming to stay consistent — a one-time bulk migration of every plan
 file already created under the old ordering, exactly the "rename target
-outside the normal scripts" risk `G31` already flags for citation
+outside the normal scripts" risk `F28` already flags for citation
 integrity).
 
 **RESOLVED 2026-08-28:** fixed in `2026-08-28-fix-plan-tick-multi-line-matching-slug-truncation-.md` — `plan-new` now emits `<date>-<slug>.md`, and the user opted for the full migration: all 44 pre-existing plan files were renamed, `docs/plans/.checksums` updated for the frozen ones (two frozen files needed a citation-text edit too, recorded there as its own gotcha), and every citation repo-wide (not just under `docs/plans/`) swept to the new filenames. This file's own name is now the literal example given above.
@@ -685,7 +553,7 @@ backlog noise without opening each file individually (relevant now that
 `todo/` alone holds 13 files). Proposed: a `priority:` frontmatter field
 (e.g. `high`/`medium`/`low`), script-set like every other frontmatter
 field — never hand-written — surfaced both at the top of the plan file
-itself and, once it exists, in the `G2` index. Open questions: who sets
+itself and, once it exists, in the `F2` index. Open questions: who sets
 priority and when (author only at `plan-new` time, or re-triaged later
 via a dedicated `plan-priority <file> <level>` script), whether it needs
 its own scale or can reuse an existing convention, and whether the index
@@ -733,7 +601,7 @@ authoring plans rather than executing one, a docs-only change, a
 `mark-trivial`'d fix — from simply having forgotten it. The observable
 result is identical in all four cases.
 
-Composes badly with `G13`, and the pair is worse than either alone: `G13`
+Composes badly with `G1`, and the pair is worse than either alone: `G1`
 says touching *any* plan satisfies the commit-time hook, and this says
 omitting the trailer makes the merge-time gate a no-op. So a commit can
 clear both gates while being governed by no plan at all — `plan-touch-guard`
@@ -750,7 +618,7 @@ would have looked exactly the same.
 Fix is not obvious and may not be worth it. A "trailer or explicit
 opt-out" requirement would mirror how `mark-trivial` already makes the
 trivial path explicit rather than silent, but it adds ceremony to every
-docs commit. Worth weighing against `G24` (`mark-trivial` has no usage
+docs commit. Worth weighing against `F21` (`mark-trivial` has no usage
 audit trail), which is the same "explicit escape hatch, unaudited"
 shape.
 

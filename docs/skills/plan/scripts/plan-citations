@@ -44,7 +44,7 @@ done
 # Scripts are in scope, not just .nix/.md: this script's own header cites
 # a plan, as do plan-lint's and required-agents'. Globbing only source and
 # docs left the failure mode alive in the files that fix it
-# plan: 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G31
+# plan: 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#F28
 # PLAN_TEXT_GLOBS + PLAN_DOC_GLOBS, not the code set
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F30
 # -z, because a path may contain a newline.

@@ -676,7 +676,9 @@ Expand, in this order:
 Contract, only once `plan-citations` reports zero unresolved references
 for a batch:
 
-- [ ] drop the pointer headings for migrated batches
+- [x] drop the pointer headings for migrated batches — done for batch 1;
+      `#F49` records what the check for "no reference remains" misses, and
+      `#G4` now carries the three steps a later batch must follow
 - [ ] remaining batches of the 26 non-frozen files with `G` headings,
       of which batch 1 is now expanded (its pointers are what contract
       removes)
@@ -862,6 +864,21 @@ This is a deliberate departure from the append-only rule, which is why
 it is recorded rather than just done: the body is not deleted, it is
 relocated within the same file, and the pointer is what makes that
 auditable.
+
+**Amended 2026-09-09, after contracting batch 1 (`#F49`).** "Once no
+reference remains" cannot be read as "once `plan-citations` is green". That
+checker resolves `<file>.md#anchor` and is blind to a bare `` `G17` `` in
+prose, which is how a plan refers to its own items — batch 1 had seven of
+them. Before dropping a batch's pointers:
+
+1. Migrate the anchored citations, and grep **without** an extension filter:
+   the `plan-*` scripts carry `# plan:` citations and have no extension.
+2. Read every bare `` `G<N>` `` in the file's own bodies and classify each
+   one. Some name *this* file's items and must move; some name a different
+   plan's, or quote historical text, and must not. There is no safe
+   substitution rule, only judgment per reference.
+3. Renumber the surviving lessons from 1, and record the old numbers in the
+   file so an older revision stays readable.
 
 ### G3 - `#G6`'s citation count was 18 and is now 47
 
@@ -2905,3 +2922,41 @@ cover it, and `gate-mutants` carries the entry that restores it
 
 **FIXED 2026-09-08:** all three; `.githooks/pre-commit` is now swept, and
 three `gate-mutants` entries restore them individually
+
+### F49 — the contract phase's "once no reference remains" test is `plan-citations`, which cannot see the references that actually break
+
+- **File:** this plan's `#G4` (the expand—contract design), and the batch-1
+  file, 2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — found while contracting batch 1, and one of
+  the missed references was caught by `plan-citations` only because it
+  happened to be in anchored form
+- **Axis:** needed-used
+- **Reachability:** every future batch. This is the gate `#G6` makes the
+  contract phase wait on, and it does not measure what the phase risks.
+- **Rule:** n/a — new-rule candidate: a migration's completeness check must
+  cover every form the thing being migrated is written in, not the one form
+  a checker already parses.
+- **Finding:** `#G4` says to delete a `### G<N>` pointer "once no reference
+  remains", and `#G6` names `plan-citations` as the check. `plan-citations`
+  resolves `<file>.md#anchor`. It does not see a bare `` `G17` `` in prose,
+  which is how a plan file refers to its *own* items — and this file's
+  bodies were full of them: **seven references to its own migrated ids**,
+  which contracting would have pointed at headings that no longer exist,
+  silently and with the checker green. Two more looked identical and had to
+  be left alone, because they name a different plan's ids (`` `G7`/`D14`
+  references``, explicitly "this session's own meta plan") or quote
+  historical text. So the classification is per-reference judgment, not a
+  substitution. Separately, one anchored citation *was* missed by my own
+  survey: `docs/skills/plan/scripts/plan-citations:47` cites `#G31`, and
+  the survey grepped `--include='*.md' --include='*.sh'` while the plan
+  scripts have no extension. `plan-citations` caught that one, which is
+  exactly the half of the problem it does cover.
+- **Fix risk:** low for batch 1, now done. For later batches the cost is
+  real: each file's own prose references must be read and classified before
+  its pointers can go.
+
+**FIXED 2026-09-09:** batch 1 contracted — seven prose references migrated,
+two deliberately left, the missed `#G31` citation corrected, six lessons
+renumbered `G1`-`G6` with the old numbers recorded in the file. The rule for
+later batches is written into `#G4`
