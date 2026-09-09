@@ -1,7 +1,7 @@
 ---
 slug: dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus
 created: 2026-09-09
-status: todo
+status: in-progress
 frozen: false
 kind: task
 priority: normal
@@ -113,6 +113,9 @@ recommends (b): it keeps the one guarantee with teeth (the day-one samba
 findings are the class it protects) while removing the livelock, whose
 driver was trivia that could not be parked.
 
+
+**ANSWERED 2026-09-09:** user said proceed with the plan's recommendations (2026-09-09): option (b), block only unresolved CRITICAL/HIGH security findings
+
 ### D2 — replacement for the freeze/checksum machinery
 
 **Recommended:** delete `docs/plans/.checksums`, `plan-repair`, the
@@ -124,12 +127,18 @@ its defect surface. Note `plan-move ... done` still needs *some* freeze
 semantics — under the recommendation it just moves the file, and
 immutability is enforced at the merge boundary instead of at write time.
 
+
+**ANSWERED 2026-09-09:** proceed as recommended: delete checksum machinery, enforce done/-immutability at the merge boundary in plan-gate CI
+
 ### D3 — where do host builds run?
 
 Keep the local pre-push five-host build (current behaviour), or move it
 to async CI in the buildbot style Mic92 uses. **Recommended:** keep local
 for now; this is a placement question orthogonal to the teardown, and the
 local build is the single highest-value gate in the repo.
+
+
+**ANSWERED 2026-09-09:** proceed as recommended: host builds stay in the local pre-push hook, unchanged
 
 ### D4 — fate of plan-lint and plan-citations
 
@@ -140,6 +149,9 @@ warnings are only ever noise. `required-agents`, `subagent-stamp`,
 choice: with nothing blocking on their output, keep only the ones whose
 output is still read.
 
+
+**ANSWERED 2026-09-09:** proceed as recommended: plan-lint/plan-citations warn-only probation; small hooks kept as-is during probation, disposition reviewed after
+
 ### D5 — do new plans keep the D/G/F item scheme?
 
 **Recommended:** new plans use plain prose plus ADRs for real
@@ -149,7 +161,22 @@ architectural decisions; D/G/F, `plan-decide`, `plan-resolve`,
 migrated). Alternative: keep the scheme as optional structure for large
 plans only.
 
-### D6 — PR #69
+
+**ANSWERED 2026-09-09:** proceed as recommended: new plans use plain prose plus ADRs; D/G/F and its scripts become optional, existing corpus untouched
+
+**Refined 2026-09-09, in discussion with the user:** option (b) — the
+*notation* stays, the *lifecycle* goes. D/G/F remains the house
+convention for new plans (anchors stay citeable, `plan-decide`/
+`plan-resolve` stay as conveniences, `**ANSWERED**` keeps meaning "the
+user confirmed" — the sign-off-provenance value), but nothing requires
+items, sequential numbering, or full drainage. Freeze semantics under
+this: `plan-move ... done` still *refuses* on a missing/empty `## State`,
+a missing rung declaration, or an unresolved CRITICAL/HIGH security
+finding; unresolved ordinary findings and open decisions *warn* instead
+of blocking. Security findings keep their structured `### F<N>` +
+`**Severity:**` shape in whatever plan they land in — the `D1` merge
+block parses exactly that. ADRs take only the decisions that meet the
+ADR bar; small in-task decisions stay as D items.
 
 It is red on two stale stamps and nothing else; the branch is green
 locally. Options: merge it on its merits once Stage 1 makes stamps
@@ -189,10 +216,15 @@ plan-citations, invert the reviewable code set, CI tree-hashing,
 plan-gate fingerprint-algorithm survival, fingerprint symlink coverage,
 frozen-plan-guard renames, hooks fail-closed, review-loop churn
 measurement, git path quoting, shrink the CI trusted set, stop-a-PR-
-weakening-the-CI-gate) plus
-2026-08-28-design-a-provenance-system-for-d-f-resolution-markers.md.
+weakening-the-CI-gate) ~~plus
+2026-08-28-design-a-provenance-system-for-d-f-resolution-markers.md~~.
 The known-weak-points catalogue stays: most of its entries describe the
 parts being deleted, which resolves them better than fixing would have.
+
+**2026-09-09:** the provenance plan comes off this list. `D5`'s refined
+answer keeps the resolution-marker notation and its "the user confirmed
+this" meaning, so that plan's motivating concern survives the teardown;
+it stays in `todo/` on its own merits. Twelve rejections remain.
 
 ### G4 — the measured baseline this plan was decided against (2026-09-09)
 

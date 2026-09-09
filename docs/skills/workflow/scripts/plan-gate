@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 # plan-gate <base-ref> [<head-ref>]
-# Refuses (non-zero exit) if any commit in <base-ref>..<head-ref> cites a
-# plan file via a "Plan: <file>.md" trailer that still has an unresolved
-# Finding, or that is missing a completion stamp for a review agent the
-# range obliged. The only automated caller is
-# .github/workflows/plan-gate.yml, over the PR range; any other range
-# (pre-deploy, say) has to be passed by hand. Read-only; never edits
-# anything. A commit with no Plan: trailer (e.g. mark-trivial'd) is simply
-# not gated here -- plan-touch-guard already covers "did this session
-# touch a plan at all" at commit time.
+# The merge boundary's one hard reviewer check, advisory about everything
+# else. Refuses (non-zero exit) only if a commit in <base-ref>..<head-ref>
+# cites a plan (via a "Plan: <file>.md" trailer) that still carries an
+# unresolved CRITICAL- or HIGH-severity security finding. Every other
+# review signal -- ordinary unresolved findings, a plan still open at
+# merge time -- is printed as a NOTE and never blocks: reviews are
+# advisory, and a finding may be parked with a note while the human
+# merges when satisfied. Completion stamps are no longer read here at
+# all; they stay in plan files as information about what ran, not as
+# locks. Decided in
+# 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D1
+# after the stamp-staleness block livelocked against its own review loop.
 #
-# Also prints a non-blocking note (does not affect exit status) for any
-# cited plan still under todo/ or in-progress/ at merge time -- a nudge
-# for the close-before-merge convention in docs/skills/workflow/SKILL.md
-# step 8, not a hard gate: some tasks legitimately span multiple PRs and
-# the plan should stay open until the work actually finishes.
+# The only automated caller is .github/workflows/plan-gate.yml, over the
+# PR range; any other range (pre-deploy, say) has to be passed by hand.
+# Read-only; never edits anything. A commit with no Plan: trailer (e.g.
+# mark-trivial'd, or one authoring plans rather than executing one) is
+# simply not gated here.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # Sourced relative to this script's own location, not $root -- CI pins a
@@ -46,8 +49,7 @@ done
 # Status checked, stderr not swallowed. Resolving both refs above does
 # not make this call safe: it can still fail on a corrupt object, an
 # unreadable pack or a shallow clone, and an empty result reads as
-# "nothing to gate" -- a green gate over a range nobody examined. Found
-# by sabotaging the Nth git call and requiring a refusal.
+# "nothing to gate" -- a green gate over a range nobody examined.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F1
 if ! plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head}" | sed '/^$/d' | sort -u)"; then
   echo "BLOCKED: cannot read commit trailers for ${base}..${head}; refusing to report an unexamined range as clean." >&2
@@ -62,89 +64,6 @@ fi
 fail=0
 still_open=0
 
-# Which review agents this range obliged, computed once: it depends only
-# on the range's file list, never on which plan is cited. Mandatory, not
-# best-effort -- a missing or failing required-agents would otherwise
-# yield an empty obligation set and quietly turn the stamp check into a
-# pass, which is the exact failure this check exists to prevent. CI pins
-# both scripts from the base branch together (see plan-gate.yml), so
-# whenever this version of plan-gate runs, required-agents is beside it.
-ra="$SCRIPT_DIR/required-agents"
-[ -x "$ra" ] || {
-  echo "BLOCKED: required-agents is missing or not executable beside plan-gate; cannot tell which reviews this range obliged." >&2
-  exit 1
-}
-# Deliberately two steps. Inlining this as `for a in $("$ra" ... || exit 1)`
-# reads tidier and is wrong: the `exit` would run in the command
-# substitution's subshell, leaving the parent to carry on with an empty
-# obligation set -- the same silent pass required-agents guards against
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F3
-obliged="$("$ra" "$base" "$head")" || {
-  echo "BLOCKED: required-agents failed for ${base}...${head}; cannot tell which reviews this range obliged." >&2
-  exit 1
-}
-# An array from here on, so no consumer iterates an unquoted string --
-# same reasoning as required-agents' own conversion. The string capture
-# above stays because a `mapfile < <(...)` would discard the exit status
-# just checked.
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F65
-obliged_agents=()
-while IFS= read -r a; do
-  if [ -n "$a" ]; then obliged_agents+=("$a"); fi
-done <<<"$obliged"
-
-# Every stampable agent must be a real agent. `plan_is_stampable` is used
-# below as a filter, and a filter has no floor: point
-# PLAN_STAMPABLE_AGENTS at names that no longer exist and nothing is
-# stampable, so nothing is checked, and the gate reports every plan
-# clean. Verified -- two BLOCKED lines became "all obliged reviews
-# stamped", exit 0, no diagnostic. Same shape as required-agents' own
-# emitter-side check.
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F55
-for a in "${PLAN_STAMPABLE_AGENTS[@]}"; do
-  plan_in_list "$a" "${PLAN_AGENT_ORDER[@]}" ||
-    { echo "BLOCKED: stampable agent '$a' is not in PLAN_AGENT_ORDER; the stamp check cannot be trusted." >&2; exit 1; }
-done
-# The subset check above has a blind side: a PLAN_STAMPABLE_AGENTS whose
-# names sit in PLAN_AGENT_ORDER too but that required-agents never emits
-# passes it, and the plan_is_stampable filter below then discards every
-# obliged agent -- zero stamp checks under a green pass. So the floor is
-# on the outcome: a range that obliged agents, none of them stampable,
-# means the name sets drifted, not that nothing needed review. Fatal is
-# safe: any code-obliging set contains 'security' and a docs-only set
-# contains 'docs-updater', both stampable, so an obliged, all-unstampable
-# set cannot arise legitimately today.
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F64
-any_stampable=0
-for agent in "${obliged_agents[@]}"; do
-  if plan_is_stampable "$agent"; then any_stampable=1; break; fi
-done
-if [ "${#obliged_agents[@]}" -gt 0 ] && [ "$any_stampable" -eq 0 ]; then
-  echo "BLOCKED: the range obliges review agents but the stamp check would examine none of them; PLAN_STAMPABLE_AGENTS and required-agents' emitted names have drifted apart." >&2
-  exit 1
-fi
-# The code as it stands now, to compare each stamp's fingerprint against.
-# Checked, like required-agents above: an unreportable fingerprint would
-# otherwise print "the code is now ." and block for a reason whose
-# remedy is the opposite of the one the message implies.
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F33
-current_fp="$(plan_code_fingerprint)" || {
-  echo "BLOCKED: cannot compute the current code fingerprint; cannot tell a stale stamp from a current one." >&2
-  exit 1
-}
-
-# Reads $frozen and $agent from the enclosing loop at call time. Severity
-# and remedy depend only on frozenness, never on which stamp problem
-# fired -- one helper instead of a frozen fork in every arm.
-stamp_problem() {
-  if [ "$frozen" = 1 ]; then
-    echo "NOTE: $* The plan is frozen, so it cannot be (re)stamped; if this range's changes really needed that review, the work needs its own plan." >&2
-  else
-    echo "BLOCKED: $* Run '${agent}', or record why it was skipped." >&2
-    fail=1
-  fi
-}
-
 while IFS= read -r p; do
   [ -n "$p" ] || continue
   rel="$(plan_locate "$p" "$root" 2>/dev/null)" || {
@@ -152,56 +71,30 @@ while IFS= read -r p; do
     fail=1
     continue
   }
-  unresolved="$(plan_unresolved_findings "$root/$rel")"
-  if [ -n "$unresolved" ]; then
-    echo "BLOCKED: $rel has unresolved finding(s) -- resolve with plan-resolve before merging/deploying:" >&2
-    echo "$unresolved" >&2
+
+  # The one hard check: an unresolved security finding rated CRITICAL or
+  # HIGH must be dealt with (plan-resolve: fixed, accepted with the
+  # user's sign-off, or moot) before the range merges. Anything the
+  # security agent rated lower, and any finding with no Severity line at
+  # all (docs-updater's, hand-written ones), is parkable.
+  critical="$(plan_unresolved_critical_findings "$root/$rel")"
+  if [ -n "$critical" ]; then
+    echo "BLOCKED: $rel has unresolved CRITICAL/HIGH security finding(s) -- resolve with plan-resolve before merging:" >&2
+    echo "$critical" >&2
     fail=1
   fi
 
-  # Every review agent this range obliged must have left a completion
-  # stamp in the cited plan. Unresolved findings prove a review that ran
-  # was closed out; this proves it ran at all -- different failure modes,
-  # and only the second survives an agent simply forgetting.
-  # Frozenness is a per-plan fact, so it is read once rather than
-  # re-parsed for every obliged agent. It gates *both* stamp failures
-  # below, not just staleness: subagent-stamp refuses to write to a
-  # frozen plan at all, so a missing stamp on one is exactly as
-  # unfixable as a stale one, and every pre-stamp-era done/ plan has no
-  # stamps. Blocking either way would be a demand nothing in the system
-  # can satisfy, whose cheapest escape is dropping the Plan: trailer --
-  # which disables this gate entirely, including the unresolved-findings
-  # check that predates it. An unfixable gate teaches the bypass.
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F1
-  # The manifest, not the file's own `frozen:` field. Here "frozen" *relaxes*
-  # the stamp requirement, so trusting the self-declared field let any plan
-  # buy that leniency by adding one line to its own frontmatter: an
-  # in-progress plan marked `frozen: true` turned two BLOCKED lines into two
-  # NOTEs and exit 0, with no review having run. This is the only gate CI
-  # executes.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61
-  frozen=0
-  plan_manifest_frozen "$root" "$rel" && frozen=1
+  # Everything below is information, not enforcement.
+  unresolved="$(plan_unresolved_findings "$root/$rel")"
+  if [ -n "$unresolved" ] && [ "$unresolved" != "$critical" ]; then
+    echo "NOTE: $rel has unresolved (parked) finding(s) -- fine to merge, listed so they aren't forgotten:" >&2
+    printf '%s\n' "$unresolved" | grep -Fxv -f <(printf '%s\n' "$critical") >&2 || true
+  fi
 
-  for agent in "${obliged_agents[@]}"; do
-    plan_is_stampable "$agent" || continue
-    if ! stamped_fp="$(plan_stamp_fingerprint "$root/$rel" "$agent")"; then
-      stamp_problem "$rel cites a range that changed files obliging '${agent}', but carries no completion stamp for it."
-    elif [ "$stamped_fp" = legacy ]; then
-      echo "NOTE: $rel's '${agent}' stamp predates code fingerprints, so it records that the agent ran but not what it read." >&2
-    elif [ "$stamped_fp" = malformed ]; then
-      # Blocks, unlike `legacy`: a stamp naming an empty fingerprint
-      # cannot come from the pre-fingerprint era, only from a truncated
-      # or hand-written line, so re-running the agent always fixes it.
-      stamp_problem "$rel's '${agent}' stamp is malformed -- it names no code fingerprint."
-    elif [ "$stamped_fp" != "$current_fp" ]; then
-      stamp_problem "$rel's '${agent}' stamp is stale -- it reviewed code $stamped_fp, but the code is now $current_fp."
-    fi
-  done
   case "$rel" in
     docs/plans/done/*|docs/plans/rejected/*) ;;
     *)
-      echo "NOTE: $rel is still open (not under done/ or rejected/) at merge time -- plan-move it to done/ first if this range's work is actually complete, per SKILL.md step 8." >&2
+      echo "NOTE: $rel is still open (not under done/ or rejected/) at merge time -- plan-move it to done/ if this range's work is actually complete." >&2
       still_open=$((still_open + 1))
       ;;
   esac
@@ -209,15 +102,11 @@ done <<<"$plans"
 
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
-  # Deliberately does not name a cause: this gate now blocks for
-  # unresolved findings, a missing stamp, or a stale one, and naming only
-  # the first sends the reader looking for the wrong thing.
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F9
-  echo "plan-gate: blocked. See the BLOCKED line(s) above for which check failed." >&2
+  echo "plan-gate: blocked. See the BLOCKED line(s) above." >&2
   exit 1
 fi
 if [ "$still_open" -gt 0 ]; then
   echo "" >&2
 fi
-echo "plan-gate: all cited plans ($(printf '%s\n' "$plans" | grep -c .)) have their findings resolved and their obliged reviews stamped."
+echo "plan-gate: no unresolved CRITICAL/HIGH security findings in any cited plan ($(printf '%s\n' "$plans" | grep -c .))."
 exit 0

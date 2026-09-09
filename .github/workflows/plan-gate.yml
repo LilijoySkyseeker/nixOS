@@ -1,13 +1,13 @@
 name: plan-gate
 
-# This repo's first CI check. Server-side backstop for the fix-or-accept
-# discipline docs/skills/plan/scripts/plan-resolve enforces locally --
-# every local hook in this system is bypassable by design (skip hooks,
-# craft tool calls outside their matchers), so this exists so an
-# unresolved security Finding, or a review that was never run at all,
-# can't reach master purely by skipping local hooks. Runs
-# docs/skills/workflow/scripts/plan-gate rather than reimplementing it,
-# so a hand-run over the same range gives the same verdict.
+# This repo's one required CI check. Server-side backstop for the single
+# review rule that still blocks a merge: no PR whose commits cite a plan
+# with an unresolved CRITICAL/HIGH security finding reaches master purely
+# by skipping local hooks (which are all bypassable by design). Everything
+# else plan-gate prints is advisory -- see ADR-0002 and
+# docs/plans/*/2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md.
+# Runs docs/skills/workflow/scripts/plan-gate rather than reimplementing
+# it, so a hand-run over the same range gives the same verdict.
 
 on:
   pull_request:
@@ -47,21 +47,18 @@ jobs:
           git show "origin/$BASE_REF:docs/skills/workflow/scripts/plan-gate" > /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
           git show "origin/$BASE_REF:docs/skills/plan/scripts/lib.sh" > /tmp/plan-gate-trusted/skills/plan/scripts/lib.sh
           chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/plan-gate
-          # required-agents decides which review agents the range obliged,
-          # so it is enforcement logic too and gets pinned on the same
-          # reasoning. A plan-gate that has the stamp check *requires* it
-          # and blocks without it -- deliberately, since a missing
-          # dependency that yielded "no agents obliged" would be a silent
-          # pass. The conditional copy is safe because the two are pinned
-          # from the same base branch: a base old enough to lack
-          # required-agents also has a plan-gate that never calls it.
+          # required-agents is pinned only for the transition window: the
+          # base branch's plan-gate may still be the stamp-checking one,
+          # which requires it beside itself and blocks without it. Once a
+          # base-branch plan-gate no longer calls it, this copy is inert
+          # and the block can be dropped.
           if git cat-file -e "origin/$BASE_REF:docs/skills/workflow/scripts/required-agents" 2>/dev/null; then
             git show "origin/$BASE_REF:docs/skills/workflow/scripts/required-agents" > /tmp/plan-gate-trusted/skills/workflow/scripts/required-agents
             chmod +x /tmp/plan-gate-trusted/skills/workflow/scripts/required-agents
           fi
           echo "found=true" >> "$GITHUB_OUTPUT"
 
-      - name: Check cited plans have findings resolved and obliged reviews stamped
+      - name: Check cited plans for unresolved critical security findings
         if: steps.pin.outputs.found == 'true'
         env:
           BASE_REF: ${{ github.base_ref }}

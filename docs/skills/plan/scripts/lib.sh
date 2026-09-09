@@ -390,6 +390,26 @@ plan_unresolved_findings() {
   ' "$1"
 }
 
+# plan_unresolved_critical_findings <file> -- the subset of unresolved
+# findings whose body carries a "**Severity:** CRITICAL" or "HIGH" line
+# (the security agent's schema; findings without a Severity line never
+# match). This is the one finding class that still blocks a merge --
+# everything else is parkable, per
+# 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D1.
+plan_unresolved_critical_findings() {
+  awk '
+    function report() {
+      if (id != "" && !resolved && critical) print id
+    }
+    /^### F[0-9]+/ { report(); id=$0; resolved=0; critical=0; next }
+    /\*\*FIXED/    { resolved=1 }
+    /\*\*ACCEPTED/ { resolved=1 }
+    /\*\*MOOT/     { resolved=1 }
+    /\*\*Severity:\*\*[[:space:]]*(CRITICAL|HIGH)/ { critical=1 }
+    END { report() }
+  ' "$1"
+}
+
 # plan_state_body <file> [skip-fences] -- the ## State section's text,
 # without the heading. Returns non-zero if the file has no State heading
 # at all. With a non-empty second argument, fenced blocks inside the
