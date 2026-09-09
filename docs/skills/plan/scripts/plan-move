@@ -27,16 +27,15 @@ new_rel="docs/plans/${target}/${base}"
 [ "$current_dir" = "docs/plans/${target}" ] && plan_die "$rel is already in docs/plans/${target}/."
 
 if [ "$target" = "done" ]; then
-  unresolved="$(plan_unresolved_decisions "$root/$rel")"
-  if [ -n "$unresolved" ]; then
-    plan_die "cannot move to done/ -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
-$unresolved"
-  fi
-
-  unresolved_f="$(plan_unresolved_findings "$root/$rel")"
-  if [ -n "$unresolved_f" ]; then
-    plan_die "cannot move to done/ -- unresolved findings (must be FIXED, ACCEPTED, or MOOT -- use plan-resolve):
-$unresolved_f"
+  # Same hard-gate/warning split as plan-freeze (which this execs below,
+  # and which repeats these checks): critical findings, State and the rung
+  # declaration refuse; ordinary unresolved items only warn, there, once.
+  # Checked here too so a doomed move refuses *before* the git mv.
+  # plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D5
+  critical_f="$(plan_unresolved_critical_findings "$root/$rel")"
+  if [ -n "$critical_f" ]; then
+    plan_die "cannot move to done/ -- unresolved CRITICAL/HIGH security finding(s) (use plan-resolve):
+$critical_f"
   fi
 
   state_problem="$(plan_state_problem "$root/$rel")"

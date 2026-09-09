@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # plan-gate <base-ref> [<head-ref>]
-# The merge boundary's one hard reviewer check, advisory about everything
-# else. Refuses (non-zero exit) only if a commit in <base-ref>..<head-ref>
-# cites a plan (via a "Plan: <file>.md" trailer) that still carries an
-# unresolved CRITICAL- or HIGH-severity security finding. Every other
+# The merge boundary's two hard checks, advisory about everything else.
+# Refuses (non-zero exit) only if the range <base-ref>..<head-ref>
+# (1) modifies or deletes a frozen plan (anything under done/ or
+# rejected/), or (2) contains a commit citing a plan (via a
+# "Plan: <file>.md" trailer) that still carries an unresolved CRITICAL-
+# or HIGH-severity security finding. Every other
 # review signal -- ordinary unresolved findings, a plan still open at
 # merge time -- is printed as a NOTE and never blocks: reviews are
 # advisory, and a finding may be parked with a note while the human
@@ -56,13 +58,37 @@ if ! plans="$(git log --format='%(trailers:key=Plan,valueonly)' "${base}..${head
   exit 1
 fi
 
-if [ -z "$plans" ]; then
-  echo "no 'Plan:' trailers found in ${base}..${head} -- nothing to gate."
-  exit 0
-fi
-
 fail=0
 still_open=0
+
+# Frozen plans are frozen by residence: nothing under done/ or rejected/
+# may be modified or deleted by the range. This is the merge-boundary twin
+# of .githooks/pre-commit's check, and the one that holds for every tool
+# and human, since local hooks are skippable. Three-dot (merge-base) diff,
+# so drift on the base branch is not charged to this range; --no-renames
+# so a rename out of a frozen folder shows as the deletion it is;
+# additions pass, because that is how a plan lands in done/ at all.
+# Checked, not swallowed: an unreadable diff must refuse, not pass.
+# plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D2
+if ! frozen_changed="$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=MDT "${base}...${head}" -- 'docs/plans/done/*.md' 'docs/plans/rejected/*.md')"; then
+  echo "BLOCKED: cannot diff ${base}...${head} for frozen-plan changes; refusing to report an unexamined range as clean." >&2
+  exit 1
+fi
+if [ -n "$frozen_changed" ]; then
+  echo "BLOCKED: this range modifies or deletes frozen plan(s) under done/ or rejected/ -- new information becomes a new plan file that cites them:" >&2
+  echo "$frozen_changed" >&2
+  fail=1
+fi
+
+if [ -z "$plans" ]; then
+  if [ "$fail" -ne 0 ]; then
+    echo "" >&2
+    echo "plan-gate: blocked. See the BLOCKED line(s) above." >&2
+    exit 1
+  fi
+  echo "no 'Plan:' trailers found in ${base}..${head} -- no frozen plan touched, nothing else to gate."
+  exit 0
+fi
 
 while IFS= read -r p; do
   [ -n "$p" ] || continue

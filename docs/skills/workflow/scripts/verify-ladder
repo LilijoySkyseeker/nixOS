@@ -63,21 +63,18 @@ if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
   fail=1
 fi
 
-echo "== freeze manifest =="
-# Nothing else runs `sha256sum -c` over the manifest: plan-lint reads only the
-# active plan, and .githooks/pre-commit checks only entries whose file is
-# staged, so a frozen plan altered without staging reached no gate. Coverage
-# as well as content: every file in done/ and rejected/ must have an entry,
-# or dropping one would leave nothing to verify and still pass.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
-manifest_problem="$(plan_manifest_problem "$root")"
-if [ -n "$manifest_problem" ]; then
-  echo "BLOCKED: $manifest_problem" >&2
-  echo "Restore it from git rather than re-freezing -- a re-freeze records whatever the file says now." >&2
+echo "== frozen plans =="
+# Folder is the authority (see plan_folder_frozen): a working-tree edit to
+# anything under done/ or rejected/ is flagged here so it surfaces before
+# the commit-time hook refuses it. Tracked changes only -- an untracked
+# file under done/ is an addition, which freezing allows.
+frozen_dirty="$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=MDT HEAD -- 'docs/plans/done/*.md' 'docs/plans/rejected/*.md')"
+if [ -n "$frozen_dirty" ]; then
+  echo "BLOCKED: frozen plan(s) modified in the working tree -- new information becomes a new plan file that cites them:" >&2
+  echo "$frozen_dirty" >&2
   fail=1
 else
-  echo "$PLAN_CHECKSUMS_RELPATH: $(grep -c . "$root/$PLAN_CHECKSUMS_RELPATH") frozen plan(s) verify."
+  echo "(no frozen plan modified)"
 fi
 
 echo "== plan-lint (active plan) =="

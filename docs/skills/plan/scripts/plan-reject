@@ -34,7 +34,7 @@ esac
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F31
 if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
-  plan_die "cannot reject -- $rel is malformed, and freezing makes that permanent:
+  plan_note "WARNING: $rel has lint problems, and freezing makes them permanent:
 $lint_out"
 fi
 

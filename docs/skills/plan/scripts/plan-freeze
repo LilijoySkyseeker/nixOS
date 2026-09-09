@@ -17,24 +17,15 @@ case "$rel" in
   *) plan_die "$rel is not under docs/plans/done/ -- use plan-move to move it there first." ;;
 esac
 
-# The manifest, not the file's own `frozen:` field. Flipping a done/ plan to
-# `frozen: false`, editing it and re-running plan-freeze would otherwise
-# rewrite the manifest to the tampered hash -- the freeze evidence
-# re-blessing whatever it was pointed at.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F34
-plan_manifest_frozen "$root" "$rel" &&
-  plan_die "$rel is already frozen ($PLAN_CHECKSUMS_RELPATH records it). Its checksum is the evidence it has not changed; re-freezing would replace that evidence."
-
-unresolved="$(plan_unresolved_decisions "$root/$rel")"
-if [ -n "$unresolved" ]; then
-  plan_die "cannot freeze -- unresolved decisions (must be ANSWERED, or DEFERRED with a plan-carry):
-$unresolved"
-fi
-
-unresolved_f="$(plan_unresolved_findings "$root/$rel")"
-if [ -n "$unresolved_f" ]; then
-  plan_die "cannot freeze -- unresolved findings (must be FIXED, ACCEPTED, or MOOT -- use plan-resolve):
-$unresolved_f"
+# Hard gates and warnings, per the dismantle plan's refined D5: an honest
+# State with a rung declaration and no unresolved CRITICAL/HIGH security
+# finding are still required -- everything else warns and proceeds, because
+# blocking on full drainage is what livelocked the old system.
+# plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D5
+critical_f="$(plan_unresolved_critical_findings "$root/$rel")"
+if [ -n "$critical_f" ]; then
+  plan_die "cannot freeze -- unresolved CRITICAL/HIGH security finding(s) (must be FIXED, ACCEPTED with the user's sign-off, or MOOT -- use plan-resolve):
+$critical_f"
 fi
 
 state_problem="$(plan_state_problem "$root/$rel")"
@@ -43,11 +34,20 @@ state_problem="$(plan_state_problem "$root/$rel")"
 rung_problem="$(plan_rung_problem "$root/$rel")"
 [ -n "$rung_problem" ] && plan_die "cannot freeze -- $rung_problem"
 
-# structure, checked at the one moment it stops being fixable; run before
-# the freeze, so the file is still judged as editable
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4
+unresolved="$(plan_unresolved_decisions "$root/$rel")"
+if [ -n "$unresolved" ]; then
+  plan_note "WARNING: freezing with unresolved decision(s) -- consider plan-decide or plan-carry first, since a frozen file can never resolve them:
+$unresolved"
+fi
+
+unresolved_f="$(plan_unresolved_findings "$root/$rel")"
+if [ -n "$unresolved_f" ]; then
+  plan_note "WARNING: freezing with unresolved (parked) finding(s) -- they stay on record here but can never be marked resolved:
+$unresolved_f"
+fi
+
 if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
-  plan_die "cannot freeze -- $rel is malformed, and freezing makes that permanent:
+  plan_note "WARNING: $rel has lint problems, and freezing makes them permanent:
 $lint_out"
 fi
 
