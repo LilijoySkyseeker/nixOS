@@ -1,8 +1,8 @@
 ---
 slug: route-every-fact-into-one-channel-by-decidability-and-audience
 created: 2026-09-05
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: map
 priority: normal
 blocked_by:
@@ -16,6 +16,15 @@ time, rather than a single task plan. Until D4's `blocked_by` frontmatter
 exists the edges live in Progress below (see G1).
 
 ## State
+
+**2026-09-09: closed.** All children landed; the work is in master. Read
+this as history: the gate machinery it describes (stamp fingerprints,
+the checksum manifest, blocking `plan-citations`) was substantially
+reshaped days later by the gate teardown
+(2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md,
+ADR-0002) — `plan-citations` and `required-agents` survive as advisory
+tools, the stamp/manifest machinery was deleted. The record below stood
+when it was written.
 
 **2026-09-05: child 5 done, child 1 all but one item, G5 and G6 closed.**
 D1-D10 are settled from a full grilling session with the user on

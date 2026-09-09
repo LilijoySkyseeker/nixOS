@@ -1,8 +1,8 @@
 ---
 slug: revise-the-plan-file-schema-state-first-four-frontmatter-fields
 created: 2026-09-07
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -11,6 +11,19 @@ blocked_by:
 # revise the plan-file schema: State first, four frontmatter fields, defects become F
 
 ## State
+
+**2026-09-09: closed.** The schema half (State-first order, the `kind`/
+`priority`/`blocked_by` fields, the migrated corpus) is in master. The
+G-to-F reclassification remainder is **moot**: the gate teardown
+(2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md,
+ADR-0002) made the D/G/F scheme optional-not-enforced, rejected the
+churn/hardening backlog that reclassification was serving, and deleted
+the checksum manifest and `plan-repair` this plan's account leans on
+throughout — freezing is now by folder residence. Read the machinery
+notes below as history. This plan carried 81 findings, all about the
+apparatus and none about the fleet; under the new advisory regime the
+open ones are parked, not blocking. The pick-up handoff below is what
+launched the assessment that produced the teardown.
 
 **2026-09-07: the schema half is built, migrated and reviewed; the G-to-F
 half is designed and not started.**
