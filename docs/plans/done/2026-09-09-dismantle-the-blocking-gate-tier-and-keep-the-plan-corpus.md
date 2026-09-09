@@ -1,8 +1,8 @@
 ---
 slug: dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus
 created: 2026-09-09
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,11 +12,16 @@ blocked_by:
 
 ## State
 
-**2026-09-09, stages 1-8 all executed** on branch `worktree-gate-teardown`
-(based on PR #69's branch head, deliberately — see the transition note
-under `G5`), the same day the plan was filed and the user ratified D1-D5
-("proceed with the recommendations", D5 refined to option (b) in
-discussion). What exists now:
+**2026-09-09, complete and merged.** Filed, ratified (D1-D5 that day, D5
+refined to option (b) in discussion; D6 answered at merge time), executed
+in eight stages on `worktree-gate-teardown` (based on PR #69's head,
+deliberately — `G5`), and landed: PR #69 merged first via a temporary
+ruleset bypass (added and removed the same hour), then PR #70 with the
+whole teardown. Master's required `plan-gate` check is now the advisory
+gate. The one defect found during close-out is recorded under `D6`'s
+restored heading: a stage-1 edit silently consumed the `### D6` heading
+line, and no surviving check flags a prose reference to a heading that
+does not exist. What exists now:
 
 - `plan-gate` blocks on exactly two rules — an unresolved CRITICAL/HIGH
   security finding in a cited plan, and any modification/deletion under
@@ -55,8 +60,11 @@ tampered done/ file (blocks) and PR #69's formerly-red range (passes
 with NOTEs). Rungs 4-5 do not apply: no host-visible behaviour changed
 — the only `.nix` diffs delete a flake check.
 
-**Open: D6 only** (PR #69's disposition), plus merging the teardown PR
-itself. Note the sequencing constraint recorded in `G5`.
+Nothing is open. The follow-on work that outlives this plan lives in its
+own files: the ADR backfill
+(2026-09-05-migrate-existing-architectural-decisions-into-docs-adr.md),
+the D4 probation review of the small hooks, and the provenance plan that
+stayed in `todo/`.
 
 ## Original plan
 
@@ -127,9 +135,10 @@ conventions, and the `security`/`docs-updater` agents themselves.
 
 ## Progress
 
-- [ ] Stage 0: user answers `D1`-`D6`; scope is ratified
-      *(D1-D5 answered 2026-09-09; D6 still open, so this line stays
-      unticked)*
+- [x] Stage 0: user answers `D1`-`D6`; scope is ratified
+      *(D1-D5 answered 2026-09-09; D6 answered at merge time the same
+      day; hand-ticked because plan-tick correctly refuses the ambiguous
+      D-references on this line)*
 - [x] Stage 1: plan-gate advisory on stamps; findings parkable — see D1
 - [x] Stage 2: done/-immutability check replaces freeze checksums — see D2
 - [x] Stage 3: gate-mutants tier deleted
@@ -142,7 +151,9 @@ conventions, and the `security`/`docs-updater` agents themselves.
 - [x] Stage 7: docs pass over AGENTS.md, skills, procedures, agents
 - [x] Stage 8: mooted gate plans plan-reject'ed with reasons — see G3
       *(12 rejected; the provenance plan stayed, see G3's note)*
-- [ ] PR #69 disposition executed — see D6
+- [x] PR #69 disposition executed — see D6
+      *(#69 merged 2026-09-09 via temporary ruleset bypass, then #70;
+      hand-ticked, same plan-tick ambiguity as Stage 0)*
 
 ## Decisions (D)
 
@@ -221,6 +232,13 @@ of blocking. Security findings keep their structured `### F<N>` +
 block parses exactly that. ADRs take only the decisions that meet the
 ADR bar; small in-task decisions stay as D items.
 
+### D6 — PR #69
+
+*(Heading restored 2026-09-09: the stage-1 edit that appended D5's
+refinement note accidentally consumed this heading line, leaving the
+body below orphaned under D5. Nothing caught it — the lint has no rule
+for a prose reference to a heading that no longer exists.)*
+
 It is red on two stale stamps and nothing else; the branch is green
 locally. Options: merge it on its merits once Stage 1 makes stamps
 advisory; sign off on the stamps now and merge before the teardown;
@@ -228,6 +246,9 @@ or close it and fold its schema work into this plan's docs pass.
 The assessment deliberately did not review its content as a change, so
 merging it needs whatever review the user actually wants — as a decision,
 not an obligation.
+
+
+**ANSWERED 2026-09-09:** user chose: merge #69 first, then #70 -- both merged 2026-09-09. #69 needed a temporary repo-admin bypass actor on the master ruleset (rulesets ignore gh's --admin; added, used, removed, restored state verified as bypass_actors: []). #70 then retargeted onto master and merged. The old gate's stale-stamp block was bypassed deliberately rather than fed another review round
 
 ## Gotchas (G)
 
