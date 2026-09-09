@@ -3112,3 +3112,201 @@ describes it
 `gate-checks.nix` as the home for a check that boots nothing, and the reason
 
 _docs-updater finished 2026-09-09T16:53:59Z (code 29bbbe5005a7873b) -- see Findings above._
+
+### F54 — `plan_record_checksum` rewrites the freeze manifest with three unchecked steps, so one failure empties it, stages the empty file, and still prints "frozen"
+
+- **File:** `docs/skills/plan/scripts/lib.sh:454-460` (the `awk`/`printf`/`sort`
+  sequence inside `plan_record_checksum`); callers `plan-freeze`,
+  `plan-reject` and `plan-repair` all run `set -u` only, no `-e`, no
+  `pipefail`.
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced in a scratch fixture under
+  `$TMPDIR`, never against this repo)
+- **Axis:** hardening
+- **Reachability:** anyone who later wants to alter a frozen plan, and any
+  agent that edits one by accident. The path does not need an attacker to
+  start it: `sort -k2 "$tmp" > "$checksums"` truncates the manifest *before*
+  `sort` runs, so an ENOSPC on the repo filesystem, a full `$TMPDIR`, a
+  SIGINT landing between the truncate and the write, or an `awk` that cannot
+  read the manifest leaves the file empty or partial. `git add` then stages
+  it — successfully, because staging an empty manifest is not an error — and
+  `#F47`'s new `|| plan_die` never fires. `.githooks/pre-commit` treats an
+  empty manifest as "nothing is frozen" (see `#F55`), so from that commit on
+  every one of the 50 frozen plans can be edited and committed with the hook
+  exiting 0.
+- **Rule:** new-rule candidate — the same class `#F47` and `#F48` closed
+  ("a gate must not report success over a write it could not make"), left
+  open in the one function that writes the freeze evidence.
+- **Finding:** measured, not argued. In a scratch repo with three manifest
+  entries and `sort` replaced by a shim that exits 1, `plan-freeze` printed
+  `docs/plans/done/...-h.md frozen.` and exited 0 while
+  `docs/plans/.checksums` went from 2 entries to 0 both on disk and in the
+  index — including the entry it had just claimed to write. None of `awk`,
+  `printf` or `sort` is checked, and the rewrite is not atomic: the manifest
+  is truncated in place rather than written to a temp file and renamed. The
+  `git add` that *is* checked runs after the damage and reports success over
+  it. Nothing downstream notices, because `sha256sum -c` passes vacuously on
+  an empty manifest and no gate runs it anyway (`#F57`).
+- **Fix risk:** low. Writing the new manifest to a temp file and `mv`-ing it
+  into place, with every step checked, changes no interface; `plan-freeze`,
+  `plan-reject`, `plan-repair` and the `lib/record-checksum-*` mutants in
+  `scripts/gate-mutants` all exercise it. A `gate-tests` case would need to
+  make `sort` or `awk` fail — a PATH shim in the fixture, the same technique
+  the sabotage sweep already uses for `git`.
+
+
+**FIXED 2026-09-09:** plan_record_checksum now checks the awk, the printf and the sort, sorts into a second temporary and replaces the manifest by mv rather than by a redirect onto itself, and refuses outright to write a manifest with fewer entries than it had. gate-tests asserts it with a failing sort forced onto PATH; gate-mutants restores both the redirect and the shrink guard's removal
+
+### F55 — `.githooks/pre-commit` cannot tell "nothing is frozen yet" from "the manifest was just deleted", so staging its removal switches the frozen-plan check off and the hook exits 0
+
+- **File:** `.githooks/pre-commit:36-46`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (reproduced in a scratch fixture)
+- **Axis:** hardening
+- **Reachability:** anyone writing the commit — in practice an agent taking
+  a shortcut, or a merge/rebase that drops the file. `git rm --cached
+  docs/plans/.checksums` staged alongside an edited frozen plan: the tampered
+  plan is staged, the hook prints nothing and exits 0. Verified against a
+  control run (manifest left in place) that blocked correctly.
+- **Rule:** n/a — the same fail-open shape `#F48` set out to close, one case
+  further out.
+- **Finding:** `#F48` made the *read* fail-closed: `git ls-files
+  --error-unmatch` first, anything but exit 0 or 1 fatal. Exit 1 still means
+  "untracked", which is correct for a repo with nothing frozen yet and wrong
+  for a repo whose manifest is staged for deletion — and the hook has the
+  evidence to tell them apart, since HEAD still carries the file. This
+  matters mostly because it is what makes `#F54` silent: an emptied or
+  removed manifest and a repo that has never frozen anything are the same
+  input to this hook. The stated design ("deletions are allowed... this only
+  guards against silent content drift") covers deleting a *plan*; it does not
+  say the freeze evidence itself may be deleted without comment.
+- **Fix risk:** low, but not zero: a repo that legitimately deletes the
+  manifest (removing the whole plan system) would need `--no-verify` once, or
+  the check would have to compare against HEAD and allow the case where no
+  `docs/plans/*/*.md` is staged. The `pre-commit/manifest-read-swallowed`
+  mutant covers the read, not the deletion, so a new `gate-tests` case is
+  needed too.
+
+
+**FIXED 2026-09-09:** the hook now asks whether the manifest's deletion is staged and blocks if it is. The first version of this fix reintroduced the same defect one call later -- the git diff ran in a pipeline, where its own failure is indistinguishable from grep's no-match -- and the sabotage sweep caught that immediately, which is the second time this session a fix for a fail-open read was itself a fail-open read. It is an assignment now, so set -e covers it
+
+### F56 — `plan_require_not_frozen` still reads the self-declared `frozen:` field, so `plan-move` will carry a manifest-frozen plan out of `done/` and pre-commit then accepts any edit to it
+
+- **File:** `docs/skills/plan/scripts/lib.sh:233-235`; callers
+  `docs/skills/plan/scripts/plan-move:21` and
+  `docs/skills/plan/scripts/plan-reject:22`. Contradicts
+  `docs/skills/plan/reference.md`'s "Which files the schema rules apply to",
+  which states the manifest is what "frozen" means repo-wide.
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced in a scratch fixture)
+- **Axis:** hardening
+- **Reachability:** any committer or agent that wants a frozen plan editable,
+  in three commands and one commit. Flip `frozen: true` to `false` in the
+  working tree (uncommitted, so the hook never sees that edit), run
+  `plan-move <the done/ plan> in-progress`, then edit freely and commit. In
+  the fixture `plan-move` exited 0, the file landed in `in-progress/`,
+  `docs/plans/.checksums` kept its now-orphaned `done/` entry, and
+  `.githooks/pre-commit` exited 0 over appended content — because the hook
+  looks the file up by its *new* path, which has no manifest entry, and
+  `--diff-filter=ACMRT` reports a rename under the new name only.
+- **Rule:** violates the invariant `#F11`/`#F34` established and
+  `reference.md` now documents — "frozen" is the manifest, never the file's
+  own field.
+- **Finding:** `#F34` converted `plan-freeze` and `#F11` converted
+  `plan-lint`, and `plan-repair` was written against the manifest from the
+  start. `plan_require_not_frozen` — the guard on the two scripts that can
+  *move* a plan, which is the operation that separates a file from its
+  manifest entry — was not converted, and is now the only enforcement point
+  left reading the self-declaration. A hand-run `git mv` reaches the same
+  end state, so this is not the only route; what makes it a finding is that
+  the sanctioned tool performs it, reports success, and leaves a manifest
+  entry naming a path that no longer exists, which nothing reports (`#F57`).
+- **Fix risk:** low for `plan_require_not_frozen` itself (switch it to
+  `plan_manifest_frozen`, which needs `$root` as well as the file path, so
+  the signature changes and both call sites plus any future one must pass
+  it). The larger question — whether the manifest should be rewritten to
+  follow a legitimately renamed plan, or whether renaming a frozen plan
+  should be refused outright — is a decision, not a patch, and pre-commit's
+  "deletions are allowed" note should be re-read against whichever way it
+  goes.
+
+
+**FIXED 2026-09-09:** plan_require_not_frozen takes root and rel and consults the manifest first, then the field; all five callers updated. This was the last enforcement point still trusting the self-declared field, closing the class F11 and F34 opened
+
+### F57 — nothing audits the freeze manifest itself: no gate verifies its checksums, that every frozen plan has an entry, or that every entry names a file that still exists
+
+- **File:** `docs/skills/workflow/scripts/verify-ladder:65-79` (lints the
+  active plan only); `.githooks/pre-commit:46-60` (checks only entries whose
+  file is staged); `.github/workflows/plan-gate.yml` (runs `plan-gate` only).
+- **Severity:** LOW
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** no adversary needed — this is the reason `#F54` and
+  `#F56` are silent rather than noisy. A manifest that lost 49 of its 50
+  entries, or that names a path nothing occupies, passes every gate in the
+  repo. `sha256sum -c docs/plans/.checksums` is the detector and it is run by
+  a human, by hand, and only appears in `scripts/gate-tests`' own fixture.
+  It also passes vacuously on an empty manifest, so it is only half a
+  detector even when run.
+- **Rule:** `docs/hardening.md` rule 11 in spirit — "a guard that declines to
+  act must be watched by something that measures the outcome, not the
+  attempt". `.githooks/pre-commit` declines to act on every plan with no
+  manifest entry, and nothing measures how many entries there should be.
+- **Finding:** the freeze gate's whole authority is one 50-line tracked
+  file, and its integrity is assumed everywhere and checked nowhere. The
+  cheap version is a `gate-tests`-style assertion over the real corpus, or a
+  flake check: every `*.md` under `done/` and `rejected/` has exactly one
+  entry, every entry names an existing file, and `sha256sum -c` passes with a
+  non-zero line count.
+- **Fix risk:** low, but it must run over the *real* corpus rather than a
+  fixture, which is a new shape for `gate-tests` (it is otherwise
+  hermetic, and `scripts/gate-mutants` copies only `TREE_PATHS`, which does
+  not include `docs/plans/`). A flake check reading `inputs.self` fits better.
+
+**Checked and found clean (security pass, 2026-09-09).** Reviewed the whole
+of `cfe6106..HEAD`. `.githooks/pre-commit`: the `mktemp`/`trap` pair is
+correctly scoped — `$blob` is truncated by the `>` redirection on every
+iteration so no previous file's bytes can be read as the current one's, a
+failed redirection or `git show` is fail-closed with `fail=1`, and the EXIT
+trap covers all four `exit 1` paths. The temp file does put a staged blob on
+a filesystem for the first time, but `boot.tmp.useTmpfs = true` in
+`modules/profiles/default.nix:270` is effective on every real host (verified
+with `nix eval` over `nixosConfigurations`: homelab, thinkpad, torrent and
+vps all tmpfs; only `isoimage` is not, and it does not run hooks), and the
+same bytes are already in `.git/objects` by the time the hook runs, so this
+is not new exposure. `git ls-files -s` returning 0 with empty output for an
+unindexed file falls through to the content read, which is fail-closed. All
+23 `|| exit 1` additions check out: every `$(plan_repo_root)` and
+`$(plan_locate ...)` call site in the repo now has one, `plan_die` reached
+through `plan_append_under_heading` is only ever called as a statement, and
+`subagent-stamp` — the one hook that must never fail the session — was
+correctly left alone with its own `git rev-parse` and its `|| exit 0` ladder
+intact. `scripts/gate-tests` and `scripts/gate-mutants` were run from a copy
+under `/tmp`: 114 passed / 0 failed / 4 residues, and 46 mutants all CAUGHT,
+0 escaped / inert / broken. Write containment holds — `git status
+--porcelain` on this worktree was byte-identical before and after, every
+fixture path roots at a checked `mktemp -d`, `$scratch` is asserted non-empty
+before any `rm -rf`, the sabotage shim is on `PATH` only for the swept
+command, and both fixtures pin `core.hooksPath`/`commit.gpgsign` and unset
+the `GIT_*` channels that would let a caller's environment reach the real
+repo. `gate-mutants`' `eval "$code"` and its four mutation verbs write only
+to `$work/$target` and `$f.mut` inside a per-mutant `mktemp -d`; the
+catalogue is a literal in the script and `--only`/`--jobs` reach no shell,
+so there is no untrusted input path into the `eval`. `nix build
+.#checks.x86_64-linux.gate-tests` succeeds, and `set -eu` at
+`pkgs/stdenv/generic/setup.sh:4` in the pinned nixpkgs confirms the check
+cannot `touch $out` over a failing suite. No frozen file was altered outside
+`plan-repair`'s permitted `## State` insertion: the manifest's path set is
+byte-identical to `cfe6106`, exactly 27 hashes changed for the 27 repaired
+plans, and `sha256sum -c docs/plans/.checksums` passes on all 50.
+`plan-citations` is green (414 resolve, 1 muted path-form in a frozen plan)
+and `plan-lint` is clean on this plan. `plan_frontmatter` filters keys to
+`^[A-Za-z_][A-Za-z0-9_]*$` and every array it feeds is `declare -A`, so no
+plan file's content can reach an arithmetic array subscript or the
+`declare -n` in `plan-lint`; that reader and `plan_get_field` agree on
+leading whitespace, quoted keys and duplicates. No secret was read or
+decrypted at any point in this review.
+
+_security finished 2026-09-09T17:07:21Z (code d9389c184df201a9) -- see Findings above._
+
+**FIXED 2026-09-09:** the decision now lives in plan_manifest_problem, which verify-ladder calls as a hard gate -- the F10 pattern, a helper so the decision is testable where gate-tests can reach it. One correction to this finding as written: GNU sha256sum -c exits 1 on a file with no checksum lines, so an empty manifest does not pass vacuously. The empty check is a clearer message and defence in depth, not the load-bearing test, and gate-mutants carries a note saying why it has no entry of its own

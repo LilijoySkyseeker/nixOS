@@ -25,7 +25,7 @@ esac
 
 root="$(plan_repo_root)" || exit 1
 rel="$(plan_locate "$arg" "$root")" || exit 1
-plan_require_not_frozen "$root/$rel"
+plan_require_not_frozen "$root" "$rel"
 
 heading_re="$(plan_heading_re "$id")"
 today="$(plan_today)"

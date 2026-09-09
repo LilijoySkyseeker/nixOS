@@ -62,6 +62,22 @@ if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
   fail=1
 fi
 
+echo "== freeze manifest =="
+# Nothing else verifies the manifest as a whole. plan-lint reads only the
+# active plan, and .githooks/pre-commit checks only entries whose file is
+# staged -- so a frozen plan altered without staging, or a manifest that lost
+# entries, is invisible to every gate. `sha256sum -c` is the detector and it
+# was run by hand only.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+manifest_problem="$(plan_manifest_problem "$root")"
+if [ -n "$manifest_problem" ]; then
+  echo "BLOCKED: $manifest_problem" >&2
+  echo "Restore it from git rather than re-freezing -- a re-freeze records whatever the file says now." >&2
+  fail=1
+else
+  echo "$PLAN_CHECKSUMS_RELPATH: $(grep -c . "$root/$PLAN_CHECKSUMS_RELPATH") frozen plan(s) verify."
+fi
+
 echo "== plan-lint (active plan) =="
 # The active plan only. Structural faults it catches -- duplicate or
 # non-sequential D/G/F ids, a Progress line citing a heading that does

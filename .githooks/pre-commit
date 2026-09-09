@@ -37,7 +37,24 @@ ls_rc=0
 git ls-files --error-unmatch -- docs/plans/.checksums >/dev/null 2>&1 || ls_rc=$?
 case "$ls_rc" in
   0) manifest="$(git show ':docs/plans/.checksums')" ;;
-  1) manifest="" ;;
+  1)
+    # "Not in the index" -- which is what an untracked manifest looks like,
+    # and equally what one *staged for deletion* looks like. The second is
+    # the cheapest cover for a tampered frozen plan: delete the manifest in
+    # the same commit and every frozen file becomes unverifiable while this
+    # hook exits 0. Distinguished by asking whether the deletion is staged.
+    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F55
+    # An assignment, not a pipeline: through a pipe this call's own failure
+    # is invisible (grep's "no match" is 1 too), so a failed `git diff` read
+    # as "not staged for deletion" and skipped the frozen check exactly as
+    # the unchecked read above did. `set -e` catches the assignment.
+    staged_manifest_delete="$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)"
+    if [[ -n "$staged_manifest_delete" ]]; then
+      echo "BLOCKED: docs/plans/.checksums is staged for deletion. It is the only evidence that frozen plans have not changed; removing it disables the frozen-plan check for every one of them." >&2
+      exit 1
+    fi
+    manifest=""
+    ;;
   *)
     echo "BLOCKED: cannot tell whether $repo_root has a freeze manifest (git exited $ls_rc); refusing to skip the frozen-plan check." >&2
     exit 1

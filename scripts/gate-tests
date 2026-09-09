@@ -743,6 +743,70 @@ fi
 git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$mv_probe" "docs/plans/rejected/$mv_probe" >/dev/null 2>&1
 rm -f "$repo/docs/plans/todo/$mv_probe" "$repo/docs/plans/rejected/$mv_probe" "$repo/docs/plans/.checksums"
 
+section "the freeze manifest is evidence, and destroying it is not success"
+# The manifest is the only proof that 50 frozen plans have not changed. Three
+# ways that proof was destroyable while every gate reported success.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F54
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+ev_repo="$scratch/evidence"
+rm -rf "$ev_repo"; mkdir -p "$ev_repo/docs/plans/done" "$ev_repo/docs/skills"
+git -C "$ev_repo" init -q
+git -C "$ev_repo" config user.email t@t
+git -C "$ev_repo" config user.name t
+cp -r "$PLAN_SCRIPTS/.." "$ev_repo/docs/skills/plan"
+ev_a="${fixture_date}-evidence-a.md"; ev_b="${fixture_date}-evidence-b.md"
+printf -- '# a\n' > "$ev_repo/docs/plans/done/$ev_a"
+printf -- '# b\n' > "$ev_repo/docs/plans/done/$ev_b"
+git -C "$ev_repo" add -A >/dev/null; git -C "$ev_repo" commit -qm base
+ev() { ( cd "$ev_repo" && bash -c '. docs/skills/plan/scripts/lib.sh; '"$1" ); }
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+
+# A failing step in the manifest rewrite must not leave the manifest shorter
+# than it was. `sort ... > "$checksums"` truncated it before sort ran, so one
+# failure emptied it for every frozen plan at once and the script exited 0.
+ev_fake="$scratch/evbin"; mkdir -p "$ev_fake"
+printf '#!%s\nexit 1\n' "$BASH" > "$ev_fake/sort"; chmod +x "$ev_fake/sort"
+ev_before="$(grep -c . "$ev_repo/docs/plans/.checksums")"
+( cd "$ev_repo" && PATH="$ev_fake:$PATH" bash -c '. docs/skills/plan/scripts/lib.sh; plan_record_checksum . "docs/plans/done/'"$ev_a"'"' ) >/dev/null 2>&1
+ev_after="$(grep -c . "$ev_repo/docs/plans/.checksums")"
+if [ "$ev_after" -ge "$ev_before" ]; then
+  ok "a failed manifest rewrite leaves the manifest intact"
+else
+  bad "a failed manifest rewrite leaves the manifest intact" \
+    "the manifest went from $ev_before entries to $ev_after; the freeze evidence was destroyed"
+fi
+
+# The manifest, not the file's own field, decides what may be edited. This is
+# the last enforcement point that read the field.
+printf -- '---\nslug: evidence-a\ncreated: %s\nstatus: done\nfrozen: false\n---\n\n# a\n' \
+  "$fixture_date" > "$ev_repo/docs/plans/done/$ev_a"
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+if ev "plan_require_not_frozen . docs/plans/done/$ev_a" >/dev/null 2>&1; then
+  bad "a manifest-frozen plan is refused even when its own field says otherwise" \
+    "plan_require_not_frozen accepted a plan the manifest records as frozen"
+else
+  ok "a manifest-frozen plan is refused even when its own field says otherwise"
+fi
+
+# plan_manifest_problem is verify-ladder's decision, in a place it can be
+# called. An empty manifest must be a problem: `sha256sum -c` exits 0 on one.
+[ -z "$(ev 'plan_manifest_problem .')" ] &&
+  ok "a manifest whose entries all verify reports no problem" ||
+  bad "a manifest whose entries all verify reports no problem" "it reported one"
+: > "$ev_repo/docs/plans/.checksums"
+[ -n "$(ev 'plan_manifest_problem .')" ] &&
+  ok "an emptied manifest is a problem, not a vacuous pass" ||
+  bad "an emptied manifest is a problem, not a vacuous pass" \
+    "sha256sum -c exits 0 on an empty file, so this must not be silent"
+printf '%s  docs/plans/done/%s\n' "$(printf 'not-the-hash' | sha256sum | cut -d" " -f1)" "$ev_a" \
+  > "$ev_repo/docs/plans/.checksums"
+[ -n "$(ev 'plan_manifest_problem .')" ] &&
+  ok "a frozen plan that no longer matches its hash is a problem" ||
+  bad "a frozen plan that no longer matches its hash is a problem" "it reported none"
+rm -rf "$ev_repo"
+
 section "the freeze manifest is keyed on the whole path, not a substring of it"
 # Three ways the same lookup degrades into a substring search, each of them a
 # live finding and none of them observable through any gate's output: the
@@ -1120,6 +1184,18 @@ move_plan="${fixture_date}-movable.md"
 } > "$mpristine/docs/plans/todo/$move_plan"
 git -C "$mpristine" add -A >/dev/null
 git -C "$mpristine" commit -qm base
+# A frozen plan and the manifest that records it, so the hook's manifest
+# branch is actually taken. The entry names a done/ plan, never the plan the
+# move sweeps use -- plan_require_not_frozen now reads the manifest, so an
+# entry for the movable plan would make plan-move refuse for the wrong
+# reason.
+frozen_ev="${fixture_date}-frozen-evidence.md"
+printf -- '# frozen evidence\n' > "$mpristine/docs/plans/done/$frozen_ev"
+printf '%s  docs/plans/done/%s\n' \
+  "$(sha256sum "$mpristine/docs/plans/done/$frozen_ev" | cut -d' ' -f1)" "$frozen_ev" \
+  > "$mpristine/docs/plans/.checksums"
+git -C "$mpristine" add -A >/dev/null
+git -C "$mpristine" commit -qm manifest
 # Staged but never committed, so every restored copy hands pre-commit
 # something to scan. An empty index makes that hook exit 0 having read
 # nothing, which is the shape its sweep must not be satisfied by.
@@ -1145,6 +1221,16 @@ mreset
 precondition "the pre-commit fixture has something staged, so the hook cannot exit early" \
   env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only)" ]'
 sabotage_sweep ".githooks/pre-commit" "" 30 \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+# Deleting the manifest is the cheapest cover for a tampered frozen plan:
+# every frozen file becomes unverifiable at once, and "not in the index"
+# looks identical to "never tracked". The hook must tell them apart.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F55
+mreset
+git -C "$mrepo" rm -q --cached docs/plans/.checksums >/dev/null 2>&1
+precondition "the manifest is staged for deletion, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)" ]'
+expect_fail ".githooks/pre-commit refuses a staged deletion of the freeze manifest" "staged for deletion" \
   env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
 SWEEP_RESET=""
 

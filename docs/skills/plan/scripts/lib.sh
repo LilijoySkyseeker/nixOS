@@ -212,6 +212,24 @@ plan_manifest_frozen() {
   ' "$manifest"
 }
 
+# plan_manifest_problem <root> -- prints why the freeze manifest cannot be
+# trusted, empty if it can. A helper rather than inline in verify-ladder for
+# the reason #F10 gives: a decision a gate makes is only testable where it can
+# be called, and this one is the difference between "no frozen plan changed"
+# and "nothing checked".
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+plan_manifest_problem() {
+  local root="${1:-.}" manifest="${1:-.}/$PLAN_CHECKSUMS_RELPATH" bad
+  # Empty is not "nothing is frozen": `sha256sum -c` exits 0 on an empty
+  # file, so an emptied manifest verifies vacuously and reads as a clean run.
+  [ -s "$manifest" ] ||
+    { printf '%s is missing or empty, so every frozen plan is unverifiable' "$PLAN_CHECKSUMS_RELPATH"; return 0; }
+  bad="$(cd "$root" && sha256sum -c "$PLAN_CHECKSUMS_RELPATH" 2>&1 | grep -v ': OK$')"
+  [ -z "$bad" ] ||
+    { printf '%s no longer matches:\n%s' "$PLAN_CHECKSUMS_RELPATH" "$bad"; return 0; }
+  return 0
+}
+
 # plan_field_refs <file> <key> -- one bare plan filename per line from a
 # comma-separated ref field. Empty output for an empty or absent field.
 plan_field_refs() {
@@ -230,8 +248,21 @@ plan_is_frozen() {
   [ "$(plan_get_field "$1" frozen)" = "true" ]
 }
 
+# plan_require_not_frozen <root> <rel> -- refuse to touch a frozen plan.
+# Consults the manifest as well as the file's own field, and the manifest is
+# the one that matters: it is what .githooks/pre-commit enforces, and the
+# field is self-declared. Editing a done/ plan's `frozen:` back to false
+# otherwise walked straight past this, and `plan-move` would then carry it
+# into in-progress/ -- after which pre-commit looks the file up under its
+# *new* path, finds no entry, and passes appended content.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 plan_require_not_frozen() {
-  plan_is_frozen "$1" && plan_die "$1 is frozen (done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
+  local root="$1" rel="$2"
+  plan_manifest_frozen "$root" "$rel" &&
+    plan_die "$rel is frozen ($PLAN_CHECKSUMS_RELPATH records it; done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
+  plan_is_frozen "$root/$rel" &&
+    plan_die "$root/$rel is frozen (done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
   return 0
 }
 
@@ -451,12 +482,30 @@ plan_record_checksum() {
   mkdir -p "$(dirname "$checksums")"
   touch "$checksums"
   tmp="$(mktemp)" || plan_die "cannot create a temporary file"
+  out="$(mktemp)" || { rm -f "$tmp"; plan_die "cannot create a temporary file"; }
+  # Every step checked, and the manifest replaced by a rename rather than by
+  # a redirect onto itself. `sort -k2 "$tmp" > "$checksums"` truncates the
+  # manifest *before* sort runs: one failure there left it empty, for every
+  # frozen plan at once, and the checked `git add` below then staged the
+  # empty file and exited 0. The freeze evidence destroyed itself and
+  # reported success.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F54
   awk -v want="$rel" '
     { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) next }
     { print }
-  ' "$checksums" > "$tmp"
-  printf '%s  %s\n' "$sum" "$rel" >> "$tmp"
-  sort -k2 "$tmp" > "$checksums"
+  ' "$checksums" > "$tmp" || { rm -f "$tmp" "$out"; plan_die "cannot rewrite $PLAN_CHECKSUMS_RELPATH."; }
+  printf '%s  %s\n' "$sum" "$rel" >> "$tmp" ||
+    { rm -f "$tmp" "$out"; plan_die "cannot append to $PLAN_CHECKSUMS_RELPATH."; }
+  sort -k2 "$tmp" > "$out" ||
+    { rm -f "$tmp" "$out"; plan_die "cannot sort $PLAN_CHECKSUMS_RELPATH."; }
+  # The manifest may only stay the same size (a re-record) or grow by one (a
+  # new freeze). Anything else means a step above lost entries, and losing
+  # one is losing the proof that that plan has not changed.
+  if [ "$(grep -c . "$out")" -lt "$(grep -c . "$checksums")" ]; then
+    rm -f "$tmp" "$out"
+    plan_die "refusing to write a $PLAN_CHECKSUMS_RELPATH with fewer entries than it had; the freeze evidence would be lost."
+  fi
+  mv "$out" "$checksums" || { rm -f "$tmp" "$out"; plan_die "cannot replace $PLAN_CHECKSUMS_RELPATH."; }
   rm -f "$tmp"
   # Checked: the manifest on disk and the manifest in the index are what
   # .githooks/pre-commit compares, so a silent failure here is a freeze whose

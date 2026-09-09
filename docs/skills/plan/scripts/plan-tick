@@ -16,7 +16,7 @@ case "$id" in [DGF][0-9]*) ;; *) plan_die "second argument must look like D1/G2/
 root="$(plan_repo_root)" || exit 1
 rel="$(plan_locate "$arg" "$root")" || exit 1
 file="$root/$rel"
-plan_require_not_frozen "$file"
+plan_require_not_frozen "$root" "$rel"
 
 ranges="$(awk '
   /^- \[ \]/    { if (start) print start":"(NR-1); start=NR; next }

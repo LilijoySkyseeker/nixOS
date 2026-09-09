@@ -358,6 +358,39 @@ mutant subagent-stamp/no-longer-fail-silent "$STAMP" \
   'mut_subst "git -C \"\$root\" add \"\$rel\" 2>/dev/null || true" "git -C \"\$root\" add \"\$rel\""' \
   "subagent-stamp is exempt from the sabotage sweep"
 
+# --- the freeze manifest, which is the only evidence frozen plans carry ------
+
+# `sort ... > "$checksums"` truncates the manifest before sort runs, so one
+# failed step emptied it for every frozen plan at once, and the checked
+# `git add` then staged the empty file and exited 0.
+mutant lib/manifest-write-not-atomic "$LIB" \
+  'mut_subst "sort -k2 \"\$tmp\" > \"\$out\" ||" "sort -k2 \"\$tmp\" > \"\$checksums\"; true ||"' \
+  "a failed manifest rewrite leaves the manifest intact"
+
+mutant lib/manifest-may-shrink "$LIB" \
+  'mut_subst "if [ \"\$(grep -c . \"\$out\")\" -lt \"\$(grep -c . \"\$checksums\")\" ]; then" "if false; then"
+   mut_subst "sort -k2 \"\$tmp\" > \"\$out\" ||" "sort -k2 \"\$tmp\" > \"\$out\"; : ||"' \
+  "a failed manifest rewrite leaves the manifest intact"
+
+# The last enforcement point that trusted the file's own `frozen:` field.
+mutant lib/require-not-frozen-trusts-the-field "$LIB" \
+  'mut_subst "  plan_manifest_frozen \"\$root\" \"\$rel\" &&" "  false &&"' \
+  "a manifest-frozen plan is refused even when its own field says otherwise"
+
+# No entry for the `[ -s "$manifest" ]` guard on its own: with it removed an
+# empty manifest still reports a problem, because GNU `sha256sum -c` exits 1
+# on a file with no checksum lines rather than passing vacuously. The guard
+# is defence in depth and a clearer message, not the load-bearing check, so a
+# mutation of it is equivalent and would escape by construction.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+mutant lib/manifest-problem-ignores-mismatch "$LIB" \
+  'mut_subst "  [ -z \"\$bad\" ] ||" "  true ||"' \
+  "a frozen plan that no longer matches its hash is a problem"
+
+mutant pre-commit/manifest-deletion-unnoticed "$PRECOMMIT" \
+  'mut_subst "    staged_manifest_delete=\"\$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)\"" "    staged_manifest_delete=\"\""' \
+  ".githooks/pre-commit refuses a staged deletion of the freeze manifest"
+
 # ------------------------------------------------------------------- machinery
 
 build_tree() { # <dest>
