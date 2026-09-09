@@ -504,7 +504,7 @@ plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 # plan_manifest_frozen.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
 plan_record_checksum() {
-  local root="$1" rel sum checksums tmp out
+  local root="$1" rel sum checksums tmp out lost
   rel="$(plan_normalise_rel "$2")"
   sum="$(plan_checksum "$root/$rel")"
   checksums="$root/$PLAN_CHECKSUMS_RELPATH"

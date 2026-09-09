@@ -13,9 +13,11 @@ the repo, not against what the main agent believes it did.
 
 1. Read `docs/style-guide.md` for this repo's comment/doc conventions.
 2. Find the active plan file: `cat .claude/.active-plan` (repo root) gives
-   its path. If that file doesn't exist or is frozen (`frozen: true` in its
-   frontmatter), stop and report that rather than guessing where findings
-   should go.
+   its path. If that file doesn't exist, or is frozen -- recorded in
+   `docs/plans/.checksums`, which is the authority, not the `frozen:` field
+   a plan can write about itself
+   (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61)
+   -- stop and report that rather than guessing where findings should go.
 3. Find what actually changed: `git diff HEAD --stat` and `git diff
    --cached --stat` (working tree + staged, combined against HEAD).
 

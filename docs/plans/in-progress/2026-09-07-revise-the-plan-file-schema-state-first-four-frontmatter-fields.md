@@ -3782,3 +3782,111 @@ Verified by feeding the hook a real ref range on stdin and watching it
 build.
 
 **FIXED 2026-09-09:** the slow tier has an actual runner now. .githooks/pre-push builds checks.gate-mutants whenever the pushed range touches scripts/, docs/skills/ or .githooks/ -- beside a host build 17s is nothing, before every commit it would be too much, and verify-ladder's nix flake check passes --no-build so it never built any check. D2's answer chose the flake over a workflow file; this is what makes that choice actually run
+
+### F69 — `lost` is not declared `local` in `plan_record_checksum`, reintroducing F67's exact defect in the same function that F67 named
+
+- **File:** `docs/skills/plan/scripts/lib.sh:507` (`local root="$1" rel sum
+  checksums tmp out` — `lost` missing), assigned at `:546`.
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** identical to F67's — `scripts/gate-tests` sources
+  `lib.sh` into its own top-level shell, so a case that ever calls
+  `plan_record_checksum` outside the `ev()`/`mf()` subshells would have a
+  global `lost` written under it. No live caller today.
+- **Rule:** n/a
+- **Finding:** the F65 fix replaced the line-count guard with a
+  set-of-paths guard and introduced a new variable without adding it to the
+  `local` list — the same one-word omission F67 recorded, in the same
+  declaration, one commit after that declaration was edited to fix it.
+- **Fix risk:** none; add `lost` to the existing `local` line.
+
+
+**FIXED 2026-09-09:** lost added to plan_record_checksum's local declaration. F67's exact defect in the same line one commit later, because F65's set-of-paths guard introduced the variable without extending the declaration
+
+### F70 — four docs describing the freeze manifest and `pre-push` went stale inside this range: one asserted the coverage gap F60 had just closed, three predate `pre-push`'s new gate-mutants responsibility
+
+- **File:** `docs/procedures/testing-changes.md:169-199,247-260`,
+  `docs/GIT_WORKFLOW.md:63-70`, `docs/skills/workflow/SKILL.md:33-41`,
+  `docs/skills/plan/reference.md:244-249`.
+- **Severity:** LOW
+- **Confidence:** CONFIRMED
+- **Axis:** documentation
+- **Reachability:** `testing-changes.md` is the doc `verify-ladder`'s own
+  failures point a reader at, and it stated the opposite of the shipped
+  behaviour: "the entries present, not the corpus, so a *dropped* entry
+  still passes". `plan_manifest_problem` has refused an uncovered
+  `done/`/`rejected/` plan since F60, and `gate-mutants`'
+  `lib/manifest-problem-ignores-uncovered` entry proves it.
+- **Rule:** n/a
+- **Finding:** fixed directly, docs-only, no script touched. (1) the
+  `verify-ladder` bullet now names `plan_manifest_problem` and its three
+  properties instead of claiming a dropped entry passes; (2) the
+  `pre-commit` bullet now lists the three manifest guards F63 added
+  (staged deletion, non-regular file, dropped entry); (3) the `pre-push`
+  bullet in both `testing-changes.md` and `GIT_WORKFLOW.md` records the
+  second, separate diff over `scripts/ docs/skills/ .githooks/` that
+  builds `checks.gate-mutants`; (4) the `gate-mutants` bullet no longer
+  says `nix flake check` is the only thing that runs it; (5)
+  `workflow/SKILL.md`'s freeze-manifest parenthetical gained the
+  no-entry-at-all case; (6) the `gate-tests` coverage list names all six
+  plan writers, so no reader can carry away the retired "five writers"
+  count. Counts re-measured rather than trusted: `gate-tests` 128 passed
+  in 2.03s (doc said 128 / 2.1s, kept), `gate-mutants` 56 caught in 15.6s
+  across 16 jobs (doc said ~17s, corrected).
+- **Fix risk:** none; `docs/**/*.md` is outside `plan_code_fingerprint`.
+
+
+**FIXED 2026-09-09:** the four stale docs were corrected in the same pass that found them: testing-changes.md's verify-ladder bullet asserted the coverage gap F60 had already closed, and three more predated pre-push's gate-mutants responsibility
+
+### F71 — `docs/agents/docs-updater.md` and `docs/agents/security.md` still tell agents to test a plan's self-declared `frozen:` field, which F56/F61 established is not the authority
+
+- **File:** `docs/agents/docs-updater.md:16`, `docs/agents/security.md:49`.
+- **Severity:** LOW
+- **Confidence:** CONFIRMED
+- **Axis:** documentation
+- **Reachability:** both instruct a subagent to decide "is this plan
+  frozen?" from `frozen: true` in the frontmatter. Every script now asks
+  `docs/plans/.checksums` instead, precisely because the field is
+  self-declared — F61 showed that trusting it let a plan buy leniency from
+  `plan-gate` by writing one line about itself. An agent following these
+  briefs literally would read a hand-set field and reach the opposite
+  answer from every gate.
+- **Rule:** n/a
+- **Finding:** not fixed here, deliberately, and this is the ambiguity
+  worth surfacing rather than resolving unilaterally: neither file is
+  touched by this branch's diff, and `docs/agents/*` is inside
+  `plan_code_fingerprint`'s covered set, so editing them invalidates every
+  review stamp and restarts the loop this pass is trying to converge. The
+  correct wording is "recorded in `docs/plans/.checksums`", or simply
+  "under `docs/plans/{done,rejected}/`", in both places.
+- **Fix risk:** none to behaviour; the cost is one more review cycle.
+
+
+**FIXED 2026-09-09:** both agent briefs now say frozen means recorded in docs/plans/.checksums, and name the frozen: field as the thing a plan can write about itself. Fixed rather than deferred: these briefs are what the review subagents read, so leaving them would have every future pass reach the opposite answer from every gate -- and docs/agents/* being inside the fingerprint is a reason to sequence the edit, not to leave it wrong
+
+### F72 — `.githooks/pre-commit`'s F63 comment narrates the session rather than the mechanism
+
+- **File:** `.githooks/pre-commit:52-60`.
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** documentation
+- **Reachability:** n/a — comment only.
+- **Rule:** `docs/style-guide.md`, "Inline comments" and "Why context: the
+  plan file, not comments".
+- **Finding:** the sentence moved here verbatim from
+  `.githooks/pre-commit:57-58` is a report on the work, not on the code:
+  "That is the third time on this branch a fix for a fail-open read was
+  itself one, so it is spelled out here". The rest of that block is
+  legitimate mechanics — `rev-parse --verify --quiet` answers 1 for an
+  unborn HEAD and 128 when git itself fails, and the two reads after it
+  are plain assignments `set -e` covers — and should stay. Not edited:
+  `.githooks/*` is inside `plan_code_fingerprint`, so a style-only comment
+  edit restarts the review loop, and the style-guide rule is not worth
+  that on this pass. Drop the sentence the next time that file is opened
+  for a real reason.
+- **Fix risk:** none.
+
+_docs-updater finished 2026-09-09T18:15:55Z (code 5cf9e1bed22ecb09) -- see Findings above._
+
+**FIXED 2026-09-09:** the session-narrative sentence moved out of .githooks/pre-commit; the rev-parse rc mechanics it introduced stay, because those explain the code

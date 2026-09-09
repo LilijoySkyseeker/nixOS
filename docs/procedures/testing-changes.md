@@ -156,7 +156,12 @@ of operations — chronology, not evidence:
   something shaped like a live AWS/Slack/GitHub token. Not a full
   secrets scanner, just a last-resort catch for the most common mistake.
   It also refuses to commit a change to a frozen plan under
-  `docs/plans/{done,rejected}/`, checked against the recorded checksum.
+  `docs/plans/{done,rejected}/`, checked against the recorded checksum,
+  and refuses a `docs/plans/.checksums` staged for deletion, staged as
+  anything but a regular file, or dropping an entry for a plan not itself
+  being deleted — each of those disables the frozen-plan check while the
+  hook still exits 0
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63).
   Those two read the **index**, not the working tree — see
   2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
   for why that distinction is the whole guard. The third,
@@ -177,7 +182,11 @@ of operations — chronology, not evidence:
   --no-verify` if you know what you're doing (e.g. already built it
   manually). This is why a docs-only commit that happens to touch
   `hosts/<name>/README.md` still triggers a real build — the hook
-  matches by path prefix, not by file extension.
+  matches by path prefix, not by file extension. A second, separate diff
+  decides one more thing: if the pushed range touches `scripts/`,
+  `docs/skills/` or `.githooks/`, the hook also builds
+  `checks.gate-mutants` (below) before letting the push through
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68).
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
   before commit rather than at push time. Runs four repo-level gates
@@ -186,10 +195,14 @@ of operations — chronology, not evidence:
   than by bare filename, outside frozen plans; run on every pass, since a
   citation breaks from the target side), `scripts/gate-tests` (the gate
   scripts' own failure-mode tests, next bullet), the freeze manifest
-  (`sha256sum -c` over `docs/plans/.checksums`, the only thing that runs
-  it — an entry that no longer matches, or a manifest emptied outright,
-  blocks; the entries present, not the corpus, so a *dropped* entry still
-  passes), and `docs/skills/plan/scripts/plan-lint` on the active plan
+  (`lib.sh`'s `plan_manifest_problem`, the only thing that runs
+  `sha256sum -c` over `docs/plans/.checksums` — an entry that no longer
+  matches, a manifest emptied outright, and a `done/`/`rejected/` plan
+  with no entry at all each block; the last is the one a hash check
+  cannot see, since dropping an entry leaves what remains verifying
+  perfectly
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60)),
+  and `docs/skills/plan/scripts/plan-lint` on the active plan
   (blocks on missing or misordered sections, missing frontmatter, a
   duplicate or non-sequential `D`/`G`/`F` id, or a `Progress` line citing
   a heading that does not exist — and on a `.claude/.active-plan` marker
@@ -205,7 +218,9 @@ of operations — chronology, not evidence:
   backstop a commit made outside that skill the way `pre-push` does.
 - **`scripts/gate-tests`** — the failure-mode tests for the gate scripts
   themselves (`plan-gate`, `required-agents`, `plan-citations`,
-  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`,
+  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, the frozen-plan
+  guard shared by all six plan writers — `plan-move`, `plan-reject`,
+  `plan-decide`, `plan-resolve`, `plan-tick`, `plan-carry` —
   `.githooks/pre-commit`, and `lib.sh`'s fingerprint, file-listing,
   rung-declaration, frontmatter, heading, active-plan-marker and
   freeze-manifest helpers).
@@ -248,9 +263,12 @@ of operations — chronology, not evidence:
   escape), `INERT` (the mutation matched nothing and measured nothing),
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
-  N× the suite — 56 entries, about 17s across 16 jobs — so it is not in
-  `verify-ladder`'s pre-commit path. It is the slow tier, and it runs as
-  `checks.gate-mutants` under `nix flake check`; run it by hand
+  N× the suite — 56 entries, measured 15.6s across 16 jobs — so it is not
+  in `verify-ladder`'s pre-commit path. It is the slow tier: it runs as
+  `checks.gate-mutants` under `nix flake check`, and the `pre-push` hook
+  builds that check when the pushed range touches `scripts/`,
+  `docs/skills/` or `.githooks/`, which is the only thing that actually
+  builds it before a push. Run it by hand
   (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)
   when you touch a gate script or add a case.
 - **`plan-move ... done` / `plan-freeze`** — refuse to close a plan

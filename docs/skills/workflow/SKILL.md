@@ -36,9 +36,10 @@ stays short on purpose (progressive disclosure).
    a gate that no longer refuses what it must, or no longer passes an
    honest sequence), the freeze manifest (`sha256sum -c` over
    `docs/plans/.checksums` -- a frozen plan that no longer matches its
-   recorded hash, or a manifest emptied outright), `plan-lint` on the
-   active plan (duplicate or non-sequential `D`/`G`/`F` ids, a `Progress`
-   line citing a heading that does not exist), `nixfmt --check`,
+   recorded hash, a manifest emptied outright, or a `done/`/`rejected/`
+   plan with no entry at all), `plan-lint` on the active plan (duplicate
+   or non-sequential `D`/`G`/`F` ids, a `Progress` line citing a heading
+   that does not exist), `nixfmt --check`,
    `nix flake check --no-build`, a targeted `nixos-rebuild build`, and any
    *newly introduced* statix/deadnix issue (pre-existing debt elsewhere in
    a touched file never blocks). This is

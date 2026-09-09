@@ -55,11 +55,9 @@ case "$ls_rc" in
     # Discriminated, not swallowed. `if x="$(git show ... 2>/dev/null)"` cannot
     # tell "HEAD has no manifest" -- true on the commit that first adds it --
     # from "git failed", and reads both as "nothing to compare", skipping the
-    # check below while exiting 0. That is the third time on this branch a
-    # fix for a fail-open read was itself one, so it is spelled out here:
-    # rev-parse --verify --quiet answers 1 for an unborn HEAD and 128 when
-    # git itself fails, and the two reads after it are plain assignments that
-    # `set -e` covers.
+    # check below while exiting 0. rev-parse --verify --quiet answers 1 for
+    # an unborn HEAD and 128 when git itself fails, and the two reads after
+    # it are plain assignments that `set -e` covers.
     # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63
     head_rc=0
     git rev-parse --verify --quiet HEAD >/dev/null 2>&1 || head_rc=$?
