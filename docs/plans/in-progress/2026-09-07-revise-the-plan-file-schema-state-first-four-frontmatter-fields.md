@@ -3771,4 +3771,14 @@ account, so `docs/hardening.md`'s host-facing rules have no surface here.
 
 _security finished 2026-09-09T17:50:14Z (code c6ffc5dbb5dfa536) -- see Findings above._
 
+**CORRECTED 2026-09-09:** the first fix for this was dead code, and pushing
+it is what showed that. `changed_files` in `.githooks/pre-push` comes from a
+diff pathspec-limited to `hosts/ modules/ files/ flake.nix flake.lock` --
+what decides the host build set -- so a change to a gate script never
+appears in it, and the hook returns at the empty-`changed_files` check
+before reaching the block anyway. It now takes its own checked diff over
+`scripts/ docs/skills/ .githooks/` and runs above that early return.
+Verified by feeding the hook a real ref range on stdin and watching it
+build.
+
 **FIXED 2026-09-09:** the slow tier has an actual runner now. .githooks/pre-push builds checks.gate-mutants whenever the pushed range touches scripts/, docs/skills/ or .githooks/ -- beside a host build 17s is nothing, before every commit it would be too much, and verify-ladder's nix flake check passes --no-build so it never built any check. D2's answer chose the flake over a workflow file; this is what makes that choice actually run
