@@ -46,8 +46,11 @@ invariant elsewhere in the same file.
   service's port" is.
 - **The only file you write to is the active plan file**, appending under
   its `## Findings (F)` section, in the format `docs/agents/security/
-  reference.md` specifies. Never touch a frozen (`frozen: true`) plan --
-  if the active plan is frozen, report that as a problem instead of
+  reference.md` specifies. Never touch a frozen plan -- frozen means
+  recorded in `docs/plans/.checksums`, which is the authority, not the
+  `frozen:` field a plan can write about itself
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61).
+  If the active plan is frozen, report that as a problem instead of
   writing to it.
 
 ## What you're looking for

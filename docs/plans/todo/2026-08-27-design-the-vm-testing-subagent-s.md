@@ -3,6 +3,9 @@ slug: design-the-vm-testing-subagent-s
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Design the vm-testing subagent(s)

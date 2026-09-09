@@ -3,26 +3,12 @@ slug: homelab-usb-uas-cksum-residual-risk-ongoing-monitoring-not-fully
 created: 2026-09-03
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # homelab USB-UAS CKSUM residual risk -- ongoing monitoring, not fully resolved
-
-## Original plan
-
-Continuation of two frozen plans:
-`docs/plans/done/2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md`
-(original diagnosis + `usb-storage.quirks` mitigation) and
-`docs/plans/done/2026-09-02-homelab-zbackup-zdata-cksum-alert-recurrence-2026-09-02-matches-known.md`
-(confirmed the 2026-09-02 alert was the same accepted residual risk,
-now also hitting `zbackup`). Both are frozen (`done/` plans get zero
-further edits by design -- `plan_require_not_frozen` in
-`docs/skills/plan/scripts/lib.sh`), so new information goes here
-instead. Purpose of *this* plan: track the residual USB-UAS CKSUM
-trickle as an open, ongoing condition rather than a closed
-investigation -- the underlying enclosure/bridge-chip vulnerability is
-mitigated, not eliminated, and will keep producing occasional alerts.
-Left in `in-progress/` deliberately (not moved to `done/`) since the
-issue itself isn't resolved, only managed.
 
 ## State
 **2026-09-03.** Quantified the mitigation's actual effect and cleared
@@ -43,6 +29,23 @@ connection timeouts because the laptop itself is offline (tailscale:
 "offline, last seen 2d ago") -- expected laptop-off behavior, not a
 homelab fault, noted here only as context, not a health problem for
 this plan to track.
+
+## Original plan
+
+Continuation of two frozen plans:
+`2026-08-28-homelab-zdata-pool-usb-uas-checksum-errors.md`
+(original diagnosis + `usb-storage.quirks` mitigation) and
+`2026-09-02-homelab-zbackup-zdata-cksum-alert-recurrence-2026-09-02-matches-known.md`
+(confirmed the 2026-09-02 alert was the same accepted residual risk,
+now also hitting `zbackup`). Both are frozen (`done/` plans get zero
+further edits by design -- `plan_require_not_frozen` in
+`docs/skills/plan/scripts/lib.sh`), so new information goes here
+instead. Purpose of *this* plan: track the residual USB-UAS CKSUM
+trickle as an open, ongoing condition rather than a closed
+investigation -- the underlying enclosure/bridge-chip vulnerability is
+mitigated, not eliminated, and will keep producing occasional alerts.
+Left in `in-progress/` deliberately (not moved to `done/`) since the
+issue itself isn't resolved, only managed.
 
 ## Progress
 - [x] Quantified pre-fix vs. post-fix CKSUM error rate with hard

@@ -33,7 +33,7 @@ rel="$(plan_active_plan "$root")" || exit 0
 # plan-gate reads with -- if the two disagree on "frozen", its
 # NOTE-vs-BLOCKED reasoning (which assumes this script refuses frozen
 # plans) silently breaks.
-plan_is_frozen "$root/$rel" && exit 0
+plan_manifest_frozen "$root" "$rel" && exit 0
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # Fingerprint the code as it stood when the agent finished, so plan-gate

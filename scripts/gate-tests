@@ -52,6 +52,20 @@ note()  { known=$((known + 1)); printf '  known %s -- %s\n' "$1" "$2"; }
 
 section() { printf '\n== %s ==\n' "$1"; }
 
+# A negative case is bounded by what its fixture can reach. Three guards in
+# this file passed because `git mv` failed for a reason that had nothing to do
+# with the gate -- rejected/ did not exist, the probe was untracked, and a
+# probe was already refused by another rule -- and all three read as passing
+# tests of the right thing. So a fixture's ability to reach the failure is
+# asserted rather than assumed, and it fails under its own name.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G12
+precondition() { # <name> <command...>
+  local name="$1"
+  shift
+  if "$@" >/dev/null 2>&1; then ok "$name"
+  else bad "$name" "the case that follows cannot reach the failure it names"; fi
+}
+
 # ---------------------------------------------------------------- rung gate
 
 # plan_state_body and plan_rung_problem decide whether a plan may close,
@@ -133,7 +147,13 @@ rung "fenced, 2-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$
 rung "fenced, 3-space indent"   refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"   \`\`\`"$'\n'"   Verified to rung 3 (ran it locally)."$'\n'"   \`\`\`"
 rung "fenced inside list item"  refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"- like this:"$'\n\n'"    \`\`\`"$'\n'"    Verified to rung 3 (ran it locally)."$'\n'"    \`\`\`"
 rung "tilde fence"              refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"~~~"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"~~~"
-rung "nested fence, odd count"  refuse "## State"$'\n\n'"Nothing verified yet."$'\n\n'"## Progress"$'\n\n'"\`\`\`\`"$'\n'"outer holding an unbalanced inner:"$'\n'"\`\`\`"$'\n'"## State"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`\`"
+# The whole nest sits *inside* State. The earlier form closed the section with
+# a "## Progress" before the fence, so the declaration was out of scope
+# already and the case refused whatever the fence logic did -- it stayed green
+# with the length-and-character close rule replaced by a toggle on any marker,
+# which is the defect it names.
+# plan: 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md#F17
+rung "nested fence, odd count"  refuse "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"\`\`\`\`"$'\n'"outer holding an unbalanced inner:"$'\n'"\`\`\`"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"\`\`\`\`"
 
 # Residues carried on the record. Both are cases where the text names the
 # rung without claiming it, and neither is decidable by string matching.
@@ -215,6 +235,15 @@ printf -- '---\nslug: t\ncreated: 2026-01-01\nstatus: in-progress\nfrozen: false
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
 printf -- '# note\n\nCites %s#G1 so the resolution path is under the sweep.\n' \
   "$fixture_plan" > "$repo/docs/note.md"
+# A second, deliberately well-formed plan: plan-lint's sweep needs a baseline
+# that passes, and the example plan above is intentionally partial.
+lint_plan="${fixture_date}-lint-clean.md"
+{
+  printf -- '---\nslug: lint-clean\ncreated: %s\nstatus: in-progress\nfrozen: false\n' "$fixture_date"
+  printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# lint clean\n'
+  printf -- '\n## State\n\nVerified to rung 1 (documentation).\n'
+  printf -- '\n## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$repo/docs/plans/in-progress/$lint_plan"
 git -C "$repo" add -A >/dev/null
 git -C "$repo" commit -qm base
 printf '{ }\n' > "$repo/a.nix"
@@ -296,6 +325,15 @@ git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 expect_fail "plan-gate refuses a range whose plan is unstamped" "carries no completion stamp" \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
 
+# "frozen" relaxes the stamp requirement, so a plan that declares itself
+# frozen would buy that leniency with one line of its own frontmatter. The
+# manifest has no entry for this file, so nothing here is actually frozen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61
+( cd "$repo" && sed -i 's/^frozen: false$/frozen: true/' "docs/plans/in-progress/$fixture_plan" )
+expect_fail "plan-gate still demands stamps from a plan that declares itself frozen" "carries no completion stamp" \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+( cd "$repo" && sed -i 's/^frozen: true$/frozen: false/' "docs/plans/in-progress/$fixture_plan" )
+
 section "awkward filenames still oblige review"
 # A reviewable file whose name git has to quote obliged no agent at all
 # until core.quotePath=false landed, and that fix demotes bytes >= 0x80
@@ -349,6 +387,558 @@ else
   ok "plan-gate passes a stamped plan with resolved findings"
 fi
 
+section "plan-lint judges a plan on what it can actually satisfy"
+# plan-lint gained the schema rules, a frozen exemption and two reference
+# checks, and gate-tests covered none of it on a change whose own #F10 was a
+# gate that silently did nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F16
+lint_probe() { # <frontmatter-body> <sections> -- writes a probe plan, prints its path
+  local fm="$1" body="$2" f="$repo/docs/plans/todo/${fixture_date}-probe.md"
+  mkdir -p "$repo/docs/plans/todo"
+  printf -- '---\n%s\n---\n\n# probe\n\n%s\n' "$fm" "$body" > "$f"
+  printf 'docs/plans/todo/%s-probe.md' "$fixture_date"
+}
+lint_full_fm="slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+kind: task
+priority: normal
+blocked_by:"
+lint_sections='## State
+
+x
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)'
+
+# A plan may not exempt itself. Two separate assertions, because they can
+# fail independently: the schema rules must still *run* (the enforcement),
+# and the self-freeze must be *reported* (the warning). Keyed on the warning
+# alone, this case stayed green with the bypass restored in full -- the probe
+# emits nine other reports and the warning is the one a bypass preserves.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F18
+self_frozen_probe="$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: true" "## Progress")"
+expect_fail "plan-lint still applies the schema rules to a self-declared frozen plan" "missing required section" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
+expect_fail "plan-lint reports a plan that declares itself frozen" "only plan-freeze may freeze" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
+
+# Both directions of the fence rule, because each was live: sections that
+# exist only inside a fence must not count, and a correct plan that quotes
+# the template inside State must not be blocked.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
+expect_fail "plan-lint does not count sections quoted inside a fence" "missing required section" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "$lint_full_fm" '```
+## State
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)
+```')"
+# State quotes a *late* heading. A fence-blind reader pins "## Findings (F)"
+# at that quoted line, above the real Decisions and Gotchas, and the order
+# check then reports a correct file as out-of-order -- a hard block nothing
+# can clear. Quoting the template in canonical order does not reproduce it:
+# first-wins keeps the sequence monotonic, which is why this case names the
+# shape that actually breaks rather than the tidy one.
+probe="$(lint_probe "$lint_full_fm" "## State
+
+The last section is:
+
+\`\`\`
+## Findings (F)
+\`\`\`
+
+## Original plan
+
+## Progress
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)")"
+if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$probe" >/dev/null 2>&1; then
+  ok "plan-lint passes a plan that quotes the template inside State"
+else
+  bad "plan-lint passes a plan that quotes the template inside State" \
+    "a correct file was blocked by its own quoted example"
+fi
+
+# The two frontmatter readers must agree about a duplicated key, or one
+# caller sees a file as frozen and another as editable. Asserted as agreement
+# between them rather than as either one's answer -- and the plan_frontmatter
+# side is read the way plan-lint reads it, last assignment winning, because a
+# probe that took the first value agreed with plan_get_field even with
+# first-wins deleted and so asserted nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F12
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F21
+dup_probe="$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+frozen: true
+kind: task
+priority: normal
+blocked_by:" "$lint_sections")"
+dup_readers="$( cd "$repo" && bash -c '
+  . docs/skills/plan/scripts/lib.sh
+  printf "%s|%s" \
+    "$(plan_get_field "'"$dup_probe"'" frozen)" \
+    "$(plan_frontmatter "'"$dup_probe"'" | awk -F"\t" "\$1==\"frozen\"{v=\$2} END{print v}")"' )"
+if [ "${dup_readers%|*}" = "${dup_readers#*|}" ]; then
+  ok "both frontmatter readers agree on a duplicated key"
+else
+  bad "both frontmatter readers agree on a duplicated key" \
+    "plan_get_field and plan_frontmatter disagree: $dup_readers"
+fi
+
+# Every entry in a reference list is checked, including the last. Asserted as
+# the invariant rather than as the one dropped-newline bug: the only invalid
+# reference here is the final one, so a reader that stops early goes green.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
+expect_fail "plan-lint checks the last entry of a reference list" "must be a bare plan filename" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "slug: probe
+created: ${fixture_date}
+status: todo
+frozen: false
+kind: task
+priority: normal
+blocked_by: ${fixture_date}-lint-clean.md, not-a-plan" "$lint_sections")"
+# Order, as its own negative case. Every section is present, so the presence
+# check is satisfied and only the order rule can refuse this -- and until it
+# existed, deleting that rule outright changed no verdict in this file.
+expect_fail "plan-lint reports required sections that appear out of order" "required order is" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "$(lint_probe "$lint_full_fm" '## State
+
+x
+
+## Progress
+
+## Original plan
+
+## Decisions (D)
+
+## Gotchas (G)
+
+## Findings (F)')"
+rm -f "$repo/docs/plans/todo/${fixture_date}-probe.md"
+
+# The three states of the active-plan marker. verify-ladder itself cannot be
+# run here -- it shells out to nix -- so the decision it makes lives in
+# plan_active_plan_problem and is asserted there instead. Absent and valid
+# must be silent; naming a deleted file must not be, which is the case that
+# was silently skipping the lint.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+marker_problem() { # <marker-contents, or nothing to remove the marker>
+  if [ $# -eq 0 ]; then rm -f "$repo/.claude/.active-plan"
+  else mkdir -p "$repo/.claude"; printf '%s\n' "$1" > "$repo/.claude/.active-plan"; fi
+  ( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_active_plan_problem .' )
+}
+[ -z "$(marker_problem)" ] &&
+  ok "no active-plan marker is not a problem" ||
+  bad "no active-plan marker is not a problem" "reported one"
+[ -n "$(marker_problem "docs/plans/todo/${fixture_date}-gone.md")" ] &&
+  ok "a marker naming a deleted plan is a problem" ||
+  bad "a marker naming a deleted plan is a problem" "reported nothing, so the caller skips its check"
+[ -z "$(marker_problem "docs/plans/in-progress/$lint_plan")" ] &&
+  ok "a marker naming a real plan is not a problem" ||
+  bad "a marker naming a real plan is not a problem" "reported one"
+rm -f "$repo/.claude/.active-plan"
+
+section "a frozen plan may be repaired, but only by adding what is absent"
+# a hole in the freeze contract, so what it refuses matters more than what
+# it does
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4
+expect_fail "plan-repair refuses a plan that is not frozen" "is not frozen" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" \
+  "docs/plans/in-progress/$lint_plan"
+
+mkdir -p "$repo/docs/plans/done"
+frozen_ok="${fixture_date}-frozen-complete.md"
+{
+  printf -- '---\nslug: frozen-complete\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen complete\n\n' "$fixture_date"
+  printf -- '%s\n' "$lint_sections"
+} > "$repo/docs/plans/done/$frozen_ok"
+printf '%s  docs/plans/done/%s\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_ok" | cut -d" " -f1)" "$frozen_ok" \
+  > "$repo/docs/plans/.checksums"
+expect_fail "plan-repair refuses to touch a section that already exists" "already has" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" \
+  "docs/plans/done/$frozen_ok"
+
+# Re-freezing must be refused on the manifest's word, not the file's own
+# frozen: field -- flipping that field back and re-running plan-freeze would
+# otherwise rewrite the recorded checksum to whatever the file now contains.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F34
+# The probe is the tamper itself: recorded in the manifest, but with its own
+# `frozen:` field flipped back to false, and otherwise valid enough that the
+# manifest guard is the only thing that can refuse it. Using a file that
+# still says `frozen: true` proves nothing -- both guards refuse that one.
+frozen_tamper="${fixture_date}-frozen-tamper.md"
+{
+  printf -- '---\nslug: frozen-tamper\ncreated: %s\nstatus: done\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# frozen tamper\n\n' "$fixture_date"
+  printf -- '## State\n\nVerified to rung 1 (documentation).\n\n## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$repo/docs/plans/done/$frozen_tamper"
+printf '%s  docs/plans/done/%s\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_tamper" | cut -d' ' -f1)" "$frozen_tamper" \
+  >> "$repo/docs/plans/.checksums"
+expect_fail "plan-freeze refuses a plan the manifest already records" "already frozen" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-freeze" "docs/plans/done/$frozen_tamper"
+rm -f "$repo/docs/plans/done/$frozen_tamper"
+
+# The positive control this section did not have. Without it, making
+# plan-repair a no-op, moving its insertion point, or deleting its checksum
+# re-record all passed -- three of the six mutations #F35 names.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F35
+frozen_gap="${fixture_date}-frozen-gap.md"
+# A fenced H1 *before* the real title. plan-repair finds its insertion point
+# with a fence-aware read; a bare /^# / matches this one first and splices the
+# section inside the code block, then re-blesses the checksum over it. Without
+# a fence in the fixture that mutation changes nothing observable.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F38
+printf -- '---\nslug: frozen-gap\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n```\n# an example title, not this file\n```\n\n# frozen gap\n\n## Original plan\n\nx\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/done/$frozen_gap"
+{
+  printf '%s  docs/plans/done/%s\n' \
+    "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_gap" | cut -d' ' -f1)" "$frozen_gap"
+  printf '%s  docs/plans/done/%s\n' \
+    "$(cd "$repo" && sha256sum "docs/plans/done/$frozen_ok" | cut -d' ' -f1)" "$frozen_ok"
+} > "$repo/docs/plans/.checksums"
+# Position, not just presence: an insertion point moved to any other heading
+# still leaves exactly one `## State` and a valid checksum, so a control that
+# only counts the heading passes with the section spliced anywhere.
+# Read through plan_headings, not grep: a section spliced inside a fence is
+# still the first line matching /^## /, so a grep-based check calls it first
+# and green. Only a fence-aware read can say the section is real.
+if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" "docs/plans/done/$frozen_gap" >/dev/null 2>&1 &&
+   gap_heads="$( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_headings "docs/plans/done/'"$frozen_gap"'" | cut -f2-' )" &&
+   [ "$(printf '%s\n' "$gap_heads" | grep -cxF '## State')" = 1 ] &&
+   [ "$(printf '%s\n' "$gap_heads" | head -n 1)" = '## State' ] &&
+   ( cd "$repo" && awk '{print $1"  "$2}' docs/plans/.checksums | sha256sum -c --quiet ); then
+  ok "plan-repair adds the missing section and re-records the checksum"
+else
+  bad "plan-repair adds the missing section and re-records the checksum" \
+    "it reported success without adding the section first, or left the manifest stale"
+fi
+# And it must refuse once the file no longer matches what the manifest says,
+# or it certifies an edit it did not make.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F40
+printf 'tampered\n' >> "$repo/docs/plans/done/$frozen_gap"
+expect_fail "plan-repair refuses a frozen file that no longer matches its checksum" "does not match" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-repair" "docs/plans/done/$frozen_gap"
+rm -f "$repo/docs/plans/done/$frozen_gap"
+
+# A frozen file's path-form citation is muted, but the citation itself must
+# still resolve. Putting `continue` back into that arm stops checking whether
+# the cited plan exists at all, in the half of the corpus that can never be
+# repaired.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F23
+printf -- '---\nslug: frozen-cite\ncreated: %s\nstatus: done\nfrozen: true\n---\n\n# frozen cite\n\nSee docs/plans/done/%s-gone-forever.md here.\n' \
+  "$fixture_date" "$fixture_date" > "$repo/docs/plans/done/${fixture_date}-frozen-cite.md"
+printf '%s  docs/plans/done/%s-frozen-cite.md\n' \
+  "$(cd "$repo" && sha256sum "docs/plans/done/${fixture_date}-frozen-cite.md" | cut -d' ' -f1)" "$fixture_date" \
+  >> "$repo/docs/plans/.checksums"
+expect_fail "a muted path-form citation in a frozen plan is still resolved" "no such plan file" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+rm -f "$repo/docs/plans/done/${fixture_date}-frozen-cite.md"
+
+# The root cause: nothing checked a plan at the moment it stopped being
+# fixable. plan-freeze now lints first.
+frozen_bad="${fixture_date}-freeze-me.md"
+printf -- '---\nslug: freeze-me\ncreated: %s\nstatus: done\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# freeze me\n\n## State\n\nVerified to rung 1 (documentation).\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/done/$frozen_bad"
+expect_fail "plan-freeze refuses a malformed plan, because freezing makes it permanent" "is malformed" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-freeze" "docs/plans/done/$frozen_bad"
+# Removed here *and* by the EXIT trap: every later section's
+# plan_manifest_frozen reads this path, so a fixture manifest left behind by
+# an early return would make a later case pass for the wrong reason.
+# plan-reject is the other door to freeze, and its refusal must leave the
+# plan exactly where it was. The marker, the git mv and the status field all
+# used to happen before the gate, so a refusal stranded the plan in rejected/
+# stamped rejected and unfrozen -- a state no script clears.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F31
+reject_bad="${fixture_date}-reject-me.md"
+# rejected/ must exist, or `git mv` fails and the plan stays in todo/ for a
+# reason that has nothing to do with the gate -- which is how the first
+# version of this case passed with the gate moved back after the move.
+mkdir -p "$repo/docs/plans/todo" "$repo/docs/plans/rejected"
+printf -- '---\nslug: reject-me\ncreated: %s\nstatus: todo\nfrozen: false\nkind: task\npriority: normal\nblocked_by:\n---\n\n# reject me\n\n## Progress\n' \
+  "$fixture_date" > "$repo/docs/plans/todo/$reject_bad"
+# Tracked, or `git mv` fails on an untracked path and the plan stays put for
+# a reason unrelated to the gate -- the second way this case passed while
+# asserting nothing.
+git -C "$repo" add "docs/plans/todo/$reject_bad" >/dev/null 2>&1
+precondition "the rejection fixture is tracked and rejected/ exists, so git mv could succeed" \
+  env -C "$repo" bash -c '[ -d docs/plans/rejected ] && git ls-files --error-unmatch "$1"' _ \
+  "docs/plans/todo/$reject_bad"
+# One invocation, two assertions about it: that it refuses, and that the
+# refusal left nothing behind. Running plan-reject twice to ask two questions
+# about the same action costs a second set of git calls for no more coverage.
+reject_out="$(env -C "$repo" "$repo/docs/skills/plan/scripts/plan-reject" \
+  "docs/plans/todo/$reject_bad" "abandoned" 2>&1)"
+reject_rc=$?
+if [ "$reject_rc" -eq 0 ]; then
+  bad "plan-reject refuses a malformed plan" "it accepted one, and freezing makes that permanent"
+elif ! printf '%s' "$reject_out" | grep -qF "is malformed"; then
+  bad "plan-reject refuses a malformed plan" "refused, but not for the stated reason: $(printf '%s' "$reject_out" | tail -n 1)"
+else
+  ok "plan-reject refuses a malformed plan"
+fi
+if [ -f "$repo/docs/plans/todo/$reject_bad" ] && [ ! -e "$repo/docs/plans/rejected/$reject_bad" ]; then
+  ok "a refused rejection leaves the plan untouched"
+else
+  bad "a refused rejection leaves the plan untouched" "the plan was moved or restamped before the gate ran"
+fi
+# The index entry goes too: later sections sweep required-agents over this
+# fixture, and a staged-then-deleted path changes what they see.
+git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$reject_bad" >/dev/null 2>&1
+rm -f "$repo/docs/plans/todo/$reject_bad"
+
+rm -f "$repo/docs/plans/done/$frozen_bad" "$repo/docs/plans/done/$frozen_ok" "$repo/docs/plans/.checksums"
+
+# The move itself must fail closed. #F31 fixed the *ordering* -- the gate now
+# runs before anything is written -- but an unchecked `git mv` failing after
+# it still left the plan stamped REJECTED in todo/ while the script went on to
+# freeze and checksum whatever sat at the destination, and exited 0 saying so.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F36
+mv_probe="${fixture_date}-mv-blocked.md"
+mkdir -p "$repo/docs/plans/rejected" "$repo/docs/plans/todo"
+# A tracked file already at the destination: `git mv` refuses without -f, which
+# is the one failure this case needs. Both files are well-formed, so nothing
+# else in plan-reject can be what refuses.
+for mv_dir in todo rejected; do
+  {
+    printf -- '---\nslug: mv-blocked\ncreated: %s\nstatus: %s\nfrozen: false\n' "$fixture_date" "$mv_dir"
+    printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# mv blocked\n\n'
+    printf -- '%s\n' "$lint_sections"
+  } > "$repo/docs/plans/$mv_dir/$mv_probe"
+done
+git -C "$repo" add "docs/plans/todo/$mv_probe" "docs/plans/rejected/$mv_probe" >/dev/null 2>&1
+precondition "the git-mv fixture lints clean, so only the move can refuse it" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "docs/plans/todo/$mv_probe"
+expect_fail "plan-reject refuses when the move fails, rather than freezing the destination" "cannot move" \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-reject" "docs/plans/todo/$mv_probe" "abandoned"
+# The exit code is only half of it: the defect was freezing and checksumming
+# the occupant, which is permanent and which a refusal alone does not undo.
+if [ ! -f "$repo/docs/plans/.checksums" ] ||
+   ! grep -qF "docs/plans/rejected/$mv_probe" "$repo/docs/plans/.checksums"; then
+  ok "a failed move freezes nothing at the destination"
+else
+  bad "a failed move freezes nothing at the destination" \
+    "the file already at the destination was stamped rejected and checksummed"
+fi
+git -C "$repo" rm -q --cached --ignore-unmatch "docs/plans/todo/$mv_probe" "docs/plans/rejected/$mv_probe" >/dev/null 2>&1
+rm -f "$repo/docs/plans/todo/$mv_probe" "$repo/docs/plans/rejected/$mv_probe" "$repo/docs/plans/.checksums"
+
+section "the freeze manifest is evidence, and destroying it is not success"
+# The manifest is the only proof that 50 frozen plans have not changed. Three
+# ways that proof was destroyable while every gate reported success.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F54
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+ev_repo="$scratch/evidence"
+rm -rf "$ev_repo"; mkdir -p "$ev_repo/docs/plans/done" "$ev_repo/docs/skills"
+git -C "$ev_repo" init -q
+git -C "$ev_repo" config user.email t@t
+git -C "$ev_repo" config user.name t
+cp -r "$PLAN_SCRIPTS/.." "$ev_repo/docs/skills/plan"
+ev_a="${fixture_date}-evidence-a.md"; ev_b="${fixture_date}-evidence-b.md"
+printf -- '# a\n' > "$ev_repo/docs/plans/done/$ev_a"
+printf -- '# b\n' > "$ev_repo/docs/plans/done/$ev_b"
+git -C "$ev_repo" add -A >/dev/null; git -C "$ev_repo" commit -qm base
+ev() { ( cd "$ev_repo" && bash -c '. docs/skills/plan/scripts/lib.sh; '"$1" ); }
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+
+# A failing step in the manifest rewrite must not leave the manifest shorter
+# than it was. `sort ... > "$checksums"` truncated it before sort ran, so one
+# failure emptied it for every frozen plan at once and the script exited 0.
+ev_fake="$scratch/evbin"; mkdir -p "$ev_fake"
+printf '#!%s\nexit 1\n' "$BASH" > "$ev_fake/sort"; chmod +x "$ev_fake/sort"
+ev_before="$(grep -c . "$ev_repo/docs/plans/.checksums")"
+( cd "$ev_repo" && PATH="$ev_fake:$PATH" bash -c '. docs/skills/plan/scripts/lib.sh; plan_record_checksum . "docs/plans/done/'"$ev_a"'"' ) >/dev/null 2>&1
+ev_after="$(grep -c . "$ev_repo/docs/plans/.checksums")"
+if [ "$ev_after" -ge "$ev_before" ]; then
+  ok "a failed manifest rewrite leaves the manifest intact"
+else
+  bad "a failed manifest rewrite leaves the manifest intact" \
+    "the manifest went from $ev_before entries to $ev_after; the freeze evidence was destroyed"
+fi
+
+# The manifest, not the file's own field, decides what may be edited. This is
+# the last enforcement point that read the field.
+printf -- '---\nslug: evidence-a\ncreated: %s\nstatus: done\nfrozen: false\n---\n\n# a\n' \
+  "$fixture_date" > "$ev_repo/docs/plans/done/$ev_a"
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+if ev "plan_require_not_frozen . docs/plans/done/$ev_a" >/dev/null 2>&1; then
+  bad "a manifest-frozen plan is refused even when its own field says otherwise" \
+    "plan_require_not_frozen accepted a plan the manifest records as frozen"
+else
+  ok "a manifest-frozen plan is refused even when its own field says otherwise"
+fi
+
+# plan_manifest_problem is verify-ladder's decision, in a place it can be
+# called. An emptied manifest is every frozen plan with its evidence gone, so
+# it must report a problem rather than an empty corpus verifying.
+[ -z "$(ev 'plan_manifest_problem .')" ] &&
+  ok "a manifest whose entries all verify reports no problem" ||
+  bad "a manifest whose entries all verify reports no problem" "it reported one"
+: > "$ev_repo/docs/plans/.checksums"
+[ -n "$(ev 'plan_manifest_problem .')" ] &&
+  ok "an emptied manifest is a problem, not a vacuous pass" ||
+  bad "an emptied manifest is a problem, not a vacuous pass" \
+    "an emptied manifest leaves every frozen plan unverifiable; it must not read as a clean run"
+# A *complete* manifest with one hash that no longer matches, because the
+# file changed after it was recorded. Complete on purpose: a manifest missing
+# an entry is reported by the coverage check below, so a fixture that is both
+# incomplete and mismatched cannot say which guard fired.
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+printf 'tampered\n' >> "$ev_repo/docs/plans/done/$ev_a"
+[ -n "$(ev 'plan_manifest_problem .')" ] &&
+  ok "a frozen plan that no longer matches its hash is a problem" ||
+  bad "a frozen plan that no longer matches its hash is a problem" "it reported none"
+
+# Completeness, and it is the direction a hash check cannot see: drop one
+# plan's entry and what remains still verifies, while that plan becomes
+# editable -- pre-commit skips a staged file with no entry by design.
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+awk -v drop="docs/plans/done/$ev_b" '
+  { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == drop) next } { print }
+' "$ev_repo/docs/plans/.checksums" > "$ev_repo/trimmed" &&
+  mv "$ev_repo/trimmed" "$ev_repo/docs/plans/.checksums"
+if ( cd "$ev_repo" && sha256sum -c --quiet docs/plans/.checksums >/dev/null 2>&1 ); then
+  [ -n "$(ev 'plan_manifest_problem .')" ] &&
+    ok "a frozen plan with no manifest entry is a problem, though the entries left all verify" ||
+    bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
+      "the trimmed manifest verifies and nothing reported the plan it stopped covering"
+else
+  bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
+    "the fixture is wrong: the trimmed manifest should still verify, or the case proves nothing"
+fi
+# An unreadable file must not become a manifest entry. sha256sum's status was
+# swallowed by the pipeline, so an unhashable file yielded rc 0 and an empty
+# hash, and that entry then read as covered and frozen everywhere.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78
+ev_before_missing="$(grep -c . "$ev_repo/docs/plans/.checksums" 2>/dev/null || echo 0)"
+if ev "plan_record_checksum . docs/plans/done/${fixture_date}-not-here.md" >/dev/null 2>&1; then
+  bad "a file that cannot be hashed does not become a manifest entry" \
+    "plan_record_checksum reported success for a file it could not read"
+elif [ "$(grep -c . "$ev_repo/docs/plans/.checksums" 2>/dev/null || echo 0)" != "$ev_before_missing" ]; then
+  bad "a file that cannot be hashed does not become a manifest entry" \
+    "it refused, but wrote an entry anyway"
+else
+  ok "a file that cannot be hashed does not become a manifest entry"
+fi
+
+# plan-carry is the sixth writer, and it had no guard at all: it appended a
+# CARRIED marker to a frozen plan, staged it and exited 0.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+expect_fail "plan-carry refuses a frozen plan" "is frozen" \
+  env -C "$ev_repo" "$ev_repo/docs/skills/plan/scripts/plan-carry" "docs/plans/done/$ev_a" D1
+
+# A manifest that legitimately holds one path twice collapses to one entry on
+# the next write. That is a shrink, and a guard counting lines refuses it for
+# good -- including to the plan-repair that would fix it.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F65
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+grep -F "  docs/plans/done/$ev_b" "$ev_repo/docs/plans/.checksums" >> "$ev_repo/dup"
+cat "$ev_repo/dup" >> "$ev_repo/docs/plans/.checksums"
+if ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1; then
+  ok "a duplicated manifest path is collapsed, not refused as a loss"
+else
+  bad "a duplicated manifest path is collapsed, not refused as a loss" \
+    "the write was refused, so the file can never be re-recorded or repaired"
+fi
+rm -f "$ev_repo/dup"
+
+# The manifest keeps its own mode. mktemp is 0600, and /tmp is a tmpfs while
+# the checkout is not, so a temporary moved in from there is both a
+# cross-device copy and a permission change.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F64
+chmod 644 "$ev_repo/docs/plans/.checksums"
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+ev_mode="$(stat -c '%a' "$ev_repo/docs/plans/.checksums")"
+[ "$ev_mode" = 644 ] &&
+  ok "recording a checksum leaves the manifest's mode alone" ||
+  bad "recording a checksum leaves the manifest's mode alone" "the manifest is now mode $ev_mode"
+
+rm -rf "$ev_repo"
+
+section "the freeze manifest is keyed on the whole path, not a substring of it"
+# Three ways the same lookup degrades into a substring search, each of them a
+# live finding and none of them observable through any gate's output: the
+# reader matched anywhere in the line (#F20), the writer deleted any line the
+# path appeared in (#F24), and the writer skipped the `./` normalisation the
+# reader applied, so one spelling appended a second entry and the file could
+# never be committed again (#F39). The positive direction -- that a recorded
+# path *is* reported frozen -- is carried by the plan-repair and plan-freeze
+# cases above, which all refuse or proceed on this reader's answer.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F20
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F39
+mf_probe="${fixture_date}-manifest-probe.md"
+mf_rel="docs/plans/done/$mf_probe"
+printf -- '# manifest probe\n' > "$repo/$mf_rel"
+mf() { ( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; '"$1" ); }
+# One entry, whose path has the probe's path as a strict prefix. That is the
+# reproduction #F20 records; it has to exist in the manifest, not on disk.
+printf '%s  %s.bak.md\n' "$(printf 'x' | sha256sum | cut -d' ' -f1)" "$mf_rel" \
+  > "$repo/docs/plans/.checksums"
+if mf "plan_manifest_frozen . \"$mf_rel\"" >/dev/null 2>&1; then
+  bad "a plan is not frozen because a longer path begins with its path" \
+    "plan_manifest_frozen matched an entry that is not this file's"
+else
+  ok "a plan is not frozen because a longer path begins with its path"
+fi
+# Both halves: the record must succeed *and* leave the other entry. The loss
+# guard also leaves it, by refusing the write outright, so "the entry is still
+# there" alone no longer distinguishes a correct delete from a refused one.
+if mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1 &&
+   grep -qF "  $mf_rel.bak.md" "$repo/docs/plans/.checksums"; then
+  ok "recording one path leaves an entry that merely begins with it alone"
+else
+  bad "recording one path leaves an entry that merely begins with it alone" \
+    "plan_record_checksum deleted an unrelated manifest entry"
+fi
+# Same file, spelled with a `./`. Two entries means the manifest disagrees
+# with itself and .githooks/pre-commit blocks the file for good.
+rm -f "$repo/docs/plans/.checksums"
+mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1
+mf "plan_record_checksum . \"./$mf_rel\"" >/dev/null 2>&1
+if [ "$(grep -c . "$repo/docs/plans/.checksums")" = 1 ]; then
+  ok "the same file spelled two ways gets one manifest entry"
+else
+  bad "the same file spelled two ways gets one manifest entry" \
+    "the manifest holds $(grep -c . "$repo/docs/plans/.checksums") entries for one file"
+fi
+git -C "$repo" rm -q --cached --ignore-unmatch "$mf_rel" "docs/plans/.checksums" >/dev/null 2>&1
+rm -f "$repo/$mf_rel" "$repo/docs/plans/.checksums"
+
 section "plan-citations resolves what exists and refuses what does not"
 # The sweep below asserts that plan-citations refuses when a git call under
 # it fails. That says nothing about whether it can tell a good citation
@@ -363,6 +953,17 @@ else
   bad "plan-citations resolves a citation that exists" \
     "$(printf '%s' "$cite_out" | tail -n 1)"
 fi
+# the bare-filename rule: a path form resolves by basename, so nothing
+# reported it and it went stale the moment plan-move ran. The bare form of
+# the same citation must still pass, which the case above requires.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
+# shellcheck disable=SC2016
+expect_fail "plan-citations refuses a plan cited by path" "never by path" \
+  env -C "$repo" bash -c '
+    printf "See docs/plans/in-progress/%s here.\n" "$1" > docs/gone.md
+    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+  _ "$lint_plan"
+
 # The cited name arrives as an argument for the same reason it is
 # assembled above, and $? / $rc are the child's, not this shell's.
 # shellcheck disable=SC2016
@@ -425,8 +1026,12 @@ invariant_rewrap "a declaration survives any wrap width" pass \
   "## State"$'\n\n'"Verified to rung 3 (ran it locally, output inspected) and the output was read end to end."
 invariant_rewrap "a bold declaration survives any wrap" pass \
   "## State"$'\n\n'"**Verified to rung 4 (VM).** Both machines booted and the units started."
+# The rung ends the sentence. With a trailing clause ("... rung 4 yet,
+# because ...") the next word refuses the paragraph on its own, so dropping
+# the matcher's leading anchor -- which accepts every denial -- left this
+# green. The property is the anchor; the fixture has to depend on it.
 invariant_rewrap "a denial stays refused at any wrap" refuse \
-  "## State"$'\n\n'"The change is not verified to rung 4 yet, because the secret is sops-backed."
+  "## State"$'\n\n'"The change to the sops-backed secret is not verified to rung 4."
 invariant_rewrap "a mention stays refused at any wrap" refuse \
   "## State"$'\n\n'"The gate wants a paragraph that says Verified to rung 3 and nothing else before it."
 invariant_rewrap "a subject-position mention stays refused" refuse \
@@ -448,14 +1053,18 @@ invariant_decoration() { # <name> <expected> <core>
 invariant_decoration "a declaration survives any decoration" pass \
   "Verified to rung 3 (ran it locally)."
 invariant_decoration "a denial survives any decoration" refuse \
-  "Not verified to rung 3 yet."
+  "Not verified to rung 3."
 
 # Quoting is the one presentation change that *must* flip an accept to a
 # refuse: a doc that shows the required form is not claiming it.
 invariant_quoted() {
   local got fence
   for fence in '```' '~~~' '   ```' '````'; do
-    got="$(rung_verdict "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"$fence"$'\n'"Verified to rung 3 (ran it locally)."$'\n'"$fence")"
+    # Blank lines inside the fence, so the declaration forms a paragraph of
+    # its own. Without them the fence markers join the declaration's block and
+    # the backtick rule refuses it -- which is a different property, and left
+    # this case green with fenced content no longer skipped at all.
+    got="$(rung_verdict "## State"$'\n\n'"Nothing verified yet:"$'\n\n'"$fence"$'\n\n'"Verified to rung 3 (ran it locally)."$'\n\n'"$fence")"
     if [ "$got" != refuse ]; then
       bad "quoting the phrase never declares it" "accepted inside a '$fence' fence"
       return
@@ -479,8 +1088,19 @@ real_git="$(command -v git)"
 fakebin="$scratch/fakebin"
 mkdir -p "$fakebin"
 {
-  printf '#!/usr/bin/env bash\n'
-  printf 'c="$(cat "$SABOTAGE_COUNT" 2>/dev/null || echo 0)"\n'
+  # $BASH, not `#!/usr/bin/env bash`: this shim is written at runtime, so
+  # nothing can rewrite its shebang the way a checked-in script's gets
+  # rewritten. In a build sandbox there is no /usr/bin/env, the shim then
+  # fails to exec, every swept gate refuses at baseline, and all five sweeps
+  # report "the gate already refuses with nothing sabotaged" -- found by
+  # running this suite as a flake check.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F45
+  printf '#!%s\n' "$BASH"
+  # `read`, not `$(cat)`: the shim runs once per git call the swept gates
+  # make, and a command substitution forks twice each time. No `|| c=0` --
+  # the counter has no trailing newline, so read assigns and *then* returns
+  # 1 at EOF, and a `||` clause would wipe the value it just set.
+  printf 'c=0; read -r c < "$SABOTAGE_COUNT" 2>/dev/null\n'
   printf 'c=$((c + 1)); printf %%s "$c" > "$SABOTAGE_COUNT"\n'
   printf 'if [ "$c" = "$SABOTAGE_AT" ]; then echo "sabotage: git call $c" >&2; exit 128; fi\n'
   printf 'exec %s "$@"\n' "$real_git"
@@ -518,9 +1138,15 @@ else
     "the sabotage shim cannot see these calls: $path_git_violations"
 fi
 
+# Set to a function name for a gate that writes: it runs before the baseline
+# and before every iteration, so each run starts from the same state. Left
+# empty for the read-only gates, which share one fixture.
+SWEEP_RESET=""
+
 sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
-  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count
+  local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count seen_calls
   shift 3
+  [ -z "$SWEEP_RESET" ] || "$SWEEP_RESET"
   # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
   # gate already refusing for an unrelated reason, and then stays green
   # whatever the sabotage does.
@@ -535,7 +1161,7 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
   printf 0 > "$scratch/sabotage.count"
   base_out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT=0 "$@" 2>&1)"
   rc=$?
-  base_count="$(cat "$scratch/sabotage.count")"
+  base_count=0; read -r base_count < "$scratch/sabotage.count" 2>/dev/null
   # rc=0 is not enough. plan-gate's "nothing to gate" exits 0 too, and a
   # baseline that accepts it sweeps only the ref-resolution calls and
   # then reports ok having exercised no stamp check at all -- measured.
@@ -545,7 +1171,11 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     bad "$name" "the gate already refuses with nothing sabotaged; the sweep would prove nothing"
     return
   fi
-  if ! printf '%s' "$base_out" | grep -qF -- "$want"; then
+  # An empty fragment is for a gate that succeeds silently -- .githooks/*
+  # print nothing when they pass. The baseline is then carried by rc=0, by
+  # the call count below, and by whatever precondition the caller asserted
+  # beside the sweep; there is no success line to match.
+  if [ -n "$want" ] && ! printf '%s' "$base_out" | grep -qF -- "$want"; then
     bad "$name" "the gate exited 0 without doing its work: $(printf '%s' "$base_out" | tail -n 1)"
     return
   fi
@@ -554,11 +1184,13 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     return
   fi
   for ((n = 1; n <= max; n++)); do
+    [ -z "$SWEEP_RESET" ] || "$SWEEP_RESET"
     printf 0 > "$scratch/sabotage.count"
     out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT="$n" "$@" 2>&1)"
     rc=$?
     # A gate that never reached call n is fine: nothing was sabotaged.
-    [ "$(cat "$scratch/sabotage.count" 2>/dev/null || echo 0)" -lt "$n" ] && break
+    seen_calls=0; read -r seen_calls < "$scratch/sabotage.count" 2>/dev/null
+    [ "$seen_calls" -lt "$n" ] && break
     if [ "$rc" -eq 0 ]; then
       leaked="$n"
       printf '    (call %s failed; gate still exited 0 saying: %s)\n' "$n" "$(printf '%s' "$out" | tail -n 1)" >&2
@@ -589,6 +1221,9 @@ sabotage_sweep "required-agents over a real range" "security" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" HEAD~1 HEAD
 sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents"
+sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
+  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  "docs/plans/in-progress/$lint_plan"
 # "citations resolve", not "plan-citations: OK": the latter is a prefix of
 # the "no files matched the scan set" line too -- the one F2's fix added to
 # make a scanned-nothing run visible -- so the baseline accepted a gate that
@@ -596,6 +1231,202 @@ sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
 sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+
+# ------------------------------------------- sabotage: the gates that write
+
+# The gates swept above only read, so one fixture serves every iteration.
+# plan-move, plan-freeze and .githooks/pre-commit all write -- they move
+# files, rewrite frontmatter, append to the checksum manifest and stage the
+# result -- so an iteration that half-completes decides the next one's
+# verdict. Each of these gets a pristine copy restored before every run.
+# This is the extension 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+# asks for, and the reason it names for why these were left until last.
+section "sabotage: a gate that writes must not report success over a failed git call"
+
+mrepo="$scratch/mrepo"
+mpristine="$scratch/mrepo-pristine"
+mkdir -p "$mpristine"
+git -C "$mpristine" init -q
+git -C "$mpristine" config user.email t@t
+git -C "$mpristine" config user.name t
+git -C "$mpristine" config commit.gpgsign false
+git -C "$mpristine" config core.hooksPath /dev/null
+mkdir -p "$mpristine/docs/skills" "$mpristine/docs/plans/todo" \
+  "$mpristine/docs/plans/in-progress" "$mpristine/docs/plans/done" "$mpristine/.claude"
+cp -r "$PLAN_SCRIPTS/.." "$mpristine/docs/skills/plan"
+cp -r "$WORKFLOW_SCRIPTS/.." "$mpristine/docs/skills/workflow"
+cp -r "$SCRIPT_DIR/../.githooks" "$mpristine/.githooks"
+find "$mpristine/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/d' {} +
+# Closeable on purpose: every required section, no open decision or finding,
+# and a rung declared -- so `plan-move ... done` reaches the move and the
+# freeze rather than stopping at a close-out gate for an unrelated reason.
+move_plan="${fixture_date}-movable.md"
+{
+  printf -- '---\nslug: movable\ncreated: %s\nstatus: todo\nfrozen: false\n' "$fixture_date"
+  printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# movable\n\n'
+  printf -- '## State\n\nVerified to rung 1 (documentation).\n\n'
+  printf -- '## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$mpristine/docs/plans/todo/$move_plan"
+git -C "$mpristine" add -A >/dev/null
+git -C "$mpristine" commit -qm base
+# A frozen plan and the manifest that records it, so the hook's manifest
+# branch is actually taken. The entry names a done/ plan, never the plan the
+# move sweeps use -- plan_require_not_frozen now reads the manifest, so an
+# entry for the movable plan would make plan-move refuse for the wrong
+# reason.
+frozen_ev="${fixture_date}-frozen-evidence.md"
+printf -- '# frozen evidence\n' > "$mpristine/docs/plans/done/$frozen_ev"
+# A second frozen plan whose name contains a space. Not a name plan-new can
+# produce, but the hook is a gate: an entry it cannot match is one it skips
+# silently, and awk's default field splitting is what made that happen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+frozen_sp="${fixture_date}-frozen spaced.md"
+printf -- '# frozen spaced\n' > "$mpristine/docs/plans/done/$frozen_sp"
+{
+  printf '%s  docs/plans/done/%s\n' \
+    "$(sha256sum "$mpristine/docs/plans/done/$frozen_ev" | cut -d' ' -f1)" "$frozen_ev"
+  printf '%s  docs/plans/done/%s\n' \
+    "$(sha256sum "$mpristine/docs/plans/done/$frozen_sp" | cut -d' ' -f1)" "$frozen_sp"
+} > "$mpristine/docs/plans/.checksums"
+git -C "$mpristine" add -A >/dev/null
+git -C "$mpristine" commit -qm manifest
+# Staged but never committed, so every restored copy hands pre-commit
+# something to scan. An empty index makes that hook exit 0 having read
+# nothing, which is the shape its sweep must not be satisfied by.
+printf '{ }\n' > "$mpristine/staged.nix"
+git -C "$mpristine" add staged.nix >/dev/null
+mreset() { rm -rf "$mrepo"; cp -a "$mpristine" "$mrepo"; }
+SWEEP_RESET=mreset
+
+sabotage_sweep "plan-move into in-progress" "docs/plans/in-progress/$move_plan" 25 \
+  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  "docs/plans/todo/$move_plan" in-progress
+# Covers plan-freeze in the same sweep: `plan-move ... done` execs it, so
+# every git call the freeze makes is one of the calls swept here.
+sabotage_sweep "plan-move into done, which execs plan-freeze" "frozen" 40 \
+  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  "docs/plans/todo/$move_plan" done
+
+# The hook succeeds silently, so there is no success line to require. The
+# precondition carries what the fragment would have: the hook short-circuits
+# to exit 0 on an empty index, and a sweep run against one would report ok
+# having scanned nothing.
+mreset
+precondition "the pre-commit fixture has something staged, so the hook cannot exit early" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only)" ]'
+sabotage_sweep ".githooks/pre-commit" "" 30 \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+# Deleting the manifest is the cheapest cover for a tampered frozen plan:
+# every frozen file becomes unverifiable at once, and "not in the index"
+# looks identical to "never tracked". The hook must tell them apart.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F55
+mreset
+git -C "$mrepo" rm -q --cached docs/plans/.checksums >/dev/null 2>&1
+precondition "the manifest is staged for deletion, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)" ]'
+expect_fail ".githooks/pre-commit refuses a staged deletion of the freeze manifest" "staged for deletion" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# Replaced by a symlink rather than deleted: the index mode is 120000 and
+# `git show` returns the link target, which parses as no entries -- so every
+# frozen plan stops being checked and the hook still exits 0.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63
+mreset
+( cd "$mrepo" && rm -f docs/plans/.checksums && ln -s /dev/null docs/plans/.checksums &&
+  git add docs/plans/.checksums ) >/dev/null 2>&1
+precondition "the manifest is staged as a symlink, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ "$(git ls-files -s -- docs/plans/.checksums | cut -d" " -f1)" = 120000 ]'
+expect_fail ".githooks/pre-commit refuses a freeze manifest staged as a symlink" "not as a regular file" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+SWEEP_RESET=""
+
+# The third of F63's manifest guards, and the only one that had neither a
+# case nor a mutant: an entry dropped for a plan that is not itself being
+# deleted. What remains verifies perfectly, which is the point.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F76
+mreset
+( cd "$mrepo" && awk '!/frozen-evidence/' docs/plans/.checksums > .m && mv .m docs/plans/.checksums &&
+  git add docs/plans/.checksums ) >/dev/null 2>&1
+precondition "the fixture drops a manifest entry while the plan stays, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -f docs/plans/done/'"$frozen_ev"' ] && ! grep -q frozen-evidence docs/plans/.checksums'
+expect_fail ".githooks/pre-commit refuses a manifest that drops an entry for a plan that stays" "drops entries" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# A frozen plan whose name has a space, tampered with and staged. The hook
+# looked its entry up with awk's `$2`, which splits on that space, so it
+# matched nothing and took the "not a frozen file" branch.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+mreset
+printf 'tampered\n' >> "$mrepo/docs/plans/done/$frozen_sp"
+git -C "$mrepo" add "docs/plans/done/$frozen_sp" >/dev/null 2>&1
+precondition "the spaced frozen plan is staged and altered, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only -- "docs/plans/done/'"$frozen_sp"'")" ]'
+expect_fail ".githooks/pre-commit refuses a tampered frozen plan whose name contains a space" "is frozen" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# .githooks/pre-push is the only runner of the mutation catalogue, and it had
+# no case and no mutant -- the gate that measures the other gates was the one
+# gate nothing measured. It shells out to `nix build` and `nixos-rebuild`, so
+# both are stubbed onto PATH and the assertion is whether they were reached.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F75
+section "pre-push decides what to build, and must not decide it from a failed range"
+pp_bin="$scratch/ppbin"; mkdir -p "$pp_bin"
+for stub in nix nixos-rebuild; do
+  { printf '#!%s\n' "$BASH"; printf 'printf "%%s\\n" "$0" >> "$PP_RAN"\nexit 0\n'; } > "$pp_bin/$stub"
+  chmod +x "$pp_bin/$stub"
+done
+pp_run() { # <local-sha> <remote-sha> -- prints the hook's rc, records stub calls
+  : > "$scratch/pp.ran"
+  printf 'refs/heads/x %s refs/heads/x %s\n' "$1" "$2" |
+    env -C "$mrepo" PATH="$pp_bin:$PATH" PP_RAN="$scratch/pp.ran" \
+    bash "$mrepo/.githooks/pre-push" >/dev/null 2>&1
+  printf '%s' "$?"
+}
+mreset
+# A second commit that touches a *gate* path, so the range owes a
+# gate-mutants build. Touching anything else proves nothing: the hook
+# legitimately builds nothing for a range with no gate and no host in it.
+printf '\n# touched by the pre-push fixture\n' >> "$mrepo/docs/skills/plan/scripts/lib.sh"
+git -C "$mrepo" add docs/skills/plan/scripts/lib.sh >/dev/null 2>&1
+git -C "$mrepo" commit -qm second >/dev/null 2>&1
+pp_head="$(git -C "$mrepo" rev-parse HEAD)"
+pp_prev="$(git -C "$mrepo" rev-parse HEAD~1)"
+precondition "the pre-push fixture has a gate file in its range, so a build is owed" \
+  env -C "$mrepo" bash -c 'git diff --name-only HEAD~1 HEAD -- docs/skills/ | grep -q .'
+pp_rc="$(pp_run "$pp_head" "$pp_prev")"
+if [ "$pp_rc" = 0 ] && grep -q . "$scratch/pp.ran"; then
+  ok "pre-push reaches its build over an ordinary range"
+else
+  bad "pre-push reaches its build over an ordinary range" \
+    "rc=$pp_rc and the stubs were invoked $(grep -c . "$scratch/pp.ran") time(s)"
+fi
+# A new branch whose merge base cannot be computed: origin/master does not
+# exist in this fixture. The range must not collapse to a working-tree diff,
+# which is empty on a clean checkout and skips every build while exiting 0.
+pp_rc="$(pp_run "$pp_head" "0000000000000000000000000000000000000000")"
+if [ "$pp_rc" != 0 ] || grep -q . "$scratch/pp.ran"; then
+  ok "pre-push does not skip its build when the merge base cannot be computed"
+else
+  bad "pre-push does not skip its build when the merge base cannot be computed" \
+    "it exited 0 having built nothing; the range collapsed to a working-tree diff"
+fi
+
+# subagent-stamp is deliberately not swept, and this records that rather
+# than leaving it looking un-done. Every failure path in it ends `exit 0`
+# -- no repo root, no active plan, a frozen plan, an uncomputable
+# fingerprint -- and its one git call ends `|| true`. That is the correct
+# shape for a SubagentStop hook, because a hook that fails takes the
+# session with it, and it is the opposite of the property this section
+# asserts. Sweeping it would demand a refusal it is designed never to make.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+if grep -q 'exit 0' "$WORKFLOW_SCRIPTS/subagent-stamp" &&
+   grep -q 'git -C "$root" add "$rel" 2>/dev/null || true' "$WORKFLOW_SCRIPTS/subagent-stamp"; then
+  note "subagent-stamp is exempt from the sabotage sweep" \
+    "it fails silently by design, so it has no refusal to assert; the stamp it fails to write is the signal"
+else
+  bad "subagent-stamp is exempt from the sabotage sweep" \
+    "it no longer fails silently, so the reason for the exemption is gone -- sweep it"
+fi
 
 printf '\ngate-tests: %s passed, %s failed, %s recorded residue(s)\n' "$pass" "$fail" "$known"
 [ "$fail" -eq 0 ] || exit 1

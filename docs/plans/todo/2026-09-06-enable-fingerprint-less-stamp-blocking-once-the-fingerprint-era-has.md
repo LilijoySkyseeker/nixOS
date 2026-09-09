@@ -3,9 +3,30 @@ slug: enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # enable fingerprint-less stamp blocking once the fingerprint era has landed
+
+## State
+
+Half landed before this file was filed, which "Original plan" above
+predates: `plan-gate` already routes `malformed` through `stamp_problem`,
+so a stamp naming an *empty* fingerprint now BLOCKS on a non-frozen plan.
+That half needed no entry condition — an empty `(code )` field cannot
+come from the pre-fingerprint era, only from a truncated or hand-written
+line, so re-running the agent always fixes it, and no legacy stamp on any
+open plan reads as `malformed`.
+
+Only the `legacy` arm remains, and it is what the entry condition and the
+verification steps above are about. Blocked there until the fingerprint
+work merges to master and the main checkout is pulled
+(`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F12`).
+Filed 2026-09-06 as the follow-up to
+`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F13`,
+which the user accepted rather than fixed.
 
 ## Original plan
 
@@ -73,24 +94,6 @@ until its agents re-run once -- one extra, satisfiable pass. Before
 enabling, check which open plans carry legacy stamps and would be
 affected. Test both arms: a legacy stamp on a frozen plan must still
 NOTE, and on a non-frozen plan must now BLOCK.
-
-## State
-
-Half landed before this file was filed, which "Original plan" above
-predates: `plan-gate` already routes `malformed` through `stamp_problem`,
-so a stamp naming an *empty* fingerprint now BLOCKS on a non-frozen plan.
-That half needed no entry condition — an empty `(code )` field cannot
-come from the pre-fingerprint era, only from a truncated or hand-written
-line, so re-running the agent always fixes it, and no legacy stamp on any
-open plan reads as `malformed`.
-
-Only the `legacy` arm remains, and it is what the entry condition and the
-verification steps above are about. Blocked there until the fingerprint
-work merges to master and the main checkout is pulled
-(`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F12`).
-Filed 2026-09-06 as the follow-up to
-`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F13`,
-which the user accepted rather than fixed.
 
 ## Progress
 

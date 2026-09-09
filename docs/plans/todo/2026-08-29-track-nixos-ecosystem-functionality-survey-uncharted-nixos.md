@@ -3,9 +3,22 @@ slug: track-nixos-ecosystem-functionality-survey-uncharted-nixos
 created: 2026-08-29
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Track NixOS ecosystem functionality survey (Uncharted NixOS)
+
+## State
+
+**2026-08-29.** F12 (`nixpkgs-multiverse`) added on request, researched and
+verified against the project's own GitHub repo and docs site rather than
+assumed. All 12 findings open, none triaged. Given the loose
+fixed/accepted/moot mapping above, expect most of these to resolve
+`accepted` (deliberately not pursued) rather than `fixed` — that's a
+normal, non-alarming outcome for an opportunity survey, unlike the other
+two plans where `accepted` means a risk was knowingly left in place.
 
 ## Original plan
 
@@ -60,16 +73,6 @@ plausible use case surfaced at this fleet's scale): `devenv`/`flox`
 (flake-parts `devShells` already cover this), and `recursive-nix`/
 `dynamic-derivations`/`impure-derivations`/the pipe operator (real Nix
 features, no realistic use case here).
-
-## State
-
-**2026-08-29.** F12 (`nixpkgs-multiverse`) added on request, researched and
-verified against the project's own GitHub repo and docs site rather than
-assumed. All 12 findings open, none triaged. Given the loose
-fixed/accepted/moot mapping above, expect most of these to resolve
-`accepted` (deliberately not pursued) rather than `fixed` — that's a
-normal, non-alarming outcome for an opportunity survey, unlike the other
-two plans where `accepted` means a risk was knowingly left in place.
 
 ## Progress
 - [ ] F1

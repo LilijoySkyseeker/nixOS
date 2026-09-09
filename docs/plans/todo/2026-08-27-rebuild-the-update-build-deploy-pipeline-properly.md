@@ -3,6 +3,9 @@ slug: rebuild-the-update-build-deploy-pipeline-properly
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Rebuild the update/build/deploy pipeline properly

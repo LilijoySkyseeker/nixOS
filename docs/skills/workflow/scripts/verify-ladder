@@ -3,20 +3,21 @@
 # the mechanical half of its rung 3 (eval, targeted build). Passing does
 # not reach rung 3, which is earned by reading the output. Wired in as a
 # hard gate in the `workflow` skill's own step sequence instead of left to
-# memory. Hard-blocks on plan-citations, gate-tests, plan-lint over the
-# active plan, nixfmt --check, nix flake check, a targeted
-# nixos-rebuild build, and statix/deadnix -- but only for *newly introduced* warnings (line falls
-# inside the actual diff), never pre-existing debt elsewhere in a touched
-# file; linting a whole file over a one-line edit would otherwise block
-# on unrelated history. Requires jq for the diff-scoped precision; falls
-# back to informational-only if jq is missing.
+# memory. Hard-blocks on plan-citations, gate-tests, the freeze manifest's
+# own entries, plan-lint over the active plan, nixfmt --check, nix flake
+# check, a targeted nixos-rebuild build, and statix/deadnix -- but only for
+# *newly introduced* warnings (line falls inside the actual diff), never
+# pre-existing debt elsewhere in a touched file; linting a whole file over
+# a one-line edit would otherwise block on unrelated history. Requires jq
+# for the diff-scoped precision; falls back to informational-only if jq is
+# missing.
 # Independent of the tabled vm-testing question -- never VM-boots or
 # switches anything.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=../../plan/scripts/lib.sh
 . "$SCRIPT_DIR/../../plan/scripts/lib.sh"
-root="$(plan_repo_root)"
+root="$(plan_repo_root)" || exit 1
 cd "$root" || plan_die "cannot cd to repo root"
 
 fail=0
@@ -48,12 +49,35 @@ fi
 echo "== gate-tests =="
 # The gates' own failure-mode tests, run unconditionally for the same
 # reason plan-citations is: a gate breaks from the *library* side, so the
-# edit that breaks it need not touch the script being tested. Under a
-# second, no network, scratch repos under TMPDIR.
+# edit that breaks it need not touch the script being tested. ~2.1s, no
+# network, scratch repos under TMPDIR.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+#
+# Called directly even though `checks.gate-tests` now runs the same suite.
+# That is not a double run: the flake-check step below passes --no-build,
+# which nix documents as "Do not build checks" -- it evaluates them and
+# stops. Drop this call and nothing runs the suite before a commit.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F46
 if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
   echo "BLOCKED: a gate script no longer fails where it must, or no longer passes an honest sequence. See above." >&2
   fail=1
+fi
+
+echo "== freeze manifest =="
+# Nothing else runs `sha256sum -c` over the manifest: plan-lint reads only the
+# active plan, and .githooks/pre-commit checks only entries whose file is
+# staged, so a frozen plan altered without staging reached no gate. Coverage
+# as well as content: every file in done/ and rejected/ must have an entry,
+# or dropping one would leave nothing to verify and still pass.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
+manifest_problem="$(plan_manifest_problem "$root")"
+if [ -n "$manifest_problem" ]; then
+  echo "BLOCKED: $manifest_problem" >&2
+  echo "Restore it from git rather than re-freezing -- a re-freeze records whatever the file says now." >&2
+  fail=1
+else
+  echo "$PLAN_CHECKSUMS_RELPATH: $(grep -c . "$root/$PLAN_CHECKSUMS_RELPATH") frozen plan(s) verify."
 fi
 
 echo "== plan-lint (active plan) =="
@@ -67,6 +91,15 @@ if active_plan="$(plan_active_plan)"; then
     echo "BLOCKED: the active plan is malformed. See the problems above." >&2
     fail=1
   fi
+elif marker_problem="$(plan_active_plan_problem)"; [ -n "$marker_problem" ]; then
+  # A marker naming nothing usable is not the same as no marker, and
+  # plan_active_plan returns 1 for both. A plan deleted or renamed after
+  # plan-new wrote the marker left this pointing at a missing file, and the
+  # lint was skipped under a line that reads like a clean pass -- observed,
+  # not hypothetical.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+  echo "BLOCKED: $marker_problem. Fix or remove the marker." >&2
+  fail=1
 else
   echo "(no active plan this session)"
 fi

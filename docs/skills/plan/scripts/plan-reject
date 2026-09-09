@@ -17,21 +17,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 arg="$1" reason="$2"
 [ -n "$reason" ] || plan_die "a reason is required -- why was this abandoned, or what superseded it?"
 
-root="$(plan_repo_root)"
-rel="$(plan_locate "$arg" "$root")"
-plan_require_not_frozen "$root/$rel"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$arg" "$root")" || exit 1
+plan_require_not_frozen "$root" "$rel"
 
 case "$(dirname "$rel")" in
   docs/plans/todo | docs/plans/in-progress) ;;
   *) plan_die "$rel is not in todo/ or in-progress/ -- nothing else is eligible for rejection." ;;
 esac
 
+# The second door to freeze: rejected/ is as permanent as done/, so it lints
+# too, even though it waives the decision and finding gates.
+# Before the marker and the move, not after: plan_die on a refusal would
+# otherwise leave the plan sitting in rejected/, stamped rejected and
+# unfrozen -- a state no script put it in and none clears.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F31
+if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
+  plan_die "cannot reject -- $rel is malformed, and freezing makes that permanent:
+$lint_out"
+fi
+
 today="$(plan_today)"
 printf '\n**REJECTED %s:** %s\n' "$today" "$reason" >> "$root/$rel"
 
 base="$(basename "$rel")"
 new_rel="docs/plans/rejected/${base}"
-git -C "$root" mv "$rel" "$new_rel"
+# Checked: an unchecked mv left the plan in todo/ already stamped REJECTED
+# while the script went on to freeze and checksum whatever sat at the
+# destination, and still exited 0 saying "rejected and frozen".
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F36
+git -C "$root" mv "$rel" "$new_rel" ||
+  plan_die "cannot move $rel to $new_rel -- the REJECTED marker has been written but nothing else was done; re-run once the move can succeed."
 plan_set_field "$root/$new_rel" status rejected
 
 plan_do_freeze "$root" "$new_rel"

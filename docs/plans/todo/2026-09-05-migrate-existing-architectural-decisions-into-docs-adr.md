@@ -3,9 +3,18 @@ slug: migrate-existing-architectural-decisions-into-docs-adr
 created: 2026-09-05
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # migrate existing architectural decisions into docs adr
+
+## State
+
+**2026-09-05, not started.** `docs/adr/` contains ADR-0001 and a README
+describing the practice and its relationship to plan files. Nothing has
+been backfilled.
 
 ## Original plan
 
@@ -23,12 +32,6 @@ documentation project blocking the log-monitoring work.
 
 **Ordering.** Depends only on ADR-0001 existing, which it does. Does not
 block anything. Best done incrementally rather than as one sweep.
-
-## State
-
-**2026-09-05, not started.** `docs/adr/` contains ADR-0001 and a README
-describing the practice and its relationship to plan files. Nothing has
-been backfilled.
 
 ## Progress
 

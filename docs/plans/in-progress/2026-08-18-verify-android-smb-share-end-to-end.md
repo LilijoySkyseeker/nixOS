@@ -3,6 +3,9 @@ slug: verify-android-smb-share-end-to-end
 created: 2026-08-18
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # verify Android SMB share end-to-end

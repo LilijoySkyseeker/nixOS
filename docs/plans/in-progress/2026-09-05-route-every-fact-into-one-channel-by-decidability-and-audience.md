@@ -3,6 +3,9 @@ slug: route-every-fact-into-one-channel-by-decidability-and-audience
 created: 2026-09-05
 status: in-progress
 frozen: false
+kind: map
+priority: normal
+blocked_by:
 ---
 
 # route every fact into one channel by decidability and audience
@@ -11,6 +14,106 @@ frozen: false
 destination plus child plans with blocking edges, worked one child at a
 time, rather than a single task plan. Until D4's `blocked_by` frontmatter
 exists the edges live in Progress below (see G1).
+
+## State
+
+**2026-09-05: child 5 done, child 1 all but one item, G5 and G6 closed.**
+D1-D10 are settled from a full grilling session with the user on
+2026-09-05.
+
+Landed so far:
+
+- **G5** — `tests/zrepl-replication.nix` imports nixpkgs' test SSH keys by
+  path concatenation rather than string interpolation. `verify-ladder`
+  had been un-passable on master for any change.
+- **G6** — child 2 re-blocked behind child 5; 18 live `#G` citations
+  would have broken silently otherwise.
+- **Child 5** — `docs/skills/plan/scripts/plan-citations` exists and is
+  wired into `verify-ladder`. 167 citations resolve, zero broken.
+- **Child 1** — seven of eight corrections applied across `AGENTS.md`,
+  `docs/adr/README.md`, `docs/procedures/testing-changes.md`,
+  `docs/skills/plan/reference.md` and `docs/skills/workflow/SKILL.md`.
+  The eighth, the GitHub description and homepage URL, needs the user's
+  own wording.
+
+**2026-09-06: child 4 landed**, so 6, 7, 8 and 14 are unblocked.
+`docs/skills/workflow/scripts/required-agents` computes the obliged set
+from the diff; `workflow/reference.md`'s "Subagent selection" and step 6
+of `workflow/SKILL.md` no longer contain a judgment escape. Child 1 is
+complete — GitHub description and homepage set 2026-09-06.
+
+**2026-09-06: child 6 landed, and D11 with it.** `plan-gate` now refuses
+a merge unless every obliged, stampable agent left a completion stamp in
+the cited plan, and the stamp carries a fingerprint of the code it read
+so a stale stamp is caught rather than accepted. `/simplify` ran and its
+ten findings were applied; `security` and `docs-updater` follow.
+
+Also this session: skill scripts and git hooks were added to the trigger
+set. They are code *and* they are the enforcement machinery — a change to
+`plan-gate` or `verify-ladder` can weaken every other gate — so keying
+only off `.nix` had left them reviewed by nothing.
+
+Four children done (1, 4, 5, 6). Next takeable: child 3 (smallest),
+child 2 (now that 5 has landed), child 7, or child 8.
+
+**Verified to rung 4 (VM).** `verify-ladder` passes, and
+`nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
+produced `vm-test-run-zrepl-replication`. Not deployed to any host, and
+nothing here needs a switch.
+
+---
+
+### Pick-up point, 2026-09-07 (unreviewed tail closed)
+
+**Where.** Worktree
+`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69**. Work there,
+not in the main checkout.
+
+**PR #68 merged 2026-09-07** as `cfe6106`. Children **1, 3, 4, 5, 6** are
+done and on master. The main checkout was fast-forwarded in the same
+session, so `#F12` is closed in practice: stamps written from a worktree
+now carry a real code fingerprint instead of `legacy`.
+
+**Child 2 is half done.** Its schema half landed 2026-09-07 as
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md,
+branch `worktree-map-child-2-plan-file-layout`, PR **#69** (draft):
+`## State` first, the four `#D4` frontmatter fields, and all 51
+non-frozen plans migrated. Read that plan's pick-up point before
+continuing -- it carries the batch, the shape and the bound.
+
+**The G-to-F reclassification, which is what `#G6` is about, is not
+started.** Three things the charting did not know:
+
+- **24 of the 47 live `#G` citations resolve into frozen plans**, which
+  can never be reclassified. So `#G` stays a valid citation form
+  permanently and the contract phase completes per batch, never
+  corpus-wide.
+- `#G6`'s count of 18 live `#G` citations is now 47.
+- Expand is a *move plus a pointer*, not "add the new beside the old":
+  the literal reading means two copies of every migrated item, which is
+  this map's own most frequent defect class. See the child plan's `#G4`.
+
+**PR #69 is blocked on a decision, not on work.** `plan-gate` refuses on
+a stale `security` stamp; D7's recurrence rule says seek sign-off rather
+than loop again, and that is the user's call.
+
+**Then the rest of the frontier:** child 7 (unblocked by 3 and 4), child
+8, child 14. Children 9 and 10 stay blocked until child 2 finishes.
+
+**Live traps a new session will hit:**
+
+- `plan-citations`, `plan-lint` and `plan-gate` are wired into
+  `verify-ladder`, so a broken citation, a malformed active plan or a
+  missing stamp blocks commits. That is intended.
+- Editing any of `PLAN_CODE_GLOBS` obliges `/simplify`, `security` and
+  `docs-updater`. See `required-agents`.
+- PR #67 will still conflict with this branch's rewrite of
+  `reference.md`'s "Subagent selection". Resolve by taking this branch's
+  version, which subsumes #67's serialization rule (`#G8`).
+- `git stash` is shared across worktrees here; use a WIP commit instead.
+- `gate-tests` is at ~1.0s against a one-second budget. Split it before
+  adding cases.
 
 ## Original plan
 
@@ -105,130 +208,6 @@ Ruled outside this destination; these do not graduate.
 - **Rolling back `docs/adr/`.** See D3.
 - **Deleting any plan, audit, or superseded document.** See D5.
 
-## State
-
-**2026-09-05: child 5 done, child 1 all but one item, G5 and G6 closed.**
-D1-D10 are settled from a full grilling session with the user on
-2026-09-05.
-
-Landed so far:
-
-- **G5** — `tests/zrepl-replication.nix` imports nixpkgs' test SSH keys by
-  path concatenation rather than string interpolation. `verify-ladder`
-  had been un-passable on master for any change.
-- **G6** — child 2 re-blocked behind child 5; 18 live `#G` citations
-  would have broken silently otherwise.
-- **Child 5** — `docs/skills/plan/scripts/plan-citations` exists and is
-  wired into `verify-ladder`. 167 citations resolve, zero broken.
-- **Child 1** — seven of eight corrections applied across `AGENTS.md`,
-  `docs/adr/README.md`, `docs/procedures/testing-changes.md`,
-  `docs/skills/plan/reference.md` and `docs/skills/workflow/SKILL.md`.
-  The eighth, the GitHub description and homepage URL, needs the user's
-  own wording.
-
-**2026-09-06: child 4 landed**, so 6, 7, 8 and 14 are unblocked.
-`docs/skills/workflow/scripts/required-agents` computes the obliged set
-from the diff; `workflow/reference.md`'s "Subagent selection" and step 6
-of `workflow/SKILL.md` no longer contain a judgment escape. Child 1 is
-complete — GitHub description and homepage set 2026-09-06.
-
-**2026-09-06: child 6 landed, and D11 with it.** `plan-gate` now refuses
-a merge unless every obliged, stampable agent left a completion stamp in
-the cited plan, and the stamp carries a fingerprint of the code it read
-so a stale stamp is caught rather than accepted. `/simplify` ran and its
-ten findings were applied; `security` and `docs-updater` follow.
-
-Also this session: skill scripts and git hooks were added to the trigger
-set. They are code *and* they are the enforcement machinery — a change to
-`plan-gate` or `verify-ladder` can weaken every other gate — so keying
-only off `.nix` had left them reviewed by nothing.
-
-Four children done (1, 4, 5, 6). Next takeable: child 3 (smallest),
-child 2 (now that 5 has landed), child 7, or child 8.
-
-**Verified to rung 4 (VM).** `verify-ladder` passes, and
-`nix build .#checks.x86_64-linux.zrepl-replication` booted both VMs and
-produced `vm-test-run-zrepl-replication`. Not deployed to any host, and
-nothing here needs a switch.
-
----
-
-### Pick-up point, 2026-09-07 (unreviewed tail closed)
-
-**Where.** Worktree
-`/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
-branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-not in the main checkout.
-
-**Children done:** 1, 3, 4, 5, 6. G5, G6 closed; G11 added. D11
-answered and built. Child 3 landed 2026-09-06 as
-2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md
--- the evidence-ladder/deploy-sequence split plus the rung declaration
-`plan-move done` and `plan-freeze` now require.
-
-**The unreviewed tail of `854156c` is closed.** The 2026-09-07 session
-ran the full loop twice over `git diff origin/master...HEAD` plus the
-working tree, in D7's order. Pass one: `/simplify` (four angles) applied
-six cleanups -- `plan_in_list` replacing three membership idioms,
-`plan_active_plan` tightened to `plan_locate`'s guard shape per F59's
-own prescription, `plan_has_heading` reuse, dead awk guard dropped, and
-the build-trigger set now spelled once per file in `pre-push` and
-`verify-ladder` (equivalence tested case by case); `docs-updater` fixed
-five comment/doc drifts (F61-F63); `security`'s seventh pass
-re-reproduced the F52/F56/F57 fixes as real, proved the new build-set
-selection never under-builds, and found F64 (the coordinated both-arrays
-tamper still green-passed) and F65 (latent glob expansion in the new
-`plan_in_list` call sites). Pass two, after the F64 floor and the array
-conversions landed: all three agents clean, zero findings. F61-F65 all
-resolved fixed.
-
-**The full review record.** Eight `security` passes, seven
-`docs-updater` passes and six `/simplify` rounds have produced **65
-findings**: 58 fixed, 7 accepted by the user with a follow-up plan each.
-The loop's own shape was settled with the user along the way -- see D7's
-three dated notes for the order, the named fix stage, why the read-only
-reviewers stay serialized, and the narrowed restart rule.
-
-**What the review actually found, and it is worth reading before
-touching any gate script.** Almost every defect was a gate that *failed
-in a way that reported the wrong answer*, not a gate that was missing.
-Eight instances reported success without checking; four blocked in a way
-nothing could clear. Six were the same index-versus-worktree confusion,
-five of those in `.githooks/pre-commit`, and four were live secret-scan
-or frozen-plan bypasses reproduced end to end. Fifteen were documentation
-describing code that had since changed. The classification is
-`2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md`,
-and its first item -- a failure-mode harness for the gate scripts --
-would have caught eight of them mechanically.
-
-**Thirteen follow-up plans are filed** under `docs/plans/todo/`, all
-dated 2026-09-06. The ones that block or shape later work here: inverting the
-code set from an allowlist to a denylist; making `plan-gate` survive a
-PR that changes the fingerprint's inputs; making CI hash the tree it was
-told to gate.
-
-**Then the frontier:** child 2 (plan-file layout -- unblocked now 5 has
-landed, and it must run as expand-contract per G6, since 18 live `#G`
-citations break otherwise), then 7 (unblocked now 3 and 4 are done),
-8, 14.
-
-**Live traps a new session will hit:**
-
-- `plan-citations`, `plan-lint` and `plan-gate` are wired into
-  `verify-ladder`, so a broken citation, a malformed active plan or a
-  missing stamp blocks commits. That is intended.
-- Editing any of `PLAN_CODE_GLOBS` -- now including `.claude/`,
-  `.github/workflows/`, `.sops.yaml`, `secrets/`, `flake.lock`,
-  `.gitignore` and `.gitattributes` -- obliges `/simplify`, `security`
-  and `docs-updater`. See `required-agents`.
-- Every stamp on this branch reads `legacy`, because a worktree session
-  runs hooks from the main checkout (F12). Pull the main checkout after
-  this merges before trusting new hook behaviour.
-- PR #67 will conflict with child 4's rewrite of `reference.md`'s
-  "Subagent selection". Resolve by taking this branch's version, which
-  already subsumes #67's serialization rule (G8).
-- `git stash` is shared across worktrees here; use a WIP commit instead.
-
 ## Progress
 
 Frontier (no blockers, takeable now):
@@ -252,9 +231,15 @@ Frontier (no blockers, takeable now):
 
 Blocked:
 
-- [ ] 2. plan-file layout revision — `## State` first, three frontmatter
-      fields, defect G-to-F reclassification — blocked by 5, see D4
-      and G6
+- [ ] 2. plan-file layout revision — `## State` first, ~~four frontmatter
+      fields (`kind`, `priority`, `blocked_by`, `superseded_by`, per D4;
+      this line said three)~~ **three frontmatter fields as of 2026-09-08**
+      (`kind`, `priority`, `blocked_by`; `superseded_by` was dropped and
+      lands with `plan-supersede` at item 9 instead — see
+      2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5),
+      defect G-to-F reclassification — see D4 and G6. Schema half landed 2026-09-07 as
+      2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md;
+      the G-to-F half is still open
 - [ ] 7. `docs-updater` split: mechanical checks into `verify-ladder`
       — blocked by 3, 4
 - [ ] 8. `spec-check` subagent — blocked by 4
@@ -350,6 +335,11 @@ is used. `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md`
 holds 40 G items of which 33 are open defects, arriving ~5/day and
 draining ~0.9/day, because nothing can resolve them. G returns to meaning
 lesson and needs no drain.
+
+**Corrected 2026-09-08:** the field list above is three, not four.
+`superseded_by` was dropped before it shipped and lands with
+`plan-supersede` at Progress item 9
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5).
 
 
 **ANSWERED 2026-09-05:** revise the plan-file schema, do not rewrite it
@@ -871,7 +861,7 @@ structural fix, not attempted here.
 - **Axis:** hardening
 - **Reachability:** any contributor following `workflow/SKILL.md` steps 6 to 8 to 9 in order. Step 8 mandates `plan-move <file> done` in the same branch, before committing; `plan-move done` execs `plan-freeze`, which sets `frozen: true`. `subagent-stamp:34` refuses to stamp a frozen plan, and `plan_require_not_frozen` refuses every other `plan-*` edit. So the moment step 8 runs, the stamp set is immutable. Any later fingerprint drift — a rebase onto an advanced master, a follow-up fix commit, or F2/F3 below — makes `plan-gate` print `BLOCKED: ... stamp is stale` with no in-system remedy: re-running the agent cannot re-stamp, `plan-resolve` cannot touch the file, and hand-editing it breaks `docs/plans/.checksums`.
 - **Rule:** new-rule candidate (a gate whose only recovery path is outside the system is a gate that gets routed around); compare `docs/hardening.md` rule 11.
-- **Finding:** The three escapes available to a blocked author are (a) hand-edit a frozen plan, (b) unfreeze it, (c) drop the `Plan:` trailer, at which point `plan-gate` prints "nothing to gate" and exits 0 — the documented `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G42` bypass. (c) is the cheapest and leaves no trace, so the fingerprint's net effect is to teach the bypass that disables the whole gate, including the unresolved-findings check that predates this change. This is exactly the dynamic G5 in this plan identified ("an un-passable gate is worse than a weak one") and D11 tried to design around; the fingerprint dodges the commit-boundary false positive D11 names but not the freeze-boundary one. A second instance of the same class: the pinned base-branch `lib.sh` supplies `PLAN_CODE_GLOBS` for `current_fp` while the PR's own `lib.sh` supplied it for `stamped_fp`, so any PR that edits `PLAN_CODE_GLOBS` compares two different file sets and is unconditionally blocked.
+- **Finding:** The three escapes available to a blocked author are (a) hand-edit a frozen plan, (b) unfreeze it, (c) drop the `Plan:` trailer, at which point `plan-gate` prints "nothing to gate" and exits 0 — the documented `2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#F36` bypass. (c) is the cheapest and leaves no trace, so the fingerprint's net effect is to teach the bypass that disables the whole gate, including the unresolved-findings check that predates this change. This is exactly the dynamic G5 in this plan identified ("an un-passable gate is worse than a weak one") and D11 tried to design around; the fingerprint dodges the commit-boundary false positive D11 names but not the freeze-boundary one. A second instance of the same class: the pinned base-branch `lib.sh` supplies `PLAN_CODE_GLOBS` for `current_fp` while the PR's own `lib.sh` supplied it for `stamped_fp`, so any PR that edits `PLAN_CODE_GLOBS` compares two different file sets and is unconditionally blocked.
 - **Fix risk:** Making `subagent-stamp` exempt stamps from the freeze re-opens frozen plans to writes and invalidates `.checksums`; scoping the fingerprint to the range's own changed files instead of the whole repo weakens what it proves. Either way, test the full step 6-8-9 sequence end to end with master advanced underneath, not just `plan-gate` in isolation.
 
 
@@ -1328,7 +1318,7 @@ _security finished 2026-09-06T22:06:28Z -- see Findings above._
 
 ### F38 — the `malformed` half of the fingerprint-less-stamp fix landed this round, and the todo plan filed for it still describes it as unbuilt
 
-- **File:** `docs/plans/todo/2026-09-06-enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has.md:11-14,44-48,89`, `docs/skills/workflow/scripts/plan-gate:135-139`
+- **File:** `2026-09-06-enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has.md:11-14,44-48,89`, `docs/skills/workflow/scripts/plan-gate:135-139`
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** the todo plan was written against a `plan-gate` that downgraded both `legacy` and `malformed` to a non-blocking NOTE — "treats a stamp with no `(code <fp>)` field as `legacy` and a stamp with an empty one as `malformed`, and downgrades **both** to a non-blocking NOTE regardless of whether the cited plan is frozen" — and proposes, as its change and its third Progress item, routing both through `stamp_problem`. The same round that filed it already routed `malformed` through `stamp_problem`, so an empty-fingerprint stamp now BLOCKS on a non-frozen plan. Half the plan's stated work is done and its premise sentence is false. The cost is not cosmetic: this plan's whole reason for existing is an entry condition that must hold before the change is safe, and a reader picking it up would either re-do the `malformed` half or, worse, conclude from the premise that a hand-written fingerprint-less stamp still passes the gate — which is the loophole the plan exists to close and which is now closed for the `malformed` form. This is the branch's recurring defect (text describing a version the same pass changed) reaching a plan file rather than a comment; the plan file is where an agent goes for the *state* of a deferred fix, so a stale premise there is more durable than a stale comment. Fixed in `## State`, the only section append-only rules let a later pass rewrite — "Original plan" and "The change" are left as written, per `plan/SKILL.md`'s append-only rule, with `## State` now carrying which arm landed and which remains.
 
@@ -1493,7 +1483,7 @@ _security finished 2026-09-06T22:46:21Z -- see Findings above._
 
 ### F51 — the lib.sh-split plan tells its implementer to move "the four arrays"; there are six
 
-- **File:** `docs/plans/todo/2026-09-06-shrink-the-ci-trusted-set-by-splitting-lib-sh.md:33`
+- **File:** `2026-09-06-shrink-the-ci-trusted-set-by-splitting-lib-sh.md:33`
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** `constants.sh`'s contents are specified as "the four arrays, the relpaths, `plan_path_matches`, `plan_is_code_path` / `plan_is_doc_path`, and the derived-set logic". `lib.sh` defines six `PLAN_*` arrays — `STAMPABLE_AGENTS`, `AGENT_ORDER`, `CODE_GLOBS`, `DOC_GLOBS`, `NONTEXT_GLOBS` and the derived `TEXT_GLOBS` (`lib.sh:21,30,285,308,316,333`). The count reads as pre-`PLAN_AGENT_ORDER`, which landed in the same round the plan was filed. It matters because the plan's failure mode is a partial move: `plan-gate` reads `PLAN_STAMPABLE_AGENTS` and `required-agents` reads `PLAN_AGENT_ORDER`, so an implementer who moves four arrays and leaves the two agent lists behind gets a `constants.sh` the CI-pinned entry points cannot run on. Named rather than counted, so the list cannot go stale again the next time an array is added.
 

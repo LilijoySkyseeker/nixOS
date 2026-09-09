@@ -7,6 +7,14 @@ frozen: true
 
 # `/storage`/`/storage-bulk` failed their first mount attempt on boot, self-healed within the same boot — worth understanding, not urgent
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-26: `/storage`/`/storage-bulk` failed their first mount

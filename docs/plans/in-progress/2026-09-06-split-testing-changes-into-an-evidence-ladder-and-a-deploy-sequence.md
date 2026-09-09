@@ -3,6 +3,9 @@ slug: split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence
 created: 2026-09-06
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # split testing-changes into an evidence ladder and a deploy sequence
@@ -11,47 +14,6 @@ Child 3 of the map
 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md;
 the design is settled there as
 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D6.
-
-## Original plan
-
-`docs/procedures/testing-changes.md`'s six-layer list mixes evidential
-depth with deploy chronology -- `nvd diff` sits at position 5 despite
-costing seconds where layer 4 costs minutes. Split it per the parent's
-D6:
-
-- **An evidence ladder**, five rungs mapping 1:1 onto the trust
-  hierarchy in `docs/skills/workflow/reference.md`: documentation,
-  source, local build with the output actually inspected, VM, switch.
-  Old layers 2, 3 and `nvd` collapse into the one build rung, because
-  the hierarchy always described rung 3 as a single thing; splitting it
-  across three non-adjacent positions is why nothing could stamp it.
-- **A deploy sequence** -- build, `nvd diff`, switch, observe -- which
-  is an order of operations, not evidence.
-- **Lint is not a rung.** By the old ladder's own words it catches style
-  and dead code, not correctness. It gates (`verify-ladder`); it
-  warrants nothing.
-- **The rung reached becomes a required declaration.** `verify-ladder`
-  already enforces the rung-3 floor mechanically (eval plus targeted
-  build); inspecting the output, VM runs and switches cannot be
-  script-verified, so they take D2's third mechanism form,
-  require-declaration: `plan-move ... done` (and `plan-freeze`) refuse
-  unless `## State` declares the rung reached. VM testing stays manual
-  -- minutes inside a pre-commit gate teaches bypassing -- but the skip
-  becomes visible instead of silent.
-
-Declaration form: a `Verified to rung <N> (<label>)` line in `## State`
--- mechanizing the exact practice the parent map's own State and
-`docs/audits/2026-08-26/RESUME.md` already follow by hand, rather than
-inventing a frontmatter field that would collide with child 2's pending
-schema revision. Always satisfiable honestly: a docs-only plan declares
-rung 1.
-
-Touched: `docs/procedures/testing-changes.md` (restructure),
-`docs/skills/plan/scripts/lib.sh` (`plan_rung_problem`),
-`docs/skills/plan/scripts/plan-move` and `plan-freeze` (the new
-refusal), plus the docs that describe those gates (`plan/SKILL.md`,
-`plan/reference.md`, `workflow/SKILL.md` step 8, `AGENTS.md`'s docs
-table row).
 
 ## State
 
@@ -122,6 +84,47 @@ declaration whose State contains a fenced command block still passes. All nine l
 `in-progress/` plans classify as expected -- the two this branch owns
 pass, the seven predating the gate refuse (G2). `verify-ladder` passes.
 No host-visible behavior changed, so rungs 4-5 do not apply.
+
+## Original plan
+
+`docs/procedures/testing-changes.md`'s six-layer list mixes evidential
+depth with deploy chronology -- `nvd diff` sits at position 5 despite
+costing seconds where layer 4 costs minutes. Split it per the parent's
+D6:
+
+- **An evidence ladder**, five rungs mapping 1:1 onto the trust
+  hierarchy in `docs/skills/workflow/reference.md`: documentation,
+  source, local build with the output actually inspected, VM, switch.
+  Old layers 2, 3 and `nvd` collapse into the one build rung, because
+  the hierarchy always described rung 3 as a single thing; splitting it
+  across three non-adjacent positions is why nothing could stamp it.
+- **A deploy sequence** -- build, `nvd diff`, switch, observe -- which
+  is an order of operations, not evidence.
+- **Lint is not a rung.** By the old ladder's own words it catches style
+  and dead code, not correctness. It gates (`verify-ladder`); it
+  warrants nothing.
+- **The rung reached becomes a required declaration.** `verify-ladder`
+  already enforces the rung-3 floor mechanically (eval plus targeted
+  build); inspecting the output, VM runs and switches cannot be
+  script-verified, so they take D2's third mechanism form,
+  require-declaration: `plan-move ... done` (and `plan-freeze`) refuse
+  unless `## State` declares the rung reached. VM testing stays manual
+  -- minutes inside a pre-commit gate teaches bypassing -- but the skip
+  becomes visible instead of silent.
+
+Declaration form: a `Verified to rung <N> (<label>)` line in `## State`
+-- mechanizing the exact practice the parent map's own State and
+`docs/audits/2026-08-26/RESUME.md` already follow by hand, rather than
+inventing a frontmatter field that would collide with child 2's pending
+schema revision. Always satisfiable honestly: a docs-only plan declares
+rung 1.
+
+Touched: `docs/procedures/testing-changes.md` (restructure),
+`docs/skills/plan/scripts/lib.sh` (`plan_rung_problem`),
+`docs/skills/plan/scripts/plan-move` and `plan-freeze` (the new
+refusal), plus the docs that describe those gates (`plan/SKILL.md`,
+`plan/reference.md`, `workflow/SKILL.md` step 8, `AGENTS.md`'s docs
+table row).
 
 ## Progress
 
@@ -328,7 +331,7 @@ _security finished 2026-09-07T18:49:58Z -- see Findings above._
 
 ### F7 — the case matrix is cited with two different sizes across this plan
 
-- **File:** `docs/plans/in-progress/2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md` (G3 heading; `## State`; F3's resolution stamp)
+- **File:** `2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md` (G3 heading; `## State`; F3's resolution stamp)
 - **Axis:** docs accuracy (docs-updater)
 - **Finding:** G3's heading calls it "the 24-case matrix", while `## State` and F3's `FIXED` stamp both say "a 20-case matrix". Since G3 exists precisely because the matrix was discarded rather than committed, the number in the plan is the only surviving record of its size, and it disagrees with itself. Not fixed here: G entries, resolution stamps and `## State` are all off-limits to this pass. Whoever ran it should correct whichever number is wrong.
 

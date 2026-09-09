@@ -3,6 +3,9 @@ slug: add-ipv6-support-for-the-vps-s-forwarded-game-port
 created: 2026-08-18
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # add IPv6 support for the vps's forwarded game ports — reviewed 2026-08-26, parked as a long-term/low-priority project, not actively planned

@@ -156,7 +156,12 @@ of operations — chronology, not evidence:
   something shaped like a live AWS/Slack/GitHub token. Not a full
   secrets scanner, just a last-resort catch for the most common mistake.
   It also refuses to commit a change to a frozen plan under
-  `docs/plans/{done,rejected}/`, checked against the recorded checksum.
+  `docs/plans/{done,rejected}/`, checked against the recorded checksum,
+  and refuses a `docs/plans/.checksums` staged for deletion, staged as
+  anything but a regular file, or dropping an entry for a plan not itself
+  being deleted — each of those disables the frozen-plan check while the
+  hook still exits 0
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63).
   Those two read the **index**, not the working tree — see
   2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
   for why that distinction is the whole guard. The third,
@@ -177,19 +182,40 @@ of operations — chronology, not evidence:
   --no-verify` if you know what you're doing (e.g. already built it
   manually). This is why a docs-only commit that happens to touch
   `hosts/<name>/README.md` still triggers a real build — the hook
-  matches by path prefix, not by file extension.
+  matches by path prefix, not by file extension. A second, separate diff
+  decides one more thing: if the pushed range touches `scripts/`,
+  `docs/skills/`, `.githooks/`, `tests/` or `modules/flake/` — the last
+  two because that is where the check derivation and its registration
+  live — the hook also builds `checks.gate-mutants` (below) before
+  letting the push through
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68,
+  2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F74).
+  Both diffs need a range: pushing a new branch, the hook takes the merge
+  base with `origin/master`, and refuses the push outright rather than
+  deciding either build set from a merge-base it could not compute
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73).
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
-  before commit rather than at push time. Runs three repo-level gates
+  before commit rather than at push time. Runs four repo-level gates
   first — `docs/skills/plan/scripts/plan-citations` (blocks on any plan
-  citation that no longer resolves; run on every pass, since a citation
-  breaks from the target side), `scripts/gate-tests` (the gate scripts'
-  own failure-mode tests, next bullet), and
-  `docs/skills/plan/scripts/plan-lint` on the active plan (blocks on a
-  missing section, a duplicate or non-sequential `D`/`G`/`F` id, or a
-  `Progress` line citing a heading that does not exist) — then covers
-  lint and rung 3's mechanical half:
-  `nixfmt --check`, `nix flake check --no-build`, a targeted
+  citation that no longer resolves, and on any plan cited by path rather
+  than by bare filename, outside frozen plans; run on every pass, since a
+  citation breaks from the target side), `scripts/gate-tests` (the gate
+  scripts' own failure-mode tests, next bullet), the freeze manifest
+  (`lib.sh`'s `plan_manifest_problem`, the only thing that runs
+  `sha256sum -c` over `docs/plans/.checksums` — an entry that no longer
+  matches, a manifest emptied outright, and a `done/`/`rejected/` plan
+  with no entry at all each block; the last is the one a hash check
+  cannot see, since dropping an entry leaves what remains verifying
+  perfectly
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60)),
+  and `docs/skills/plan/scripts/plan-lint` on the active plan
+  (blocks on missing or misordered sections, missing frontmatter, a
+  duplicate or non-sequential `D`/`G`/`F` id, or a `Progress` line citing
+  a heading that does not exist — and on a `.claude/.active-plan` marker
+  naming a file that is gone, which is not the same as no marker) — then
+  covers lint and rung 3's mechanical half: `nixfmt --check`,
+  `nix flake check --no-build`, a targeted
   `nixos-rebuild build --flake .#<host>` for any host whose directory or
   a shared path actually changed, and `statix`/`deadnix` — but
   diff-scoped, so only *newly introduced* issues on changed lines block;
@@ -198,19 +224,61 @@ of operations — chronology, not evidence:
   `workflow` skill's sequence is actually followed — it does not
   backstop a commit made outside that skill the way `pre-push` does.
 - **`scripts/gate-tests`** — the failure-mode tests for the gate scripts
-  themselves (`plan-gate`, `required-agents`, `plan-citations`, and
-  `lib.sh`'s fingerprint, file-listing and rung-declaration helpers).
+  themselves (`plan-gate`, `required-agents`, `plan-citations`,
+  `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, the frozen-plan
+  guard shared by all six plan writers — `plan-move`, `plan-reject`,
+  `plan-decide`, `plan-resolve`, `plan-tick`, `plan-carry` —
+  `.githooks/pre-commit`, `.githooks/pre-push`'s choice of what to
+  build, and `lib.sh`'s fingerprint, file-listing, rung-declaration,
+  frontmatter, heading, checksum, active-plan-marker and freeze-manifest
+  helpers).
   Three kinds of check: enumerated broken environments, invariants over
   generated plan text (rewrap and re-decorate a `## State`, require the
   verdict not to move), and a sabotage sweep that fails the Nth `git`
   call and requires the gate to refuse — plus a positive control that an
   honest sequence still ends green, since a gate nothing can satisfy is
-  the other half of the same defect. Hermetic, network-free, under a
-  second, scratch repos under `$TMPDIR`. This is what rung 3 looks like
-  for a change with no closure to build. Read
+  the other half of the same defect. A negative case whose fixture has to
+  reach a particular failure asserts that it can, under its own name:
+  three guards here once passed because `git mv` failed for reasons that
+  had nothing to do with the gate. Hermetic, network-free, scratch repos
+  under `$TMPDIR`; 136 assertions, measured 2.1s, knowingly over the
+  one-second budget and recorded as such rather than kept under it by
+  dropping cases. This is what rung 3 looks like for a change with no
+  closure to build. Read
   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
-  before adding cases. Run from `verify-ladder` only — no git hook or CI
-  step runs it yet.
+  before adding cases, and run `scripts/gate-mutants` after. The sabotage
+  sweep covers the gates that write as well — `plan-move`, `plan-freeze`
+  and `.githooks/pre-commit` — each with a pristine fixture restored before
+  every iteration, since a half-completed iteration would otherwise decide
+  the next one's verdict. `subagent-stamp` is deliberately exempt: every
+  failure path in it ends `exit 0`, which is correct for a hook that runs
+  after every subagent, and the exemption is asserted rather than assumed.
+  Runs from `verify-ladder` before every non-trivial commit, and as
+  `checks.gate-tests` under `nix flake check` — on any machine, in any CI,
+  with the enforcement in the flake rather than in a workflow file. Both,
+  deliberately: `verify-ladder` passes `--no-build`, which does not build
+  checks, so the check alone would never run before a commit.
+- **`scripts/gate-mutants`** — the measure of whether `gate-tests` works,
+  because the suite counting its own assertions does not: 102 of them
+  passed in the same session in which six mutations, each restoring a
+  defect the branch had just fixed, passed 98 of 98. A catalogue of
+  (target file, mutation, the case that must go red), every entry taken
+  from a recorded finding: it reintroduces one defect, runs the whole
+  suite against the mutant, and requires the named case to fail. Four
+  verdicts besides `caught`, because an entry can be wrong in ways that
+  otherwise read as success — `UNKNOWN-CASE` (no clean run prints that
+  case, so a rename has turned the entry into a permanent silent
+  escape), `INERT` (the mutation matched nothing and measured nothing),
+  `BROKEN` (the mutant no longer parses, so its red cases say nothing
+  about the defect), and `ESCAPED`, which is the finding. Costs roughly
+  N× the suite — 60 entries, measured 17.0s across 16 jobs — so it is not
+  in `verify-ladder`'s pre-commit path. It is the slow tier: it runs as
+  `checks.gate-mutants` under `nix flake check`, and the `pre-push` hook
+  builds that check when the pushed range touches one of the five paths
+  listed under that hook above, which is the only thing that actually
+  builds it before a push. Run it by hand
+  (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)
+  when you touch a gate script or add a case.
 - **`plan-move ... done` / `plan-freeze`** — refuse to close a plan
   whose `## State` declares no verification rung (see "Declaring the
   rung" above).

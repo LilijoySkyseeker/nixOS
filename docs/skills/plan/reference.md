@@ -10,16 +10,102 @@
 - `<slug>`: kebab-case, chosen once by `plan-new`, never renamed. Capped
   at 70 characters, backing up to the last word boundary rather than
   cutting mid-word.
-- Frontmatter mirrors the folder for greppability but is only ever written
-  by the scripts:
+- Frontmatter mirrors the folder for greppability. The scripts write all of
+  it except `blocked_by`, which is hand-set (below):
   ```yaml
   ---
   slug: add-tailnet-build-fleet
   created: 2026-08-27
-  status: todo        # todo | in-progress | done | rejected
+  status: todo         # mirrors the folder (todo|in-progress|done|rejected)
   frozen: false        # true only once, set by plan-freeze
+  kind: task
+  priority: normal
+  blocked_by:          # comma-separated bare plan filenames
   ---
   ```
+  The block above is a shape example, not the vocabulary. What `kind` and
+  `priority` may contain, which keys are core and which the map plan's
+  `#D4` added, and which vocabulary governs which field, are the
+  `PLAN_*` arrays in `docs/skills/plan/scripts/lib.sh` — `plan-lint`
+  reads them from there, so read the arrays rather than a prose copy of
+  them. `status` is the exception: it has no array, it is checked
+  against the folder name.
+
+  There is no `superseded_by` field. It was in the first draft of this
+  schema and came out again: nothing writes it until `plan-supersede` and
+  `docs/plans/superseded/` exist, and both are unbuilt
+  (2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D5).
+  It lands with that tool, not ahead of it. `priority` stays on different
+  grounds — its reader is the person triaging the backlog, not a
+  script (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5).
+
+- `blocked_by` makes a map's dependency edges readable without parsing
+  its Progress prose.
+
+### Which files the schema rules apply to
+
+**The mutable corpus is migrated to the current schema whenever the
+schema changes; frozen files are exempt by definition.** "Frozen" means
+recorded in `docs/plans/.checksums`, which only `plan-freeze` and
+`plan-repair` write and which `.githooks/pre-commit` enforces — not the
+file's own `frozen:` field, which a plan could otherwise set about itself
+to switch off every rule below. `plan-lint` reports the two disagreeing,
+in either direction. A frozen plan cannot be edited, so every rule added
+after it froze is one it can never satisfy, and a gate nothing can clear
+is what teaches the bypass. `plan-lint` therefore checks the section set,
+the section order and the schema fields only on a plan
+`docs/plans/.checksums` does not record as frozen, and checks the rules
+that do not depend on the era — core frontmatter, status against folder,
+id sequencing, Progress citations — everywhere.
+
+**The one exception, and its limits.** `plan-repair` may add `## State`
+to an already-frozen plan that has none, and re-record its checksum. That
+section is hardcoded, not an argument: it refuses a plan that is not
+frozen and refuses one that already has the section, so it can only ever
+add a heading nobody wrote — it cannot edit a word of anyone's text. It
+exists because 27 `done/` plans were frozen before `## State` existed, and
+nothing checked a plan at the moment it stopped being fixable. Both freeze doors now lint
+first (`plan-freeze` and `plan-reject`), so the backlog it was written to
+clear cannot grow again.
+
+This is the rule to follow at the next schema revision, not a one-off
+for this one. See
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1
+and `#G5`.
+
+## `kind`, and the two shapes a plan comes in
+
+- **`task`** — the default. One piece of work, its own decisions, its own
+  close-out.
+- **`map`** — a plan whose Progress items are *other plans*. Children are
+  created at the frontier rather than all at once, so the map records
+  what is blocked by what and the child records how it was done.
+
+A map child that would break live citations runs as
+**expand—contract**: add the new form beside the old one, migrate the
+references in batches, and drop a batch's old form only once *every form
+the reference is written in* has been checked. `plan-citations` green is
+not that test — it resolves `<file>.md#anchor` and is blind to the bare
+`` `G<N>` `` a plan uses for its own items, which is the form contracting
+breaks
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G4
+sets out the three steps). That ordering is the map pattern. It needs no
+skill of its own: it is a blocking-edge graph, and `blocked_by` plus
+`plan-citations` supply the mechanical half; the prose references are
+classified by hand, one at a time.
+
+## `G` is a lesson, `F` is a defect
+
+`D` has `plan-decide` and `F` has `plan-resolve`. `G` has neither, which
+is correct for a lesson — something learned, with nothing to drain — and
+wrong for a defect, which needs a terminal state. Record a defect as an
+`F` even when you found it yourself rather than a review agent.
+
+Plans written before this rule carry defects as `G`. Non-frozen ones
+migrate under
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md;
+frozen ones keep `#G` anchors forever, so `#G` stays a valid citation
+form permanently and is not being retired.
 
 ## Why bare-filename citations
 
@@ -37,6 +123,12 @@ forever, regardless of where the file currently sits. Resolving one is a
 single `git grep -rl '2026-08-27-foo.md'` or an editor's "quick open."
 
 <!-- plan-citations: ignore-end -->
+
+`plan-citations` enforces this: a plan cited by path is reported, in every
+`*.md` and script it scans, not just in frontmatter. Frozen files are
+exempt, since they cannot be edited to comply -- it counts them on its OK
+line instead
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3).
 
 ## The three decision states, precisely
 
@@ -111,6 +203,10 @@ superseded by a different approach. `plan-reject <file> "<reason>"`:
 - Does **not** require every decision to be resolved first, unlike
   `plan-move ... done` -- abandoning the work legitimately moots open
   questions rather than obligating them to be answered.
+- Runs `plan-lint` first and refuses a malformed plan, exactly like
+  `plan-freeze` -- `rejected/` is as permanent, and the file stays
+  citeable evidence
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10).
 - Freezes the file permanently, exactly like `done/` (same checksum
   manifest, same git-level enforcement).
 
@@ -124,14 +220,40 @@ is rare enough not to need its own mechanic.
 `plan-freeze`:
 1. Refuses if already frozen, if the file isn't under `docs/plans/done/`,
    if any decision or finding is unresolved (above), if `## State` is
-   missing or empty, or if `## State` declares no verification rung
+   missing or empty, if `## State` declares no verification rung
    (`Verified to rung <N> ...` -- see
-   `docs/procedures/testing-changes.md`, "Declaring the rung").
+   `docs/procedures/testing-changes.md`, "Declaring the rung"), or if
+   `plan-lint` reports the file malformed -- freezing makes a structural
+   fault permanent, and `plan-repair` is the only way back
+   (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4).
 2. Sets `frozen: true`.
 3. Records a `sha256sum`-format line (`<hash>  <relpath>`) in
    `docs/plans/.checksums`, which the git-level `pre-commit` hook
    uses to detect any later attempt to modify a frozen file, from any
    tool or human.
+
+The manifest, not the file's own `frozen:` field, is what every script
+that edits a plan asks -- `plan-move`, `plan-reject`, `plan-decide`,
+`plan-resolve`, `plan-tick` and `plan-carry` all refuse on a manifest
+entry, so setting `frozen: false` by hand buys nothing
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56,
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62).
+`plan-gate` and `subagent-stamp` read it too, rather than the field
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61).
+
+Three things guard the manifest itself. `pre-commit` refuses a commit
+that stages its deletion, stages it as anything but a regular file, or
+drops an entry for a plan that is not itself being deleted.
+`plan_record_checksum` refuses any write that would lose a path, and
+refuses to record an entry at all for a file it cannot hash -- an empty
+hash would otherwise read as covered and frozen while matching nothing
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78).
+`verify-ladder` checks three properties on every pass through
+`plan_manifest_problem`: the manifest is non-empty, every entry's file
+still hashes to what it records, and every file in `done/` and `rejected/`
+has an entry at all -- the last being the one a hash check cannot see,
+since dropping an entry leaves what remains verifying perfectly
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60).
 
 ## Citeable IDs
 
@@ -169,19 +291,22 @@ slug: add-tailnet-build-fleet
 created: 2026-08-27
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Add tailnet-wide distributed Nix builders
-
-## Original plan
-Wire nix.distributedBuilds/buildMachines so homelab/thinkpad/torrent can
-build for each other over Tailscale.
 
 ## State
 **2026-08-27, mid-work.** build-worker.nix landed and is live on homelab.
 build-fleet.nix is drafted but not yet wired into any host (blocked on
 D1, now answered -- next step is applying it). One finding (F1) from the
 `security` subagent is still open.
+
+## Original plan
+Wire nix.distributedBuilds/buildMachines so homelab/thinkpad/torrent can
+build for each other over Tailscale.
 
 ## Progress
 - [x] build-worker.nix drafted

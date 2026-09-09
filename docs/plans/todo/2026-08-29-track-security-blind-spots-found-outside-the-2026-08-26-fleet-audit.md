@@ -3,9 +3,18 @@ slug: track-security-blind-spots-found-outside-the-2026-08-26-fleet-audit
 created: 2026-08-29
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Track security blind spots found outside the 2026-08-26 fleet audit
+
+## State
+
+**2026-08-29, just created.** All 9 findings are open — none evaluated or
+resolved yet. Next step is the user triaging each one (fix it, accept it as
+a documented risk in `docs/accepted-risks.md`, or dismiss as moot).
 
 ## Original plan
 
@@ -30,12 +39,6 @@ Artifact in that session — not repo-tracked, kept here as the durable copy).
 This plan exists to make sure each of the 9 items gets an actual
 fixed/accepted/moot resolution instead of sitting in a one-off report that
 nobody revisits.
-
-## State
-
-**2026-08-29, just created.** All 9 findings are open — none evaluated or
-resolved yet. Next step is the user triaging each one (fix it, accept it as
-a documented risk in `docs/accepted-risks.md`, or dismiss as moot).
 
 ## Progress
 - [ ] F1

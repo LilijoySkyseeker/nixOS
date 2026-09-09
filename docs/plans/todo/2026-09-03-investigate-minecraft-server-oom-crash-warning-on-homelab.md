@@ -3,9 +3,17 @@ slug: investigate-minecraft-server-oom-crash-warning-on-homelab
 created: 2026-09-03
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Investigate Minecraft server OOM-crash warning on homelab
+
+## State
+
+Not started. Logged as a backlog item from an unrelated CPU/log sweep;
+no diagnosis done yet.
 
 ## Original plan
 
@@ -29,11 +37,6 @@ nothing was actively wrong). Come back and:
   `modules/services/minecraft.nix`)
 - decide whether it's a real risk (container OOM-killed under load) or
   just a noisy startup-script advisory, and fix or dismiss accordingly
-
-## State
-
-Not started. Logged as a backlog item from an unrelated CPU/log sweep;
-no diagnosis done yet.
 
 ## Progress
 

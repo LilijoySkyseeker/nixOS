@@ -29,6 +29,39 @@ PLAN_STAMPABLE_AGENTS=("security" "docs-updater")
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
 PLAN_AGENT_ORDER=("/simplify" "docs-updater" "security" "spec-check")
 
+# the plan-file schema's vocabularies and key sets; plan-new, plan-lint and
+# the skill docs read these lists from here instead of restating them
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D4
+PLAN_KINDS=("task" "map")
+PLAN_PRIORITIES=("low" "normal" "high")
+# which vocabulary governs which field -- plan-lint reports an entry missing
+# here rather than dying on an unbound variable
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F15
+PLAN_VOCAB_FIELDS=("kind" "priority")
+declare -A PLAN_FIELD_VOCAB=([kind]="PLAN_KINDS" [priority]="PLAN_PRIORITIES")
+# what plan-new stamps on a new file; members of the vocabularies above, so a
+# generated plan lints clean
+PLAN_DEFAULT_KIND="task"
+PLAN_DEFAULT_PRIORITY="normal"
+# carried by every plan, including the 50 frozen ones written before the
+# schema grew
+PLAN_CORE_FIELDS=("slug" "created" "status" "frozen")
+# comma-separated bare plan filenames, same citation form as everywhere else,
+# so they survive a file moving between folders. superseded_by is not here:
+# it has no writer until plan-supersede exists, and a field nothing sets is
+# a lint rule enforced for nobody
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D5
+PLAN_REF_FIELDS=("blocked_by")
+# added by the map plan's #D4, required of non-frozen plans only -- a frozen
+# file can never be edited to gain them; derived from the two lists above so a
+# field added to one and forgotten in the other cannot half-land
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1
+PLAN_SCHEMA_FIELDS=("${PLAN_VOCAB_FIELDS[@]}" "${PLAN_REF_FIELDS[@]}")
+
+# section order for a non-frozen plan, State first
+# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D4
+PLAN_SECTIONS=("## State" "## Original plan" "## Progress" "## Decisions (D)" "## Gotchas (G)" "## Findings (F)")
+
 plan_die() { printf 'plan: %s\n' "$*" >&2; exit 1; }
 plan_note() { printf '%s\n' "$*" >&2; }
 
@@ -87,12 +120,178 @@ plan_set_field() {
   ' "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
+# plan_frontmatter <file> -- every frontmatter key as "key<TAB>value", one
+# per line, value possibly empty. For a caller wanting several keys: one awk
+# instead of one per key, which is what plan-lint used to pay. Presence and
+# value both fall out of the one parse, so there is no separate has-this-key
+# helper -- an absent key has no line, an empty one an empty value.
+# plan_get_field stays the single-key reader every other plan-* script calls.
+plan_frontmatter() {
+  awk '
+    NR==1 && $0=="---" { infm=1; next }
+    infm && $0=="---" { exit }
+    infm {
+      i = index($0, ":")
+      if (i > 1) {
+        k = substr($0, 1, i - 1)
+        # first wins, because plan_get_field stops at its first match; two
+        # readers disagreeing over a duplicated key let one file be frozen to
+        # one caller and editable to the other
+        # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F12
+        if (k in seen) next
+        seen[k] = 1
+        if (k ~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
+          v = substr($0, i + 1)
+          sub(/^[ \t]+/, "", v)
+          sub(/[ \t]+$/, "", v)
+          print k "\t" v
+        }
+      }
+    }
+  ' "$1"
+}
+
+# plan_headings <file> -- top-level "## " headings outside fenced code, as
+# "line<TAB>heading". Fence handling is plan_state_body's, and for the same
+# reason: a plain grep counts a heading quoted inside a fence, which both
+# passes a file whose only sections are an example template and blocks a
+# correct file that quotes one
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
+plan_headings() {
+  awk '
+    match($0, /^[ \t]*(`{3,}|~{3,})/) {
+      m = substr($0, RSTART, RLENGTH)
+      sub(/^[ \t]+/, "", m)
+      if (!fence) { fence = 1; open = m }
+      else if (substr(m, 1, 1) == substr(open, 1, 1) && length(m) >= length(open)) fence = 0
+      next
+    }
+    !fence && /^## / { print FNR "\t" $0 }
+  ' "$1"
+}
+
+# plan_active_plan_problem <root> -- prints why the active-plan marker cannot
+# be used, empty if it can or if there is no marker at all. The distinction is
+# the whole point: plan_active_plan returns 1 both for "no marker" and for
+# "marker naming a deleted file", and a caller that cannot tell them apart
+# skips its check under a line that reads like a pass.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+plan_active_plan_problem() {
+  local root="${1:-.}" marker="${1:-.}/$PLAN_ACTIVE_MARKER_RELPATH"
+  [ -s "$marker" ] || return 0
+  plan_active_plan "$root" >/dev/null && return 0
+  printf "%s names '%s', which is not a usable plan file" \
+    "$PLAN_ACTIVE_MARKER_RELPATH" "$(head -n 1 "$marker")"
+}
+
+# plan_normalise_rel <rel> -- collapse leading and embedded ./ segments, so
+# the same file spelled two ways compares equal. Shared, because a reader that
+# normalises and a writer that does not will disagree about which entry they
+# are talking about.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F39
+plan_normalise_rel() {
+  local rel="${1#./}"
+  while [ "$rel" != "${rel//\/.\//\/}" ]; do rel="${rel//\/.\//\/}"; done
+  printf '%s' "$rel"
+}
+
+# plan_manifest_frozen <root> <rel> -- frozen according to the checksum
+# manifest, which is the authority .githooks/pre-commit enforces. The file's
+# own `frozen:` field is self-declared: a todo/ plan can assert it and switch
+# off every rule that applies only to editable files
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+plan_manifest_frozen() {
+  local manifest="$1/$PLAN_CHECKSUMS_RELPATH" rel
+  rel="$(plan_normalise_rel "$2")"
+  [ -f "$manifest" ] || return 1
+  # Exact match on the path field, not a substring of the line: `grep -F`
+  # matched any entry this path is a suffix of.
+  awk -v want="$rel" '
+    { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) { found = 1; exit } }
+    END { exit(found ? 0 : 1) }
+  ' "$manifest"
+}
+
+# plan_manifest_problem <root> -- prints why the freeze manifest cannot be
+# trusted, empty if it can. Three things, because each fails independently:
+# the manifest exists and is non-empty, every entry's file still hashes to
+# what it records, and every file in done/ and rejected/ has an entry at all.
+# The third is the one a hash check cannot see -- drop an entry and what is
+# left verifies perfectly, while the plan it covered becomes editable.
+# A helper rather than inline in verify-ladder for the reason #F10 gives: a
+# decision a gate makes is only testable where it can be called, and this one
+# is the difference between "no frozen plan changed" and "nothing checked".
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
+plan_manifest_problem() {
+  local root="${1:-.}" manifest="${1:-.}/$PLAN_CHECKSUMS_RELPATH" bad
+  # empty is not "nothing is frozen" but every frozen plan with its evidence
+  # gone -- a clearer message than the "no properly formatted checksum lines"
+  # sha256sum -c gives for the same case, not a case it would miss
+  [ -s "$manifest" ] ||
+    { printf '%s is missing or empty, so every frozen plan is unverifiable' "$PLAN_CHECKSUMS_RELPATH"; return 0; }
+  bad="$(cd "$root" && sha256sum -c "$PLAN_CHECKSUMS_RELPATH" 2>&1 | grep -v ': OK$')"
+  [ -z "$bad" ] ||
+    { printf '%s no longer matches:\n%s' "$PLAN_CHECKSUMS_RELPATH" "$bad"; return 0; }
+  # Completeness, both directions. Everything above verifies the entries the
+  # manifest *has* and says nothing about the ones it should have: delete 49
+  # of 50 lines and what remains verifies perfectly, after which
+  # .githooks/pre-commit accepts edits to the other 49, because it skips a
+  # staged plan with no entry by design. The set that must be covered is not
+  # the manifest's own -- it is every file in the two permanent folders.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
+  local uncovered
+  uncovered="$(cd "$root" && find docs/plans/done docs/plans/rejected -maxdepth 1 -name '*.md' 2>/dev/null |
+    awk -v mf="$PLAN_CHECKSUMS_RELPATH" '
+      BEGIN { while ((getline l < mf) > 0) { i = index(l, "  "); if (i > 0) have[substr(l, i + 2)] = 1 } }
+      !($0 in have) { print "  " $0 }
+    ')"
+  [ -z "$uncovered" ] ||
+    { printf 'these frozen plans have no %s entry, so nothing proves they have not changed:\n%s' \
+        "$PLAN_CHECKSUMS_RELPATH" "$uncovered"; return 0; }
+  # No check for an entry whose file is gone: `sha256sum -c` already reports
+  # that as `FAILED open or read` and is caught above, so a separate one can
+  # never be the guard that fires. It was written, and gate-mutants proved it
+  # unreachable by escaping -- removing a check nothing can reach is the same
+  # measurement working in the other direction.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
+  return 0
+}
+
+# plan_field_refs <file> <key> -- one bare plan filename per line from a
+# comma-separated ref field. Empty output for an empty or absent field.
+plan_field_refs() {
+  local raw
+  raw="$(plan_get_field "$1" "$2")"
+  [ -n "$raw" ] || return 0
+  # printf '%s\n', not '%s': without the trailing newline the last entry
+  # reaches `while read` unterminated, read returns non-zero at EOF, and the
+  # loop body never runs for it -- every ref list silently skipped its final
+  # reference, which is the one a caller is most likely to have just added
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
+  printf '%s\n' "$raw" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d'
+}
+
 plan_is_frozen() {
   [ "$(plan_get_field "$1" frozen)" = "true" ]
 }
 
+# plan_require_not_frozen <root> <rel> -- refuse to touch a frozen plan.
+# Consults the manifest as well as the file's own field, and the manifest is
+# the one that matters: it is what .githooks/pre-commit enforces, and the
+# field is self-declared. Editing a done/ plan's `frozen:` back to false
+# otherwise walked straight past this, and `plan-move` would then carry it
+# into in-progress/ -- after which pre-commit looks the file up under its
+# *new* path, finds no entry, and passes appended content.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
 plan_require_not_frozen() {
-  plan_is_frozen "$1" && plan_die "$1 is frozen (done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
+  local root="$1" rel="$2"
+  plan_manifest_frozen "$root" "$rel" &&
+    plan_die "$rel is frozen ($PLAN_CHECKSUMS_RELPATH records it; done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
+  plan_is_frozen "$root/$rel" &&
+    plan_die "$root/$rel is frozen (done/ and rejected/ plans get zero further edits, ever). New information becomes a new plan file that cites it."
   return 0
 }
 
@@ -297,28 +496,93 @@ plan_rung_problem() {
     echo "no verification-rung declaration in ## State. Give it its own paragraph, opening with the phrase itself -- 'Verified to rung 3 (ran it locally, output inspected).' -- per docs/procedures/testing-changes.md, 'Declaring the rung'. Mentioning the phrase mid-sentence does not count, and neither does naming a rung you did not reach: declare the highest one you did, then say what you skipped."
 }
 
-plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
+# Checked: `sha256sum "$1" | awk ...` returns awk's status, so an unreadable
+# file yielded rc 0 and an empty hash -- and that empty hash then went into
+# the manifest as a real entry, reading as covered and frozen everywhere
+# while matching nothing.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78
+plan_checksum() {
+  local sum
+  sum="$(sha256sum "$1")" || return 1
+  printf '%s' "${sum%% *}"
+}
+
+# plan_record_checksum <root> <rel> -- record this file's current checksum in
+# the manifest, replacing any entry it already has. The one writer, called by
+# plan_do_freeze and plan-repair; the path field is compared exactly, as in
+# plan_manifest_frozen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
+plan_record_checksum() {
+  local root="$1" rel sum checksums tmp out lost
+  rel="$(plan_normalise_rel "$2")"
+  sum="$(plan_checksum "$root/$rel")" || plan_die "cannot hash $rel; refusing to record an entry with no checksum."
+  checksums="$root/$PLAN_CHECKSUMS_RELPATH"
+  mkdir -p "$(dirname "$checksums")"
+  touch "$checksums"
+  # Beside the manifest, not in $TMPDIR: /tmp is a tmpfs on this fleet and the
+  # checkout is not, so `mv` across them is a copy -- not atomic, and it
+  # replaces the manifest with the temporary's 0600 instead of its own mode.
+  # In the same directory it is a real rename.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F64
+  tmp="$(mktemp "${checksums}.XXXXXX")" || plan_die "cannot create a temporary file"
+  out="$(mktemp "${checksums}.XXXXXX")" || { rm -f "$tmp"; plan_die "cannot create a temporary file"; }
+  # Every step checked, and the manifest replaced by a rename rather than by
+  # a redirect onto itself. `sort -k2 "$tmp" > "$checksums"` truncates the
+  # manifest *before* sort runs: one failure there left it empty, for every
+  # frozen plan at once, and the checked `git add` below then staged the
+  # empty file and exited 0. The freeze evidence destroyed itself and
+  # reported success.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F54
+  awk -v want="$rel" '
+    { i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) next }
+    { print }
+  ' "$checksums" > "$tmp" || { rm -f "$tmp" "$out"; plan_die "cannot rewrite $PLAN_CHECKSUMS_RELPATH."; }
+  printf '%s  %s\n' "$sum" "$rel" >> "$tmp" ||
+    { rm -f "$tmp" "$out"; plan_die "cannot append to $PLAN_CHECKSUMS_RELPATH."; }
+  sort -k2 "$tmp" > "$out" ||
+    { rm -f "$tmp" "$out"; plan_die "cannot sort $PLAN_CHECKSUMS_RELPATH."; }
+  # Every path the manifest held must still be there. Compared as a set of
+  # paths, not as a line count: a manifest that legitimately holds one path
+  # twice -- a merge resolution, or the `./` duplicate #F39 produced --
+  # collapses to a single entry and so shrinks, and a count guard would then
+  # refuse that file for good, including to the plan-repair that would fix
+  # it. Losing a path is the thing worth refusing; losing a duplicate is not.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F65
+  # Keyed on FILENAME, not the usual `NR == FNR`: that idiom silently breaks
+  # when the first file is empty -- FNR never advances, so every record of the
+  # *second* file matches it too, and a first freeze into an empty manifest
+  # reports its own new entry as lost. Caught by this suite's own cases.
+  lost="$(awk -v first="$checksums" '
+    FILENAME == first { i = index($0, "  "); if (i > 0) had[substr($0, i + 2)] = 1; next }
+    { i = index($0, "  "); if (i > 0) delete had[substr($0, i + 2)] }
+    END { for (p in had) print "  " p }
+  ' "$checksums" "$out")"
+  if [ -n "$lost" ]; then
+    rm -f "$tmp" "$out"
+    plan_die "refusing to write a $PLAN_CHECKSUMS_RELPATH that drops entries -- the proof these have not changed would be lost:
+$lost"
+  fi
+  # The manifest's own mode, not the temporary's 0600.
+  chmod --reference="$checksums" "$out" 2>/dev/null || chmod 644 "$out"
+  mv "$out" "$checksums" || { rm -f "$tmp" "$out"; plan_die "cannot replace $PLAN_CHECKSUMS_RELPATH."; }
+  rm -f "$tmp"
+  # Checked: the manifest on disk and the manifest in the index are what
+  # .githooks/pre-commit compares, so a silent failure here is a freeze whose
+  # evidence never reaches the commit.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F47
+  git -C "$root" add "$rel" "$PLAN_CHECKSUMS_RELPATH" ||
+    plan_die "recorded the checksum for $rel but could not stage it or $PLAN_CHECKSUMS_RELPATH."
+}
 
 # plan_do_freeze <root> <rel> -- the mechanical half of freezing, shared by
 # plan-freeze (done/, gated on resolved decisions) and plan-reject
 # (rejected/, gated on a mandatory reason instead): sets frozen: true,
-# records the checksum. Does not check which folder <rel> is in or
-# anything about decisions -- callers do their own gating first.
+# records the checksum, marks the plan touched. Does not check which folder
+# <rel> is in or anything about decisions -- callers do their own gating.
 plan_do_freeze() {
-  local root="$1" rel="$2" sum checksums tmp
+  local root="$1" rel="$2"
   plan_set_field "$root/$rel" frozen true
-  sum="$(plan_checksum "$root/$rel")"
-
-  checksums="$root/$PLAN_CHECKSUMS_RELPATH"
-  mkdir -p "$(dirname "$checksums")"
-  touch "$checksums"
-  tmp="$(mktemp)"
-  grep -vF "  $rel" "$checksums" > "$tmp" 2>/dev/null || true
-  printf '%s  %s\n' "$sum" "$rel" >> "$tmp"
-  sort -k2 "$tmp" > "$checksums"
-  rm -f "$tmp"
-
-  git -C "$root" add "$rel" "$PLAN_CHECKSUMS_RELPATH"
+  plan_record_checksum "$root" "$rel"
   plan_mark_touched "$root" "$rel"
 }
 

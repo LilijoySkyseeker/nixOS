@@ -7,6 +7,11 @@ set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 
+# The binary probe below needs the blob on disk rather than in a variable,
+# and needs git's own exit status rather than a pipeline's.
+blob="$(mktemp)" || { echo "BLOCKED: cannot create a temporary file." >&2; exit 1; }
+trap 'rm -f "$blob"' EXIT
+
 # A frozen plan file is permanently un-editable, checked against the
 # checksum plan-freeze/plan-reject recorded -- compared directly against
 # the manifest, not against HEAD (diff-filter=M would miss a file that was
@@ -21,12 +26,98 @@ repo_root="$(git rev-parse --show-toplevel)"
 # compared against -- an unstaged edit or `rm` of the working-tree copy
 # otherwise disabled the check
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
-if manifest="$(git show ':docs/plans/.checksums' 2>/dev/null)"; then
+# `git show` on an index entry fails identically whether the manifest is
+# simply untracked -- legitimate, a repo with nothing frozen yet -- or git
+# itself failed, which is not legitimate: the frozen-plan check below then
+# does not run and the hook still exits 0. Ask whether it is tracked first,
+# and treat anything that is not a clean yes or no as fatal. `git show`
+# itself is then outside a condition, so `set -e` catches it.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+ls_rc=0
+git ls-files --error-unmatch -- docs/plans/.checksums >/dev/null 2>&1 || ls_rc=$?
+case "$ls_rc" in
+  0)
+    # A symlink staged in the manifest's place: the index mode is 120000 and
+    # `git show` returns the link target, which parses as no entries at all --
+    # so every frozen plan silently stops being checked while this exits 0.
+    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63
+    manifest_mode="$(git ls-files -s -- docs/plans/.checksums | cut -d' ' -f1)"
+    if [[ "$manifest_mode" != "100644" && "$manifest_mode" != "100755" ]]; then
+      echo "BLOCKED: docs/plans/.checksums is staged with mode ${manifest_mode:-unknown}, not as a regular file. It is the evidence frozen plans have not changed." >&2
+      exit 1
+    fi
+    manifest="$(git show ':docs/plans/.checksums')"
+    # Entries may be added or rewritten, never dropped: removing one plan's
+    # line -- or truncating the file outright -- is cheaper than tampering
+    # with the manifest's hashes and has the same effect, because a plan with
+    # no entry is skipped by design below. A drop is legitimate only when the
+    # plan itself is being deleted in the same commit.
+    # Discriminated, not swallowed. `if x="$(git show ... 2>/dev/null)"` cannot
+    # tell "HEAD has no manifest" -- true on the commit that first adds it --
+    # from "git failed", and reads both as "nothing to compare", skipping the
+    # check below while exiting 0. rev-parse --verify --quiet answers 1 for
+    # an unborn HEAD and 128 when git itself fails, and the two reads after
+    # it are plain assignments that `set -e` covers.
+    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63
+    head_rc=0
+    git rev-parse --verify --quiet HEAD >/dev/null 2>&1 || head_rc=$?
+    if [[ "$head_rc" -gt 1 ]]; then
+      echo "BLOCKED: cannot resolve HEAD (git exited $head_rc); refusing to skip the freeze-manifest comparison." >&2
+      exit 1
+    fi
+    head_entry=""
+    [[ "$head_rc" -eq 0 ]] && head_entry="$(git ls-tree --name-only HEAD -- docs/plans/.checksums)"
+    if [[ -n "$head_entry" ]]; then
+      head_manifest="$(git show 'HEAD:docs/plans/.checksums')"
+      staged_deletes="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=D)"
+      dropped="$(awk -v first="/dev/fd/3" '
+          FILENAME == first { i = index($0, "  "); if (i > 0) had[substr($0, i + 2)] = 1; next }
+          FILENAME == "/dev/fd/4" { i = index($0, "  "); if (i > 0) delete had[substr($0, i + 2)]; next }
+          { delete had[$0] }
+          END { for (p in had) print "  " p }
+        ' /dev/fd/3 /dev/fd/4 /dev/fd/5 \
+        3<<<"$head_manifest" 4<<<"$manifest" 5<<<"$staged_deletes")"
+      if [[ -n "$dropped" ]]; then
+        echo "BLOCKED: docs/plans/.checksums drops entries for plans that are not being deleted:" >&2
+        echo "$dropped" >&2
+        echo "A frozen plan with no entry is not checked at all; restore the lines rather than removing them." >&2
+        exit 1
+      fi
+    fi
+    ;;
+  1)
+    # "Not in the index" -- which is what an untracked manifest looks like,
+    # and equally what one *staged for deletion* looks like. The second is
+    # the cheapest cover for a tampered frozen plan: delete the manifest in
+    # the same commit and every frozen file becomes unverifiable while this
+    # hook exits 0. Distinguished by asking whether the deletion is staged.
+    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F55
+    # An assignment, not a pipeline: through a pipe this call's own failure
+    # is invisible (grep's "no match" is 1 too), so a failed `git diff` read
+    # as "not staged for deletion" and skipped the frozen check exactly as
+    # the unchecked read above did. `set -e` catches the assignment.
+    staged_manifest_delete="$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)"
+    if [[ -n "$staged_manifest_delete" ]]; then
+      echo "BLOCKED: docs/plans/.checksums is staged for deletion. It is the only evidence that frozen plans have not changed; removing it disables the frozen-plan check for every one of them." >&2
+      exit 1
+    fi
+    manifest=""
+    ;;
+  *)
+    echo "BLOCKED: cannot tell whether $repo_root has a freeze manifest (git exited $ls_rc); refusing to skip the frozen-plan check." >&2
+    exit 1
+    ;;
+esac
+if [[ -n "$manifest" ]]; then
   staged_done="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT -- 'docs/plans/*/*.md')"
   if [[ -n "$staged_done" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
-      recorded="$(awk -v f="$f" '$2==f{print $1}' <<<"$manifest")"
+      # Exact path field, like plan_manifest_frozen and the guard above it.
+      # `$2==f` field-splits, so a frozen plan whose name contains a space
+      # never matched its own entry and was silently skipped.
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F77
+      recorded="$(awk -v want="$f" '{ i = index($0, "  "); if (i > 0 && substr($0, i + 2) == want) { print substr($0, 1, i - 1); exit } }' <<<"$manifest")"
       [[ -z "$recorded" ]] && continue # not a frozen file plan-freeze knows about
       actual="$(git show ":$f" | sha256sum | awk '{print $1}')"
       if [[ "$actual" != "$recorded" ]]; then
@@ -82,7 +173,17 @@ while IFS= read -r file; do
   # closed on it -- blocking would make `git submodule add` unfixable
   # except by --no-verify, which switches off every check in this hook
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F57
-  if [[ "$(git ls-files -s -- "$file" | cut -d' ' -f1)" == "160000" ]]; then
+  # Read the mode fail-closed, like the content read below and for the same
+  # reason: an unreadable mode makes this exemption inconclusive, and an
+  # inconclusive answer must not silently take the `continue` branch that
+  # skips every scan for this file.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  if ! mode="$(git ls-files -s -- "$file")"; then
+    echo "BLOCKED: cannot read the staged mode of $file; refusing to decide whether to scan it." >&2
+    fail=1
+    continue
+  fi
+  if [[ "$(cut -d' ' -f1 <<<"$mode")" == "160000" ]]; then
     continue
   fi
 
@@ -99,9 +200,19 @@ while IFS= read -r file; do
   # gitattribute: staging a .gitattributes saying `*.pem -diff` beside a
   # .pem holding a private key switched this scan off entirely, verified
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F52
-  # a second `git show`, not `<<<"$content"`: command substitution strips
-  # NUL bytes, so probing $content could never find one
-  if git show ":$file" | grep -qaP '\x00'; then
+  # A second read, not `<<<"$content"`: command substitution strips NUL
+  # bytes, so probing $content could never find one. Written to a file
+  # rather than piped, so git's own status is checkable -- through a pipe
+  # it is not, because `pipefail` reports the rightmost non-zero status and
+  # grep's "no match" is also 1, making a failed read indistinguishable
+  # from a text file.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  if ! git show ":$file" > "$blob"; then
+    echo "BLOCKED: cannot re-read the staged content of $file to tell text from binary." >&2
+    fail=1
+    continue
+  fi
+  if grep -qaP '\x00' < "$blob"; then
     continue
   fi
 

@@ -3,9 +3,19 @@ slug: tighten-minecraft-factorio-mod-supply-auto-update-
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Tighten Minecraft/Factorio mod-supply auto-update (three items)
+
+## State
+
+Not started. D1 (which mods are load-bearing) is the blocker for item 1;
+items 2-3 can proceed independently. `--memory`/`--pids-limit` ceilings
+are already landed (D15) and out of scope here; only `userns-remap`
+remains genuinely open on the container-hardening side.
 
 ## Original plan
 
@@ -47,13 +57,6 @@ frozen: false
       set on both containers (`modules/services/minecraft.nix`,
       `modules/services/factorio.nix`) — struck through above as stale.
       Only `userns-remap` is still genuinely unset.
-
-## State
-
-Not started. D1 (which mods are load-bearing) is the blocker for item 1;
-items 2-3 can proceed independently. `--memory`/`--pids-limit` ceilings
-are already landed (D15) and out of scope here; only `userns-remap`
-remains genuinely open on the container-hardening side.
 
 ## Progress
 

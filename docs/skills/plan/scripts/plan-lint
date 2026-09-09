@@ -13,23 +13,111 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SCRIPT_DIR/lib.sh"
 
 [ $# -eq 1 ] || { printf 'usage: plan-lint <path-or-filename>\n' >&2; exit 1; }
-root="$(plan_repo_root)"
-rel="$(plan_locate "$1" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$1" "$root")" || exit 1
 file="$root/$rel"
 problems=0
 report() { printf '%s\n' "$1"; problems=$((problems + 1)); }
 
-for key in slug created status frozen; do
-  [ -n "$(plan_get_field "$file" "$key")" ] || report "frontmatter missing '$key:'"
+# one pass over the frontmatter, one over the headings -- every value, every
+# key-present answer and every heading line comes from these two reads
+declare -A fm_val=() fm_seen=()
+while IFS=$'\t' read -r fkey fval; do
+  [ -n "$fkey" ] || continue
+  fm_seen["$fkey"]=1
+  fm_val["$fkey"]="$fval"
+done < <(plan_frontmatter "$file")
+
+# Whole-line and fence-aware: a substring match passed on a prose mention of
+# a heading name mid-sentence, and a fence-blind one counts an example
+# template quoted inside a section.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G1
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
+declare -A sec_line=()
+while IFS=$'\t' read -r sline stext; do
+  [ -n "$stext" ] || continue
+  [ -n "${sec_line[$stext]:-}" ] || sec_line["$stext"]="$sline"
+done < <(plan_headings "$file")
+
+for key in "${PLAN_CORE_FIELDS[@]}"; do
+  [ -n "${fm_val[$key]:-}" ] || report "frontmatter missing '$key:'"
 done
 
 folder="$(basename "$(dirname "$rel")")"
-status="$(plan_get_field "$file" status)"
+status="${fm_val[status]:-}"
 [ "$status" = "$folder" ] || report "frontmatter status '$status' does not match folder '$folder'"
 
-for section in "## Original plan" "## State" "## Progress" "## Decisions (D)" "## Gotchas (G)" "## Findings (F)"; do
-  grep -qF "$section" "$file" || report "missing required section '$section'"
-done
+# The manifest decides, not the file's own self-declared `frozen:` field;
+# written only by plan-freeze and plan-repair, enforced by
+# .githooks/pre-commit. A disagreement is reported in either direction.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+frozen_field="${fm_val[frozen]:-}"
+if plan_manifest_frozen "$root" "$rel"; then
+  frozen=1
+  [ "$frozen_field" = "true" ] ||
+    report "frontmatter says frozen '$frozen_field' but $PLAN_CHECKSUMS_RELPATH records this file as frozen"
+else
+  frozen=0
+  [ "$frozen_field" != "true" ] ||
+    report "frontmatter says 'frozen: true' but $PLAN_CHECKSUMS_RELPATH has no entry -- only plan-freeze may freeze a plan"
+fi
+
+# schema-era rules, sections and D4 fields alike, run only where the file can
+# still be edited to satisfy them
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G5
+if [ "$frozen" -eq 0 ]; then
+  for section in "${PLAN_SECTIONS[@]}"; do
+    [ -n "${sec_line[$section]:-}" ] || report "missing required section '$section'"
+  done
+
+  prev_line=0 prev_name=""
+  for section in "${PLAN_SECTIONS[@]}"; do
+    line="${sec_line[$section]:-}"
+    [ -n "$line" ] || continue
+    [ "$line" -gt "$prev_line" ] ||
+      report "section '$section' appears before '$prev_name' -- required order is: ${PLAN_SECTIONS[*]}"
+    prev_line="$line" prev_name="$section"
+  done
+
+  for key in "${PLAN_SCHEMA_FIELDS[@]}"; do
+    [ -n "${fm_seen[$key]:-}" ] ||
+      report "frontmatter missing '$key:' -- added by the D4 schema revision"
+  done
+
+  # key-to-vocabulary mapping is lib.sh's, so a new vocabulary field needs no
+  # edit here
+  for key in "${PLAN_VOCAB_FIELDS[@]}"; do
+    [ -n "${fm_seen[$key]:-}" ] || continue
+    vocab_name="${PLAN_FIELD_VOCAB[$key]:-}"
+    if [ -z "$vocab_name" ]; then
+      report "no vocabulary is defined for '$key' -- add it to PLAN_FIELD_VOCAB"
+      continue
+    fi
+    declare -n allowed="$vocab_name"
+    value="${fm_val[$key]:-}"
+    if [ -z "$value" ]; then
+      report "frontmatter '$key:' is empty -- one of: ${allowed[*]}"
+    elif ! plan_in_list "$value" "${allowed[@]}"; then
+      report "frontmatter $key '$value' is not one of: ${allowed[*]}"
+    fi
+    unset -n allowed
+  done
+
+  # shape only: existence is plan-citations' job, the path form is the one
+  # thing its resolver cannot catch
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G7
+  for key in "${PLAN_REF_FIELDS[@]}"; do
+    while IFS= read -r ref; do
+      [ -n "$ref" ] || continue
+      # One rule, one message. A path, a `..`, a bare slug and a note to
+      # self all fail the same regex, so a separate case arm for the path
+      # form only ever changed the wording.
+      # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
+      [[ "$ref" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]*\.md$ ]] ||
+        report "frontmatter $key cites '$ref' -- must be a bare plan filename <date>-<slug>.md, never a path"
+    done < <(plan_field_refs "$file" "$key")
+  done
+fi
 
 for type in D G F; do
   raw="$(grep -oE "^### ${type}[0-9]+" "$file" | grep -oE '[0-9]+')"

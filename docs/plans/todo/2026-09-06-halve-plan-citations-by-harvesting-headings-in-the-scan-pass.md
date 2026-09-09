@@ -3,9 +3,18 @@ slug: halve-plan-citations-by-harvesting-headings-in-the-scan-pass
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # halve plan-citations by harvesting headings in the scan pass
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` efficiency finding, with
+measurements. Below the correctness/security bar that the originating
+branch was fixing inline, so it was filed rather than done there.
 
 ## Original plan
 
@@ -73,12 +82,6 @@ the awk.
 132 ms on a gate whose next step is `nix flake check` (seconds) is not a
 problem anyone is feeling. This is filed because the measurement exists
 and the fix is known, not because the gate is slow.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` efficiency finding, with
-measurements. Below the correctness/security bar that the originating
-branch was fixing inline, so it was filed rather than done there.
 
 ## Progress
 

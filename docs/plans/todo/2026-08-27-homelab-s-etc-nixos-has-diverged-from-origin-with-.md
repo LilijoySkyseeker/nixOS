@@ -3,9 +3,20 @@ slug: homelab-s-etc-nixos-has-diverged-from-origin-with-
 created: 2026-08-27
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # homelab's /etc/nixos has diverged from origin with an unpushed auto-update commit
+
+## State
+
+Still open. D1 (discard vs. keep) has been answered and re-answered
+twice already (G3, G4) because the underlying cause -- `/etc/nixos` on
+homelab drifting onto whatever branch someone last checked out there --
+keeps recurring. Not something to fix host-by-host; see G4's note on the
+pipeline-rebuild plan.
 
 ## Original plan
 
@@ -55,14 +66,6 @@ frozen: false
       which is what `flake-update-test` itself does on every run) or
       keeping the lock bump deliberately. That is a judgement call on a
       live host's git state, so it is yours.
-
-## State
-
-Still open. D1 (discard vs. keep) has been answered and re-answered
-twice already (G3, G4) because the underlying cause -- `/etc/nixos` on
-homelab drifting onto whatever branch someone last checked out there --
-keeps recurring. Not something to fix host-by-host; see G4's note on the
-pipeline-rebuild plan.
 
 ## Progress
 

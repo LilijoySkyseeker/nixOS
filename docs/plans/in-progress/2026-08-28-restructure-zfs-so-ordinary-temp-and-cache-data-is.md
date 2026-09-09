@@ -3,9 +3,33 @@ slug: restructure-zfs-so-ordinary-temp-and-cache-data-is
 created: 2026-08-28
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # restructure ZFS so ordinary temp and cache data is not snapshotted or replicated
+
+## State
+
+**2026-09-05.** One of three decisions is landed. D1
+(`boot.tmp.useTmpfs = true`, `modules/profiles/default.nix`) is committed
+and builds clean on all five configurations, with the rendered
+`tmp.mount` checked on torrent and vps — but **not yet deployed to any
+host**; it takes effect at each host's next switch. Both findings are
+closed: F1 MOOT (the pinned nix-2.34.8 defaults `build-dir` to
+`/nix/var/nix/builds`, not `$TMPDIR`) and F2 MOOT (superseded by a4f5e95,
+which moved restic's snapshot mounts to a `RuntimeDirectory`).
+
+D2 (fleet-wide impermanence) is delegated to
+`2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md` and is
+untouched; this plan owns the reason, not the execution.
+
+D3 remains the open item, but as of 2026-09-05 it is no longer
+open-ended: ADR-0001 gives it a tier vocabulary, so each `/home` split is
+now a bounded "which tier?" question — see the note under D3. The
+mechanism it was going to have to invent now lives in
+`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md`.
 
 ## Original plan
 
@@ -55,27 +79,6 @@ homelab gets this free from impermanence: its root is rolled back to
   in `/tmp`. `~/Downloads` is **957 GB** and is also where
   `iso-autobuild` drops built ISOs. torrent's replica on homelab is
   3.16T.
-
-## State
-
-**2026-09-05.** One of three decisions is landed. D1
-(`boot.tmp.useTmpfs = true`, `modules/profiles/default.nix`) is committed
-and builds clean on all five configurations, with the rendered
-`tmp.mount` checked on torrent and vps — but **not yet deployed to any
-host**; it takes effect at each host's next switch. Both findings are
-closed: F1 MOOT (the pinned nix-2.34.8 defaults `build-dir` to
-`/nix/var/nix/builds`, not `$TMPDIR`) and F2 MOOT (superseded by a4f5e95,
-which moved restic's snapshot mounts to a `RuntimeDirectory`).
-
-D2 (fleet-wide impermanence) is delegated to
-`2026-08-18-migrate-torrent-and-thinkpad-to-impermanence.md` and is
-untouched; this plan owns the reason, not the execution.
-
-D3 remains the open item, but as of 2026-09-05 it is no longer
-open-ended: ADR-0001 gives it a tier vocabulary, so each `/home` split is
-now a bounded "which tier?" question — see the note under D3. The
-mechanism it was going to have to invent now lives in
-`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md`.
 
 ## Progress
 

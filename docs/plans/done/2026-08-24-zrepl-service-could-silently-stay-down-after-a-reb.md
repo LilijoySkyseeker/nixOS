@@ -7,6 +7,14 @@ frozen: true
 
 # `zrepl.service` could silently stay down after a reboot due to a `local-fs.target` race — fixed by relaxing the dependency
 
+## State
+
+**Section added 2026-09-08 by `plan-repair`.** This plan was frozen
+before `## State` existed, so it never had one. Only the heading and
+this note were added; no word of the original was changed, and the
+status was not reconstructed -- read `## Progress` and the sections
+below for what happened.
+
 ## Original plan
 
 - [x] **2026-08-24: `zrepl.service` could silently stay down after a

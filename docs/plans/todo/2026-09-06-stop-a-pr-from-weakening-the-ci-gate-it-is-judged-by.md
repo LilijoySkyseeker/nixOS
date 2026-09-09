@@ -3,9 +3,19 @@ slug: stop-a-pr-from-weakening-the-ci-gate-it-is-judged-by
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # stop a PR from weakening the CI gate it is judged by
+
+## State
+
+Not started. Filed 2026-09-06 from a `security` finding on the
+channel-routing branch. Independent of that plan's remaining children;
+takeable any time, and worth pairing with the threat-model question in
+option 4 before writing any code.
 
 ## Original plan
 
@@ -75,13 +85,6 @@ Whatever is chosen must be tested with an actual PR that modifies the
 gate workflow, on a branch, observing what the required check reports.
 Reasoning about GitHub's ref-resolution from documentation is not
 sufficient — the resolution behavior is the whole subject.
-
-## State
-
-Not started. Filed 2026-09-06 from a `security` finding on the
-channel-routing branch. Independent of that plan's remaining children;
-takeable any time, and worth pairing with the threat-model question in
-option 4 before writing any code.
 
 ## Progress
 

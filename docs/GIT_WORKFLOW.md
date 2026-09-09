@@ -67,8 +67,11 @@ and human, the reasoning stays in the plan.
   `modules/services/`, and `modules/flake/` alike — or
   `flake.nix`/`flake.lock`), runs `nixos-rebuild build --flake .#<host>`
   before allowing the push. This never switches a running system — it only
-  builds. Bypass with `git push --no-verify` if you know what you're doing
-  (e.g. you already built it manually on that host).
+  builds. Also builds `checks.gate-mutants` when the pushed range touches
+  `scripts/`, `docs/skills/`, `.githooks/`, `tests/` or `modules/flake/`
+  — see `docs/procedures/testing-changes.md`. Bypass with `git push --no-verify`
+  if you know what you're doing (e.g. you already built it manually on
+  that host).
 
 ## Day to day
 

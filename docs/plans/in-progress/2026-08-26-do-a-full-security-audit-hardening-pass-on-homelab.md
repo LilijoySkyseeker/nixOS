@@ -3,6 +3,9 @@ slug: do-a-full-security-audit-hardening-pass-on-homelab
 created: 2026-08-26
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # do a full security audit / hardening pass on homelab

@@ -3,9 +3,20 @@ slug: invert-the-reviewable-code-set-from-an-allowlist-to-a-denylist
 created: 2026-09-06
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # invert the reviewable code set from an allowlist to a denylist
+
+## State
+
+Not started. Filed 2026-09-06 from a `/simplify` altitude finding, after
+the allowlist was widened twice in one session and found incomplete a
+third time. Deliberately not done inline: it is a design change to the
+set that four separate mechanisms read, and the branch that raised it was
+already closing.
 
 ## Original plan
 
@@ -74,14 +85,6 @@ which is the trap
 `2026-09-06-make-plan-gate-survive-a-pr-that-changes-the-fingerprint-algorithm-or.md`
 is filed against. Sequence this after that plan, or accept the same
 one-off staleness the widenings already took.
-
-## State
-
-Not started. Filed 2026-09-06 from a `/simplify` altitude finding, after
-the allowlist was widened twice in one session and found incomplete a
-third time. Deliberately not done inline: it is a design change to the
-set that four separate mechanisms read, and the branch that raised it was
-already closing.
 
 ## Progress
 

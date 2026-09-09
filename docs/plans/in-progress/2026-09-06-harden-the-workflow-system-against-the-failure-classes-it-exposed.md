@@ -3,142 +3,12 @@ slug: harden-the-workflow-system-against-the-failure-classes-it-exposed
 created: 2026-09-06
 status: in-progress
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # harden the workflow system against the failure classes it exposed
-
-## Original plan
-
-Building the mechanical review system in
-`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md`
-produced 40 findings across four `security` passes and five
-`docs-updater` passes. This file is not a list of those findings — they
-are recorded there, resolved. It is the **classification**, because the
-individual fixes are done and the classes are not.
-
-The headline: **almost every defect was a gate that failed in a way that
-reported the wrong answer**, not a gate that was missing. The system's
-weakness is not coverage. It is that its failure modes were untested,
-and both directions of failure are worse than having no gate at all.
-
-### Class 1 — the gate reports success when it did not check
-
-Eight instances, and this is the one to design against.
-
-| finding | what reported "pass" |
-|---|---|
-| `#F3` | `required-agents` turned a failed `git diff` into "no agents obliged" |
-| `#F4` | `plan-gate` printed "nothing to gate" for a ref it could not resolve |
-| `#F5` | `plan-citations` printed `OK (N citations)` over a scan that aborted early |
-| `#F32` | the fingerprint returned **empty with rc=0** whenever the sort-last path was not a regular file |
-| `#F37` | `plan_worktree_files` returned rc=0 and a *plausible subset* when a `git diff` leg failed |
-| `#F34` | a `.nix` file with a non-ASCII name obliged **no** review agent, because git C-quotes the path and the quoted form matches no glob |
-| `#F31` | four `.claude/skills/*` symlinks oblige review but never move the fingerprint |
-| — | `plan_code_fingerprint` from a subdirectory returned a *different hash* with rc=0 (fixed under `#F37`) |
-
-The shared shape: **a shell construct whose exit status does not mean
-what it looks like it means.** A `while` loop exits with its last body
-command's status. A `{ a; b; c; }` group exits with `c`'s. A command
-substitution swallows the inner exit. `2>/dev/null` on an `awk` hides an
-abort. None of these are exotic; all of them are invisible in review
-unless you go looking for them specifically.
-
-**What would help:** a test harness that runs each gate script against a
-deliberately broken environment — bad ref, missing file, locked index,
-non-ASCII filename, path with a newline, subdirectory cwd — and asserts
-each one *fails*. Every finding above would have been caught by a
-ten-line test. The repo has eight VM tests for NixOS behaviour and zero
-tests for the scripts that gate every commit.
-
-### Class 2 — the gate blocks in a way nothing can clear
-
-Four instances. Equally damaging, because the escape is always the same:
-drop the `Plan:` trailer and the whole gate switches off
-(`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#G42`).
-
-- `#F1` — a frozen plan plus a stale fingerprint. `plan-move done`
-  freezes the plan, `subagent-stamp` refuses to write to a frozen plan,
-  so any later drift is unfixable in-system.
-- `#F2` — the mandated agent order guaranteed a stale `security` stamp,
-  because `docs-updater` edits the code the fingerprint covers. Red on
-  the first honest attempt, every time.
-- `#F28` — `.claude/settings.local.json`, written by the harness on a
-  "don't ask again" grant, entered the local fingerprint and can never
-  exist in CI.
-- `#G5` — `verify-ladder` was un-passable on master for any change, for
-  environmental reasons.
-
-**What would help:** the same harness, asserting the *positive* case —
-that an honest sequence of steps ends green. `#F2` was found by reasoning
-rather than by running the sequence, and `#F1` is still only half fixed
-(a stale stamp on a frozen plan degrades to a NOTE; the freeze boundary
-itself is untouched).
-
-### Class 3 — documentation describing code that has since changed
-
-**Twelve instances**, the most frequent class by count. Every one was a
-comment or doc that was true when written and silently false afterwards.
-
-The three that matter structurally:
-
-- The same fact rendered in two channels drifts. `#F21` and `#F40` are
-  the *same sentence* in `reference.md` going wrong in opposite
-  directions two passes apart — once by listing a stale glob set, once by
-  dropping half the current one.
-- A comment can assert a relationship the code no longer has. `#F29`
-  claimed three consumers shared one glob set immediately after a pass
-  deliberately split them.
-- It reaches plan files too, not just comments. `#F38` — a follow-up plan
-  described work as unbuilt after half of it had landed. That is the most
-  dangerous instance: the next agent reads the plan, not the diff.
-
-There is also a distinct sub-shape worth its own guard: `#F39`, where a
-comment rewrite left the *pre-rewrite text spliced into the new text
-mid-sentence*. That is not a stale comment, it is a botched edit, and it
-is visible in the diff without reading any code.
-
-**What would help:** the fix that actually worked was structural, not
-disciplinary — `#F21`/`#F24` changed the docs from *restating*
-`PLAN_CODE_GLOBS` to *pointing at* it, and that particular drift stopped
-recurring immediately. Generalise it: prose should cite the array, the
-script, the plan anchor. `plan-citations` already verifies the pointers
-resolve; nothing verifies a paraphrase.
-
-### Class 4 — the loop generates its own work
-
-Roughly half the findings after the first pass were consequences of
-earlier fixes in the same session, not pre-existing defects. Widening the
-code set made three docs stale; fixing those changed code; the next
-reviewer met a new surface. Two of the most serious findings all session
-(`#F28`, `#F15`) were defects the loop **introduced and then caught**.
-
-That is the loop working, and it is indistinguishable from the loop
-spinning unless someone is counting. Already filed as
-`2026-09-06-measure-whether-the-review-loop-is-converging-or-churning.md`.
-
-### Class 5 — gaps that remain by design, and should be labelled as such
-
-Not defects; deliberate limits that must not be mistaken for coverage.
-
-- **`/simplify` is obliged on every code change and stamped by nothing.**
-  A slash command fires no `SubagentStop`. The one honour-system leg in a
-  system built to remove honour-system legs.
-- **`spec-check` does not exist**, so its leg of the loop is unenforced
-  by construction.
-- **A stamp is a record, not proof** (`#F7`). One `printf` forges one,
-  and `SubagentStop` fires for a no-op prompt.
-- **A PR can weaken the CI workflow that judges it** (`#F25`), since
-  GitHub resolves a `pull_request` workflow from the PR's own ref.
-- **Worktree sessions run hooks from the main checkout** (`#F12`), so a
-  PR that changes hook behaviour is never exercised by the sessions
-  developing it.
-- **The code set is an allowlist**, twice found incomplete
-  (`#G11`), inversion filed separately.
-
-The honest framing, worth writing into `reference.md` as a threat model:
-this system defends against **an agent that forgets a step**. It does not
-defend against one that lies, and several of the above are only
-defensible under that assumption.
 
 ## State
 
@@ -229,8 +99,8 @@ finds defects and one that records old ones.
 
 **Where.** Worktree
 `/home/lilijoy/dotfiles/.claude/worktrees/map-plan-docs-channel-routing`,
-branch `worktree-map-plan-docs-channel-routing`, PR **#68**. Work there,
-never the main checkout.
+branch `worktree-map-child-2-plan-file-layout`, PR **#69**. Work there,
+never the main checkout. PR #68 and its branch are merged and done.
 
 **Committed and pushed through `08771c2`.** `5eb67ef` closed the review
 loop over `854156c`'s unreviewed tail (F61-F65 on the map plan).
@@ -258,17 +128,182 @@ mutation, and wrong that the round was finished: the two MEDIUMs were
 both live, and F14 is the one that names why the previous two rounds
 could not have worked.
 
-**Then:** push the stamps, and merge PR #68 -- the user
-signed that off 2026-09-07, to be done after child 3 lands and *before*
-child 2 starts, so child 2 runs against a base where the stamp gates are
-real rather than legacy (#F12 on the map plan). Resolve the PR #67
-conflict by taking this branch's `reference.md`. Then child 2 of the
-map, as expand-contract per its G6.
+**PR #68 merged 2026-09-07** as `cfe6106` on master, after the owed
+`security` pass ran and its three findings (`#F14`-`#F16`) were fixed.
+The main checkout was fast-forwarded in the same session, which matters:
+worktree sessions run hooks from there, so completion stamps written from
+now on carry a real code fingerprint instead of reading `legacy`. That
+was the whole reason the merge had to precede child 2 (`#F12` on the map
+plan), and it is now true rather than planned.
+
+**The PR #67 conflict is still open and unchanged:** resolve it by taking
+this branch's `reference.md`, which subsumes #67's serialization rule.
+
+**Where the harness stands.** `gate-tests` is 92 assertions, 0 failed, 3
+recorded residues, hermetic, ~1.0s. Since this plan's own pass it also
+covers `plan-lint` (four cases plus a sabotage sweep), the active-plan
+marker, and the two frontmatter readers -- all added under child 2 and
+recorded in
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md.
+
+**Next for the harness, in order, and the first one is now blocking:**
+
+1. **Split a fast tier from a slow one.** `#G2` sets the budget at under
+   a second and it is at ~1.0s. Every remaining gate on the list mutates
+   and so needs a scratch repo per sabotage iteration, which multiplies
+   the cost. The split has to land before the cases do, or the result is
+   the bypassed gate `#G2` warns about. Recorded as `#G8` on the child
+   plan.
+2. Then sweep `subagent-stamp`, `plan-freeze`/`plan-move` and
+   `.githooks/*`.
+3. `#F4` remains the open Progress item: run `gate-tests` server-side, as
+   a `checks.*` entry or a CI step. Accepted for now by the user
+   2026-09-07; the choice between the two homes is still theirs.
+
+**The recurrence is worth knowing before touching a test here.** The
+shape `#F3`, `#F6`, `#F7` and `#F10` name -- an assertion satisfied by
+something other than the thing it names -- returned four more times in
+child 2, and four of the eight instances across both plans were in tests
+written to catch it. The rule distilled from that: **key a test on the
+symptom a bypass removes, not the one it preserves.** See the child
+plan's `## State`.
 
 **Do not backfill the rung declaration into older plans.** Seven open
 plans predate the gate and will refuse to close until whoever did the
-work adds one sentence. The user signed that off 2026-09-07; see the
-child plan's G2.
+work adds one sentence. The user signed that off 2026-09-07.
+
+## Original plan
+
+Building the mechanical review system in
+`2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md`
+produced 40 findings across four `security` passes and five
+`docs-updater` passes. This file is not a list of those findings — they
+are recorded there, resolved. It is the **classification**, because the
+individual fixes are done and the classes are not.
+
+The headline: **almost every defect was a gate that failed in a way that
+reported the wrong answer**, not a gate that was missing. The system's
+weakness is not coverage. It is that its failure modes were untested,
+and both directions of failure are worse than having no gate at all.
+
+### Class 1 — the gate reports success when it did not check
+
+Eight instances, and this is the one to design against.
+
+| finding | what reported "pass" |
+|---|---|
+| `#F3` | `required-agents` turned a failed `git diff` into "no agents obliged" |
+| `#F4` | `plan-gate` printed "nothing to gate" for a ref it could not resolve |
+| `#F5` | `plan-citations` printed `OK (N citations)` over a scan that aborted early |
+| `#F32` | the fingerprint returned **empty with rc=0** whenever the sort-last path was not a regular file |
+| `#F37` | `plan_worktree_files` returned rc=0 and a *plausible subset* when a `git diff` leg failed |
+| `#F34` | a `.nix` file with a non-ASCII name obliged **no** review agent, because git C-quotes the path and the quoted form matches no glob |
+| `#F31` | four `.claude/skills/*` symlinks oblige review but never move the fingerprint |
+| — | `plan_code_fingerprint` from a subdirectory returned a *different hash* with rc=0 (fixed under `#F37`) |
+
+The shared shape: **a shell construct whose exit status does not mean
+what it looks like it means.** A `while` loop exits with its last body
+command's status. A `{ a; b; c; }` group exits with `c`'s. A command
+substitution swallows the inner exit. `2>/dev/null` on an `awk` hides an
+abort. None of these are exotic; all of them are invisible in review
+unless you go looking for them specifically.
+
+**What would help:** a test harness that runs each gate script against a
+deliberately broken environment — bad ref, missing file, locked index,
+non-ASCII filename, path with a newline, subdirectory cwd — and asserts
+each one *fails*. Every finding above would have been caught by a
+ten-line test. The repo has eight VM tests for NixOS behaviour and zero
+tests for the scripts that gate every commit.
+
+### Class 2 — the gate blocks in a way nothing can clear
+
+Four instances. Equally damaging, because the escape is always the same:
+drop the `Plan:` trailer and the whole gate switches off
+(`2026-08-27-known-weak-points-in-the-plan-file-and-workflow-sy.md#F36`).
+
+- `#F1` — a frozen plan plus a stale fingerprint. `plan-move done`
+  freezes the plan, `subagent-stamp` refuses to write to a frozen plan,
+  so any later drift is unfixable in-system.
+- `#F2` — the mandated agent order guaranteed a stale `security` stamp,
+  because `docs-updater` edits the code the fingerprint covers. Red on
+  the first honest attempt, every time.
+- `#F28` — `.claude/settings.local.json`, written by the harness on a
+  "don't ask again" grant, entered the local fingerprint and can never
+  exist in CI.
+- `#G5` — `verify-ladder` was un-passable on master for any change, for
+  environmental reasons.
+
+**What would help:** the same harness, asserting the *positive* case —
+that an honest sequence of steps ends green. `#F2` was found by reasoning
+rather than by running the sequence, and `#F1` is still only half fixed
+(a stale stamp on a frozen plan degrades to a NOTE; the freeze boundary
+itself is untouched).
+
+### Class 3 — documentation describing code that has since changed
+
+**Twelve instances**, the most frequent class by count. Every one was a
+comment or doc that was true when written and silently false afterwards.
+
+The three that matter structurally:
+
+- The same fact rendered in two channels drifts. `#F21` and `#F40` are
+  the *same sentence* in `reference.md` going wrong in opposite
+  directions two passes apart — once by listing a stale glob set, once by
+  dropping half the current one.
+- A comment can assert a relationship the code no longer has. `#F29`
+  claimed three consumers shared one glob set immediately after a pass
+  deliberately split them.
+- It reaches plan files too, not just comments. `#F38` — a follow-up plan
+  described work as unbuilt after half of it had landed. That is the most
+  dangerous instance: the next agent reads the plan, not the diff.
+
+There is also a distinct sub-shape worth its own guard: `#F39`, where a
+comment rewrite left the *pre-rewrite text spliced into the new text
+mid-sentence*. That is not a stale comment, it is a botched edit, and it
+is visible in the diff without reading any code.
+
+**What would help:** the fix that actually worked was structural, not
+disciplinary — `#F21`/`#F24` changed the docs from *restating*
+`PLAN_CODE_GLOBS` to *pointing at* it, and that particular drift stopped
+recurring immediately. Generalise it: prose should cite the array, the
+script, the plan anchor. `plan-citations` already verifies the pointers
+resolve; nothing verifies a paraphrase.
+
+### Class 4 — the loop generates its own work
+
+Roughly half the findings after the first pass were consequences of
+earlier fixes in the same session, not pre-existing defects. Widening the
+code set made three docs stale; fixing those changed code; the next
+reviewer met a new surface. Two of the most serious findings all session
+(`#F28`, `#F15`) were defects the loop **introduced and then caught**.
+
+That is the loop working, and it is indistinguishable from the loop
+spinning unless someone is counting. Already filed as
+`2026-09-06-measure-whether-the-review-loop-is-converging-or-churning.md`.
+
+### Class 5 — gaps that remain by design, and should be labelled as such
+
+Not defects; deliberate limits that must not be mistaken for coverage.
+
+- **`/simplify` is obliged on every code change and stamped by nothing.**
+  A slash command fires no `SubagentStop`. The one honour-system leg in a
+  system built to remove honour-system legs.
+- **`spec-check` does not exist**, so its leg of the loop is unenforced
+  by construction.
+- **A stamp is a record, not proof** (`#F7`). One `printf` forges one,
+  and `SubagentStop` fires for a no-op prompt.
+- **A PR can weaken the CI workflow that judges it** (`#F25`), since
+  GitHub resolves a `pull_request` workflow from the PR's own ref.
+- **Worktree sessions run hooks from the main checkout** (`#F12`), so a
+  PR that changes hook behaviour is never exercised by the sessions
+  developing it.
+- **The code set is an allowlist**, twice found incomplete
+  (`#G11`), inversion filed separately.
+
+The honest framing, worth writing into `reference.md` as a threat model:
+this system defends against **an agent that forgets a step**. It does not
+defend against one that lies, and several of the above are only
+defensible under that assumption.
 
 ## Progress
 

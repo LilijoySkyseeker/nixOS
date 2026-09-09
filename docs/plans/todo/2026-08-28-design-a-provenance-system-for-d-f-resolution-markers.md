@@ -3,9 +3,16 @@ slug: design-a-provenance-system-for-d-f-resolution-markers
 created: 2026-08-28
 status: todo
 frozen: false
+kind: task
+priority: normal
+blocked_by:
 ---
 
 # Design a provenance system for D/F resolution markers
+
+## State
+
+**2026-08-28, not started.** Just opened; no design work done yet.
 
 ## Original plan
 
@@ -30,10 +37,6 @@ unresolved security Finding.
 (matches `D`'s existing, already-accepted precedent) and track building a
 real provenance mechanism separately here, rather than block the
 plan-file-rework plan on solving it inline.
-
-## State
-
-**2026-08-28, not started.** Just opened; no design work done yet.
 
 ## Progress
 
