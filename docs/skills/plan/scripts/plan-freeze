@@ -46,10 +46,9 @@ if [ -n "$unresolved_f" ]; then
 $unresolved_f"
 fi
 
-if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
-  plan_note "WARNING: $rel has lint problems, and freezing makes them permanent:
-$lint_out"
-fi
+# No lint call here: it is advisory now, verify-ladder already warns on it
+# before every commit, and an advisory subprocess inside a write-path gate
+# would make its git failures look like the gate's own.
 
 plan_do_freeze "$root" "$rel"
 plan_note "$rel frozen."
