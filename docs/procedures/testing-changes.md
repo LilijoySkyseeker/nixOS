@@ -218,7 +218,7 @@ of operations — chronology, not evidence:
   reach a particular failure asserts that it can, under its own name:
   three guards here once passed because `git mv` failed for reasons that
   had nothing to do with the gate. Hermetic, network-free, scratch repos
-  under `$TMPDIR`; 121 assertions, measured 1.72s, knowingly over the
+  under `$TMPDIR`; 128 assertions, measured 2.1s, knowingly over the
   one-second budget and recorded as such rather than kept under it by
   dropping cases. This is what rung 3 looks like for a change with no
   closure to build. Read
@@ -248,7 +248,7 @@ of operations — chronology, not evidence:
   escape), `INERT` (the mutation matched nothing and measured nothing),
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
-  N× the suite — 51 entries, about 13s across 16 jobs — so it is not in
+  N× the suite — 56 entries, about 17s across 16 jobs — so it is not in
   `verify-ladder`'s pre-commit path. It is the slow tier, and it runs as
   `checks.gate-mutants` under `nix flake check`; run it by hand
   (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)

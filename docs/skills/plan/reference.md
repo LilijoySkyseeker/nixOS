@@ -234,12 +234,22 @@ is rare enough not to need its own mechanic.
 
 The manifest, not the file's own `frozen:` field, is what every script
 that edits a plan asks -- `plan-move`, `plan-reject`, `plan-decide`,
-`plan-resolve` and `plan-tick` all refuse on a manifest entry, so setting
-`frozen: false` by hand buys nothing
-(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56).
-Two things guard the manifest itself: `pre-commit` blocks a commit that
-stages its deletion, and `verify-ladder` runs `sha256sum -c` over it on
-every pass. Neither checks that every frozen plan still *has* an entry
+`plan-resolve`, `plan-tick` and `plan-carry` all refuse on a manifest
+entry, so setting `frozen: false` by hand buys nothing
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56,
+2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62).
+`plan-gate` and `subagent-stamp` read it too, rather than the field
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61).
+
+The manifest itself is guarded three ways. `pre-commit` refuses a commit
+that stages its deletion, stages it as anything but a regular file, or
+drops an entry for a plan that is not itself being deleted.
+`plan_record_checksum` refuses any write that would lose a path.
+`verify-ladder` checks all three properties on every pass through
+`plan_manifest_problem`: the manifest is non-empty, every entry's file
+still hashes to what it records, and every file in `done/` and `rejected/`
+has an entry at all -- the last being the one a hash check cannot see,
+since dropping an entry leaves what remains verifying perfectly
 (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60).
 
 ## Citeable IDs

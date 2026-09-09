@@ -173,8 +173,15 @@ while IFS= read -r p; do
   # which disables this gate entirely, including the unresolved-findings
   # check that predates it. An unfixable gate teaches the bypass.
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F1
+  # The manifest, not the file's own `frozen:` field. Here "frozen" *relaxes*
+  # the stamp requirement, so trusting the self-declared field let any plan
+  # buy that leniency by adding one line to its own frontmatter: an
+  # in-progress plan marked `frozen: true` turned two BLOCKED lines into two
+  # NOTEs and exit 0, with no review having run. This is the only gate CI
+  # executes.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61
   frozen=0
-  plan_is_frozen "$root/$rel" && frozen=1
+  plan_manifest_frozen "$root" "$rel" && frozen=1
 
   for agent in "${obliged_agents[@]}"; do
     plan_is_stampable "$agent" || continue

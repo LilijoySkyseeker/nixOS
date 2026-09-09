@@ -504,14 +504,19 @@ plan_checksum() { sha256sum "$1" | awk '{print $1}'; }
 # plan_manifest_frozen.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F24
 plan_record_checksum() {
-  local root="$1" rel sum checksums tmp
+  local root="$1" rel sum checksums tmp out
   rel="$(plan_normalise_rel "$2")"
   sum="$(plan_checksum "$root/$rel")"
   checksums="$root/$PLAN_CHECKSUMS_RELPATH"
   mkdir -p "$(dirname "$checksums")"
   touch "$checksums"
-  tmp="$(mktemp)" || plan_die "cannot create a temporary file"
-  out="$(mktemp)" || { rm -f "$tmp"; plan_die "cannot create a temporary file"; }
+  # Beside the manifest, not in $TMPDIR: /tmp is a tmpfs on this fleet and the
+  # checkout is not, so `mv` across them is a copy -- not atomic, and it
+  # replaces the manifest with the temporary's 0600 instead of its own mode.
+  # In the same directory it is a real rename.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F64
+  tmp="$(mktemp "${checksums}.XXXXXX")" || plan_die "cannot create a temporary file"
+  out="$(mktemp "${checksums}.XXXXXX")" || { rm -f "$tmp"; plan_die "cannot create a temporary file"; }
   # Every step checked, and the manifest replaced by a rename rather than by
   # a redirect onto itself. `sort -k2 "$tmp" > "$checksums"` truncates the
   # manifest *before* sort runs: one failure there left it empty, for every
@@ -527,13 +532,29 @@ plan_record_checksum() {
     { rm -f "$tmp" "$out"; plan_die "cannot append to $PLAN_CHECKSUMS_RELPATH."; }
   sort -k2 "$tmp" > "$out" ||
     { rm -f "$tmp" "$out"; plan_die "cannot sort $PLAN_CHECKSUMS_RELPATH."; }
-  # The manifest may only stay the same size (a re-record) or grow by one (a
-  # new freeze). Anything else means a step above lost entries, and losing
-  # one is losing the proof that that plan has not changed.
-  if [ "$(grep -c . "$out")" -lt "$(grep -c . "$checksums")" ]; then
+  # Every path the manifest held must still be there. Compared as a set of
+  # paths, not as a line count: a manifest that legitimately holds one path
+  # twice -- a merge resolution, or the `./` duplicate #F39 produced --
+  # collapses to a single entry and so shrinks, and a count guard would then
+  # refuse that file for good, including to the plan-repair that would fix
+  # it. Losing a path is the thing worth refusing; losing a duplicate is not.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F65
+  # Keyed on FILENAME, not the usual `NR == FNR`: that idiom silently breaks
+  # when the first file is empty -- FNR never advances, so every record of the
+  # *second* file matches it too, and a first freeze into an empty manifest
+  # reports its own new entry as lost. Caught by this suite's own cases.
+  lost="$(awk -v first="$checksums" '
+    FILENAME == first { i = index($0, "  "); if (i > 0) had[substr($0, i + 2)] = 1; next }
+    { i = index($0, "  "); if (i > 0) delete had[substr($0, i + 2)] }
+    END { for (p in had) print "  " p }
+  ' "$checksums" "$out")"
+  if [ -n "$lost" ]; then
     rm -f "$tmp" "$out"
-    plan_die "refusing to write a $PLAN_CHECKSUMS_RELPATH with fewer entries than it had; the freeze evidence would be lost."
+    plan_die "refusing to write a $PLAN_CHECKSUMS_RELPATH that drops entries -- the proof these have not changed would be lost:
+$lost"
   fi
+  # The manifest's own mode, not the temporary's 0600.
+  chmod --reference="$checksums" "$out" 2>/dev/null || chmod 644 "$out"
   mv "$out" "$checksums" || { rm -f "$tmp" "$out"; plan_die "cannot replace $PLAN_CHECKSUMS_RELPATH."; }
   rm -f "$tmp"
   # Checked: the manifest on disk and the manifest in the index are what

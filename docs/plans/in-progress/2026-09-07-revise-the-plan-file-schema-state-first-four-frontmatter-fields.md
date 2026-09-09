@@ -3406,3 +3406,369 @@ would miss — matching `gate-mutants`' note and `#F57`'s correction
 _docs-updater finished 2026-09-09T17:33:30Z (code 12a1595177f8a204) -- see Findings above._
 
 **FIXED 2026-09-09:** closed rather than left recorded: plan_manifest_problem now checks coverage too -- every file in docs/plans/done/ and rejected/ must have an entry, verified against the manifest's exact path field in one awk pass. The invariant holds exactly today (50 entries, 50 done/ files, 0 rejected/, none uncovered). The reverse direction was written and then removed: sha256sum -c already reports an entry whose file is gone as FAILED open or read, so a separate check can never be the guard that fires, and gate-mutants proved it unreachable by escaping. verify-ladder blocks on all of it
+
+### F61 — `plan-gate` still reads the self-declared `frozen:` field, so a plan that writes `frozen: true` into its own frontmatter turns every missing review stamp from BLOCKED into NOTE and the PR gate goes green
+
+- **File:** `docs/skills/workflow/scripts/plan-gate:176-177` (`frozen=0;
+  plan_is_frozen "$root/$rel" && frozen=1`) and `:139-145`
+  (`stamp_problem`); `docs/skills/workflow/scripts/subagent-stamp:36` reads
+  the same field. Contradicts this plan's own `#F56` FIXED note ("This was
+  the last enforcement point still trusting the self-declared field").
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced end to end in a scratch repo under
+  `~/.cache`, never against this repo)
+- **Axis:** hardening
+- **Reachability:** anyone opening a PR, and any agent that would rather not
+  wait for a review. `.github/workflows/plan-gate.yml` is the *only*
+  automated gate this repo runs in CI, and it runs `plan-gate` from a copy
+  pinned to the base branch precisely so a PR cannot neuter its own gate by
+  editing the script. The pinning is irrelevant here: the switch is not in
+  the code, it is one line of frontmatter in the PR's own plan file, which
+  is data the pinned script reads. Measured: a scratch range that changed a
+  `modules/*.nix` file and cited an `in-progress/` plan printed two BLOCKED
+  lines and exited 1; adding `frozen: true` to that same plan's frontmatter
+  and nothing else turned both into NOTE and the run ended `plan-gate: all
+  cited plans (1) have their findings resolved and their obliged reviews
+  stamped.`, exit 0 — with no `security` or `docs-updater` review having
+  run. `plan-lint` does report this (`only plan-freeze may freeze a plan`,
+  `plan-lint:61-62`), but `verify-ladder` runs `plan-lint` on the *active
+  plan only* and is skill-invoked, so it does not backstop a commit made
+  outside the `workflow` skill — which `docs/procedures/testing-changes.md`
+  states explicitly. Nothing in CI runs `plan-lint` at all.
+- **Rule:** n/a — the `#F11` class ("a plan may not exempt itself by
+  self-declaring frozen"), closed in `plan-lint`, `plan-freeze`,
+  `plan-repair` and, this session, `plan_require_not_frozen`, and still
+  fully open in the one gate that CI actually executes.
+- **Finding:** the fix that landed for `#F56` is correct as far as it goes
+  and its closing claim is false. Two workflow scripts still decide
+  frozenness from `plan_get_field ... frozen`. `subagent-stamp`'s read is
+  defensible on its own (it exits 0 without writing, and its comment says
+  the two readers must agree), but `plan-gate` converts that same field into
+  a downgrade of the review requirement, so the pair is a self-service
+  waiver. Note the unresolved-findings check is unaffected and still blocks;
+  only the stamp obligation is waived, which is the half that survives an
+  agent simply not running the review.
+- **Fix risk:** moderate, and the reason the field is read here is real —
+  `plan-gate:169-175` argues that blocking on a frozen plan is an unfixable
+  gate whose cheapest escape is dropping the `Plan:` trailer. Switching to
+  `plan_manifest_frozen "$root" "$rel"` keeps that property for genuinely
+  frozen plans (every `done/`/`rejected/` plan has a manifest entry, checked
+  by `plan_manifest_problem` as of this session) while removing the
+  self-declared route. It needs `$root`, which `plan-gate` already has, and
+  CI's pinned `lib.sh` already carries the reader. Must be tested against a
+  pre-stamp-era `done/` plan, which is the case the NOTE branch exists for.
+
+
+**FIXED 2026-09-09:** plan-gate and subagent-stamp both read plan_manifest_frozen now, not the self-declared field. My F56 note claimed this class was closed and it was not -- F56 fixed plan_require_not_frozen only, and plan-gate is the one gate CI runs, where frozen *relaxes* the stamp requirement so the field bought leniency. gate-tests asserts a self-declared frozen plan is still made to carry stamps; gate-mutants restores the field read
+
+### F62 — `plan-carry` is the sixth writer and has no frozen guard, so it silently appends to a manifest-frozen plan and permanently invalidates its checksum
+
+- **File:** `docs/skills/plan/scripts/plan-carry:17-45` — no
+  `plan_require_not_frozen`, then `plan_append_under_heading "$root/$rel"`
+  and an unchecked `git -C "$root" add "$rel"` on the *original* plan.
+  `docs/skills/plan/reference.md:235-238` enumerates the guarded writers as
+  "`plan-move`, `plan-reject`, `plan-decide`, `plan-resolve` and
+  `plan-tick`", presenting that set as complete.
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (reproduced in a scratch repo under `~/.cache`)
+- **Axis:** hardening
+- **Reachability:** any agent or human following the documented deferral
+  workflow. `plan-carry <plan> D<N>` requires only that `D<N>` carry a
+  DEFERRED marker with no CARRIED marker. A `done/` plan cannot normally be
+  in that state, because `plan-move ... done` refuses unresolved decisions —
+  but `plan-reject` deliberately waives exactly that gate ("this does NOT
+  require every decision to be resolved"), so every `rejected/` plan may
+  hold a DEFERRED-without-CARRIED decision, and picking up a parked question
+  from an abandoned plan is the documented reason `plan-carry` exists.
+  Measured: against a frozen `rejected/` fixture with a manifest entry that
+  verified, `plan-carry` created the new todo plan, appended `**CARRIED
+  ...**` to the frozen file, staged it, printed the new path and exited 0;
+  `sha256sum -c` went from `OK` to `FAILED` in the same command.
+- **Rule:** n/a — the `#F56` class, one script further out.
+- **Finding:** the five call sites `#F56` fixed are the five that already
+  had a guard. `plan-carry` never had one, so it was not on the list to
+  update, and it is the only remaining `plan-*` script that writes into an
+  existing plan without asking whether that plan is frozen (`plan-repair`
+  writes into frozen plans on purpose and re-records; `plan-freeze` and
+  `plan-lint` consult the manifest; `plan-new` creates). The damage is
+  fail-closed downstream — `.githooks/pre-commit` then blocks the file
+  forever and `plan_manifest_problem` blocks every `verify-ladder` pass —
+  but it is silent at the moment it happens, it is staged, and there is no
+  in-system remedy: `plan-repair` refuses a frozen file that no longer
+  matches its checksum, so recovery is a manual `git checkout` of a file the
+  operator has not been told was touched.
+- **Fix risk:** low. `plan_require_not_frozen "$root" "$rel"` after
+  `plan_locate`, before the DEFERRED/CARRIED probes, matches the other five
+  exactly. It does change behaviour: carrying a decision *out of* a frozen
+  plan becomes impossible, so the deferral would have to be restated in the
+  new plan by hand rather than appended back to the frozen one. That is the
+  same trade the freeze rule already makes everywhere else, and it should be
+  said in `reference.md` next to the enumeration this finding contradicts.
+  A `gate-tests` case needs a `rejected/`-shaped fixture, since a `done/`
+  one cannot reach the precondition.
+
+
+**FIXED 2026-09-09:** plan-carry calls plan_require_not_frozen. It was a sixth writer my grep for existing callers could not find, because it had no call to find. reference.md's list of guarded scripts now names six, and gate-mutants deletes the guard to prove the case goes red
+
+### F63 — the manifest can still be neutered in the same commit as a tampered frozen plan, by emptying it, dropping one entry, or replacing it with a symlink; only outright deletion is refused
+
+- **File:** `.githooks/pre-commit:36-77`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (four fixtures in a scratch repo under
+  `~/.cache`, with a control)
+- **Axis:** hardening
+- **Reachability:** whoever writes the commit — in practice an agent taking
+  a shortcut, or a merge that mangles the manifest. Measured, each staged
+  alongside a tampered `done/` plan: manifest **deleted** blocks (the
+  `#F55` fix works); manifest **renamed away** blocks (pathspec limiting
+  runs before rename detection, so the source still reports as `D` — worth
+  recording, it is not obvious); manifest **truncated to empty** commits
+  clean, exit 0; manifest with **only the tampered plan's entry removed**
+  commits clean, exit 0; manifest **replaced by a symlink** to `/dev/null`
+  commits clean, exit 0. The last three all pass through `ls_rc=0` and then
+  either `[[ -n "$manifest" ]]` (empty and symlink cases) or the
+  `[[ -z "$recorded" ]] && continue` arm (dropped-entry case).
+- **Rule:** n/a — the same fail-open shape `#F48` and `#F55` closed, three
+  doors further out.
+- **Finding:** the `#F55` comment at `:41-45` calls staging the deletion
+  "the cheapest cover for a tampered frozen plan". It is not the cheapest —
+  `: > docs/plans/.checksums` and a one-line `sed -i` are both cheaper, both
+  are ordinary staged *modifications* of a tracked file, and both produce
+  exactly the outcome the deletion check exists to prevent. The symlink case
+  is worse in kind: the index entry is mode `120000` and `git show` returns
+  the link target as blob content, so `manifest` is a short non-empty string
+  that no `$2==f` lookup ever matches, and every frozen file is skipped
+  while the hook looks like it checked them. `plan_manifest_problem` catches
+  all three, but only inside `verify-ladder`, which is skill-invoked; the
+  hook is the layer this repo documents as applying "to any tool or human".
+- **Fix risk:** low but not free. The dropped-entry case needs the hook to
+  do what `plan_manifest_problem` now does — assert that every staged
+  `docs/plans/{done,rejected}/*.md` has an entry — which is a new class of
+  block for a repo mid-reorganisation; the empty and symlink cases need the
+  index *mode* checked (`100644`) and an empty manifest treated as an error
+  whenever HEAD had a non-empty one, not as "nothing is frozen". The hook
+  must not gain a dependency on `lib.sh`; it is deliberately standalone.
+
+
+**FIXED 2026-09-09:** pre-commit now refuses a manifest staged as anything but a regular file (the symlink case, index mode 120000, where git show returns the link target and the file parses as no entries), and refuses a staged manifest that drops an entry for a plan not itself being deleted -- which covers truncation and single-entry removal together. The HEAD comparison is rc-discriminated rather than swallowed: that was the third time on this branch a fix for a fail-open read was itself one, and the sabotage sweep caught it before it landed
+
+### F64 — `plan_record_checksum`'s `mv` is a cross-device copy on this fleet, so the replace is not atomic and it resets the manifest to mode 0600
+
+- **File:** `docs/skills/plan/scripts/lib.sh:513-537`; `mktemp` with no `-p`
+  or `TMPDIR`, and `modules/profiles/default.nix:270`
+  (`boot.tmp.useTmpfs = true`).
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (`df -T` shows `/tmp` as `tmpfs` and the
+  checkout on `zroot/local/home`; the mode change measured directly with a
+  scratch `mv`)
+- **Axis:** hardening
+- **Reachability:** no adversary needed — the same accident class `#F54`
+  named (SIGINT, ENOSPC, a crash) during any `plan-freeze`, `plan-reject` or
+  `plan-repair`. The comment at `:515-520` says the manifest is now
+  "replaced by a rename rather than by a redirect onto itself", and on every
+  host in this fleet it is not a rename: `/tmp` is a tmpfs and the repo is on
+  ZFS, so `mv` falls back to open-truncate-copy-unlink on the destination.
+  The window is smaller than the redirect's (the copy is one write of ~4 KB
+  rather than a truncate followed by `sort`'s whole run) but it is the same
+  window, and the shrink guard cannot see it because it runs *before* the
+  `mv`. Second, measured effect: `mv` across filesystems carries the source
+  mode, and `mktemp` creates 0600, so `docs/plans/.checksums` becomes
+  owner-only on disk after any freeze. git tracks only the executable bit,
+  so this never shows up in a diff.
+- **Rule:** n/a — new-rule candidate, the general form being "a temp file
+  written for an atomic replace must be created in the destination's own
+  directory".
+- **Finding:** stated plainly because the plan's `#F54` FIXED note records
+  "replaces the manifest by mv rather than by a redirect onto itself" as the
+  fix, and a later reader will take that as meaning the write is atomic. It
+  is atomic only if `TMPDIR` happens to be on the same filesystem as the
+  checkout, which on this fleet it never is.
+- **Fix risk:** low. `mktemp -p "$(dirname "$checksums")"` (or `TMPDIR`
+  pointed there) makes both temporaries land beside the manifest, which
+  makes the `mv` a real `rename(2)` and preserves nothing surprising about
+  the mode — but it puts two short-lived `tmp.XXXX` files inside
+  `docs/plans/`, so `plan_worktree_files`, `plan-citations` and the
+  `git add` paths should be checked for anything that would pick them up,
+  and the `EXIT`-less cleanup in this function means a `plan_die` between
+  the two `mktemp`s must still remove them (it does today).
+
+
+**FIXED 2026-09-09:** both temporaries are created beside the manifest, so mv is a rename on the same filesystem rather than a cross-device copy, and the manifest's own mode is restored with chmod --reference before the move. gate-tests asserts the mode survives
+
+### F65 — the new shrink guard permanently refuses to re-record any path the manifest holds twice, and blames the wrong cause
+
+- **File:** `docs/skills/plan/scripts/lib.sh:530-536`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (reproduced in a scratch repo under `~/.cache`)
+- **Axis:** needed-used
+- **Reachability:** no adversary; a merge or a hand-edit. The manifest is an
+  append-mostly sorted file, so two branches that each freeze a plan conflict
+  in it, and the natural resolution — keep both sides — can duplicate a line.
+  `#F39` produced exactly this shape from a `./` spelling before it was
+  fixed. Measured: with three entries of which two name the same path,
+  `plan_record_checksum` on that path dies with `refusing to write a
+  docs/plans/.checksums with fewer entries than it had; the freeze evidence
+  would be lost.` and exits 1, every time, because the `awk` legitimately
+  drops both duplicates and the `printf` adds back one.
+- **Rule:** n/a
+- **Finding:** the answer to "can the refusal be turned into a denial of
+  service" is yes, for one shape, and it fails closed — the manifest is left
+  untouched, no evidence is lost, and only that one path is affected. The
+  real cost is the message: it names the one cause that is not what
+  happened, and the operator's obvious next move (re-run `plan-freeze`, or
+  `plan-repair`, which is the only sanctioned way to touch a frozen file) is
+  also blocked, so the plan becomes unrepairable until someone notices the
+  duplicate by eye. Every other legitimate write was checked and is accepted:
+  a first freeze grows the manifest by one, a re-record leaves it the same
+  size, and both temporaries are removed on all seven exit paths in the
+  function.
+- **Fix risk:** low. Comparing distinct path counts rather than line counts,
+  or simply saying "the manifest holds N entries for this path" when the
+  `awk` removed more than one, keeps the guard's strength and removes the
+  wrong diagnosis. Whichever is chosen, the `lib/manifest-may-shrink` mutant
+  must still be CAUGHT.
+
+
+**FIXED 2026-09-09:** the guard compares the set of paths, not the line count, so a manifest legitimately holding one path twice collapses to one entry without being refused. Fixing it introduced a second defect the suite caught immediately: the awk used the NR == FNR idiom, which silently breaks when the first file is empty -- FNR never advances, so every record of the second file matches too and a first freeze reported its own new entry as lost. Keyed on FILENAME now
+
+### F66 — both harness counts are a session old again, and two docs now describe the coverage gap that this same range closed
+
+- **File:** `docs/procedures/testing-changes.md:221` ("121 assertions"),
+  `:252` ("51 entries"), `:189-192` ("the entries present, not the corpus,
+  so a *dropped* entry still passes"), `docs/skills/plan/reference.md:240-242`
+  ("Neither checks that every frozen plan still *has* an entry"),
+  `docs/skills/workflow/SKILL.md:37-40`.
+- **Severity:** INFO
+- **Confidence:** CONFIRMED (measured: `scripts/gate-tests` prints `122
+  passed, 0 failed, 4 recorded residue(s)`; `scripts/gate-mutants --list`
+  and `grep -c '^mutant '` both give 52)
+- **Axis:** needed-used
+- **Reachability:** anyone reading the testing procedure to decide whether
+  the corpus is verified. Two separate errors in one range. First, the
+  numbers: `9ba1799` added an assertion and a catalogue entry and updated
+  neither count, so the doc says 121/51 against a measured 122/52 — the
+  third consecutive recurrence of the class `#F51` and `#F58` already
+  record. Second, and worse than a stale number, the prose in
+  `reference.md` and `testing-changes.md` was written in `5d05887` to
+  document the `#F60` gap, and `9ba1799` closed that gap four commits later
+  without revisiting either sentence. They now state the opposite of the
+  code: `plan_manifest_problem` does check that every file under
+  `docs/plans/done/` and `docs/plans/rejected/` has an entry, and
+  `verify-ladder` blocks on it.
+- **Rule:** n/a
+- **Finding:** the direction of the error is the safe one (the docs
+  understate what is enforced), but it is the direction that invites the
+  next session to re-add the check that already exists, or to decide the
+  invariant cannot be relied on. `SKILL.md` step 4 describes the freeze
+  step as hash-only for the same reason.
+- **Fix risk:** none — doc edits. The counts are the recurring half; the
+  standing answer in this plan is that a number a human retypes goes stale,
+  so if it is worth stating it is worth having `gate-tests` print it and the
+  doc cite the command instead.
+
+
+**FIXED 2026-09-09:** counts re-measured (128 assertions, 2.1s; 56 entries, 17s) and reference.md rewritten: it described the coverage gap 9ba1799 had already closed, and listed five guarded scripts where there are now six
+
+### F67 — `out` is not declared `local` in `plan_record_checksum`, in a file its own siblings declare it local in
+
+- **File:** `docs/skills/plan/scripts/lib.sh:507` (`local root="$1" rel sum
+  checksums tmp` — `out` missing), against `:712` (`plan_code_fingerprint`:
+  `local out r`).
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** hardening
+- **Reachability:** no live caller today, which is why this is INFO:
+  `plan_do_freeze`, `plan-freeze`, `plan-reject` and `plan-repair` use
+  `lint_out`/`reject_out`, not `out`. But `scripts/gate-tests` sources
+  `lib.sh` into its own top-level shell (`:18`) and keeps a global `out` in
+  its assertion helper (`:262`), so the day a case calls
+  `plan_record_checksum` directly rather than through the `ev()`/`mf()`
+  subshells it uses today, the manifest writer silently clobbers the
+  variable the harness reports failures from.
+- **Rule:** n/a
+- **Finding:** a one-word omission with no current effect, recorded because
+  the function is the single writer of the freeze evidence and because the
+  same file gets this right five lines' worth of functions away.
+- **Fix risk:** none.
+
+
+**FIXED 2026-09-09:** out added to the local declaration in plan_record_checksum
+
+### F68 — `checks.gate-mutants` is executed by nothing: the only CI workflow is `plan-gate`, and the only `nix flake check` in the repo passes `--no-build`
+
+- **File:** `modules/flake/gate-checks.nix:29-32`,
+  `docs/skills/workflow/scripts/verify-ladder:195`,
+  `.github/workflows/` (contains `plan-gate.yml` only),
+  `docs/procedures/testing-changes.md:254-256`.
+- **Severity:** INFO
+- **Confidence:** CONFIRMED (`ls .github/workflows`; the only `nix flake
+  check` call site in the tree is `verify-ladder:195`, with `--no-build`)
+- **Axis:** needed-used
+- **Reachability:** anyone relying on the sentence "it runs as
+  `checks.gate-mutants` under `nix flake check`" to believe the mutation
+  catalogue is enforced. `#D2` chose `gate-checks.nix` over a GitHub Actions
+  step on the reasoning that "a check runs on any machine, in any CI, and
+  locally". Today no CI runs `nix flake check` at all, and the one local
+  caller documents that `--no-build` "does not build checks" — the note
+  `verify-ladder:56-60` makes about `gate-tests`, which is why `gate-tests`
+  is *also* called directly. `gate-mutants` has no such direct call by
+  design, so the enforcement is a human remembering.
+- **Rule:** n/a
+- **Finding:** the flake check is not wrong, it is unreached, and the doc
+  reads as though it were a gate. The same is true of `checks.gate-tests` as
+  a *check* — what actually runs before a commit is the direct call. Either
+  a workflow runs `nix flake check` (no `--no-build`) on PRs, or the docs
+  should say plainly that the slow tier is manual.
+- **Fix risk:** low for the doc half. Running `nix flake check` in CI pulls
+  in every other check in `checks.nix`, including the VM tests, which cost
+  minutes each — so it would need `nix build .#checks.<system>.gate-mutants`
+  specifically, not a blanket `nix flake check`.
+
+---
+
+**Second security pass on this branch, 2026-09-09** — checked and clean, for
+the record of what was covered. Reviewed the whole of `cfe6106..HEAD` with
+emphasis on `99aa7ef..HEAD` and `5d05887..HEAD`. Verified directly, and
+found correct: no file under `docs/plans/done/` or `docs/plans/rejected/`
+was touched after `5d05887`, and `sha256sum -c docs/plans/.checksums`
+reports 50 of 50 `OK` with 50 entries against 50 `done/` files and an empty
+`rejected/`. `plan_record_checksum`'s five steps are each checked, both
+temporaries are removed on every failure path, and the shrink guard accepts
+every legitimate shape (first freeze grows by one, re-record stays equal) —
+the one refusal it gets wrong is `#F65`. All five `plan_require_not_frozen`
+call sites (`plan-move:21`, `plan-reject:22`, `plan-decide:23`,
+`plan-resolve:28`, `plan-tick:19`) pass `"$root" "$rel"` in that order, with
+`rel` from `plan_locate`, i.e. repo-root-relative — no site passes a full
+path or transposes the arguments; `plan-carry` is the one that passes
+nothing, which is `#F62`. `plan_manifest_problem`'s coverage `awk` was
+attacked with the crafted paths the brief names and holds: it splits on the
+*first* two-space run, so a filename containing two spaces still matches;
+`find` is rooted at the two directories so no `./` prefix can appear on
+either side; a missing `rejected/` is handled (`find` writes to the
+suppressed stderr and still lists `done/`); a filename with a newline or a
+backslash fails *closed*, reported as uncovered, because `sha256sum` escapes
+it in the manifest and `find` does not. An unreadable manifest makes the
+`getline` loop exit with an empty `have`, i.e. everything uncovered — also
+closed. The removal of the "entry naming a deleted file" check is safe and
+measured: GNU `sha256sum -c` prints `FAILED open or read` (plus a stderr
+warning) for a missing file, `Is a directory` for a directory, and `no
+properly formatted checksum lines found` for an empty or garbage manifest —
+all three land in `bad` through the `2>&1 | grep -v ': OK$'`, so a separate
+check genuinely could never fire first. The `#F59` correction is confirmed
+too: `sha256sum -c` on an empty file exits 1, not 0. In `.githooks/pre-commit`
+the `ls_rc` case analysis is sound for the deletion it was written for, and
+a manifest staged as a *rename* also blocks (pathspec limiting precedes
+rename detection, so the source still reports `D`) — the three shapes that
+do not block are `#F63`. `scripts/gate-tests` runs green at 122/0 with 4
+recorded residues in ~1.7s and writes nothing outside `$TMPDIR`; its new
+freeze-manifest section asserts what it claims, including the failing-`sort`
+PATH shim and a trimmed-manifest fixture that first proves the trimmed
+manifest still verifies. Every fixture in this review was built under
+`~/.cache/`, outside every checkout; no `secrets/*` file was read, decrypted
+or referenced, and nothing in the range touches `.sops.yaml`, a
+`sops.secrets.*` reference, a firewall rule, a systemd unit or a service
+account, so `docs/hardening.md`'s host-facing rules have no surface here.
+
+_security finished 2026-09-09T17:50:14Z (code c6ffc5dbb5dfa536) -- see Findings above._
+
+**FIXED 2026-09-09:** the slow tier has an actual runner now. .githooks/pre-push builds checks.gate-mutants whenever the pushed range touches scripts/, docs/skills/ or .githooks/ -- beside a host build 17s is nothing, before every commit it would be too much, and verify-ladder's nix flake check passes --no-build so it never built any check. D2's answer chose the flake over a workflow file; this is what makes that choice actually run

@@ -15,6 +15,12 @@ case "$id" in D[0-9]*) ;; *) plan_die "second argument must look like D<N>, got 
 
 root="$(plan_repo_root)" || exit 1
 rel="$(plan_locate "$arg" "$root")" || exit 1
+# This script appends a CARRIED marker and stages the file, so it is a writer
+# like the other five and needs the same guard. Without it, carrying a
+# decision out of a frozen plan edited that plan and broke its checksum,
+# exiting 0.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62
+plan_require_not_frozen "$root" "$rel"
 
 section="$(awk -v id="$id" '
   $0 ~ "^### " id "([[:space:]]|$)" { grab=1; print; next }

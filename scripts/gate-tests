@@ -325,6 +325,15 @@ git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 expect_fail "plan-gate refuses a range whose plan is unstamped" "carries no completion stamp" \
   env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
 
+# "frozen" relaxes the stamp requirement, so a plan that declares itself
+# frozen would buy that leniency with one line of its own frontmatter. The
+# manifest has no entry for this file, so nothing here is actually frozen.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61
+( cd "$repo" && sed -i 's/^frozen: false$/frozen: true/' "docs/plans/in-progress/$fixture_plan" )
+expect_fail "plan-gate still demands stamps from a plan that declares itself frozen" "carries no completion stamp" \
+  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+( cd "$repo" && sed -i 's/^frozen: true$/frozen: false/' "docs/plans/in-progress/$fixture_plan" )
+
 section "awkward filenames still oblige review"
 # A reviewable file whose name git has to quote obliged no agent at all
 # until core.quotePath=false landed, and that fix demotes bytes >= 0x80
@@ -830,6 +839,39 @@ else
   bad "a frozen plan with no manifest entry is a problem, though the entries left all verify" \
     "the fixture is wrong: the trimmed manifest should still verify, or the case proves nothing"
 fi
+# plan-carry is the sixth writer, and it had no guard at all: it appended a
+# CARRIED marker to a frozen plan, staged it and exited 0.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62
+ev "plan_record_checksum . docs/plans/done/$ev_a" >/dev/null 2>&1
+expect_fail "plan-carry refuses a frozen plan" "is frozen" \
+  env -C "$ev_repo" "$ev_repo/docs/skills/plan/scripts/plan-carry" "docs/plans/done/$ev_a" D1
+
+# A manifest that legitimately holds one path twice collapses to one entry on
+# the next write. That is a shrink, and a guard counting lines refuses it for
+# good -- including to the plan-repair that would fix it.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F65
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+grep -F "  docs/plans/done/$ev_b" "$ev_repo/docs/plans/.checksums" >> "$ev_repo/dup"
+cat "$ev_repo/dup" >> "$ev_repo/docs/plans/.checksums"
+if ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1; then
+  ok "a duplicated manifest path is collapsed, not refused as a loss"
+else
+  bad "a duplicated manifest path is collapsed, not refused as a loss" \
+    "the write was refused, so the file can never be re-recorded or repaired"
+fi
+rm -f "$ev_repo/dup"
+
+# The manifest keeps its own mode. mktemp is 0600, and /tmp is a tmpfs while
+# the checkout is not, so a temporary moved in from there is both a
+# cross-device copy and a permission change.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F64
+chmod 644 "$ev_repo/docs/plans/.checksums"
+ev "plan_record_checksum . docs/plans/done/$ev_b" >/dev/null 2>&1
+ev_mode="$(stat -c '%a' "$ev_repo/docs/plans/.checksums")"
+[ "$ev_mode" = 644 ] &&
+  ok "recording a checksum leaves the manifest's mode alone" ||
+  bad "recording a checksum leaves the manifest's mode alone" "the manifest is now mode $ev_mode"
+
 rm -rf "$ev_repo"
 
 section "the freeze manifest is keyed on the whole path, not a substring of it"
@@ -858,8 +900,11 @@ if mf "plan_manifest_frozen . \"$mf_rel\"" >/dev/null 2>&1; then
 else
   ok "a plan is not frozen because a longer path begins with its path"
 fi
-mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1
-if grep -qF "  $mf_rel.bak.md" "$repo/docs/plans/.checksums"; then
+# Both halves: the record must succeed *and* leave the other entry. The loss
+# guard also leaves it, by refusing the write outright, so "the entry is still
+# there" alone no longer distinguishes a correct delete from a refused one.
+if mf "plan_record_checksum . \"$mf_rel\"" >/dev/null 2>&1 &&
+   grep -qF "  $mf_rel.bak.md" "$repo/docs/plans/.checksums"; then
   ok "recording one path leaves an entry that merely begins with it alone"
 else
   bad "recording one path leaves an entry that merely begins with it alone" \
@@ -1256,6 +1301,18 @@ git -C "$mrepo" rm -q --cached docs/plans/.checksums >/dev/null 2>&1
 precondition "the manifest is staged for deletion, so the hook has something to refuse" \
   env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only --diff-filter=D -- docs/plans/.checksums)" ]'
 expect_fail ".githooks/pre-commit refuses a staged deletion of the freeze manifest" "staged for deletion" \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+
+# Replaced by a symlink rather than deleted: the index mode is 120000 and
+# `git show` returns the link target, which parses as no entries -- so every
+# frozen plan stops being checked and the hook still exits 0.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F63
+mreset
+( cd "$mrepo" && rm -f docs/plans/.checksums && ln -s /dev/null docs/plans/.checksums &&
+  git add docs/plans/.checksums ) >/dev/null 2>&1
+precondition "the manifest is staged as a symlink, so the hook has something to refuse" \
+  env -C "$mrepo" bash -c '[ "$(git ls-files -s -- docs/plans/.checksums | cut -d" " -f1)" = 120000 ]'
+expect_fail ".githooks/pre-commit refuses a freeze manifest staged as a symlink" "not as a regular file" \
   env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
 SWEEP_RESET=""
 

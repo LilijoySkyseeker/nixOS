@@ -55,6 +55,22 @@ if echo "$changed_files" | grep -qv '^hosts/'; then
 else
   global=0
 fi
+# The slow tier's actual home. checks.gate-mutants existed but nothing built
+# it: verify-ladder runs `nix flake check --no-build`, which does not build
+# checks, and the only workflow is plan-gate.yml. So the catalogue that
+# measures whether gate-tests detects anything ran by hand only. Here rather
+# than in verify-ladder because it costs ~13s -- fine beside a host build,
+# too much before every commit -- and only when the push touches a gate.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68
+if echo "$changed_files" | grep -qE '^(scripts/|docs/skills/|\.githooks/)'; then
+  echo "pre-push: gate scripts changed -- running the mutation catalogue"
+  if ! nix build --no-link ".#checks.x86_64-linux.gate-mutants"; then
+    echo "" >&2
+    echo "BLOCKED: scripts/gate-mutants found a mutation the suite does not catch, or failed to run. Push with --no-verify only if you have read why." >&2
+    exit 1
+  fi
+fi
+
 for host in $hosts; do
   if [[ "$global" -eq 1 ]] || echo "$changed_files" | grep -q "^hosts/${host}/"; then
     to_build+=" $host"

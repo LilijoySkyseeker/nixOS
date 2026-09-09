@@ -51,7 +51,11 @@ TREE_PATHS=(scripts/gate-tests docs/skills/plan docs/skills/workflow .githooks)
 # ------------------------------------------------------------- mutation verbs
 
 # All four operate on $f (the copy under mutation) and match *literal* text,
-# never a regex. Anchors are copied verbatim out of the target, so a mutation
+# never a regex. **Anchors are single-line**: these read the file a line at a
+# time, so a multi-line anchor matches nothing. It does not report INERT
+# either, if some other verb in the same entry did apply -- the entry then
+# runs a partial mutation and usually escapes. Split such an edit into one
+# verb per line. Anchors are copied verbatim out of the target, so a mutation
 # that stops matching after a refactor reports INERT rather than quietly
 # measuring nothing. Values reach awk through the environment, not -v: awk
 # expands escape sequences in a -v assignment, so an anchor containing a
@@ -119,6 +123,7 @@ REJECT=docs/skills/plan/scripts/plan-reject
 MOVE=docs/skills/plan/scripts/plan-move
 STAMP=docs/skills/workflow/scripts/subagent-stamp
 PRECOMMIT=.githooks/pre-commit
+CARRY=docs/skills/plan/scripts/plan-carry
 GATE=docs/skills/workflow/scripts/plan-gate
 AGENTS=docs/skills/workflow/scripts/required-agents
 
@@ -176,8 +181,13 @@ mutant lib/manifest-frozen-always-false "$LIB" \
   'mut_subst "END { exit(found ? 0 : 1) }" "END { exit 1 }"' \
   "plan-repair adds the missing section and re-records the checksum"
 
+# Both the loose match and the guard that would catch its damage: with only
+# the match loosened, plan_record_checksum refuses the write instead of
+# dropping the entry, which also leaves the entry in place. The contract is
+# "the unrelated entry survives *and* the record succeeds".
 mutant lib/record-checksum-loose-path "$LIB" \
-  'mut_subst "{ i = index(\$0, \"  \"); if (i > 0 && substr(\$0, i + 2) == want) next }" "{ if (index(\$0, want) > 0) next }"' \
+  'mut_subst "{ i = index(\$0, \"  \"); if (i > 0 && substr(\$0, i + 2) == want) next }" "{ if (index(\$0, want) > 0) next }"
+   mut_subst "  if [ -n \"\$lost\" ]; then" "  if false; then"' \
   "recording one path leaves an entry that merely begins with it alone"
 
 mutant lib/record-checksum-unnormalised "$LIB" \
@@ -340,8 +350,7 @@ mutant lib/record-checksum-unchecked-add "$LIB" \
   "plan-move into done, which execs plan-freeze"
 
 mutant pre-commit/manifest-read-swallowed "$PRECOMMIT" \
-  'mut_subst "  0) manifest=\"\$(git show '"'"':docs/plans/.checksums'"'"')\" ;;" "  0) manifest=\"\$(git show '"'"':docs/plans/.checksums'"'"' 2>/dev/null || true)\" ;;"
-   mut_subst "git ls-files --error-unmatch -- docs/plans/.checksums >/dev/null 2>&1 || ls_rc=\$?" "ls_rc=0"' \
+  'mut_subst "docs/plans/.checksums >/dev/null 2>&1 || ls_rc=\$?" "docs/plans/.checksums >/dev/null 2>&1 || ls_rc=1"' \
   ".githooks/pre-commit"
 
 mutant pre-commit/gitlink-probe-unchecked "$PRECOMMIT" \
@@ -358,6 +367,14 @@ mutant subagent-stamp/no-longer-fail-silent "$STAMP" \
   'mut_subst "git -C \"\$root\" add \"\$rel\" 2>/dev/null || true" "git -C \"\$root\" add \"\$rel\""' \
   "subagent-stamp is exempt from the sabotage sweep"
 
+mutant plan-gate/frozen-is-self-declared "$GATE" \
+  'mut_subst "  plan_manifest_frozen \"\$root\" \"\$rel\" && frozen=1" "  plan_is_frozen \"\$root/\$rel\" && frozen=1"' \
+  "plan-gate still demands stamps from a plan that declares itself frozen"
+
+mutant plan-carry/no-frozen-guard "$CARRY" \
+  'mut_delline "plan_require_not_frozen \"\$root\" \"\$rel\""' \
+  "plan-carry refuses a frozen plan"
+
 # --- the freeze manifest, which is the only evidence frozen plans carry ------
 
 # `sort ... > "$checksums"` truncates the manifest before sort runs, so one
@@ -365,11 +382,6 @@ mutant subagent-stamp/no-longer-fail-silent "$STAMP" \
 # `git add` then staged the empty file and exited 0.
 mutant lib/manifest-write-not-atomic "$LIB" \
   'mut_subst "sort -k2 \"\$tmp\" > \"\$out\" ||" "sort -k2 \"\$tmp\" > \"\$checksums\"; true ||"' \
-  "a failed manifest rewrite leaves the manifest intact"
-
-mutant lib/manifest-may-shrink "$LIB" \
-  'mut_subst "if [ \"\$(grep -c . \"\$out\")\" -lt \"\$(grep -c . \"\$checksums\")\" ]; then" "if false; then"
-   mut_subst "sort -k2 \"\$tmp\" > \"\$out\" ||" "sort -k2 \"\$tmp\" > \"\$out\"; : ||"' \
   "a failed manifest rewrite leaves the manifest intact"
 
 # The last enforcement point that trusted the file's own `frozen:` field.
@@ -383,6 +395,18 @@ mutant lib/require-not-frozen-trusts-the-field "$LIB" \
 # is defence in depth and a clearer message, not the load-bearing check, so a
 # mutation of it is equivalent and would escape by construction.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
+mutant lib/manifest-loss-guard-counts-lines "$LIB" \
+  'mut_subst "  lost=\"\$(awk -v first=\"\$checksums\" '"'"'" "  lost=\"\$( [ \"\$(grep -c . \"\$out\")\" -lt \"\$(grep -c . \"\$checksums\")\" ] && echo loss; true; false || awk -v first=\"\$checksums\" '"'"'"' \
+  "a duplicated manifest path is collapsed, not refused as a loss"
+
+mutant lib/manifest-mode-not-preserved "$LIB" \
+  'mut_delline "chmod --reference=\"\$checksums\" \"\$out\""' \
+  "recording a checksum leaves the manifest's mode alone"
+
+mutant pre-commit/manifest-mode-unchecked "$PRECOMMIT" \
+  'mut_subst "    if [[ \"\$manifest_mode\" != \"100644\" && \"\$manifest_mode\" != \"100755\" ]]; then" "    if false; then"' \
+  ".githooks/pre-commit refuses a freeze manifest staged as a symlink"
+
 mutant lib/manifest-problem-ignores-uncovered "$LIB" \
   'mut_subst "  [ -z \"\$uncovered\" ] ||" "  true ||"' \
   "a frozen plan with no manifest entry is a problem, though the entries left all verify"
