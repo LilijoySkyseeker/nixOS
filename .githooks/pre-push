@@ -15,11 +15,10 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   if [[ "$remote_sha" == "$zero" ]]; then
     # New branch: diff against master, or against the empty tree if there is
     # no common ancestor. Checked, not swallowed: `|| true` collapsed the
-    # range to a bare sha, which makes the diffs below *working-tree* diffs
-    # -- empty on a clean checkout, exit 0 -- so neither the host build nor
-    # the gate-mutants build ran, on exactly the new-branch push this arm
-    # exists for. merge-base answers 1 for "no common ancestor" and 128 when
-    # git itself fails.
+    # range to a bare sha, which makes the diff below a *working-tree* diff
+    # -- empty on a clean checkout, exit 0 -- so no host was built, on
+    # exactly the new-branch push this arm exists for. merge-base answers 1
+    # for "no common ancestor" and 128 when git itself fails.
     # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73
     mb_rc=0
     base="$(git merge-base origin/master "$local_sha" 2>/dev/null)" || mb_rc=$?

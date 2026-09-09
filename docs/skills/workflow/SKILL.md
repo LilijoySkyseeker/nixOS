@@ -30,45 +30,42 @@ stays short on purpose (progressive disclosure).
    for what slips through, not the primary mechanism.
 4. **Run the scriptable verification floor**:
    `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
-   `plan-citations` (any plan citation that no longer resolves, or any
-   cited by path instead of bare filename),
-   `scripts/gate-tests` (the gate scripts' own failure-mode tests --
-   a gate that no longer refuses what it must, or no longer passes an
-   honest sequence), the freeze manifest (`sha256sum -c` over
-   `docs/plans/.checksums` -- a frozen plan that no longer matches its
-   recorded hash, a manifest emptied outright, or a `done/`/`rejected/`
-   plan with no entry at all), `plan-lint` on the active plan (duplicate
-   or non-sequential `D`/`G`/`F` ids, a `Progress` line citing a heading
-   that does not exist), `nixfmt --check`,
-   `nix flake check --no-build`, a targeted `nixos-rebuild build`, and any
-   *newly introduced* statix/deadnix issue (pre-existing debt elsewhere in
-   a touched file never blocks). This is
+   `scripts/gate-tests` (the gate scripts' own failure-mode tests), a
+   working-tree edit to any frozen plan (anything under `done/` or
+   `rejected/`), `nixfmt --check`, `nix flake check --no-build`, a
+   targeted `nixos-rebuild build`, and any *newly introduced*
+   statix/deadnix issue (pre-existing debt elsewhere in a touched file
+   never blocks). `plan-citations` and `plan-lint` run warn-only -- read
+   their warnings, fix what's worth fixing (see ADR-0002). This is
    independent of VM-testing, which is not yet part of this system -- see
    reference.md.
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
    `### G<N>` entries, append-only.
-6. **Run every agent
+6. **Run the review agents
    `docs/skills/workflow/scripts/required-agents` names**, in the order
    it prints them, one at a time -- never two in the same parallel
-   batch. *Which* agents comes from the diff, the order from
-   `PLAN_AGENT_ORDER`; nothing here is a judgment call. Apply the
-   findings once the read-only reviewers have reported, and if that fix
-   changed code, run the whole sequence again.
-   `security`/`docs-updater` append findings into the
-   *same* current plan file. See reference.md, "Order, and the loop"
-   for the restart rule and why nothing runs concurrently, "What a
-   completion stamp proves" for what the `SubagentStop` hook does and
-   does not establish, and "Why a hook at all" for why this skill's own
-   sequencing is not what makes it work.
+   batch. They are advisory, run because they find things (ADR-0002):
+   apply the findings worth applying once the read-only reviewers have
+   reported, park the rest with a note via `plan-resolve` or by leaving
+   them open, and run a second pass only if the fixes were substantial
+   enough to deserve one -- never loop until zero findings.
+   The one hard rule: an unresolved CRITICAL/HIGH `security` finding
+   blocks the merge (`plan-gate`) and the plan's close, so those always
+   get fixed, accepted with the user's sign-off, or shown moot.
+   `security`/`docs-updater` append findings into the *same* current
+   plan file. See reference.md, "Order" for why nothing runs
+   concurrently.
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
    `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
    user's actual input, never inferred.
 8. **Close or leave open, before committing.** `plan-move <file> done`
    now, in this same branch, if the work is actually complete and
    verified per the trust hierarchy in `reference.md` (this refuses if
-   any `D*`/`F*` is unresolved, or if `## State` has no paragraph
-   *opening* with the fixed phrase `Verified to rung <N>` -- see
-   `docs/procedures/testing-changes.md`, "Declaring the rung") -- not as
+   `## State` is missing or has no paragraph *opening* with the fixed
+   phrase `Verified to rung <N>` -- see
+   `docs/procedures/testing-changes.md`, "Declaring the rung" -- or if a
+   CRITICAL/HIGH security finding is unresolved; open decisions and
+   ordinary findings warn but do not block) -- not as
    a follow-up commit or a second PR after this one merges. Leave it in
    `in-progress/` only when the task genuinely isn't finished yet (e.g.
    still needs a real host switch or other later verification), and
