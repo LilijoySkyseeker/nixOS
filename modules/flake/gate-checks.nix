@@ -22,14 +22,12 @@ in
 {
   perSystem = _: {
     checks = {
-      # The fast tier. Also called directly by verify-ladder before every
-      # non-trivial commit -- not a double run, see the note there.
+      # Also called directly by verify-ladder before every non-trivial
+      # commit -- not a double run, see the note there. The former
+      # gate-mutants sibling (a mutation catalogue over this suite) was
+      # deleted with the blocking gate tier it existed to certify.
+      # 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md
       gate-tests = gateCheck "scripts/gate-tests";
-
-      # The slow tier: one whole run of the suite per catalogue entry.
-      # Never in verify-ladder's pre-commit path.
-      # 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G13
-      gate-mutants = gateCheck "scripts/gate-mutants";
     };
   };
 }

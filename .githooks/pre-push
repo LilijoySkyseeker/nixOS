@@ -8,7 +8,6 @@ cd "$repo_root"
 
 zero="0000000000000000000000000000000000000000"
 changed_files=""
-gate_files=""
 
 while read -r _local_ref local_sha _remote_ref remote_sha; do
   [[ "$local_sha" == "$zero" ]] && continue # deleting a ref, nothing to build
@@ -51,40 +50,9 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   fi
   changed_files+=$'\n'"$files"
 
-  # A second, separate diff: the one above is pathspec-limited to what
-  # decides the host build set, so a change to a gate script never appears in
-  # it. Checked for the same reason it is.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68
-  # tests/ and modules/flake/ are in the set because that is where the check
-  # derivation and its registration live: a commit that edits only
-  # tests/gate-script-check.nix changes how the catalogue runs while touching
-  # nothing this pathspec would otherwise see.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F74
-  if ! gfiles="$(git -c core.quotePath=false diff --name-only "$range" -- scripts/ docs/skills/ .githooks/ tests/ modules/flake/)"; then
-    echo "BLOCKED: cannot diff $range; refusing to decide whether the gates changed from a failed diff." >&2
-    exit 1
-  fi
-  gate_files+=$'\n'"$gfiles"
 done
 
 changed_files="$(echo "$changed_files" | sed '/^$/d' | sort -u)"
-gate_files="$(echo "$gate_files" | sed '/^$/d' | sort -u)"
-
-# The slow tier's actual runner. checks.gate-mutants existed and nothing
-# built it: verify-ladder runs `nix flake check --no-build`, which does not
-# build checks, and the only workflow is plan-gate.yml. Here rather than in
-# verify-ladder because it costs ~17s -- nothing beside a host build, too
-# much before every commit. Above the early exit below, because a push that
-# changes only gate scripts changes no host and would otherwise return here.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68
-if [[ -n "$gate_files" ]]; then
-  echo "pre-push: gate scripts changed -- running the mutation catalogue"
-  if ! nix build --no-link ".#checks.x86_64-linux.gate-mutants"; then
-    echo "" >&2
-    echo "BLOCKED: scripts/gate-mutants found a mutation scripts/gate-tests does not catch, or failed to run. Push with --no-verify only if you have read why." >&2
-    exit 1
-  fi
-fi
 
 if [[ -z "$changed_files" ]]; then
   exit 0
