@@ -46,27 +46,18 @@
 
 **The mutable corpus is migrated to the current schema whenever the
 schema changes; frozen files are exempt by definition.** "Frozen" means
-recorded in `docs/plans/.checksums`, which only `plan-freeze` and
-`plan-repair` write and which `.githooks/pre-commit` enforces — not the
-file's own `frozen:` field, which a plan could otherwise set about itself
-to switch off every rule below. `plan-lint` reports the two disagreeing,
-in either direction. A frozen plan cannot be edited, so every rule added
-after it froze is one it can never satisfy, and a gate nothing can clear
-is what teaches the bypass. `plan-lint` therefore checks the section set,
-the section order and the schema fields only on a plan
-`docs/plans/.checksums` does not record as frozen, and checks the rules
-that do not depend on the era — core frontmatter, status against folder,
-id sequencing, Progress citations — everywhere.
-
-**The one exception, and its limits.** `plan-repair` may add `## State`
-to an already-frozen plan that has none, and re-record its checksum. That
-section is hardcoded, not an argument: it refuses a plan that is not
-frozen and refuses one that already has the section, so it can only ever
-add a heading nobody wrote — it cannot edit a word of anyone's text. It
-exists because 27 `done/` plans were frozen before `## State` existed, and
-nothing checked a plan at the moment it stopped being fixable. Both freeze doors now lint
-first (`plan-freeze` and `plan-reject`), so the backlog it was written to
-clear cannot grow again.
+*residence*: everything under `done/` and `rejected/` is permanently
+un-editable, enforced by `.githooks/pre-commit`, `verify-ladder` and
+`plan-gate`'s CI range check, with git history as the integrity record
+(ADR-0002; the old checksum manifest is gone). The `frozen:` frontmatter
+field is an informational marker `plan-freeze` sets on the way in;
+`plan-lint` reports it disagreeing with the folder, in either direction.
+A frozen plan cannot be edited, so every rule added after it froze is one
+it can never satisfy — `plan-lint` therefore checks the section set, the
+section order and the schema fields only on non-frozen plans, and checks
+the era-independent rules — core frontmatter, status against folder, id
+sequencing, Progress citations — everywhere. All of it warns rather than
+blocks: the schema is the house convention, not a gate.
 
 This is the rule to follow at the next schema revision, not a one-off
 for this one. See
@@ -136,29 +127,27 @@ A `### D<N>` heading records a question that needs the user's actual
 input -- never the agent's inference. Exactly three ways to record
 progress on it:
 
-- **`answered`** -- the user gave a real, final answer. Terminal: this
-  alone satisfies `plan-freeze`.
+- **`answered`** -- the user gave a real, final answer. `**ANSWERED**`
+  means *the user confirmed*, never "the agent assumed" -- that
+  provenance is the marker's whole value.
 - **`discussed`** -- talked through, but not yet a final answer. Real
-  progress worth keeping, but **does not** let the plan freeze -- prevents
-  an open question from quietly riding into an unfixable frozen file.
-- **`deferred`** -- explicitly punted for now. Not terminal by itself:
-  `plan-freeze` also requires a matching `plan-carry`, which spins the
-  item into a new `docs/plans/todo/` plan and appends a `**CARRIED**`
-  marker next to the original `**DEFERRED**` one. This guarantees a
-  deferred question always resurfaces as live backlog instead of
-  disappearing.
+  progress worth keeping.
+- **`deferred`** -- explicitly punted for now. Pair it with `plan-carry`,
+  which spins the item into a new `docs/plans/todo/` plan and appends a
+  `**CARRIED**` marker next to the original `**DEFERRED**` one, so a
+  deferred question resurfaces as live backlog instead of disappearing.
 
 `plan-freeze` (and therefore `plan-move ... done`) walks every `### D<N>`
-heading and refuses if any one of them isn't `ANSWERED`, or
-`DEFERRED`-with-`CARRIED`.
+heading and **warns** about any that isn't `ANSWERED` or
+`DEFERRED`-with-`CARRIED` -- a nudge to resolve or carry before the file
+becomes permanent, not a block (ADR-0002).
 
 ## The three finding states, precisely
 
 A `### F<N>` heading records something `security`/`docs-updater` (or a
 fleet-wide `security-audit` finding graduating into this plan, see below)
-raised that needs closing out -- never left to just sit there. Exactly
-three terminal states exist, recorded via `plan-resolve`, mirroring `D`'s
-three states above:
+raised. Three terminal states exist, recorded via `plan-resolve`,
+mirroring `D`'s states above:
 
 - **`fixed`** -- the underlying issue was actually fixed. Cite the commit
   in the note.
@@ -170,10 +159,13 @@ three states above:
 - **`moot`** -- no longer applicable (e.g. the code it was about got
   removed for an unrelated reason).
 
-Unlike `D`, there is no non-terminal `discussed`-equivalent and no
-`deferred`-then-`carry` path -- a finding that needs more time is not yet
-resolved, full stop, and `plan-freeze`/`plan-move ... done` refuse until
-every `F` is `fixed`, `accepted`, or `moot`.
+A finding that reaches none of those states is **parked**: it stays open
+on the record, `plan-gate` and `plan-freeze` list it as a NOTE/WARNING,
+and nothing blocks on it. The one exception is a `security` finding whose
+body carries `**Severity:** CRITICAL` or `HIGH` -- that class cannot be
+parked: `plan-gate` refuses the merge and `plan-freeze`/`plan-move ...
+done` refuse the close until it is `fixed`, `accepted` (the user's own
+sign-off), or `moot` (ADR-0002).
 
 ### Findings graduating from a fleet-wide security audit
 
@@ -200,15 +192,11 @@ superseded by a different approach. `plan-reject <file> "<reason>"`:
 - Requires a mandatory reason (cite the superseding plan's bare filename
   in the reason text if there is one), appended as a dated
   `**REJECTED <date>:**` marker -- append-only, same as everything else.
-- Does **not** require every decision to be resolved first, unlike
-  `plan-move ... done` -- abandoning the work legitimately moots open
-  questions rather than obligating them to be answered.
-- Runs `plan-lint` first and refuses a malformed plan, exactly like
-  `plan-freeze` -- `rejected/` is as permanent, and the file stays
-  citeable evidence
-  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10).
-- Freezes the file permanently, exactly like `done/` (same checksum
-  manifest, same git-level enforcement).
+- Does **not** require decisions or findings to be resolved first --
+  abandoning the work legitimately moots open questions rather than
+  obligating them to be answered.
+- Freezes the file permanently, exactly like `done/` (same
+  frozen-by-residence enforcement).
 
 If someone later reconsiders a rejected idea, there's no dedicated
 "revive" script -- `plan-new` a fresh plan and cite the old rejected
@@ -217,43 +205,28 @@ is rare enough not to need its own mechanic.
 
 ## Freeze mechanics
 
-`plan-freeze`:
-1. Refuses if already frozen, if the file isn't under `docs/plans/done/`,
-   if any decision or finding is unresolved (above), if `## State` is
-   missing or empty, if `## State` declares no verification rung
-   (`Verified to rung <N> ...` -- see
-   `docs/procedures/testing-changes.md`, "Declaring the rung"), or if
-   `plan-lint` reports the file malformed -- freezing makes a structural
-   fault permanent, and `plan-repair` is the only way back
-   (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D4).
-2. Sets `frozen: true`.
-3. Records a `sha256sum`-format line (`<hash>  <relpath>`) in
-   `docs/plans/.checksums`, which the git-level `pre-commit` hook
-   uses to detect any later attempt to modify a frozen file, from any
-   tool or human.
+Frozen means *residence*: everything under `done/` and `rejected/` is
+permanently un-editable, and git history is the integrity record
+(ADR-0002). One rule, enforced at three boundaries -- no modification or
+deletion of anything under the two permanent folders, additions pass:
 
-The manifest, not the file's own `frozen:` field, is what every script
-that edits a plan asks -- `plan-move`, `plan-reject`, `plan-decide`,
-`plan-resolve`, `plan-tick` and `plan-carry` all refuse on a manifest
-entry, so setting `frozen: false` by hand buys nothing
-(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F56,
-2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F62).
-`plan-gate` and `subagent-stamp` read it too, rather than the field
-(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61).
+- `.githooks/pre-commit` refuses the staged change, for any tool or
+  human, not just a Claude Code session.
+- `verify-ladder` flags a working-tree edit before the commit is even
+  attempted.
+- `plan-gate` refuses the PR range in CI, which is the check that
+  survives skipped local hooks.
 
-Three things guard the manifest itself. `pre-commit` refuses a commit
-that stages its deletion, stages it as anything but a regular file, or
-drops an entry for a plan that is not itself being deleted.
-`plan_record_checksum` refuses any write that would lose a path, and
-refuses to record an entry at all for a file it cannot hash -- an empty
-hash would otherwise read as covered and frozen while matching nothing
-(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78).
-`verify-ladder` checks three properties on every pass through
-`plan_manifest_problem`: the manifest is non-empty, every entry's file
-still hashes to what it records, and every file in `done/` and `rejected/`
-has an entry at all -- the last being the one a hash check cannot see,
-since dropping an entry leaves what remains verifying perfectly
-(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60).
+`plan-freeze` itself (run by `plan-move ... done`) refuses if the file
+isn't under `docs/plans/done/`, if `## State` is missing or empty, if
+`## State` declares no verification rung (`Verified to rung <N> ...` --
+see `docs/procedures/testing-changes.md`, "Declaring the rung"), or if a
+CRITICAL/HIGH security finding is unresolved; it warns about open
+decisions and ordinary findings, sets `frozen: true` (informational --
+the folder is the authority), and stages the file. Every script that
+edits a plan (`plan-move`, `plan-reject`, `plan-decide`, `plan-resolve`,
+`plan-tick`, `plan-carry`, `subagent-stamp`) refuses a file in a
+permanent folder, so setting `frozen: false` by hand buys nothing.
 
 ## Citeable IDs
 

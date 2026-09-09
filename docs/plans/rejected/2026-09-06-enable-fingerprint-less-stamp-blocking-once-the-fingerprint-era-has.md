@@ -1,8 +1,8 @@
 ---
 slug: enable-fingerprint-less-stamp-blocking-once-the-fingerprint-era-has
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -112,3 +112,5 @@ NOTE, and on a non-frozen plan must now BLOCK.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: stamps no longer block at all -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md removed stamp enforcement (ADR-0002)

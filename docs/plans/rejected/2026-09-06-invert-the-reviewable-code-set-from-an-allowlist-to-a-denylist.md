@@ -1,8 +1,8 @@
 ---
 slug: invert-the-reviewable-code-set-from-an-allowlist-to-a-denylist
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -104,3 +104,5 @@ one-off staleness the widenings already took.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: PLAN_CODE_GLOBS now only selects advisory reviewers, so an allowlist gap no longer weakens any enforcement -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md (ADR-0002)

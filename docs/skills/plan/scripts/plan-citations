@@ -166,7 +166,7 @@ while IFS=$'\t' read -r kind a b; do
       # the rule SKILL.md states repo-wide, enforced where it bites rather
       # than on one frontmatter field
       # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
-      if plan_manifest_frozen "$root" "${a#./}"; then
+      if plan_folder_frozen "${a#./}"; then
         # a frozen file can neither comply nor carry an ignore marker, so
         # counted on the OK line rather than reported or silently dropped
         # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G1

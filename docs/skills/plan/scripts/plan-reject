@@ -26,17 +26,8 @@ case "$(dirname "$rel")" in
   *) plan_die "$rel is not in todo/ or in-progress/ -- nothing else is eligible for rejection." ;;
 esac
 
-# The second door to freeze: rejected/ is as permanent as done/, so it lints
-# too, even though it waives the decision and finding gates.
-# Before the marker and the move, not after: plan_die on a refusal would
-# otherwise leave the plan sitting in rejected/, stamped rejected and
-# unfrozen -- a state no script put it in and none clears.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G10
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F31
-if ! lint_out="$("$SCRIPT_DIR/plan-lint" "$rel" 2>&1)"; then
-  plan_die "cannot reject -- $rel is malformed, and freezing makes that permanent:
-$lint_out"
-fi
+# No lint call here: it is advisory now and verify-ladder already warns on
+# it -- see plan-freeze for the same removal and its reason.
 
 today="$(plan_today)"
 printf '\n**REJECTED %s:** %s\n' "$today" "$reason" >> "$root/$rel"

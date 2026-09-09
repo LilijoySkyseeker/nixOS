@@ -37,45 +37,29 @@ Which agents a change obliges is decided **mechanically, from the diff**
 `docs/skills/workflow/scripts/required-agents` prints the set for the
 current working tree and is the authority; this table only explains it.
 
-| Agent | Fires when | Built? | Stamped? |
-|---|---|---|---|
-| `/simplify` | any code change (see below) | yes | **no** |
-| `docs-updater` | any of the above **or** any `.md` changed | yes | yes |
-| `security` | any code change | yes | yes |
-| `spec-check` | the active plan has any `### D<N>` | not yet | not yet |
+| Agent | Fires when | Built? |
+|---|---|---|
+| `/simplify` | any code change (see below) | yes |
+| `docs-updater` | any of the above **or** any `.md` changed | yes |
+| `security` | any code change | yes |
+| `spec-check` | the active plan has any `### D<N>` | not yet |
 
 Listed in run order; `required-agents` prints them in that order too.
-
-**"Stamped?" is the honest column.** `plan-gate` can only refuse a merge
-for an agent that leaves a completion stamp, and `/simplify` is a slash
-command -- no `SubagentStop`, so nothing records that it ran. It is
-obliged on every code change and enforced by nobody, which is the one
-remaining honour-system leg of this loop.
+All of it is advisory (ADR-0002): the agents run because they find
+things, and nothing refuses a merge over whether or when they ran. The
+one hard reviewer rule sits downstream, in what they *report*: an
+unresolved CRITICAL/HIGH `security` finding blocks `plan-gate` and the
+plan's close.
 
 "Code" is `PLAN_CODE_GLOBS` in `docs/skills/plan/scripts/lib.sh`, which
 is the authority. It is deliberately wider than Nix: the skill and repo
 scripts (`*/scripts/*`, `scripts/*`), the git hooks (`.githooks/*`), the
 hook wiring (`.claude/settings.json`), the agent and skill entries under
 `.claude/`, the agent definitions, `.sops.yaml` and `secrets/`, the CI
-workflows, `flake.lock`, `.gitignore` (which, through
-`--exclude-standard`, decides the fingerprint's own input set) and
-`.gitattributes` (`*.pem -diff` switches off the `pre-commit` secret
-scan) are all things a change to which weakens other gates more
-thoroughly than any module edit could. It is an allowlist, and it has
-three times been found to be missing something that met its own rule --
-the standing proposal to invert it is
-2026-09-06-invert-the-reviewable-code-set-from-an-allowlist-to-a-denylist.md.
-
-**What that does and does not buy.** Obliging review and moving the
-fingerprint is enforcement for anything the *repo's own* gates check --
-a `.claude/settings.json` edit that disables the stamp hook still faces
-a server-side missing-stamp block. It is **not** enforcement for the CI
-workflow itself: GitHub resolves a `pull_request` workflow from the PR's
-own ref, so a PR editing `.github/workflows/plan-gate.yml` runs its own
-version, and the required status context is satisfied by whatever job
-carries that name. Listing the workflow here means such a PR is reviewed
-and stamped, not that it is mechanically prevented. See
-2026-09-06-stop-a-pr-from-weakening-the-ci-gate-it-is-judged-by.md.
+workflows, `flake.lock`, `.gitignore` and `.gitattributes` (`*.pem
+-diff` switches off the `pre-commit` secret scan) are all things a
+change to which weakens other gates more thoroughly than any module
+edit could.
 
 Why mechanical: "invoke where relevant" ran on 12 of 89 plans while
 "`/simplify`, always" ran every time -- same skill, same agent, one
@@ -85,117 +69,53 @@ because a code change can invalidate a doc without touching it, which is
 the drift that matters most.
 `plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7`
 
-### Order, and the loop
+### Order
 
 Run them strictly one after another -- never two in the same parallel
 batch, even though the review agents are read-only and would seem safe to
 overlap:
 
 ```
-loop { /simplify -> docs-updater -> security -> spec-check -> fix }
-      until security and spec-check found nothing to fix,
-      or the user signed off
+/simplify -> docs-updater -> security -> spec-check -> apply what's worth applying
 ```
 
-**Every agent that writes runs before every agent whose stamp must stay
-valid.** `/simplify` and `docs-updater` edit; `security` and `spec-check`
-are read-only. Ordering them the other way is not merely untidy, it is
-unsatisfiable: `docs-updater` rewrites inline comments in `.nix` files and
-skill scripts, all of which the stamp fingerprint covers, so a
-`docs-updater` pass after `security` leaves `security`'s stamp stale by
-construction and `plan-gate` blocks on a task where nothing is actually
-wrong. A gate that goes red on the first honest attempt every time is the
-one people learn to route around.
-
-Each also needs to see the code *after* the previous one's fixes landed,
-which is why none of them run in parallel. A real session had `/simplify`
-land a refactor that was later reverted for an eval-time infinite
-recursion, while `docs-updater` ran concurrently and had already written
-the reverted design into the plan's Findings as settled fact -- leaving
-plan and code contradicting each other until hand-reconciled. That
-incident constrains `docs-updater` to follow `/simplify`; it says nothing
-about the read-only reviewers, so putting them last costs nothing it
-protects.
+**Every agent that writes runs before every agent that reads.**
+`/simplify` and `docs-updater` edit; `security` and `spec-check` are
+read-only, and each needs to see the code *after* the previous one's
+fixes landed. A real session had `/simplify` land a refactor that was
+later reverted for an eval-time infinite recursion, while `docs-updater`
+ran concurrently and had already written the reverted design into the
+plan's Findings as settled fact -- leaving plan and code contradicting
+each other until hand-reconciled.
 
 The two read-only reviewers stay serialized too, for a different reason:
 both append `### F<N>` findings to the same plan file, numbering from the
 next unused id. Run them concurrently and both pick the same number --
-duplicate headings `plan-lint` then rejects, on exactly the runs that
-matter, the ones with findings. If parallel tail reviewers are ever
-wanted, that is a design constraint on `spec-check`'s finding-append
-contract, to settle when `spec-check` is built
-(2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7),
-not a scheduling flag to flip.
+duplicate headings, on exactly the runs that matter, the ones with
+findings.
 
-**The fix stage is the pass's last step, not a detour.** Findings from
-`security` or `spec-check` are applied *after* both have reported, so a
-verdict always lands on a settled tree and a fix is never churned on
-unreviewed. A non-empty fix stage is what sends the loop back to
-`/simplify`; an empty one is the exit. It appears once, at the tail,
-because `/simplify` and `docs-updater` apply their own findings as part
-of running; the read-only reviewers cannot, and an unnamed handoff is one
-that gets skipped.
+**One pass, not a loop.** Apply the findings worth applying after both
+read-only reviewers have reported, park the rest with a note, and run a
+second pass only when the fixes were substantial enough to deserve fresh
+eyes. Never loop until zero findings: LLM reviewers have a floor rate of
+findings on any nontrivial surface, so "reviewers found nothing" is not
+a reachable exit -- the old design that used it as one livelocked and
+was stopped by hand (see ADR-0002 and
+2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md).
+The exit is the human's judgment, bounded by the one hard rule: a
+CRITICAL/HIGH `security` finding cannot be parked -- it ends fixed,
+accepted with the user's sign-off, or moot, before merge or close.
 
-Any actionable finding from `security` or `spec-check` **restarts the loop
-at `/simplify`** -- as does any other manual change the main agent makes
-after `/simplify` last ran to code or to anything functionally
-load-bearing: a skill script, a git hook, an agent definition (`.md` or
-not). Either way the behavior has moved past what
-the earlier agents saw, including `docs-updater`, whose description of the
-settled state is stale the moment the code moves again. `docs-updater`'s
-*own* doc and comment fixes never restart the loop by themselves: they
-change no behavior, so there is nothing new for `/simplify` or the
-reviewers to judge (decided with the user 2026-09-06, see
-2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7).
-The exception is mechanical rather than a judgment call: if `docs-updater`
-edits something inside `PLAN_CODE_GLOBS` -- an agent definition, a script
-comment -- the fingerprint moves and the reviewers must run again anyway,
-which is the same rule, not a second one.
+### Completion stamps
 
-Termination needs no new machinery. Every finding resolves `fixed`,
-`accepted` or `moot`, and `plan-freeze` already refuses while any is
-unresolved -- the loop's exit condition is the gate that already exists.
-If the same finding recurs across passes, seek the user's sign-off rather
-than looping again.
-
-### What a completion stamp proves
-
-`subagent-stamp` appends a stamp to the active plan when a stampable
-agent finishes, and `plan-gate` refuses a merge if an obliged agent left
-none. The stamp carries a **fingerprint of the code the agent read** --
-a content hash over the same `PLAN_CODE_GLOBS` set the trigger table
-above names -- and `plan-gate` blocks when it no longer matches. That is
-what separates "this agent ran" from "this agent ran against *this*
-code": a fix applied after the agent finished leaves a stale stamp and
-is caught.
-
-The line the set draws is **behavior, not file extension**. Plan files
-and explanatory docs stay out: every stamp appends to a plan file and
-`docs-updater` edits docs, so folding prose in would make each stamp
-invalidate itself and every stamp before it. Agent definitions are in
-even though they are `.md`, because an agent definition is what a
-reviewer does, not a description of it.
-
-**What a stamp is not.** It is a record, not proof. `SubagentStop` fires
-for any subagent of that type whatever it actually did, so a no-op prompt
-produces an identical valid stamp; and the line is plaintext in a file the
-author controls, so one `printf` forges one. That is fine against the
-adversary this system has -- an agent that forgets a step -- and worth
-nothing against one that lies. Real attestation would need a signature
-from something the author does not control, which a local hook cannot be.
-
-Consequence for the loop: re-running an agent after a code change is not
-etiquette, it is how the merge passes.
-
-**Worktree sessions stamp with the main checkout's scripts.** Hooks
-appear to resolve through the session's original project directory (the
-effect is confirmed, the mechanism inferred), so a PR that changes
-`subagent-stamp` (or any hook script) is never exercised by the sessions
-developing it -- its stamps carry whatever format the main checkout's
-copy writes, and older formats read as `legacy` NOTEs to the gate. That
-is expected, not a failure. After merging a hook-script PR, pull the
-main checkout before trusting the new hook behavior (see
-2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F12).
+`subagent-stamp` still appends a timestamped, code-fingerprinted stamp to
+the active plan when `security` or `docs-updater` finishes. Stamps are
+provenance -- they record that an agent ran and what tree it saw -- and
+nothing blocks on them. A stamp is a record, not proof: `SubagentStop`
+fires whatever the subagent actually did, and the line is plaintext in a
+file the author controls. That was always true; the old gate that treated
+stamps as locks bought no attestation for its blocking, which is part of
+why it went.
 
 ### The agents themselves
 

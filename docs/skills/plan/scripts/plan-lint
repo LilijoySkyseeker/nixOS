@@ -47,19 +47,18 @@ folder="$(basename "$(dirname "$rel")")"
 status="${fm_val[status]:-}"
 [ "$status" = "$folder" ] || report "frontmatter status '$status' does not match folder '$folder'"
 
-# The manifest decides, not the file's own self-declared `frozen:` field;
-# written only by plan-freeze and plan-repair, enforced by
-# .githooks/pre-commit. A disagreement is reported in either direction.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F11
+# The folder decides, not the file's own self-declared `frozen:` field --
+# the field is an informational marker plan_do_freeze sets on the way into
+# done/ or rejected/. A disagreement is reported in either direction.
 frozen_field="${fm_val[frozen]:-}"
-if plan_manifest_frozen "$root" "$rel"; then
+if plan_folder_frozen "$rel"; then
   frozen=1
   [ "$frozen_field" = "true" ] ||
-    report "frontmatter says frozen '$frozen_field' but $PLAN_CHECKSUMS_RELPATH records this file as frozen"
+    report "frontmatter says frozen '$frozen_field' but the file sits under done/ or rejected/, which is what frozen means"
 else
   frozen=0
   [ "$frozen_field" != "true" ] ||
-    report "frontmatter says 'frozen: true' but $PLAN_CHECKSUMS_RELPATH has no entry -- only plan-freeze may freeze a plan"
+    report "frontmatter says 'frozen: true' outside done/ and rejected/ -- only plan-move/plan-reject may freeze a plan, by moving it"
 fi
 
 # schema-era rules, sections and D4 fields alike, run only where the file can

@@ -1,8 +1,8 @@
 ---
 slug: make-the-fingerprint-cover-symlinks-not-just-their-targets
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -108,3 +108,5 @@ produces a stable value across locales, per
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: the fingerprint is provenance only, nothing blocks on it -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md (ADR-0002)

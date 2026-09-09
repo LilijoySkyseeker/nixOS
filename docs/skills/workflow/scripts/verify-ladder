@@ -3,14 +3,15 @@
 # the mechanical half of its rung 3 (eval, targeted build). Passing does
 # not reach rung 3, which is earned by reading the output. Wired in as a
 # hard gate in the `workflow` skill's own step sequence instead of left to
-# memory. Hard-blocks on plan-citations, gate-tests, the freeze manifest's
-# own entries, plan-lint over the active plan, nixfmt --check, nix flake
-# check, a targeted nixos-rebuild build, and statix/deadnix -- but only for
-# *newly introduced* warnings (line falls inside the actual diff), never
-# pre-existing debt elsewhere in a touched file; linting a whole file over
-# a one-line edit would otherwise block on unrelated history. Requires jq
-# for the diff-scoped precision; falls back to informational-only if jq is
-# missing.
+# memory. Hard-blocks on gate-tests, a working-tree edit to a frozen plan,
+# nixfmt --check, nix flake check, a targeted nixos-rebuild build, and
+# statix/deadnix -- but only for *newly introduced* warnings (line falls
+# inside the actual diff), never pre-existing debt elsewhere in a touched
+# file; linting a whole file over a one-line edit would otherwise block on
+# unrelated history. plan-citations and plan-lint run warn-only
+# (2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D4).
+# Requires jq for the diff-scoped precision; falls back to
+# informational-only if jq is missing.
 # Independent of the tabled vm-testing question -- never VM-boots or
 # switches anything.
 set -uo pipefail
@@ -32,18 +33,16 @@ changed_nix="$(plan_worktree_files '*.nix' | plan_existing_files)" || {
   exit 1
 }
 
-echo "== plan-citations =="
+echo "== plan-citations (warn-only) =="
 # Cheap (one awk pass over the working tree's code and docs, tracked and
 # untracked), so it runs on every pass rather than only when a plan file
 # changed: a citation breaks from the *target* side -- a renamed plan or
 # a retyped id -- and that edit need not touch the file doing the citing.
-# Called unconditionally: unlike plan-gate, which CI runs from a pinned
-# base-branch copy that may predate a sibling, verify-ladder always ships
-# from the same checkout as plan-citations. An existence check here could
-# only ever fire on a broken checkout, and would hide it behind a pass.
+# Warns, never blocks: a dangling citation in a personal knowledge base is
+# a broken link, not a build failure.
+# plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D4
 if ! "$SCRIPT_DIR/../../plan/scripts/plan-citations"; then
-  echo "BLOCKED: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
-  fail=1
+  echo "WARNING: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
 fi
 
 echo "== gate-tests =="
@@ -63,43 +62,32 @@ if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
   fail=1
 fi
 
-echo "== freeze manifest =="
-# Nothing else runs `sha256sum -c` over the manifest: plan-lint reads only the
-# active plan, and .githooks/pre-commit checks only entries whose file is
-# staged, so a frozen plan altered without staging reached no gate. Coverage
-# as well as content: every file in done/ and rejected/ must have an entry,
-# or dropping one would leave nothing to verify and still pass.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F57
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F60
-manifest_problem="$(plan_manifest_problem "$root")"
-if [ -n "$manifest_problem" ]; then
-  echo "BLOCKED: $manifest_problem" >&2
-  echo "Restore it from git rather than re-freezing -- a re-freeze records whatever the file says now." >&2
+echo "== frozen plans =="
+# Folder is the authority (see plan_folder_frozen): a working-tree edit to
+# anything under done/ or rejected/ is flagged here so it surfaces before
+# the commit-time hook refuses it. Tracked changes only -- an untracked
+# file under done/ is an addition, which freezing allows.
+frozen_dirty="$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=MDT HEAD -- 'docs/plans/done/*.md' 'docs/plans/rejected/*.md')"
+if [ -n "$frozen_dirty" ]; then
+  echo "BLOCKED: frozen plan(s) modified in the working tree -- new information becomes a new plan file that cites them:" >&2
+  echo "$frozen_dirty" >&2
   fail=1
 else
-  echo "$PLAN_CHECKSUMS_RELPATH: $(grep -c . "$root/$PLAN_CHECKSUMS_RELPATH") frozen plan(s) verify."
+  echo "(no frozen plan modified)"
 fi
 
-echo "== plan-lint (active plan) =="
-# The active plan only. Structural faults it catches -- duplicate or
-# non-sequential D/G/F ids, a Progress line citing a heading that does
-# not exist -- are what two agents appending findings concurrently
-# produce, so the serialization rule in reference.md depends on something
-# actually running this.
+echo "== plan-lint (active plan, warn-only) =="
+# The active plan only. Warns, never blocks: the D/G/F structure is the
+# house convention, not a gate, per the dismantle plan's refined D5.
 if active_plan="$(plan_active_plan)"; then
   if ! "$SCRIPT_DIR/../../plan/scripts/plan-lint" "$active_plan"; then
-    echo "BLOCKED: the active plan is malformed. See the problems above." >&2
-    fail=1
+    echo "WARNING: the active plan has lint problems. See above." >&2
   fi
 elif marker_problem="$(plan_active_plan_problem)"; [ -n "$marker_problem" ]; then
   # A marker naming nothing usable is not the same as no marker, and
-  # plan_active_plan returns 1 for both. A plan deleted or renamed after
-  # plan-new wrote the marker left this pointing at a missing file, and the
-  # lint was skipped under a line that reads like a clean pass -- observed,
-  # not hypothetical.
+  # plan_active_plan returns 1 for both.
   # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
-  echo "BLOCKED: $marker_problem. Fix or remove the marker." >&2
-  fail=1
+  echo "WARNING: $marker_problem. Fix or remove the marker." >&2
 else
   echo "(no active plan this session)"
 fi

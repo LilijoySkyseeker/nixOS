@@ -1,7 +1,7 @@
 ---
 name: plan
 description: Conventions and scripts for creating, updating, and closing citeable plan files under docs/plans/{todo,in-progress,done,rejected}/ -- the repo's replacement for TODO.md/docs/DONE.md. Use whenever creating a new plan, recording a decision/gotcha/finding, ticking progress, moving a plan between todo/in-progress/done, or rejecting/abandoning one.
-allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/plan-new *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-move *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-decide *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-carry *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-freeze *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-tick *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-reject *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-resolve *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-lint *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-repair *)
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/plan-new *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-move *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-decide *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-carry *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-freeze *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-tick *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-reject *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-resolve *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-lint *)
 ---
 
 Read `reference.md` in this skill's directory for the full citation-ID
@@ -24,27 +24,25 @@ pass.
 | Script | Purpose |
 |---|---|
 | `plan-new "<title>"` | Create a new plan in `docs/plans/todo/`. Prints its path. |
-| `plan-move <file> in-progress\|done` | Move between folders. Moving to `done` auto-freezes (below) and refuses if any decision or finding is unresolved, or if `## State` is missing, empty, or has no paragraph *opening* with the fixed phrase `Verified to rung <N>` (see `docs/procedures/testing-changes.md`, "Declaring the rung"). |
+| `plan-move <file> in-progress\|done` | Move between folders. Moving to `done` auto-freezes (below) and refuses if `## State` is missing, empty, or has no paragraph *opening* with the fixed phrase `Verified to rung <N>` (see `docs/procedures/testing-changes.md`, "Declaring the rung"), or if a CRITICAL/HIGH security finding is unresolved. Open decisions and ordinary findings warn but do not block (ADR-0002). |
 | `plan-decide <file> D<N> answered\|discussed\|deferred "<note>"` | Record a decision's status. Only `answered` (from an actual user confirmation) or a `deferred`-then-`plan-carry`'d item let the plan later freeze -- `discussed` alone does not. |
 | `plan-resolve <file> F<N> fixed\|accepted\|moot "<note>"` | Record a finding's resolution. Exactly mirrors `plan-decide` for findings -- see "The three finding states" in `reference.md`. |
 | `plan-carry <file> D<N> ["<new title>"]` | Spin a `deferred` decision into a brand-new `docs/plans/todo/` plan, so it resurfaces as backlog instead of disappearing into a frozen file. |
-| `plan-freeze <file>` | Called automatically by `plan-move ... done`. Marks the file permanently un-editable and records its checksum. Refuses if already frozen, if any decision or finding is unresolved, if `## State` is missing/empty, if `## State` carries no `Verified to rung <N>` declaration, or if `plan-lint` reports the file malformed — freezing makes a structural fault permanent. `plan-reject` applies the same lint for the same reason. |
+| `plan-freeze <file>` | Called automatically by `plan-move ... done`. Sets `frozen: true` (informational -- residence in `done/`/`rejected/` is what actually freezes, enforced by `pre-commit`, `verify-ladder` and `plan-gate`). Same hard gates and warnings as `plan-move ... done` above. |
 | `plan-tick <file> <D\|G\|F><N>` | Check off that ID's line in the Progress section. |
-| `plan-lint <file>` | Read-only structural check. Era-independent rules run on every plan: core frontmatter, status against folder, sequential/non-duplicate D/G/F ids, and that every Progress citation resolves to a real heading. Schema-era rules -- the required section set, the `## State`-first order, and the `kind`/`priority`/`blocked_by` fields -- run only on a plan the checksum manifest does not record as frozen, because a frozen file can never be edited to satisfy them (the manifest, not the file's own `frozen:` field, since only `plan-freeze` and `plan-repair` write the manifest) (see `reference.md`, "Which files the schema rules apply to"). Run as a blocking gate by the `workflow` skill's `verify-ladder` against the active plan; run it yourself when unsure any other plan is well-formed. |
-| `plan-repair <file>` | Adds the **one** section it knows about -- `## State`, plus a dated note saying it was added -- to an already-frozen plan that lacks it, and re-records its checksum. Takes no section argument: widening what it can insert is a decision, not a flag. The one script permitted to write into a frozen file, so it is deliberately narrow: it refuses a plan that is not frozen, and refuses one that already has the section, which means it can only ever add a heading nobody wrote. Exists because 27 `done/` plans were frozen before `## State` existed and had no legal way to gain one. |
-| `plan-reject <file> "<reason>"` | For work started and then abandoned or superseded. Moves a `todo/`/`in-progress/` plan to `docs/plans/rejected/` and freezes it. Unlike `plan-move ... done`, does **not** require decisions or findings to be resolved -- abandoning the work legitimately moots open questions. A reason is mandatory instead. Still runs `plan-lint`, like `plan-freeze` -- `rejected/` is as permanent as `done/`. |
+| `plan-lint <file>` | Read-only structural check, **warn-only** everywhere it runs (verify-ladder runs it on the active plan every pass). Era-independent rules run on every plan: core frontmatter, status against folder, sequential/non-duplicate D/G/F ids, and that every Progress citation resolves to a real heading. Schema-era rules -- the required section set, the `## State`-first order, and the `kind`/`priority`/`blocked_by` fields -- run only on a non-frozen plan (folder decides), because a frozen file can never be edited to satisfy them. |
+| `plan-reject <file> "<reason>"` | For work started and then abandoned or superseded. Moves a `todo/`/`in-progress/` plan to `docs/plans/rejected/` and freezes it. Does **not** require decisions or findings to be resolved -- abandoning the work legitimately moots open questions. A reason is mandatory instead. |
 
 Every script exits non-zero and prints a clear reason on failure -- read
-the message, don't guess. All of them refuse to touch a frozen file --
-except `plan-repair`, which only ever operates on one and can only add a
-section that is absent.
+the message, don't guess. All of them refuse to touch a frozen file
+(anything under `done/` or `rejected/`).
 
 ## Never hand-edit these mechanics
 
 Don't hand-write `frozen: true`, hand-move a file with `mv`/`git mv`, or
 hand-write an `**ANSWERED/DISCUSSED/DEFERRED**` or
 `**FIXED/ACCEPTED/MOOT**` marker -- always go through the scripts above, so
-the checksum manifest and the freeze/decision/finding gates stay correct.
+the freeze/decision/finding records stay correct.
 Free-text edits (the actual plan content, new `###` entries,
 `~~strikethrough~~` corrections, and the `## State` section -- see below)
 are exactly what you're expected to write by hand; only the

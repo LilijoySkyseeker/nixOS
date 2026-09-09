@@ -1,8 +1,8 @@
 ---
 slug: make-plan-gate-survive-a-pr-that-changes-the-fingerprint-algorithm-or
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -99,3 +99,5 @@ while a genuinely stale stamp still blocks.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: plan-gate no longer reads fingerprints -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md (ADR-0002)

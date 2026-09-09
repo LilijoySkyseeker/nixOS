@@ -1,8 +1,8 @@
 ---
 slug: make-the-frozen-plan-guard-survive-renames-and-stop-self-certifying
 created: 2026-09-06
-status: todo
-frozen: false
+status: rejected
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -92,3 +92,5 @@ since each is a two-line reproduction.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**REJECTED 2026-09-09:** superseded: the checksum manifest is gone; frozen-by-residence with --no-renames handles the rename case -- 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D2
