@@ -49,7 +49,7 @@ fi
 echo "== gate-tests =="
 # The gates' own failure-mode tests, run unconditionally for the same
 # reason plan-citations is: a gate breaks from the *library* side, so the
-# edit that breaks it need not touch the script being tested. ~1.7s, no
+# edit that breaks it need not touch the script being tested. ~2.1s, no
 # network, scratch repos under TMPDIR.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
 #

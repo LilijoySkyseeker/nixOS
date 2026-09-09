@@ -99,5 +99,8 @@ do not silently pick an interpretation and rewrite past it.
   are consulted if the change is structural enough to require an update
   there.
 - Every new plan citation you write uses the bare-filename+anchor form.
-- You never edit a frozen (`docs/plans/done/`) plan file, even to add a
-  finding -- report the problem instead if you believe one needs updating.
+- You never edit a frozen plan file, even to add a finding -- report the
+  problem instead if you believe one needs updating. Frozen means recorded
+  in `docs/plans/.checksums`, which covers `rejected/` exactly as it covers
+  `done/`
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F61).

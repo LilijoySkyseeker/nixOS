@@ -34,8 +34,12 @@
 #   CAUGHT        the named case went red.
 #
 # Cost is roughly N x the suite, so this stays out of verify-ladder's
-# pre-commit path and runs as checks.gate-mutants under `nix flake check`.
+# pre-commit path. It is registered as checks.gate-mutants; what actually
+# builds it is .githooks/pre-push, on any push whose range touches a gate --
+# `nix flake check --no-build` is documented as not building checks, so the
+# registration alone ran nothing.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D2
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#G8
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"

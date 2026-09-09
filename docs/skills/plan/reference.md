@@ -244,7 +244,10 @@ entry, so setting `frozen: false` by hand buys nothing
 Three things guard the manifest itself. `pre-commit` refuses a commit
 that stages its deletion, stages it as anything but a regular file, or
 drops an entry for a plan that is not itself being deleted.
-`plan_record_checksum` refuses any write that would lose a path.
+`plan_record_checksum` refuses any write that would lose a path, and
+refuses to record an entry at all for a file it cannot hash -- an empty
+hash would otherwise read as covered and frozen while matching nothing
+(2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F78).
 `verify-ladder` checks three properties on every pass through
 `plan_manifest_problem`: the manifest is non-empty, every entry's file
 still hashes to what it records, and every file in `done/` and `rejected/`

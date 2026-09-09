@@ -4178,3 +4178,111 @@ read, no file outside this plan was written, and no host was rebuilt.
 _security finished 2026-09-09T18:28:51Z (code 330be557084f24d8) -- see Findings above._
 
 **FIXED 2026-09-09:** plan_checksum checks sha256sum's status rather than returning awk's, and plan_record_checksum refuses rather than writing an entry with no hash
+
+### F79 — every doc claim about `pre-push`'s trigger set and both harness counts went stale again inside this range, and nothing yet said `plan_record_checksum` can refuse
+
+- **File:** `docs/procedures/testing-changes.md:186-196,222-226,244,274-278`,
+  `docs/GIT_WORKFLOW.md:70-72`, `docs/skills/plan/reference.md:246-249`.
+- **Severity:** LOW
+- **Confidence:** CONFIRMED — every number re-measured in this pass rather
+  than read off the diff: `./scripts/gate-tests` prints `136 passed, 0
+  failed, 4 recorded residue(s)` in 2.11s real; `./scripts/gate-mutants`
+  prints `60 caught, 0 escaped, 0 inert, 0 broken, 0 unknown` in 17.06s
+  real, `nproc` 16.
+- **Axis:** documentation
+- **Reachability:** `testing-changes.md` is the doc `verify-ladder` and
+  `pre-push` point a reader at when they block, and it named a trigger set
+  two paths short of the one `.githooks/pre-push:63` actually uses. A
+  reader trusting it would conclude that editing only
+  `tests/gate-script-check.nix` or `modules/flake/gate-checks.nix` — the
+  check derivation and its registration, i.e. exactly the files that decide
+  *how* the catalogue runs — skips the mutation build, which `#F74` closed.
+  The same doc gave 128 assertions against a suite that runs 136, and 56
+  mutants against a catalogue of 60.
+- **Rule:** n/a
+- **Finding:** fixed directly, docs-only, no script touched. (1) both
+  `pre-push` bullets (`testing-changes.md`, `GIT_WORKFLOW.md`) now name all
+  five trigger paths and say why the last two are in the set, citing
+  `#F74`; (2) `testing-changes.md`'s `pre-push` bullet gained the
+  new-branch case `#F73` created — the hook takes the merge base with
+  `origin/master` and refuses the push outright rather than deciding either
+  build set from a merge-base it could not compute, which is a `BLOCKED`
+  message a reader can now hit and previously could not have looked up;
+  (3) the `gate-mutants` bullet no longer restates the trigger paths in its
+  own words, which is how they drifted — it points at the `pre-push` bullet
+  above it, so there is one spelling of that set in the doc; (4) counts
+  corrected to 136 assertions / 60 entries / 17.0s; (5) the `gate-tests`
+  coverage list gained `.githooks/pre-push`'s choice of what to build (a
+  new section of three assertions) and `lib.sh`'s checksum helper, both of
+  which the suite now covers and the list did not name; (6)
+  `reference.md`'s manifest-guard paragraph records that
+  `plan_record_checksum` also refuses to record an entry for a file it
+  cannot hash — before `#F78` it could not fail, and the paragraph read as
+  though it still could not.
+- **Fix risk:** none; `docs/**/*.md` is outside `plan_code_fingerprint`, so
+  this pass costs no review stamp.
+
+
+**FIXED 2026-09-09:** the four stale docs were corrected in the pass that found them: pre-push's trigger set was two paths short, its new-branch refusal was undocumented, gate-mutants' bullet restated the trigger paths in its own words rather than pointing at the one spelling, and both counts were stale
+
+### F80 — `verify-ladder`'s gate-tests timing note and `gate-mutants`' header both predate the runners they describe, and neither is worth a fingerprint cycle on its own
+
+- **File:** `docs/skills/workflow/scripts/verify-ladder:52`,
+  `scripts/gate-mutants:36-37`.
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** documentation
+- **Reachability:** neither misleads a reader into a wrong action, which is
+  why this is a finding rather than an edit. `verify-ladder:52` says the
+  suite costs `~1.7s`; it now costs 2.11s, measured, and
+  `testing-changes.md` already carries the accurate figure with the
+  explicit note that it is knowingly over the one-second budget.
+  `gate-mutants:36-37` says the catalogue "stays out of verify-ladder's
+  pre-commit path and runs as `checks.gate-mutants` under `nix flake
+  check`" — true, but written before `#F68` made `.githooks/pre-push` the
+  thing that actually builds that check, so the header names the
+  registration and not the runner.
+- **Rule:** `docs/style-guide.md`, "Inline comments".
+- **Finding:** not fixed here, deliberately. Both files are inside
+  `plan_code_fingerprint`'s covered set (`*/scripts/*`, `scripts/*`), so
+  either edit invalidates every review stamp and restarts a loop that is
+  otherwise converging, and neither claim is load-bearing: one is an
+  approximate cost note off by 0.4s, the other is incomplete rather than
+  wrong. Fold both into the next commit that opens those files for a real
+  reason — `~1.7s` to `~2.1s`, and one clause naming `pre-push` as the
+  runner.
+- **Fix risk:** none to behaviour; the cost is one more review cycle, which
+  is the whole reason to defer.
+
+
+**FIXED 2026-09-09:** fixed rather than deferred: plan-gate blocks on unresolved findings as well as on stale stamps, so deferring one is not available without the user's ACCEPTED sign-off. verify-ladder's cost note is 2.1s, and gate-mutants' header now names .githooks/pre-push as what builds it rather than only the registration
+
+### F81 — `docs/agents/docs-updater.md`'s rubric still glosses "frozen" as `docs/plans/done/`, which is the gloss `#F71` corrected 86 lines above it
+
+- **File:** `docs/agents/docs-updater.md:102` (rubric), against `:16-19`
+  (the same file's own, correct, statement).
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** documentation
+- **Reachability:** `#F71` fixed the brief's step 2 to say frozen means
+  recorded in `docs/plans/.checksums`; the rubric at the end of the same
+  file still says "a frozen (`docs/plans/done/`) plan file". `plan-reject`
+  freezes into `docs/plans/rejected/` and records a manifest entry there
+  the same way, so an agent reading only the rubric could conclude a
+  `rejected/` plan is fair game. The consequence is bounded — the writer
+  guards and `.githooks/pre-commit` both refuse on the manifest entry, so
+  the attempt fails at the gate rather than succeeding — which is why this
+  is INFO and not a defect.
+- **Rule:** n/a
+- **Finding:** not fixed here. `docs/agents/*` is inside
+  `plan_code_fingerprint`, and this is one parenthetical that contradicts
+  nothing a gate enforces, in a file whose authoritative sentence is
+  already correct. The wording, when that file is next opened: "a frozen
+  plan file (one with an entry in `docs/plans/.checksums`)".
+- **Fix risk:** none to behaviour; the cost is one more review cycle.
+
+_docs-updater finished — see Findings above._
+
+_docs-updater finished 2026-09-09T18:39:29Z (code be8abf6465e53739) -- see Findings above._
+
+**FIXED 2026-09-09:** the rubric gloss now says frozen means recorded in docs/plans/.checksums, which covers rejected/ exactly as it covers done/

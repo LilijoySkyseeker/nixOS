@@ -184,9 +184,16 @@ of operations — chronology, not evidence:
   `hosts/<name>/README.md` still triggers a real build — the hook
   matches by path prefix, not by file extension. A second, separate diff
   decides one more thing: if the pushed range touches `scripts/`,
-  `docs/skills/` or `.githooks/`, the hook also builds
-  `checks.gate-mutants` (below) before letting the push through
-  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68).
+  `docs/skills/`, `.githooks/`, `tests/` or `modules/flake/` — the last
+  two because that is where the check derivation and its registration
+  live — the hook also builds `checks.gate-mutants` (below) before
+  letting the push through
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F68,
+  2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F74).
+  Both diffs need a range: pushing a new branch, the hook takes the merge
+  base with `origin/master`, and refuses the push outright rather than
+  deciding either build set from a merge-base it could not compute
+  (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73).
 - **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
   skill's step-4 hard gate for any non-trivial agentic change, run
   before commit rather than at push time. Runs four repo-level gates
@@ -221,9 +228,10 @@ of operations — chronology, not evidence:
   `plan-lint`, `plan-freeze`'s lint gate, `plan-repair`, the frozen-plan
   guard shared by all six plan writers — `plan-move`, `plan-reject`,
   `plan-decide`, `plan-resolve`, `plan-tick`, `plan-carry` —
-  `.githooks/pre-commit`, and `lib.sh`'s fingerprint, file-listing,
-  rung-declaration, frontmatter, heading, active-plan-marker and
-  freeze-manifest helpers).
+  `.githooks/pre-commit`, `.githooks/pre-push`'s choice of what to
+  build, and `lib.sh`'s fingerprint, file-listing, rung-declaration,
+  frontmatter, heading, checksum, active-plan-marker and freeze-manifest
+  helpers).
   Three kinds of check: enumerated broken environments, invariants over
   generated plan text (rewrap and re-decorate a `## State`, require the
   verdict not to move), and a sabotage sweep that fails the Nth `git`
@@ -233,7 +241,7 @@ of operations — chronology, not evidence:
   reach a particular failure asserts that it can, under its own name:
   three guards here once passed because `git mv` failed for reasons that
   had nothing to do with the gate. Hermetic, network-free, scratch repos
-  under `$TMPDIR`; 128 assertions, measured 2.1s, knowingly over the
+  under `$TMPDIR`; 136 assertions, measured 2.1s, knowingly over the
   one-second budget and recorded as such rather than kept under it by
   dropping cases. This is what rung 3 looks like for a change with no
   closure to build. Read
@@ -263,11 +271,11 @@ of operations — chronology, not evidence:
   escape), `INERT` (the mutation matched nothing and measured nothing),
   `BROKEN` (the mutant no longer parses, so its red cases say nothing
   about the defect), and `ESCAPED`, which is the finding. Costs roughly
-  N× the suite — 56 entries, measured 15.6s across 16 jobs — so it is not
+  N× the suite — 60 entries, measured 17.0s across 16 jobs — so it is not
   in `verify-ladder`'s pre-commit path. It is the slow tier: it runs as
   `checks.gate-mutants` under `nix flake check`, and the `pre-push` hook
-  builds that check when the pushed range touches `scripts/`,
-  `docs/skills/` or `.githooks/`, which is the only thing that actually
+  builds that check when the pushed range touches one of the five paths
+  listed under that hook above, which is the only thing that actually
   builds it before a push. Run it by hand
   (`./scripts/gate-mutants`, or `nix build .#checks.x86_64-linux.gate-mutants`)
   when you touch a gate script or add a case.
