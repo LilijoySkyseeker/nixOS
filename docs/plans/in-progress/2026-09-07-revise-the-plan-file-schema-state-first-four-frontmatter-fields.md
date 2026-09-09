@@ -212,6 +212,91 @@ asserts the contract rather than which line enforced it. They are
 equivalent mutants, not coverage gaps — the fix was to write the entry at
 the contract's granularity, stripping every guard at once.
 
+### Pick-up point, 2026-09-09 — handoff for a fresh, uncommitted assessment
+
+**Read this section knowing who wrote it.** Everything below was written by
+the agent that built most of the machinery it is describing. That agent has
+an obvious stake in concluding the machinery is worth keeping. The numbers
+are all independently checkable and the commands to check them are given;
+check them rather than believing them, and treat every judgement here as a
+claim to test, not a finding to inherit.
+
+**The question the user is asking is not "what next".** It is whether this
+whole apparatus is a ball of mud, whether it should be rethought from first
+principles, whether it should merely be improved, or some combination. That
+question is genuinely open, and this plan's own record contains strong
+evidence on both sides.
+
+**What exists now.** A plan-file system (`docs/plans/`, 102 files, 50
+frozen) and a workflow-gate system enforcing it: `plan-new/-lint/-move/`
+`-freeze/-reject/-repair/-carry/-tick/-decide/-resolve/-citations`,
+`plan-gate`, `required-agents`, `subagent-stamp`, `verify-ladder`,
+`plan-touch-guard`, `footer-guard`, `fresh-branch-guard`, `mark-trivial`,
+three git hooks, two flake checks, `scripts/gate-tests` (136 assertions)
+and `scripts/gate-mutants` (60 mutants, which measures whether gate-tests
+detects anything).
+
+**The measurements, and they are the case for reassessment.**
+
+- **Gate machinery: 5,140 lines. Workflow docs: 1,393. The NixOS fleet all
+  of it guards: 9,414 lines.** Roughly two lines of apparatus for every
+  three lines of the thing it exists to protect.
+  `wc -l scripts/gate-* docs/skills/*/scripts/* .githooks/*` against
+  `find hosts modules -name '*.nix' | xargs wc -l`.
+- **This branch is 15 commits and changed 2,635 lines of gate machinery,
+  6,277 lines of plan prose, and *zero* lines of fleet config.**
+  `git diff --numstat cfe6106..HEAD`.
+- **56 of this plan's 81 findings are defects in the gate machinery
+  itself**, not in anything it guards.
+- **This one plan file is 4,288 lines.** There are 255 findings across the
+  non-frozen corpus.
+- **52 non-frozen plans are outstanding** (41 `todo/`, 11 `in-progress/`):
+  backups, ZFS restructuring, fleet log monitoring, a security audit,
+  `/srv` permissions. None of it advanced this session.
+- **Per-commit cost:** `verify-ladder` ~25s, and `pre-push` builds five
+  hosts plus a 17s mutation run.
+
+**The case on the other side, stated as strongly.** The gates found real
+defects that nothing else would have: `plan-gate` — the only gate CI runs —
+took frozenness from a field a plan writes about itself, so any plan could
+switch off its own review (`#F61`); `pre-push` swallowed `git merge-base`'s
+status, so on a new-branch push *no host was built at all* (`#F73`); a
+frozen plan named with a space never matched its own manifest entry and
+could be edited freely (`#F77`); several paths destroyed the freeze
+manifest while reporting success (`#F54`). `gate-mutants` also found dead
+code — a check that could never fire (`#F60`) — which is the measurement
+working in reverse. Whether those defects were worth their discovery cost
+depends entirely on what the apparatus is *for*, which is the thing to
+settle first.
+
+**One structural fact, because it is not an opinion and it decides a lot.**
+`plan-gate` blocks on stale review stamps *and* on unresolved findings. A
+finding therefore cannot be parked: it must end FIXED, MOOT, or ACCEPTED,
+and ACCEPTED needs the user's own sign-off. So *any* finding forces a code
+change, which re-stales both stamps, which forces another review round. The
+loop is a designed-in livelock, and it was observed live: three rounds
+found 11, then 10, then 3 findings, and round 4's two remaining items were
+a cost comment 0.4s out of date and an incomplete gloss — both of which
+still had to be fixed, because parking them would have blocked the merge
+just as the stale stamps did. **The user stopped the loop rather than let
+it continue.** PR #69 is open and red on exactly this.
+
+**Do not assume the answer is "delete it".** The corpus is 102 plan files
+holding real, hard-won operational knowledge — a fleet security audit, a
+USB/UAS data-corruption investigation, ZFS layout decisions. Whatever
+happens to the *gates*, that record has value independent of them, and any
+proposal should say what becomes of it.
+
+**Where the work actually stands.** Branch
+`worktree-map-child-2-plan-file-layout`, HEAD `91990d6`, pushed. Tree
+clean, `verify-ladder` green, `gate-tests` 136/0/4, `gate-mutants` 60
+caught / 0 escaped, all 50 frozen checksums verify, zero unresolved
+findings, zero open decisions, zero open Progress items. CI is red on two
+stale stamps and nothing else. Three ways out were offered and none chosen:
+merge past the check, close the plan (which needs the rung declaration
+corrected first — it claims the diff contains no `.nix` file, and it adds
+two), or sign off on the stamps.
+
 ### Pick-up point, 2026-09-08 (after the checks.* wiring)
 
 **`#D2` is built.** `checks.gate-tests` and `checks.gate-mutants` both exist,
