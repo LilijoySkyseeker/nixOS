@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=../../plan/scripts/lib.sh
 . "$SCRIPT_DIR/../../plan/scripts/lib.sh"
 
-root="$(plan_repo_root)"
+root="$(plan_repo_root)" || exit 1
 cd "$root" || plan_die "cannot cd to repo root"
 
 if [ $# -ge 1 ]; then

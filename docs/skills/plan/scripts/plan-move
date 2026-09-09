@@ -16,8 +16,8 @@ case "$target" in
   *) plan_die "target must be 'in-progress' or 'done', got '$target'." ;;
 esac
 
-root="$(plan_repo_root)"
-rel="$(plan_locate "$arg" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$arg" "$root")" || exit 1
 plan_require_not_frozen "$root/$rel"
 
 base="$(basename "$rel")"
@@ -46,14 +46,25 @@ $unresolved_f"
   [ -n "$rung_problem" ] && plan_die "cannot move to done/ -- $rung_problem"
 fi
 
-git -C "$root" mv "$rel" "$new_rel"
+# Checked, for the same reason plan-reject's is: an unchecked mv left the
+# plan where it was while the script went on to rewrite the frontmatter of a
+# path that does not exist, mark it touched, and -- for `done` -- exec
+# plan-freeze over it, exiting 0 the whole way.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F47
+git -C "$root" mv "$rel" "$new_rel" ||
+  plan_die "cannot move $rel to $new_rel -- nothing else was done; re-run once the move can succeed."
 plan_set_field "$root/$new_rel" status "$target"
 plan_mark_touched "$root" "$new_rel"
 
+# Checked, both arms: the move has already happened by this point, so a
+# failed stage leaves the plan in its new folder and out of the index while
+# the script says it succeeded -- and for `done` it then execs plan-freeze,
+# which records a checksum for a file the commit will not carry.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F47
+git -C "$root" add "$new_rel" ||
+  plan_die "$rel was moved to $new_rel but could not be staged; stage it before committing."
 if [ "$target" = "done" ]; then
-  git -C "$root" add "$new_rel"
   exec "$SCRIPT_DIR/plan-freeze" "$new_rel"
 else
-  git -C "$root" add "$new_rel"
   echo "$new_rel"
 fi

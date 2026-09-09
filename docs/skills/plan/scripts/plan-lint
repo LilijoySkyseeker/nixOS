@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SCRIPT_DIR/lib.sh"
 
 [ $# -eq 1 ] || { printf 'usage: plan-lint <path-or-filename>\n' >&2; exit 1; }
-root="$(plan_repo_root)"
-rel="$(plan_locate "$1" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$1" "$root")" || exit 1
 file="$root/$rel"
 problems=0
 report() { printf '%s\n' "$1"; problems=$((problems + 1)); }

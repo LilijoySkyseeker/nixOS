@@ -989,9 +989,15 @@ else
     "the sabotage shim cannot see these calls: $path_git_violations"
 fi
 
+# Set to a function name for a gate that writes: it runs before the baseline
+# and before every iteration, so each run starts from the same state. Left
+# empty for the read-only gates, which share one fixture.
+SWEEP_RESET=""
+
 sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
   local name="$1" want="$2" max="$3" n out rc leaked="" base_out base_count seen_calls
   shift 3
+  [ -z "$SWEEP_RESET" ] || "$SWEEP_RESET"
   # Baseline first: a sweep that only asserts "rc != 0" is satisfied by a
   # gate already refusing for an unrelated reason, and then stays green
   # whatever the sabotage does.
@@ -1016,7 +1022,11 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     bad "$name" "the gate already refuses with nothing sabotaged; the sweep would prove nothing"
     return
   fi
-  if ! printf '%s' "$base_out" | grep -qF -- "$want"; then
+  # An empty fragment is for a gate that succeeds silently -- .githooks/*
+  # print nothing when they pass. The baseline is then carried by rc=0, by
+  # the call count below, and by whatever precondition the caller asserted
+  # beside the sweep; there is no success line to match.
+  if [ -n "$want" ] && ! printf '%s' "$base_out" | grep -qF -- "$want"; then
     bad "$name" "the gate exited 0 without doing its work: $(printf '%s' "$base_out" | tail -n 1)"
     return
   fi
@@ -1025,6 +1035,7 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
     return
   fi
   for ((n = 1; n <= max; n++)); do
+    [ -z "$SWEEP_RESET" ] || "$SWEEP_RESET"
     printf 0 > "$scratch/sabotage.count"
     out="$(PATH="$fakebin:$PATH" SABOTAGE_COUNT="$scratch/sabotage.count" SABOTAGE_AT="$n" "$@" 2>&1)"
     rc=$?
@@ -1071,6 +1082,88 @@ sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
 sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
   env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+
+# ------------------------------------------- sabotage: the gates that write
+
+# The gates swept above only read, so one fixture serves every iteration.
+# plan-move, plan-freeze and .githooks/pre-commit all write -- they move
+# files, rewrite frontmatter, append to the checksum manifest and stage the
+# result -- so an iteration that half-completes decides the next one's
+# verdict. Each of these gets a pristine copy restored before every run.
+# This is the extension 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+# asks for, and the reason it names for why these were left until last.
+section "sabotage: a gate that writes must not report success over a failed git call"
+
+mrepo="$scratch/mrepo"
+mpristine="$scratch/mrepo-pristine"
+mkdir -p "$mpristine"
+git -C "$mpristine" init -q
+git -C "$mpristine" config user.email t@t
+git -C "$mpristine" config user.name t
+git -C "$mpristine" config commit.gpgsign false
+git -C "$mpristine" config core.hooksPath /dev/null
+mkdir -p "$mpristine/docs/skills" "$mpristine/docs/plans/todo" \
+  "$mpristine/docs/plans/in-progress" "$mpristine/docs/plans/done" "$mpristine/.claude"
+cp -r "$PLAN_SCRIPTS/.." "$mpristine/docs/skills/plan"
+cp -r "$WORKFLOW_SCRIPTS/.." "$mpristine/docs/skills/workflow"
+cp -r "$SCRIPT_DIR/../.githooks" "$mpristine/.githooks"
+find "$mpristine/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/d' {} +
+# Closeable on purpose: every required section, no open decision or finding,
+# and a rung declared -- so `plan-move ... done` reaches the move and the
+# freeze rather than stopping at a close-out gate for an unrelated reason.
+move_plan="${fixture_date}-movable.md"
+{
+  printf -- '---\nslug: movable\ncreated: %s\nstatus: todo\nfrozen: false\n' "$fixture_date"
+  printf -- 'kind: task\npriority: normal\nblocked_by:\n---\n\n# movable\n\n'
+  printf -- '## State\n\nVerified to rung 1 (documentation).\n\n'
+  printf -- '## Original plan\n\n## Progress\n\n## Decisions (D)\n\n## Gotchas (G)\n\n## Findings (F)\n'
+} > "$mpristine/docs/plans/todo/$move_plan"
+git -C "$mpristine" add -A >/dev/null
+git -C "$mpristine" commit -qm base
+# Staged but never committed, so every restored copy hands pre-commit
+# something to scan. An empty index makes that hook exit 0 having read
+# nothing, which is the shape its sweep must not be satisfied by.
+printf '{ }\n' > "$mpristine/staged.nix"
+git -C "$mpristine" add staged.nix >/dev/null
+mreset() { rm -rf "$mrepo"; cp -a "$mpristine" "$mrepo"; }
+SWEEP_RESET=mreset
+
+sabotage_sweep "plan-move into in-progress" "docs/plans/in-progress/$move_plan" 25 \
+  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  "docs/plans/todo/$move_plan" in-progress
+# Covers plan-freeze in the same sweep: `plan-move ... done` execs it, so
+# every git call the freeze makes is one of the calls swept here.
+sabotage_sweep "plan-move into done, which execs plan-freeze" "frozen" 40 \
+  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  "docs/plans/todo/$move_plan" done
+
+# The hook succeeds silently, so there is no success line to require. The
+# precondition carries what the fragment would have: the hook short-circuits
+# to exit 0 on an empty index, and a sweep run against one would report ok
+# having scanned nothing.
+mreset
+precondition "the pre-commit fixture has something staged, so the hook cannot exit early" \
+  env -C "$mrepo" bash -c '[ -n "$(git diff --cached --name-only)" ]'
+sabotage_sweep ".githooks/pre-commit" "" 30 \
+  env -C "$mrepo" bash "$mrepo/.githooks/pre-commit"
+SWEEP_RESET=""
+
+# subagent-stamp is deliberately not swept, and this records that rather
+# than leaving it looking un-done. Every failure path in it ends `exit 0`
+# -- no repo root, no active plan, a frozen plan, an uncomputable
+# fingerprint -- and its one git call ends `|| true`. That is the correct
+# shape for a SubagentStop hook, because a hook that fails takes the
+# session with it, and it is the opposite of the property this section
+# asserts. Sweeping it would demand a refusal it is designed never to make.
+# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+if grep -q 'exit 0' "$WORKFLOW_SCRIPTS/subagent-stamp" &&
+   grep -q 'git -C "$root" add "$rel" 2>/dev/null || true' "$WORKFLOW_SCRIPTS/subagent-stamp"; then
+  note "subagent-stamp is exempt from the sabotage sweep" \
+    "it fails silently by design, so it has no refusal to assert; the stamp it fails to write is the signal"
+else
+  bad "subagent-stamp is exempt from the sabotage sweep" \
+    "it no longer fails silently, so the reason for the exemption is gone -- sweep it"
+fi
 
 printf '\ngate-tests: %s passed, %s failed, %s recorded residue(s)\n' "$pass" "$fail" "$known"
 [ "$fail" -eq 0 ] || exit 1

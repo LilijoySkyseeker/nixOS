@@ -7,6 +7,11 @@ set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 
+# The binary probe below needs the blob on disk rather than in a variable,
+# and needs git's own exit status rather than a pipeline's.
+blob="$(mktemp)" || { echo "BLOCKED: cannot create a temporary file." >&2; exit 1; }
+trap 'rm -f "$blob"' EXIT
+
 # A frozen plan file is permanently un-editable, checked against the
 # checksum plan-freeze/plan-reject recorded -- compared directly against
 # the manifest, not against HEAD (diff-filter=M would miss a file that was
@@ -21,7 +26,24 @@ repo_root="$(git rev-parse --show-toplevel)"
 # compared against -- an unstaged edit or `rm` of the working-tree copy
 # otherwise disabled the check
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
-if manifest="$(git show ':docs/plans/.checksums' 2>/dev/null)"; then
+# `git show` on an index entry fails identically whether the manifest is
+# simply untracked -- legitimate, a repo with nothing frozen yet -- or git
+# itself failed, which is not legitimate: the frozen-plan check below then
+# does not run and the hook still exits 0. Ask whether it is tracked first,
+# and treat anything that is not a clean yes or no as fatal. `git show`
+# itself is then outside a condition, so `set -e` catches it.
+# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+ls_rc=0
+git ls-files --error-unmatch -- docs/plans/.checksums >/dev/null 2>&1 || ls_rc=$?
+case "$ls_rc" in
+  0) manifest="$(git show ':docs/plans/.checksums')" ;;
+  1) manifest="" ;;
+  *)
+    echo "BLOCKED: cannot tell whether $repo_root has a freeze manifest (git exited $ls_rc); refusing to skip the frozen-plan check." >&2
+    exit 1
+    ;;
+esac
+if [[ -n "$manifest" ]]; then
   staged_done="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT -- 'docs/plans/*/*.md')"
   if [[ -n "$staged_done" ]]; then
     while IFS= read -r f; do
@@ -82,7 +104,17 @@ while IFS= read -r file; do
   # closed on it -- blocking would make `git submodule add` unfixable
   # except by --no-verify, which switches off every check in this hook
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F57
-  if [[ "$(git ls-files -s -- "$file" | cut -d' ' -f1)" == "160000" ]]; then
+  # Read the mode fail-closed, like the content read below and for the same
+  # reason: an unreadable mode makes this exemption inconclusive, and an
+  # inconclusive answer must not silently take the `continue` branch that
+  # skips every scan for this file.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  if ! mode="$(git ls-files -s -- "$file")"; then
+    echo "BLOCKED: cannot read the staged mode of $file; refusing to decide whether to scan it." >&2
+    fail=1
+    continue
+  fi
+  if [[ "$(cut -d' ' -f1 <<<"$mode")" == "160000" ]]; then
     continue
   fi
 
@@ -99,9 +131,19 @@ while IFS= read -r file; do
   # gitattribute: staging a .gitattributes saying `*.pem -diff` beside a
   # .pem holding a private key switched this scan off entirely, verified
   # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F52
-  # a second `git show`, not `<<<"$content"`: command substitution strips
-  # NUL bytes, so probing $content could never find one
-  if git show ":$file" | grep -qaP '\x00'; then
+  # A second read, not `<<<"$content"`: command substitution strips NUL
+  # bytes, so probing $content could never find one. Written to a file
+  # rather than piped, so git's own status is checkable -- through a pipe
+  # it is not, because `pipefail` reports the rightmost non-zero status and
+  # grep's "no match" is also 1, making a failed read indistinguishable
+  # from a text file.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  if ! git show ":$file" > "$blob"; then
+    echo "BLOCKED: cannot re-read the staged content of $file to tell text from binary." >&2
+    fail=1
+    continue
+  fi
+  if grep -qaP '\x00' < "$blob"; then
     continue
   fi
 

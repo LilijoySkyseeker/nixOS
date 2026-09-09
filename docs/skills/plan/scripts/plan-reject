@@ -17,8 +17,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 arg="$1" reason="$2"
 [ -n "$reason" ] || plan_die "a reason is required -- why was this abandoned, or what superseded it?"
 
-root="$(plan_repo_root)"
-rel="$(plan_locate "$arg" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$arg" "$root")" || exit 1
 plan_require_not_frozen "$root/$rel"
 
 case "$(dirname "$rel")" in

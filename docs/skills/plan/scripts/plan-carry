@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 arg="$1" id="$2" title="${3:-}"
 case "$id" in D[0-9]*) ;; *) plan_die "second argument must look like D<N>, got '$id'." ;; esac
 
-root="$(plan_repo_root)"
-rel="$(plan_locate "$arg" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$arg" "$root")" || exit 1
 
 section="$(awk -v id="$id" '
   $0 ~ "^### " id "([[:space:]]|$)" { grab=1; print; next }

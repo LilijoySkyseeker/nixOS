@@ -45,7 +45,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 # to the same verdict. That is what makes mutation possible at all -- the
 # alternative is mutating the working copy, which loses the user's edits if
 # anything goes wrong.
-TREE_PATHS=(scripts/gate-tests docs/skills/plan docs/skills/workflow)
+TREE_PATHS=(scripts/gate-tests docs/skills/plan docs/skills/workflow .githooks)
 
 # ------------------------------------------------------------- mutation verbs
 
@@ -115,6 +115,9 @@ CITE=docs/skills/plan/scripts/plan-citations
 REPAIR=docs/skills/plan/scripts/plan-repair
 FREEZE=docs/skills/plan/scripts/plan-freeze
 REJECT=docs/skills/plan/scripts/plan-reject
+MOVE=docs/skills/plan/scripts/plan-move
+STAMP=docs/skills/workflow/scripts/subagent-stamp
+PRECOMMIT=.githooks/pre-commit
 GATE=docs/skills/workflow/scripts/plan-gate
 AGENTS=docs/skills/workflow/scripts/required-agents
 
@@ -309,6 +312,50 @@ mutant required-agents/no-order-check "$AGENTS" \
 mutant required-agents/absolute-git "$AGENTS" \
   'mut_subst "git -c core.quotePath=false diff --name-only" "\"\$(command -v git)\" -c core.quotePath=false diff --name-only"' \
   "every git the swept gates invoke is resolved through PATH"
+
+# --- the gates that write, swept with a fresh fixture per iteration ---------
+
+# plan-move as it was: plan_repo_root and plan_locate both end in plan_die,
+# but they are called in a command substitution, where plan_die exits the
+# subshell and leaves the caller running with an empty root -- and neither
+# the mv nor the stage was checked either. Every guard goes at once, because
+# the sweep asserts the contract ("it refuses") and not which line refused:
+# strip only one and a later guard still refuses, so the mutation is
+# equivalent and escapes. That is the correct outcome for a contract-level
+# test, and the reason this entry is written at the contract's granularity.
+mutant plan-move/fails-open-without-its-guards "$MOVE" \
+  'mut_subst "root=\"\$(plan_repo_root)\" || exit 1" "root=\"\$(plan_repo_root)\""
+   mut_subst "rel=\"\$(plan_locate \"\$arg\" \"\$root\")\" || exit 1" "rel=\"\$(plan_locate \"\$arg\" \"\$root\")\""
+   mut_subst "git -C \"\$root\" mv \"\$rel\" \"\$new_rel\" ||" "git -C \"\$root\" mv \"\$rel\" \"\$new_rel\" || true ||"
+   mut_subst "git -C \"\$root\" add \"\$new_rel\" ||" "git -C \"\$root\" add \"\$new_rel\" || true ||"' \
+  "plan-move into in-progress" "plan-move into done, which execs plan-freeze"
+
+mutant plan-move/unchecked-git-add "$MOVE" \
+  'mut_subst "git -C \"\$root\" add \"\$new_rel\" ||" "git -C \"\$root\" add \"\$new_rel\" || true ||"' \
+  "plan-move into in-progress"
+
+mutant lib/record-checksum-unchecked-add "$LIB" \
+  'mut_subst "git -C \"\$root\" add \"\$rel\" \"\$PLAN_CHECKSUMS_RELPATH\" ||" "git -C \"\$root\" add \"\$rel\" \"\$PLAN_CHECKSUMS_RELPATH\" || true ||"' \
+  "plan-move into done, which execs plan-freeze"
+
+mutant pre-commit/manifest-read-swallowed "$PRECOMMIT" \
+  'mut_subst "  0) manifest=\"\$(git show '"'"':docs/plans/.checksums'"'"')\" ;;" "  0) manifest=\"\$(git show '"'"':docs/plans/.checksums'"'"' 2>/dev/null || true)\" ;;"
+   mut_subst "git ls-files --error-unmatch -- docs/plans/.checksums >/dev/null 2>&1 || ls_rc=\$?" "ls_rc=0"' \
+  ".githooks/pre-commit"
+
+mutant pre-commit/gitlink-probe-unchecked "$PRECOMMIT" \
+  'mut_subst "  if ! mode=\"\$(git ls-files -s -- \"\$file\")\"; then" "  mode=\"\$(git ls-files -s -- \"\$file\" || true)\"; if false; then"' \
+  ".githooks/pre-commit"
+
+mutant pre-commit/binary-probe-unchecked "$PRECOMMIT" \
+  'mut_subst "  if ! git show \":\$file\" > \"\$blob\"; then" "  git show \":\$file\" > \"\$blob\" || true; if false; then"' \
+  ".githooks/pre-commit"
+
+# The residue is an assertion too: if subagent-stamp stops failing silently,
+# the reason it is exempt from the sweep is gone and the note must go red.
+mutant subagent-stamp/no-longer-fail-silent "$STAMP" \
+  'mut_subst "git -C \"\$root\" add \"\$rel\" 2>/dev/null || true" "git -C \"\$root\" add \"\$rel\""' \
+  "subagent-stamp is exempt from the sabotage sweep"
 
 # ------------------------------------------------------------------- machinery
 

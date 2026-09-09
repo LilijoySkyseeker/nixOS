@@ -218,7 +218,14 @@ of operations — chronology, not evidence:
   and recorded as such rather than kept under it by dropping cases. This
   is what rung 3 looks like for a change with no closure to build. Read
   2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
-  before adding cases, and run `scripts/gate-mutants` after. Runs from
+  before adding cases, and run `scripts/gate-mutants` after. The sabotage
+  sweep covers the gates that write as well — `plan-move`, `plan-freeze`
+  and `.githooks/pre-commit` — each with a pristine fixture restored before
+  every iteration, since a half-completed iteration would otherwise decide
+  the next one's verdict. `subagent-stamp` is deliberately exempt: every
+  failure path in it ends `exit 0`, which is correct for a hook that runs
+  after every subagent, and the exemption is asserted rather than assumed.
+  Runs from
   `verify-ladder` before every non-trivial commit, and as
   `checks.gate-tests` under `nix flake check` — on any machine, in any CI,
   with the enforcement in the flake rather than in a workflow file. Both,

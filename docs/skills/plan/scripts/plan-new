@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 [ $# -eq 1 ] || { printf 'usage: plan-new "<title>"\n' >&2; exit 1; }
 title="$1"
-root="$(plan_repo_root)"
+root="$(plan_repo_root)" || exit 1
 slug="$(plan_slugify "$title")"
 [ -n "$slug" ] || plan_die "title '$title' produced an empty slug."
 today="$(plan_today)"

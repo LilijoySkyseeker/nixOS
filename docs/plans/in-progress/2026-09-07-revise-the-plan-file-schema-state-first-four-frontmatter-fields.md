@@ -172,6 +172,46 @@ the migration's dry run was read before it was applied. Rungs 4-5 do not
 apply — no host-visible behaviour changed, and the diff contains no
 `.nix` file, no secret and no host.
 
+### Pick-up point, 2026-09-08 (after the sabotage sweep was extended)
+
+**The sweep now covers the gates that write, and it found two defects the
+first time it ran.** `plan-move`, `plan-freeze` (swept through
+`plan-move ... done`, which execs it) and `.githooks/pre-commit`, each with
+a pristine fixture restored before every iteration — which is the part
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+named as the reason these were left until last.
+
+**`#F47` is the one to read.** `plan_repo_root` and `plan_locate` both end
+in `plan_die`, and every caller invokes them as `root="$(plan_repo_root)"`.
+`plan_die` is `exit 1`, which inside `$( )` ends the *subshell*: the
+assignment succeeds with an empty value and the script runs on. **23 call
+sites across 13 files.** In `plan-move` that produced a run which moved
+nothing, staged nothing, and exited 0. The read-only gates already swept
+hid it — with an empty root a later `plan_die` fires at top level, so they
+refused for the wrong reason and looked correct.
+
+**`#F48`** is three fail-open reads in `.githooks/pre-commit`, surfaced one
+per iteration: the frozen-plan check was skipped whenever the manifest read
+failed, the gitlink probe let an unreadable mode win the "not a gitlink"
+branch, and the binary probe's status was unusable through a pipe because
+`pipefail` and grep's "no match" are both 1.
+
+**`subagent-stamp` is exempt, and the exemption is asserted** (`#G14`).
+Every failure path in it ends `exit 0` by design, because a `SubagentStop`
+hook that fails takes the session with it. Sweeping it would demand a
+refusal it must never make. `gate-tests` records the reason as a `known`
+residue that fails if the `|| true` and `exit 0` paths ever go.
+
+**Cost.** `gate-tests` 110 to **114** assertions and 1.20s to **1.57s** —
+three mutating sweeps for 0.37s. `gate-mutants` is 39 to **46** entries,
+all caught. Both build green as flake checks.
+
+**One lesson about the catalogue itself.** Two entries that removed a
+single guard escaped, because a later guard still refused and the sweep
+asserts the contract rather than which line enforced it. They are
+equivalent mutants, not coverage gaps — the fix was to write the entry at
+the contract's granularity, stripping every guard at once.
+
 ### Pick-up point, 2026-09-08 (after the checks.* wiring)
 
 **`#D2` is built.** `checks.gate-tests` and `checks.gate-mutants` both exist,
@@ -673,10 +713,11 @@ Also done 2026-09-08:
       `verify-ladder`'s direct call stays, and `#F46` is why
 
 Still open:
-- [ ] extend the sabotage sweep to `subagent-stamp`,
-      `plan-freeze`/`plan-move` and `.githooks/*`. No longer blocked by a
-      decision; it waits on the split above, because four more swept
-      gates is what makes the one-second limit teach the bypass (`#G8`)
+- [x] extended the sabotage sweep to `plan-move`, `plan-freeze` (swept
+      through `plan-move ... done`, which execs it) and
+      `.githooks/pre-commit`, each with a pristine fixture restored per
+      iteration. It found `#F47` and `#F48`. `subagent-stamp` is exempt
+      and the exemption is asserted rather than assumed — see `#G14`
 
 
 ## Decisions (D)
@@ -959,6 +1000,30 @@ nix build --no-link --impure --expr \
 Note `nixpkgs-unstable`, not `nixpkgs` — this flake has no input by that
 name, and the obvious spelling fails with "attribute 'nixpkgs' missing".
 
+**Corrected 2026-09-08, after it recurred and the command above did not fix
+it.** Two things were wrong with it, and both matter:
+
+- **`--option substitute false` is required.** Without it the output is
+  fetched from `cache.nixos.org` and the `.drv` is never instantiated, so
+  the missing path stays missing and the error repeats verbatim. The
+  substituted output even looks like success.
+- **Try both nixpkgs inputs, not just `nixpkgs-unstable`.** The failing
+  derivation belonged to `nixpkgs-stable`; hosts pinned to the stable
+  release evaluate a different `base16-schemes` with a different `.drv`
+  hash, and the stack trace names neither input.
+
+So the command that actually works is, for each of `nixpkgs-stable` and
+`nixpkgs-unstable`:
+
+```
+nix build --no-link --impure --option substitute false --expr \
+  '(builtins.getFlake (toString /path/to/repo)).inputs.<input>.legacyPackages.x86_64-linux.base16-schemes'
+```
+
+The general shape is worth more than the specific package: when
+`nix flake check` names a `.drv` that is not valid, re-instantiate the
+package from **every** nixpkgs input this flake has, with substitution off.
+
 Worth knowing because it will recur: any GC that removes a derivation
 evaluation needs produces this, the message names the derivation rather
 than the input that wants it, and `verify-ladder` hard-blocks on it. The
@@ -1103,6 +1168,29 @@ have caught it *is* a catalogue entry, and belongs in `gate-mutants` in the
 same change. The whole mutation set was already written down across two
 plans' findings before any of it was executable.
 
+
+### G14 - subagent-stamp is exempt from the sabotage sweep, and the exemption is an assertion
+
+2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
+lists `subagent-stamp` among the gates left to sweep. It should not be
+swept, and that is a property of what it is rather than an omission.
+
+Every failure path in it ends `exit 0` — no repo root, no active plan, a
+frozen plan, an uncomputable fingerprint — and its one `git add` ends
+`|| true`. That is correct for a `SubagentStop` hook: it runs at the end of
+every subagent, and a hook that fails takes the session with it. The sweep
+asserts the opposite property, "no gate may report success when a git call
+underneath it failed", so sweeping this one would demand a refusal it is
+designed never to make.
+
+The signal it does carry is the absence of a stamp. `plan-gate` blocks on a
+missing stamp, so a `subagent-stamp` that silently does nothing is caught
+one gate later, by the gate whose job that is.
+
+An exemption with no test is indistinguishable from an oversight, so
+`gate-tests` asserts the reason instead of the behaviour: a `known` residue
+that checks the `|| true` and the `exit 0` paths are still there, and turns
+into a failure if they go. `gate-mutants` carries the matching entry.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
@@ -2747,3 +2835,73 @@ green at 110/0/3 in the sandbox, and the suite is unchanged outside it
 **FIXED 2026-09-08:** `verify-ladder` keeps its direct call, with the
 `--no-build` reason recorded beside it; `checks.gate-tests` and
 `checks.gate-mutants` added. Both build green
+
+### F47 — `plan_die` inside a command substitution exits the subshell, so 23 call sites carried on with an empty repo root
+
+- **File:** every `plan-*` script plus `required-agents`, `plan-gate` and
+  `verify-ladder` — 23 sites across 13 files; the fail-open path was proved
+  through `docs/skills/plan/scripts/plan-move`
+- **Severity:** HIGH
+- **Confidence:** CONFIRMED — the new `plan-move` sabotage sweep reported
+  `call 1 failed; gate still exited 0 saying: docs/plans/in-progress/`
+- **Axis:** needed-used
+- **Reachability:** any `git` failure at the first call a plan script makes:
+  a corrupt index, a missing `.git`, a hook running with the wrong `GIT_DIR`.
+  No adversary needed.
+- **Rule:** n/a — new-rule candidate: a helper whose error path is
+  `plan_die` cannot be called in `$( )` without checking its status, because
+  the `exit` lands in the subshell.
+- **Finding:** `plan_repo_root` and `plan_locate` both end in `plan_die`,
+  which is `printf >&2; exit 1`. Every caller invokes them as
+  `root="$(plan_repo_root)"`. The `exit` ends the command substitution's
+  subshell, the assignment succeeds with an empty value, and the script runs
+  on. In `plan-move` that produced a run which moved nothing, staged
+  nothing, printed `docs/plans/in-progress/` and **exited 0**. The suite did
+  not catch it before because the swept gates were all read-only ones, and
+  in those the empty root happens to make a later `plan_die` fire at top
+  level — so they refused, for the wrong reason, and looked correct.
+  Compounding it, `plan-move` left both its `git mv` and its `git add`
+  unchecked, so even a checked root would have reported success over a
+  failed move — the same defect `#F36` fixed in `plan-reject` and did not
+  fix in its sibling. `plan_record_checksum`'s `git add` was unchecked too,
+  which is a freeze whose evidence never reaches the commit.
+- **Fix risk:** low. `|| exit 1` on all 23, and `|| plan_die` on the three
+  writes. `plan_die` already prints, so no diagnostic is lost.
+
+**FIXED 2026-09-08:** 23 call sites checked, `plan-move`'s mv and stage
+checked, `plan_record_checksum`'s stage checked. Three new sabotage sweeps
+cover it, and `gate-mutants` carries the entry that restores it
+
+### F48 — `.githooks/pre-commit` skipped its frozen-plan check, and its binary probe, whenever the git call underneath failed
+
+- **File:** `.githooks/pre-commit`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED — the new sweep found all three, one per
+  iteration, each fixed before the next surfaced
+- **Axis:** needed-used
+- **Reachability:** whoever commits while git cannot read the index — and
+  the frozen-plan check is the one that makes a frozen plan permanent.
+- **Rule:** the file's own stated stance, three lines further down:
+  "anything else that cannot be read is still fail-closed". Two of its own
+  reads did not follow it.
+- **Finding:** three, in the order the sweep surfaced them.
+  1. `if manifest="$(git show ':docs/plans/.checksums' 2>/dev/null)"` cannot
+     tell "no manifest, nothing is frozen yet" from "git failed". On failure
+     the whole frozen-plan check was skipped and the hook still exited 0.
+     Now it asks `git ls-files --error-unmatch` first and treats any status
+     other than a clean 0 or 1 as fatal, which also moves the `git show`
+     out of a condition so `set -e` covers it.
+  2. The gitlink probe read the staged mode unchecked; an unreadable mode
+     made the "not a gitlink" branch win by default. It now blocks, like the
+     content read beside it.
+  3. The binary probe was `git show | grep -qaP`. Its status is unusable:
+     `pipefail` reports the rightmost non-zero status, and grep's "no match"
+     is also 1, so a failed read is indistinguishable from a text file. It
+     now writes the blob to a temporary file, checks git's own status, and
+     greps the file — which also keeps the reason the second read exists at
+     all, that a command substitution strips the NUL bytes it looks for.
+- **Fix risk:** low, and all three make the hook stricter rather than
+  looser. The third adds one `mktemp` and a trap.
+
+**FIXED 2026-09-08:** all three; `.githooks/pre-commit` is now swept, and
+three `gate-mutants` entries restore them individually

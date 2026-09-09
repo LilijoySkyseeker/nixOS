@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 arg="$1" id="$2"
 case "$id" in [DGF][0-9]*) ;; *) plan_die "second argument must look like D1/G2/F3, got '$id'." ;; esac
 
-root="$(plan_repo_root)"
-rel="$(plan_locate "$arg" "$root")"
+root="$(plan_repo_root)" || exit 1
+rel="$(plan_locate "$arg" "$root")" || exit 1
 file="$root/$rel"
 plan_require_not_frozen "$file"
 

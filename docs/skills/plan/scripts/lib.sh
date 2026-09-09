@@ -458,7 +458,12 @@ plan_record_checksum() {
   printf '%s  %s\n' "$sum" "$rel" >> "$tmp"
   sort -k2 "$tmp" > "$checksums"
   rm -f "$tmp"
-  git -C "$root" add "$rel" "$PLAN_CHECKSUMS_RELPATH"
+  # Checked: the manifest on disk and the manifest in the index are what
+  # .githooks/pre-commit compares, so a silent failure here is a freeze whose
+  # evidence never reaches the commit.
+  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F47
+  git -C "$root" add "$rel" "$PLAN_CHECKSUMS_RELPATH" ||
+    plan_die "recorded the checksum for $rel but could not stage it or $PLAN_CHECKSUMS_RELPATH."
 }
 
 # plan_do_freeze <root> <rel> -- the mechanical half of freezing, shared by
