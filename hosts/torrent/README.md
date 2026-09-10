@@ -46,7 +46,7 @@ _Auto-generated from `nixosConfigurations.torrent`. Regenerate with
 
 ### Services (enabled)
 
-accounts-daemon, dbus, displayManager, flatpak, fstrim, fwupd, geoclue2, getty, graphical-desktop, libinput, logind, logrotate, lvm, mingetty, mullvad-vpn, nixosManual, nscd, openssh, orca, pcscd, pipewire, power-profiles-daemon, printing, resolved, rpcbind, smartd, speechd, sshd, system-config-printer, systembus-notify, tailscale, timesyncd, udev, udisks2, upower, xserver, zrepl
+accounts-daemon, alloy, dbus, displayManager, flatpak, fstrim, fwupd, geoclue2, getty, graphical-desktop, libinput, logind, logrotate, lvm, mingetty, mullvad-vpn, nixosManual, nscd, openssh, orca, pcscd, pipewire, power-profiles-daemon, printing, resolved, rpcbind, smartd, speechd, sshd, system-config-printer, systembus-notify, tailscale, timesyncd, udev, udisks2, upower, xserver, zrepl
 
 ### Packages
 
@@ -88,7 +88,7 @@ Human:
 
 System (excludes nixbld*/nobody; may include accounts a service
 module auto-creates, not just ones this repo hand-declares):
-`flatpak`, `fwupd-refresh`, `geoclue`, `health-check`, `mandb`, `nm-iodine`, `nscd`, `pcscd`, `rtkit`, `sshd`, `systemd-oom`, `wpa_supplicant`
+`alloy`, `flatpak`, `fwupd-refresh`, `geoclue`, `health-check`, `mandb`, `nm-iodine`, `nscd`, `pcscd`, `rtkit`, `sshd`, `systemd-oom`, `wpa_supplicant`
 
 ### Secrets in use
 

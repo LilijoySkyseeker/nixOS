@@ -88,3 +88,13 @@ each is whether a resulting alert would actually change what you do.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+**2026-09-10 addendum (from the log-stack build):** the HTTPS/SNI-probe
+blind spot on vps's public edge is deferred here too, and now carries a
+tried-and-failed approach: a host-less `https://` catch-all vhost with
+`tls internal` was live-verified inert — caddy refuses the handshake for
+unlisted SNI without presenting any cert, and logs nothing (see
+2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#F5).
+A working fix needs caddy's `fallback_sni`/default-cert machinery or
+on-demand TLS (previously rejected as an abuse surface) — design before
+retrying.

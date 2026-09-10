@@ -46,10 +46,10 @@ key:
 
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
-| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties` |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `zfs-dataset-properties`, `jellyfin`, `immich`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
-| `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
+| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy` |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
+| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `zfs-dataset-properties`, `datasets`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `alloy` |
+| `vps` | unstable | `profile-default`, `profile-server`, `health-alerts`, `alloy` |
 | `isoimage` | unstable | `copyparty-iso` |
 
 ### Which nixpkgs a host tracks
@@ -134,18 +134,22 @@ not the boundary itself:
   `flake.modules.homeManager.<name>`. A module only takes effect if
   `modules/flake/hosts.nix` (or a profile it composes) actually lists its
   key — being present in the directory, or even being syntactically valid
-  and picked up by `import-tree`, doesn't mean any host uses it. Some of
-  these (`auto-update.nix`, `health-alerts.nix`, `iso-autobuild.nix`,
-  `pull-deploy.nix`, `push-deploy.nix`) define a real `options`/`config`
-  surface with an enable flag — see `docs/style-guide.md`'s `my<Name>`
-  convention. Others (`kde.nix`, `wooting.nix`, most of
+  and picked up by `import-tree`, doesn't mean any host uses it. Many of
+  these (`alloy.nix`, `auto-update.nix`, `health-alerts.nix`,
+  `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`, `datasets.nix`,
+  among others) define a real `options`/`config` surface with an enable
+  flag — see `docs/style-guide.md`'s `my<Name>` convention. Others (`kde.nix`, `wooting.nix`, most of
   `modules/home-manager/`) are plain config attrsets with no options
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
-  copyparty, factorio, minecraft, octodns, nfs, samba), each registering as
+  beets, copyparty, factorio, minecraft, octodns, nfs, samba, loki,
+  grafana — grafana is written but wired to no host yet, see the comment
+  in `modules/flake/hosts.nix`), each registering as
   `flake.modules.nixos.<name>` and listed per-host in
-  `modules/flake/hosts.nix`. No options surface. Reach for
+  `modules/flake/hosts.nix`. No options surface (one exception:
+  `loki.nix` exposes a single `myLoki.alertWebhookFile` option as a VM-test
+  seam — see the comment there). Reach for
   `modules/services/` over an inline host-config block once the config is
   substantial enough to warrant its own file, or could plausibly move to
   another host later.

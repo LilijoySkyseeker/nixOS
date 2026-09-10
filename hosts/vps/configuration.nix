@@ -22,6 +22,12 @@ let
     ) || store_path=""
 
     reject() {
+      # the stderr line only reaches the ssh *client*; the logger line is
+      # what lands in this host's own journal, where the log pipeline's
+      # alert rule reads it -- without it a probe with a stolen key is
+      # invisible server-side
+      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+      ${pkgs.util-linux}/bin/logger -t vps-deploy -p auth.warning "rejected command: $cmd" || true
       echo "vps-deploy: rejected command: $cmd" >&2
       exit 1
     }
@@ -305,6 +311,10 @@ in
     polkit.addRule(function(action, subject) {
       if (action.id == "org.freedesktop.systemd1.manage-units" &&
           subject.user == "vps-deploy") {
+        // silent auto-grants leave no journal line at all; this one is
+        // what the log pipeline's alert rule matches
+        // plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+        polkit.log("vps-deploy manage-units grant: " + action.id);
         return polkit.Result.YES;
       }
     });
@@ -644,9 +654,6 @@ in
     virtualHosts = {
       # catch-all for plain-HTTP requests with no matching Host (bots hitting the raw
       # IP, fake hostnames, etc.) — otherwise these produce zero log output anywhere.
-      # HTTPS/SNI-based probes aren't covered here: Caddy can't present a cert for an
-      # unlisted hostname without on-demand TLS, which is its own design/abuse-surface
-      # decision, not a quick add — left for a follow-up.
       ":80" = {
         logFormat = ''
           output stdout
@@ -656,6 +663,12 @@ in
           respond 421
         '';
       };
+
+      # no TLS catch-all: a `tls internal` host-less vhost was tried and
+      # live-verified inert — caddy refuses the handshake for unlisted SNI
+      # and logs nothing, so it bought no visibility. HTTPS/SNI probes stay
+      # a known blind spot, re-deferred with the other logging blind spots
+      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#F5
       "jellyfin.${lib.removeSuffix "." vars.domain}" = {
         # without this, caddy emits no access logs for crowdsec's parser
         logFormat = ''
@@ -892,6 +905,24 @@ in
     owner = "health-check";
     group = "health-check";
   };
+
+  # ship this host's journal to Loki on homelab
+  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
+  myAlloy = {
+    enable = true;
+    # this host's impermanence root is /persist, not vars.persistRoot
+    persistenceRoot = "/persist";
+    # 1GB-RAM host with a small disk: half the fleet default, still sized
+    # for a 24h burst rather than steady state (G6)
+    journalMaxUse = "1G";
+    # caddy is this host's other security-relevant chatty unit (CrowdSec
+    # reads it); raise its per-unit limit alongside sshd's
+    raisedRateLimitUnits = [
+      "sshd"
+      "caddy"
+    ];
+  };
+
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
