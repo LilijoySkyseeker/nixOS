@@ -314,6 +314,10 @@ do_restic() {
   # reading B2 at the first match instead of walking the whole tree
   pick=$(rh "$restic_wrapper ls --recursive --json $(q "$id") $(q "$proot/$restic_pick_sub") 2>/dev/null \
     | jq -c --unbuffered 'select(.type==\"file\" and .size > 0 and .size < 1048576)' | head -n1")
+  # the SIGPIPE'd ls above dies holding its repo lock; unlock removes
+  # only stale locks, so this is cleanup, not force
+  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G8
+  rh "$restic_wrapper unlock >/dev/null 2>&1" || true
   [ -n "$pick" ] || { mark restic FAIL "no small file found to restore"; return; }
   include=$(jq -r .path <<<"$pick")
   want=$(jq -r .size <<<"$pick")

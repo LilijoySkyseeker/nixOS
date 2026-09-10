@@ -254,6 +254,18 @@ restore does not have to displace the backup schedule. Compare G3 in
 the offsite-upload equivalent (2.3 MB/s WAN ceiling): pulling from
 zbackup is ~10x faster than any restic/B2 path even in this worst case.
 
+### G8 -- the restic drill's early-exit `ls | head -n1` leaves a stale repo lock behind
+Killing `restic ls` via SIGPIPE (the deliberate stop-at-first-match
+optimization) means restic never removes the non-exclusive lock it took,
+and restic does not treat a dead-PID lock younger than ~30 minutes as
+stale -- the very next repo operation refuses with `repository is
+already locked`. Found live: the 2026-09-10 composite drill left 3 such
+locks, which then blocked a manual `prune`. Restic self-heals once the
+lock ages past its staleness window (so the weekly Friday run was never
+at risk), but the drill now runs `restic unlock` (which removes only
+stale locks -- never force) right after the pick, so it cleans up after
+itself.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
 
