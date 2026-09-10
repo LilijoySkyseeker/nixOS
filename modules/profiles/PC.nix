@@ -230,7 +230,7 @@ in
       stylix = {
         enable = true;
         autoEnable = true;
-        # source path, not a package: no eval-time IFD
+        # source path, not a package: the scheme itself needs no eval-time build
         # plan: 2026-09-10-nix-flake-check-fails-on-master-base16-schemes-drv-is-not-valid.md#G1
         base16Scheme = "${inputs.stylix.inputs.tinted-schemes}/base16/gruvbox-dark-soft.yaml";
         image = ../../files/gruvbox-dark-rainbow.png;

@@ -1,8 +1,8 @@
 ---
 slug: nix-flake-check-fails-on-master-base16-schemes-drv-is-not-valid
 created: 2026-09-10
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,7 +12,7 @@ blocked_by:
 
 ## State
 
-**2026-09-10.** Root-caused and fixed on branch
+**2026-09-10.** Root-caused, fixed, and verified on branch
 `worktree-flake-check-base16-ifd`. The failure was an
 import-from-derivation interacting with a known open Nix bug (G1):
 stylix read its scheme yaml out of `pkgs-stable.base16-schemes`, and
@@ -22,10 +22,20 @@ tripped over the missing `.drv` — identically on any machine whose
 store had GC'd them, which is why it hit torrent and homelab the same
 night with no code change. Fix: `stylix.base16Scheme` now points at
 stylix's own pinned `tinted-schemes` source input (byte-identical
-yaml, D1), so no derivation has to exist at eval time at all.
-`nix flake check` is green locally, but torrent's store was healed as
-a diagnosis side effect (G2), so the clean-machine proof is the check
-passing on homelab against this branch — pending below.
+yaml, D1), so the scheme needs no derivation at eval time.
+
+Verified to rung 3 (ran it locally, output inspected): verify-ladder
+fully green on torrent (flake check plus all five host builds), and —
+since torrent's store was healed as a diagnosis side effect (G2) —
+the decisive clean-machine proof ran on homelab, whose store still
+carried the broken state: `nix flake check --no-build` against this
+branch printed `all checks passed!` there with no store surgery,
+while master still failed on the same machine minutes earlier. No
+runtime behaviour changes (the yaml is byte-identical), so no VM or
+switch rung applies. Reviews: /simplify (2 findings, both applied),
+docs-updater (F1, left open — user wording call), security (F2 INFO,
+fixed; supply-chain swap independently confirmed a no-op at current
+pins). F1 is the only open item and is non-blocking.
 
 ## Original plan
 
@@ -80,10 +90,14 @@ as the common dependency).
   reads from `inputs.stylix.inputs.tinted-schemes` (D1).
 - [x] `nix flake check --no-build` green on torrent (weak evidence —
   see G2).
-- [ ] Clean-machine proof: check passes on homelab against this
+- [x] Clean-machine proof: check passes on homelab against this
   branch without any store surgery there (its store still had the
-  broken state, so this is the real before/after).
-- [ ] verify-ladder + review agents + merge.
+  broken state, so this is the real before/after). Verified
+  2026-09-10: `all checks passed!` on homelab for this branch while
+  master still failed there minutes earlier.
+- [x] verify-ladder green; review agents run in order (/simplify →
+  docs-updater → security). Merge happens via PR right after this
+  plan's close, same branch.
 
 ## Decisions (D)
 
@@ -158,3 +172,94 @@ IFD).
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+### F1 — "temp copy from stable" banner in PC.nix lost its referent
+
+`modules/profiles/PC.nix:76` still carries the `# temp copy from
+stable` banner over feishin/prismlauncher/vesktop/… inside the
+`pkgs-unstable` list. History (commit `bdd645c`, 2026-04-24, "update
+and change torrent and thinkpad to unstable"): these packages were
+moved out of the then-populated `with pkgs-stable; [ ... ]` list into
+the unstable list and labeled as a temporary copy. This branch removed
+the (long-empty) `pkgs-stable` list and the `pkgs-stable` module arg
+entirely, so the banner now names a list that no longer exists in the
+file. The 2026-08-26 audit had already flagged the comment as
+ambiguous (F-P1-15 in `docs/audits/2026-08-26/findings-tail.md`).
+Whether "temp" still encodes an intent to move these packages back to
+a stable source someday — or the banner should be deleted/reworded as
+a plain section label — is a user decision; not silently rewritten
+during this docs pass.
+
+_docs-updater finished 2026-09-10T16:53:26Z (code 72f94449f539f4be) -- see Findings above._
+
+### F2 — PC.nix comment "no eval-time IFD" overclaims what this fix removes
+
+- **File:** `modules/profiles/PC.nix:233`
+- **Severity:** INFO
+- **Confidence:** CONFIRMED
+- **Axis:** needed-used
+- **Reachability:** n/a — documentation-accuracy issue, no adversary; the
+  risk is a future maintainer, not an attacker.
+- **Rule:** n/a
+- **Finding:** The new comment reads "source path, not a package: no
+  eval-time IFD". True for this line's own read, but the plan's own G3
+  establishes that stylix still performs eval-time IFD internally
+  (importYAML's `runCommand` yaml→json conversion), with a residual
+  in-principle exposure of its builder-input drv chain to the same
+  upstream bug (NixOS/nix#15448). Someone later triaging a recurring
+  "…drv is not valid" could read this comment, conclude stylix IFD was
+  fully eliminated here, and rule out the actual site. The comment does
+  link the plan file, which mitigates; a two-word qualifier ("no
+  eval-time IFD *for the scheme read*" or "see G3 for stylix's residual
+  IFD") would close the gap.
+- **Fix risk:** None — comment-only change; nothing to test beyond
+  re-running eval.
+
+---
+
+**Security review, 2026-09-10 (cold read of `worktree-flake-check-base16-ifd`,
+commit 5f1446d vs master) — checked and clean apart from F2 (INFO) above.**
+
+Reviewed: `modules/profiles/PC.nix` full current content (not just the
+diff), the plan-file bookkeeping under `docs/plans/in-progress/`, and the
+supply-chain posture of the `base16Scheme` source swap. Verified, not
+assumed:
+
+- **Supply-chain delta is nil at current pins.** The pinned nixpkgs-stable
+  (`a3116115…`, `pkgs/by-name/ba/base16-schemes/package.nix`) shows the old
+  package was itself just `fetchFromGitHub tinted-theming/schemes` (rev
+  `43dd14f6…`) with the yamls copied to `share/themes/` — same upstream
+  repo as the new source input, one layer of repackaging removed. Fetched
+  the pinned tinted-schemes rev `9bd28ed3…`: narHash matches flake.lock
+  (`sha256-fNdfCTeC…`), `base16/gruvbox-dark-soft.yaml` exists, and its
+  sha256 (`0df568e0…`) is byte-identical to the stable package's copy —
+  independently re-confirming D1's diff claim. Content is 16 hex colors +
+  metadata, nothing else. At `nix flake update` time trust floats to
+  tinted-theming repo HEAD via stylix's lock instead of a nixpkgs channel
+  bump, but the identical update-time trust is already extended to stylix
+  itself and its dozen other theme-repo inputs, which are a strictly larger
+  eval-time surface — no new adversary capability, so recorded here rather
+  than as a finding.
+- **Both consumers evaluate.** `nix build --dry-run` of torrent's and
+  thinkpad's `system.build.toplevel` on this branch: exit 0, no eval
+  errors. (Per the plan's own G2, this machine's store is healed, so this
+  confirms expression validity only — the clean-machine proof on homelab
+  remains the plan's pending item, correctly tracked there.)
+- **No dangling references.** `pkgs-stable` removal from PC.nix's arg set
+  is safe: the specialArg is still supplied by `modules/flake/hosts.nix`
+  and still consumed by `modules/nixos/{tooling,kde}.nix`,
+  `modules/profiles/default.nix`, and the home-manager tooling modules.
+  Repo-wide grep shows no other `base16`/`base16-schemes` reference
+  anywhere in Nix config — the old package path has no orphaned users.
+- **Hardening axis untouched.** No firewall, systemd unit, secret wiring,
+  user/group, or service exposure changed; the package-list edit is
+  formatting-only (same packages, `pkgs-stable` empty-list stub deleted).
+  The orphaned "temp copy from stable" banner is already F1.
+
+No CRITICAL/HIGH/MEDIUM/LOW findings. Nothing here blocks merge.
+
+_security agent finished 2026-09-10 (cold review, session cut from master context)._
+
+_security finished 2026-09-10T16:58:16Z (code 72f94449f539f4be) -- see Findings above._
+
+**FIXED 2026-09-10:** comment reworded: claims only that the scheme itself needs no eval-time build; stylix's internal importYAML IFD stays documented in G3
