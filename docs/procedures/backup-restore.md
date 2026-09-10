@@ -154,8 +154,13 @@ dataset has diverged from what `zbackup` holds, zrepl reports a conflict
 and waits for a decision rather than clobbering, which is intended
 behaviour, not a fault.
 
-Timing, measured: 5.0G restored in ~2.5min (drill default); a
-multi-terabyte send has previously taken ~40 hours (see
+Timing, measured
+(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G7):
+5.0G in ~2.5min (drill default); 873G in 11h17m at a flat ~23 MB/s for
+a **same-pool** restore (zbackup reading and writing at once — the
+worst case; restoring to a different pool or host runs faster, e.g.
+the same data streams off zbackup at 90–100 MB/s when only read). A
+multi-terabyte cross-host send has previously taken ~40 hours (see
 `2026-08-21-torrent-s-initial-full-backup-send-to-homelab-is-t.md`) —
 run big ones under `tmux`.
 

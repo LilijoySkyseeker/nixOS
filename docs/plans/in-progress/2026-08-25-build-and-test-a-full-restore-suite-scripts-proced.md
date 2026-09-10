@@ -21,14 +21,26 @@ script's runbook, D2's staleness marker declared in homelab's config
 docs-updater (F1 fixed), security (F2 HIGH + F3-F5 MEDIUM + F6 INFO,
 all fixed -- every remote splice now printf-%q-quoted, mux socket out
 of /tmp, arithmetic input validated, cross-host recv recipe hardened).
-Remaining: the real-scale restore-timing check (873G
-`zdata/storage/storage` restore into `zbackup/restore-drill/big-recv`
-in flight on homelab at ~23MB/s, ~8h to go -- result to be recorded
-here), one full composite `drill` re-run after that finishes (also
-creates the success marker; note the marker sits in unpersisted /var/lib
-until homelab deploys the new persistence entry, so the first
-post-deploy reboot will page "marker missing" once -- re-run the drill
-to clear it), and deploying homelab when the user says so.
+**2026-09-10.** Real-scale check done: 873G restored same-pool in
+11h17m at ~23MB/s, GUID-verified (G7). Final composite `drill` re-run
+on the fully-hardened script: all five paths PASS, scratch
+self-cleaned, and `/var/lib/restore-drill/last-drill-success` now
+exists on homelab.
+
+Verified to rung 3 (ran it locally with output inspected): every
+restore path executed for real against real backup data from the
+operator machine, outputs verified in-band (cmp, GUID, rsync readback,
+size checks); no VM rung applies (nothing here is a service to boot)
+and no host switch has happened yet.
+
+Remaining before close: deploy homelab with the new
+staleMarkerFiles/persistence entries (user-gated switch; note the
+marker predates the persistence entry, so the first post-deploy reboot
+pages "marker missing" once -- re-run the drill to clear it), and
+decide whether the original bullet's "disaster-recovery-from-scratch"
+(bare-metal host rebuild + restore, distinct from the dataset-level
+drills built here) stays in this plan's scope or spins into its own
+plan.
 
 ## Original plan
 
@@ -93,13 +105,14 @@ not two that are supposed to stay in sync by discipline.
       operator machine)
 - [x] drill: snapshot/mutate/rollback lifecycle
 - [x] drill: restic offsite restore from B2
-- [ ] real-scale restore-timing check (multi-hundred-GB dataset)
+- [x] real-scale restore-timing check (multi-hundred-GB dataset)
 - [x] rewrite `docs/procedures/backup-restore.md` to wrap the script
 - [x] G1
 - [x] G2
 - [x] G3
 - [x] G4
 - [x] G5
+- [x] G7
 
 ## Decisions (D)
 
@@ -221,6 +234,25 @@ tier1 module's `zbackup/restore-test-scratch` -- different subsystems
 with different lifecycles (self-healing automated canary vs
 tagged+refuse manual drill); the clone-property recipe *was* aligned
 (see Applied) which is the half with the security rationale.
+
+### G7 -- real-scale restore benchmark: 873G at a sustained ~23 MB/s same-pool, 11h17m end to end
+`restore-drill dataset --src zbackup/backup/homelab/zdata/storage/storage
+--to zbackup/restore-drill/big-recv` (2026-09-09 -> 09-10): 40,654s for
+873G used, GUID-verified, flat ~23 MB/s the whole run. This is the
+**same-pool worst case** -- zbackup's USB-attached mirror reading the
+snapshot and writing the receive simultaneously (zpool iostat showed
+~30-35 MB/s each way; the 5G thinkpad-root drill sees ~36 MB/s, and the
+same data crosses the LAN wire at 90-100 MB/s when only *read* from the
+pool, so the bottleneck is the concurrent read+write, not send/recv
+overhead). Sizing implications for a real DR: restoring `storage` back
+to `zdata` (a different pool) should run substantially faster than this
+number since reads and writes land on different mirrors; a same-pool
+restore of `storage-bulk` (2.07T) would extrapolate to ~26h; and zrepl
+replication kept running throughout with no failures -- a full-scale
+restore does not have to displace the backup schedule. Compare G3 in
+`2026-08-18-homelab-backup-replication-stack-has-several-compo.md` for
+the offsite-upload equivalent (2.3 MB/s WAN ceiling): pulling from
+zbackup is ~10x faster than any restic/B2 path even in this worst case.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
