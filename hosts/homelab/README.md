@@ -76,6 +76,9 @@ acl, attr, audit, backblaze-b2, bash-interactive, bat, bcache-tools, bind, bitwa
 - `/` <- `zroot/local/root` (zfs)
 - `/nix` <- `zroot/local/nix` (zfs)
 - `/nix/state` <- `zroot/local/state` (zfs)
+- `/nix/state/loki` <- `zroot/persist/loki` (zfs)
+- `/nix/state/srv/jellyfin/cache` <- `zroot/persist/jellyfin-cache` (zfs)
+- `/nix/state/var/lib/docker` <- `zroot/persist/docker` (zfs)
 - `/storage` <- `zdata/storage/storage` (zfs)
 - `/storage-bulk` <- `zdata/storage/storage-bulk` (zfs)
 

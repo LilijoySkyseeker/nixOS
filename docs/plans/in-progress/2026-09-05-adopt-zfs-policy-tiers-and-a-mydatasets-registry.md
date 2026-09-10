@@ -44,7 +44,17 @@ Scope is deliberately narrow (D5): the registry plus new datasets only,
 with two existing reclassifications that are pure wins. No existing
 service state is migrated here.
 
-## Original plan
+**2026-09-10, resumed.** Branch rebased onto current master (eight
+merges of drift, including the plan-schema revision and the ADR-0002
+gate dismantle). Conflict resolutions: this plan file schema-migrated
+(State first, new frontmatter fields); `docs/skills/workflow/reference.md`
+taken from master, whose post-ADR-0002 rewrite already carries this
+branch's /simplify-race incident lesson in updated form;
+`hosts/homelab/README.md` regenerated with `scripts/doc-host.sh homelab`
+(now shows the three registry mounts plus master's newer `beets` user).
+No code changes; verify-ladder re-run on the rebased tree. The manual
+`zfs create` step above remains the only outstanding item, still with
+the operator.
 
 Give every service its own ZFS dataset so rollback, replication and
 offsite backup are decided per service rather than per filesystem, and
