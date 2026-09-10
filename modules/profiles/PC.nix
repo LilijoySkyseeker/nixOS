@@ -8,7 +8,6 @@ in
   flake.modules.nixos."profile-pc" =
     {
       pkgs-unstable,
-      pkgs-stable,
       inputs,
       config,
       lib,
@@ -25,70 +24,67 @@ in
       ];
 
       # System installed pkgs
-      environment.systemPackages =
-        (with pkgs-unstable; [
-          grc # Text colors
-          ripgrep
-          gitFull
-          gh # GitHub CLI
-          gjs # for kdeconnect
-          restic # backups
-          fd
-          nixos-anywhere
-          ssh-to-age
-          rclone
-          distrobox
-          caligula # cli burning tool
-          scrcpy
-          isd
-          kdePackages.krfb # kde remote desktop tool
-          kdePackages.krdc # kde remote desktop tool
-          vipsdisp # big image viewer
-          yt-dlp
-          android-tools
+      environment.systemPackages = with pkgs-unstable; [
+        grc # Text colors
+        ripgrep
+        gitFull
+        gh # GitHub CLI
+        gjs # for kdeconnect
+        restic # backups
+        fd
+        nixos-anywhere
+        ssh-to-age
+        rclone
+        distrobox
+        caligula # cli burning tool
+        scrcpy
+        isd
+        kdePackages.krfb # kde remote desktop tool
+        kdePackages.krdc # kde remote desktop tool
+        vipsdisp # big image viewer
+        yt-dlp
+        android-tools
 
-          yubikey-manager
-          distrobox
-          bitwarden-desktop
-          thunderbird
-          vscode-fhs
-          easyeffects
-          qpwgraph
-          libreoffice
-          vlc
-          r2modman
-          yubioath-flutter
-          nicotine-plus
-          vial
-          element-desktop
-          ungoogled-chromium
-          python313Packages.nomadnet
-          rns
-          signal-desktop
-          picard # music metadata tool
-          calibre
-          quodlibet
+        yubikey-manager
+        distrobox
+        bitwarden-desktop
+        thunderbird
+        vscode-fhs
+        easyeffects
+        qpwgraph
+        libreoffice
+        vlc
+        r2modman
+        yubioath-flutter
+        nicotine-plus
+        vial
+        element-desktop
+        ungoogled-chromium
+        python313Packages.nomadnet
+        rns
+        signal-desktop
+        picard # music metadata tool
+        calibre
+        quodlibet
 
-          texliveFull
+        texliveFull
 
-          # closed source
-          spotify
-          claude-code
+        # closed source
+        spotify
+        claude-code
 
-          # temp copy from stable
-          feishin
-          prismlauncher
-          vesktop
-          discord
-          kdePackages.kdenlive
-          wl-clipboard # for waydroid
-          quickemu
-          qbittorrent
-          texliveSmall
+        # temp copy from stable
+        feishin
+        prismlauncher
+        vesktop
+        discord
+        kdePackages.kdenlive
+        wl-clipboard # for waydroid
+        quickemu
+        qbittorrent
+        texliveSmall
 
-        ])
-        ++ (with pkgs-stable; [
-        ]);
+      ];
 
       # networking
       networking.networkmanager = {
@@ -234,7 +230,9 @@ in
       stylix = {
         enable = true;
         autoEnable = true;
-        base16Scheme = "${pkgs-stable.base16-schemes}/share/themes/gruvbox-dark-soft.yaml";
+        # source path, not a package: no eval-time IFD
+        # plan: 2026-09-10-nix-flake-check-fails-on-master-base16-schemes-drv-is-not-valid.md#G1
+        base16Scheme = "${inputs.stylix.inputs.tinted-schemes}/base16/gruvbox-dark-soft.yaml";
         image = ../../files/gruvbox-dark-rainbow.png;
         polarity = "dark";
         cursor.package = pkgs-unstable.capitaine-cursors-themed;
