@@ -387,7 +387,7 @@ actual problem.
 ## Restore
 
 See `docs/procedures/backup-restore.md` for the restore paths out of both
-`zbackup` and Backblaze. It is written from the mechanics and has not yet
-been exercised as a real restore — verify each step's output as you go,
-and correct that doc once a real restore has been done (tracked in
-`2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md`).
+`zbackup` and Backblaze. `scripts/restore-drill` is the tooling behind
+that runbook — the same script is the periodic fire drill and the real
+recovery procedure, exercised against real backup data on 2026-09-09
+(`2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md`).

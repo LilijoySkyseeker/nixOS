@@ -70,8 +70,11 @@ almost always recoverable from the same host, in under a minute, without
 touching `zbackup` or another machine at all — the on-box `ceiling` preset
 keeps roughly 32 days of these.
 
-Recover with the same recipe as "Recovering a few files" in
-`docs/procedures/backup-restore.md`: find the most recent snapshot from
+Recover via the `.zfs/snapshot/` route noted under "Recovering a few
+files" in `docs/procedures/backup-restore.md` (the main recipe there,
+`restore-drill file`, restores from `zbackup` on homelab — overkill here,
+since the mistake host's own mounted datasets already carry the
+snapshots): find the most recent snapshot from
 *before* the mistake under `<mountpoint>/.zfs/snapshot/<zrepl_timestamp>/...`
 (`zfs list -t snapshot <dataset>` to see what's available), then `cp -a` the
 missing path back out and verify with `diff -rq` against the snapshot before

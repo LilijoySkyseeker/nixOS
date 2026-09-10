@@ -1,0 +1,406 @@
+#!/usr/bin/env bash
+# restore-drill <drill|file|dataset|stream|rollback|restic|cleanup> [options]
+#
+# The fleet's restore tooling, doubling as its fire drill -- one artifact
+# for both, so running the drill periodically exercises exactly what a
+# real recovery would run (plan:
+# 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md).
+# Executes everything over `ssh root@homelab` (override with
+# RESTORE_DRILL_HOST), where zbackup and the restic wrapper live.
+#
+# Usage, examples, and the recovery runbook:
+# docs/procedures/backup-restore.md -- deliberately the single copy; this
+# header only carries what the runbook can't.
+#
+# A destination argument (--dest/--to) selects a real restore and
+# requires that subcommand's full argument set -- a recovery never
+# silently inherits a drill default. Without one the subcommand runs as
+# a drill (the same commands pointed at scratch, plus verification and
+# cleanup); --src/--snap/--id alone just point the drill at other data.
+set -uo pipefail
+
+host=${RESTORE_DRILL_HOST:-root@homelab}
+
+# scratch: drills use the fixed name (and refuse to start over leftovers,
+# keeping the periodic drill honest); real file recoveries use a per-run
+# name so stale drill scratch can never block an actual recovery
+scratch_base=zbackup/restore-drill
+scratch_mnt_base=/mnt/restore-drill
+drill_prop=org.dotfiles:restore-drill
+
+# drill-mode defaults. The '@zrepl_' snapshot prefix tracks myZrepl's
+# naming (modules/nixos/zrepl.nix); the two datasets are members of the
+# replicated set declared by myHealthAlerts.backupStaleness in
+# hosts/homelab/configuration.nix -- torrent home as the most actively
+# replicated, thinkpad root as the smallest full dataset
+drill_file_src=zbackup/backup/torrent/zroot/local/home
+drill_dataset_src=zbackup/backup/thinkpad/zroot/local/root
+restic_wrapper=restic-backblazeWeekly # createWrapper, hosts/homelab/configuration.nix
+restic_pick_sub=zroot                 # small-file subtree the restic drill picks from
+# touched after an all-PASS `drill`; watched by myHealthAlerts.staleMarkerFiles
+success_marker=/var/lib/restore-drill/last-drill-success
+
+# mux socket in XDG_RUNTIME_DIR (0700), never /tmp: a predictable path in
+# a world-writable dir invites another uid to squat a fake mux master
+# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F5
+rh() {
+  ssh -o BatchMode=yes -o ConnectTimeout=8 \
+    -o ControlMaster=auto -o ControlPath="${XDG_RUNTIME_DIR:-$HOME/.ssh}/restore-drill-%C" \
+    -o ControlPersist=60 "$host" "$@"
+}
+
+# every data value spliced into a remote command string goes through this:
+# restic archive paths are arbitrary bytes named by whatever wrote the
+# backed-up file, and the remote shell is root's
+# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F2
+q() { printf '%q' "$1"; }
+
+fail=0
+declare -A result
+mark() {
+  result[$1]="$2${3:+ $3}"
+  echo "==> $1: $2${3:+ $3}"
+  [ "$2" = PASS ] || fail=1
+}
+
+resolve_snap() { # <dataset> <snapname-or-empty> -> full snapshot name, empty if none
+  if [ -n "$2" ]; then
+    echo "$1@$2"
+  else
+    rh "zfs list -H -t snapshot -o name -s creation $(q "$1") | grep '@zrepl_' | tail -1"
+  fi
+}
+
+get_snap() { # <label> <dataset> <snapname-or-empty>; sets $snap or marks FAIL
+  snap=$(resolve_snap "$2" "$3")
+  [ -n "$snap" ] || { mark "$1" FAIL "no zrepl snapshot on $2"; return 1; }
+}
+
+scratch_ds='' scratch_mnt=''
+scratch_setup() { # <suffix>: '' for drills, unique (e.g. -$$) for real runs
+  [ -z "$scratch_ds" ] || return 0 # already set up this run
+  scratch_ds=$scratch_base$1
+  scratch_mnt=$scratch_mnt_base$1
+  if [ -z "$1" ] && rh "zfs list '$scratch_ds'" >/dev/null 2>&1; then
+    echo "restore-drill: $scratch_ds already exists (leftover from an interrupted run?)." >&2
+    echo "Inspect it, then run: restore-drill cleanup" >&2
+    exit 1
+  fi
+  rh "zfs create -o mountpoint=none -o $drill_prop=on '$scratch_ds' && mkdir -p '$scratch_mnt'" || exit 1
+  trap scratch_teardown EXIT
+}
+
+destroy_tagged() { # <dataset> <mountdir>: destroy only what carries the drill tag
+  local ds=${1:?} mnt=${2:?} tagged
+  tagged=$(rh "zfs get -H -o value '$drill_prop' '$ds' 2>/dev/null") || true
+  if [ "$tagged" = on ]; then
+    rh "zfs destroy -r '$ds' && rm -rf '$mnt'"
+  elif rh "zfs list '$ds'" >/dev/null 2>&1; then
+    echo "restore-drill: refusing to destroy $ds -- it lacks $drill_prop=on" >&2
+    return 1
+  else
+    rh "rm -rf '$mnt'"
+  fi
+}
+
+# shellcheck disable=SC2329  # invoked via the EXIT trap
+scratch_teardown() {
+  if [ "$keep" = true ]; then
+    echo "==> --keep: leaving $scratch_ds and $scratch_mnt in place"
+    return 0
+  fi
+  destroy_tagged "$scratch_ds" "$scratch_mnt" && echo "==> scratch cleaned up"
+}
+
+do_cleanup() { # every top-level scratch dataset this script may have created
+  local ds
+  for ds in $(rh "zfs list -H -o name -d 1 zbackup" | grep "^$scratch_base"); do
+    destroy_tagged "$ds" "$scratch_mnt_base${ds#"$scratch_base"}"
+  done
+  rh "rm -rf '${scratch_mnt_base:?}' ${scratch_mnt_base:?}-*"
+  echo "==> scratch cleaned up"
+}
+
+# --- file: clone-based file recovery ---------------------------------------
+do_file() {
+  local src dest glob clone_ds clone_mnt
+  # a destination-ish argument selects real recovery and requires the
+  # full set; --src/--snap alone just point the drill at different data
+  if [ -n "$opt_dest$opt_glob" ]; then
+    [ -n "$opt_src" ] && [ -n "$opt_dest" ] && [ -n "$opt_glob" ] \
+      || usage_err "file: a real recovery needs --src, --glob and --dest together"
+    src=$opt_src glob=$opt_glob dest=$opt_dest
+    scratch_setup "-$$"
+  else
+    src=${opt_src:-$drill_file_src} glob=''
+    scratch_setup ''
+    dest=$scratch_mnt/file-out
+  fi
+  get_snap file "$src" "$opt_snap" || return
+  clone_ds=$scratch_ds/file-clone clone_mnt=$scratch_mnt/file-clone
+  echo "==> [file] recovering from $snap"
+  # explicit mountpoint/canmount/readonly: a bare clone inherits
+  # mountpoint=none from zbackup and is unusable; forcing all three
+  # also never trusts properties that arrived in a send stream
+  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G2
+  rh "zfs clone -o readonly=on -o canmount=on -o mountpoint='$clone_mnt' $(q "$snap") '$clone_ds'" \
+    || { mark file FAIL "clone failed"; return; }
+  local qdest qglob
+  qdest=$(q "$dest") qglob=$(q "$glob")
+  rh bash -s <<REMOTE || { mark file FAIL "copy/verify failed"; return; }
+set -u
+out=$qdest; mkdir -p "\$out"
+if [ -n $qglob ]; then
+  mapfile -d '' -t files < <(find "$clone_mnt" -xdev -type f -path $qglob -print0)
+else
+  # drill: a few real files prove the mechanism. -maxdepth bounds the
+  # walk; -size -1024k, not -1M, because find rounds sizes up per unit,
+  # so -1M matches only empty files and the walk never terminates
+  mapfile -d '' -t files < <(find "$clone_mnt" -maxdepth 4 -xdev -type f -size +0 -size -1024k -print0 2>/dev/null | head -zn 3)
+fi
+[ "\${#files[@]}" -gt 0 ] || { echo "no matching files found" >&2; exit 1; }
+for f in "\${files[@]}"; do
+  rel=\${f#"$clone_mnt"/}
+  mkdir -p "\$out/\$(dirname "\$rel")"
+  cp -a "\$f" "\$out/\$rel" || exit 1
+  cmp -s "\$f" "\$out/\$rel" || { echo "MISMATCH: \$rel" >&2; exit 1; }
+  echo "    recovered + verified: \$rel"
+done
+echo "    \${#files[@]} file(s) -> \$out"
+REMOTE
+  mark file PASS "$snap"
+}
+
+# --- dataset: full restore via send|recv -----------------------------------
+do_dataset() {
+  local src to snapname t0 t1 src_guid recv_guid used diffs
+  if [ -n "$opt_to" ]; then
+    [ -n "$opt_src" ] || usage_err "dataset: a real restore needs --src with --to"
+    src=$opt_src to=$opt_to
+  else
+    src=${opt_src:-$drill_dataset_src}
+    scratch_setup ''
+    to=$scratch_ds/recv
+  fi
+  get_snap dataset "$src" "$opt_snap" || return
+  snapname=${snap#*@}
+  if rh "zfs list $(q "$to")" >/dev/null 2>&1; then
+    mark dataset FAIL "$to already exists -- this tool never overwrites"
+    return
+  fi
+  echo "==> [dataset] full restore $snap -> $to"
+  t0=$(date +%s)
+  # -c sends blocks as stored (compressed): same received data + GUID,
+  # roughly half the I/O and wire bytes on lz4/zstd datasets
+  rh "zfs send -c $(q "$snap") | zfs recv -u -o mountpoint=none -o readonly=on $(q "$to")" \
+    || { mark dataset FAIL "send|recv failed"; return; }
+  t1=$(date +%s)
+  read -r src_guid recv_guid used < <(
+    rh "zfs get -H -o value guid $(q "$snap") $(q "$to@$snapname"); zfs get -H -o value used $(q "$to")" | tr '\n' ' '
+  )
+  echo "    send|recv took $((t1 - t0))s for $used"
+  if [ -z "$src_guid" ] || [ "$src_guid" != "$recv_guid" ]; then
+    mark dataset FAIL "snapshot GUID mismatch ($src_guid vs $recv_guid)"
+    return
+  fi
+  echo "    snapshot GUIDs match ($src_guid)"
+  if [ -n "$opt_to" ]; then
+    # real recovery: GUID equality is ZFS's own end-to-end integrity
+    # guarantee; inspect the data before swapping any mountpoints
+    mark dataset PASS "$snap -> $to in $((t1 - t0))s ($used)"
+    return
+  fi
+  echo "    running full readback verify (content + metadata, drill mode)"
+  rh "zfs clone -o readonly=on -o canmount=on -o mountpoint='$scratch_mnt/ds-src' '$snap' '$scratch_ds/ds-src' &&
+      zfs clone -o readonly=on -o canmount=on -o mountpoint='$scratch_mnt/ds-recv' '$to@$snapname' '$scratch_ds/ds-recv'" \
+    || { mark dataset FAIL "verification clones failed"; return; }
+  t0=$(date +%s)
+  # rsync dry-run rather than diff -rq: --checksum compares content, -a
+  # -HAX adds perms/owners/times/hardlinks/ACLs/xattrs -- the real-world
+  # metadata this drill exists to check -- and it compares the sockets
+  # and fifos a live-system snapshot carries, which diff cannot
+  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G4
+  diffs=$(rh "rsync -naHAXx --checksum --delete --itemize-changes '$scratch_mnt/ds-src/' '$scratch_mnt/ds-recv/'") \
+    || { mark dataset FAIL "verify rsync failed"; return; }
+  t1=$(date +%s)
+  if [ -z "$diffs" ]; then
+    mark dataset PASS "$snap ($used), GUID + full readback clean in $((t1 - t0))s"
+  else
+    head -20 <<<"$diffs" >&2
+    mark dataset FAIL "readback verify found differences"
+  fi
+}
+
+# --- stream: raw send stream on stdout (the cross-host restore path) -------
+do_stream() {
+  local src bytes expect t0 t1
+  if [ -n "$opt_src" ]; then
+    get_snap stream "$opt_src" "$opt_snap" || return
+    exec ssh -o BatchMode=yes -o ConnectTimeout=8 "$host" "zfs send -c $(q "$snap")"
+  fi
+  src=$drill_dataset_src
+  get_snap stream "$src" "$opt_snap" || return
+  echo "==> [stream] $snap over ssh to a byte counter (proves the cross-host pull path short of zfs recv)"
+  expect=$(rh "zfs send -c -nvP $(q "$snap") 2>&1" | awk '/^size/ {print $2}')
+  # remote-derived value headed for bash arithmetic: integers only
+  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F4
+  [[ $expect =~ ^[0-9]+$ ]] || expect=''
+  t0=$(date +%s)
+  # the drill deliberately pulls the whole stream across the wire -- that
+  # transfer is exactly what a real cross-host restore does
+  bytes=$(rh "zfs send -c $(q "$snap")" | wc -c)
+  t1=$(date +%s)
+  echo "    streamed $bytes bytes in $((t1 - t0))s (send estimate: ${expect:-?})"
+  # estimates run slightly over or under the real stream; 90% is close enough
+  if [ "$bytes" -gt 0 ] && [ -n "$expect" ] && [ "$bytes" -ge $((expect * 9 / 10)) ]; then
+    mark stream PASS "$bytes bytes in $((t1 - t0))s"
+  else
+    mark stream FAIL "streamed $bytes bytes, send estimated ${expect:-unknown}"
+  fi
+}
+
+# --- rollback: drill-only lifecycle proof (a real rollback is one bare
+# deliberate `zfs rollback -r` on the affected host) ------------------------
+# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#D1
+do_rollback() {
+  scratch_setup ''
+  echo "==> [rollback] snapshot/mutate/rollback lifecycle on a scratch dataset"
+  rh bash -s <<REMOTE || { mark rollback FAIL; return; }
+set -u
+ds="$scratch_ds/rollback"; mnt="$scratch_mnt/rollback"
+zfs create -o mountpoint="\$mnt" "\$ds" || exit 1
+head -c 1M /dev/urandom > "\$mnt/fileA"
+before=\$(sha256sum "\$mnt/fileA" | cut -d' ' -f1)
+zfs snapshot "\$ds@drill-before" || exit 1
+head -c 1M /dev/urandom > "\$mnt/fileA"   # corrupt it
+head -c 1k /dev/urandom > "\$mnt/fileB"   # and add post-snapshot data
+zfs rollback "\$ds@drill-before" || exit 1
+after=\$(sha256sum "\$mnt/fileA" | cut -d' ' -f1)
+[ "\$before" = "\$after" ] || { echo "fileA not restored by rollback" >&2; exit 1; }
+[ ! -e "\$mnt/fileB" ] || { echo "fileB survived rollback" >&2; exit 1; }
+echo "    fileA restored (sha256 \$after), fileB gone"
+REMOTE
+  mark rollback PASS
+}
+
+# --- restic: offsite restore from B2 ---------------------------------------
+do_restic() {
+  local id dest include out got want proot pick
+  if [ -n "$opt_include$opt_dest" ]; then
+    [ -n "$opt_include" ] && [ -n "$opt_dest" ] \
+      || usage_err "restic: a real restore needs --include and --dest together"
+    include=$opt_include dest=$opt_dest id=${opt_id:-latest}
+    echo "==> [restic] restore $id --include $include -> $dest"
+    rh "$restic_wrapper restore $(q "$id") --target $(q "$dest") --include $(q "$include")" \
+      || { mark restic FAIL "restore failed"; return; }
+    mark restic PASS "$id --include $include -> $dest (inspect before use)"
+    return
+  fi
+  scratch_setup ''
+  dest=$scratch_mnt/restic
+  # one call resolves the snapshot id and its archived root path (the
+  # /run/restic-backups-backblazeWeekly prefix), instead of hardcoding
+  # what hosts/homelab/configuration.nix's RuntimeDirectory owns
+  read -r id proot < <(
+    rh "$restic_wrapper snapshots --json 2>/dev/null" | jq -r --arg id "${opt_id:-latest}" \
+      '(if $id == "latest" then .[-1] else (map(select(.short_id == $id)) | .[0]) end) | "\(.short_id) \(.paths[0])"'
+  )
+  if [ -z "${id:-}" ] || [ "$id" = null ]; then
+    mark restic FAIL "no matching restic snapshot"
+    return
+  fi
+  echo "==> [restic] drill: picking a small file from snapshot $id under $proot/$restic_pick_sub"
+  # the filter and head run remotely (jq --unbuffered) so restic stops
+  # reading B2 at the first match instead of walking the whole tree
+  pick=$(rh "$restic_wrapper ls --recursive --json $(q "$id") $(q "$proot/$restic_pick_sub") 2>/dev/null \
+    | jq -c --unbuffered 'select(.type==\"file\" and .size > 0 and .size < 1048576)' | head -n1")
+  # the SIGPIPE'd ls above dies holding its repo lock; unlock removes
+  # only stale locks, so this is cleanup, not force
+  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G8
+  rh "$restic_wrapper unlock >/dev/null 2>&1" || true
+  [ -n "$pick" ] || { mark restic FAIL "no small file found to restore"; return; }
+  include=$(jq -r .path <<<"$pick")
+  want=$(jq -r .size <<<"$pick")
+  echo "==> [restic] restore $id --include $include -> $dest"
+  out=$(rh "$restic_wrapper restore $(q "$id") --target $(q "$dest") --include $(q "$include") && stat -c %s $(q "$dest$include")") \
+    || { mark restic FAIL "restore failed"; return; }
+  # shellcheck disable=SC2001  # multiline indent; ${var//} can't anchor lines
+  sed 's/^/    /' <<<"$out"
+  got=$(tail -n1 <<<"$out")
+  if [ "$got" = "$want" ]; then
+    mark restic PASS "$include from $id ($want bytes)"
+  else
+    mark restic FAIL "restored size ${got:-none} != expected $want"
+  fi
+}
+
+# --- argument handling ------------------------------------------------------
+usage() {
+  cat >&2 <<'EOF'
+usage: restore-drill <mode> [options]
+  drill                                    every restore path, scratch targets, summary
+  file    --src DS --glob PAT --dest DIR   recover files from a zbackup snapshot
+  dataset --src DS --to POOL/DS            full restore into a new dataset on homelab
+  stream  --src DS                         raw zfs send on stdout (pipe into zfs recv)
+  restic  --include PAT --dest DIR         restore from the offsite B2 repo
+  rollback                                 drill-only rollback lifecycle proof
+  cleanup                                  remove scratch left by an interrupted run
+options: --snap NAME (zbackup snapshot), --id SNAP (restic snapshot), --keep
+a destination argument (--dest/--to) selects a real restore; without one,
+file/dataset/stream/rollback/restic run as individual drills
+(--src/--snap/--id alone point the drill at other data)
+EOF
+  exit 2
+}
+usage_err() {
+  echo "restore-drill: $1" >&2
+  usage
+}
+
+mode=${1:-drill}
+shift || :
+keep=false
+opt_src='' opt_snap='' opt_dest='' opt_to='' opt_glob='' opt_id='' opt_include=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --keep) keep=true ;;
+    --src) opt_src=${2:?--src needs a value}; shift ;;
+    --snap) opt_snap=${2:?--snap needs a value}; shift ;;
+    --dest) opt_dest=${2:?--dest needs a value}; shift ;;
+    --to) opt_to=${2:?--to needs a value}; shift ;;
+    --glob) opt_glob=${2:?--glob needs a value}; shift ;;
+    --id) opt_id=${2:?--id needs a value}; shift ;;
+    --include) opt_include=${2:?--include needs a value}; shift ;;
+    *) usage_err "unknown argument: $1" ;;
+  esac
+  shift
+done
+
+case "$mode" in
+  cleanup) do_cleanup; exit $? ;;
+  drill)
+    [ -z "$opt_src$opt_dest$opt_to$opt_glob$opt_include" ] || usage_err "drill takes no target options"
+    do_file
+    do_dataset
+    do_stream
+    do_rollback
+    do_restic
+    if [ "$fail" -eq 0 ]; then
+      rh "mkdir -p '${success_marker%/*}' && touch '$success_marker'"
+      echo "==> all drills passed; touched $success_marker"
+    fi
+    echo
+    echo "== restore-drill summary =="
+    for d in file dataset stream rollback restic; do
+      echo "  $d: ${result[$d]:-skipped}"
+    done
+    ;;
+  file) do_file ;;
+  dataset) do_dataset ;;
+  stream) do_stream ;;
+  rollback) do_rollback ;;
+  restic) do_restic ;;
+  -h | --help | help) usage ;;
+  *) usage_err "unknown mode: $mode" ;;
+esac
+exit "$fail"

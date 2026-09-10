@@ -28,6 +28,20 @@ check — identical to the 2026-08-30 count. Automatic `forget --prune`
 is not reaching these packs. Assumption in G2 below was wrong; a manual
 `restic prune` is the actual fix, not a wait-and-see.
 
+**2026-09-10.** G2 closed: ran the manual prune. `prune --dry-run`
+sized it first — exactly the 63 unreferenced pack files (1.058 GiB),
+zero blobs to repack, so no upload cost — then the real
+`restic-backblazeWeekly prune` deleted all 63 and a follow-up
+`restic check` reported no errors with 0 B unused remaining. The
+2026-08-28 interrupted run's orphans are gone; expect the "additional
+files" warning to be absent from the Fri 2026-09-11 03:00 run's log
+(worth one glance to confirm). Lesson matching G2's fallback branch:
+an interrupted restic run needs an explicit `prune` during recovery —
+neither the next weekly `forget --prune` nor the B2 lifecycle rule
+ever clears orphaned packs. Still open on this plan: only the
+`--keep-daily 2` history-loss caveat (documented, intentional) and
+observing a real long-outage reboot with `Persistent = false`.
+
 ## Original plan
 
 - [ ] **2026-08-18: homelab backup/replication stack has several
@@ -104,7 +118,7 @@ is not reaching these packs. Assumption in G2 below was wrong; a manual
 
 ## Progress
 - [x] G1 -- confirmed pruning is already automatic
-- [ ] G2 -- confirm orphaned-pack warning clears on the 2026-09-04 scheduled run
+- [x] G2 -- confirm orphaned-pack warning clears on the 2026-09-04 scheduled run
 - [x] G3 -- captured full-run timing/throughput benchmark
 
 ## Decisions (D)
