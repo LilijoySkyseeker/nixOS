@@ -556,6 +556,12 @@
       # — a threshold this loose still turns "silently stopped deploying"
       # from never-detected into detected-within-three-weeks.
       "/nix/var/nix/profiles/system" = 504;
+      # touched by an all-PASS scripts/restore-drill run (the manual Tier 3
+      # fire drill; see docs/procedures/backup-restore.md), so "we haven't
+      # drilled a restore lately" alerts instead of rotting as a date in a
+      # doc. 2160h = 90 days -- a quarterly drill cadence.
+      # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#D2
+      "/var/lib/restore-drill/last-drill-success" = 2160;
     };
   };
 
@@ -736,6 +742,7 @@
       # holds and bookmarks all live in ZFS itself, so there is no
       # equivalent of sanoid's /var/lib/sanoid cache to keep here.
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
+      "/var/lib/restore-drill" # restore-drill success marker, same staleness pattern
     ];
     files = [
       "/etc/machine-id"

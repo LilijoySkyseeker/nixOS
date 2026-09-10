@@ -3,13 +3,41 @@
 Getting data back out of `zbackup` (zrepl) or Backblaze (restic). For how
 the backups are produced, see [`docs/backups.md`](../backups.md).
 
-> **Written from the mechanics, not yet exercised.** The zrepl layout it
-> describes is deployed and replicating on all three hosts, but the `zfs`
-> commands below are standard, unverified-in-practice recipes — nobody has
-> done a real restore against this layout yet (tracked in
-> `2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md`).
-> Verify each step's output rather than pasting the whole sequence, and
-> correct this doc once a restore has actually been done.
+**`scripts/restore-drill` is the restore tooling, and this document is
+its runbook.** The same script is both the periodic fire drill and the
+real recovery procedure — drill mode is just the real commands pointed at
+scratch destinations with verification and cleanup added, so exercising
+the drill exercises the real thing and the two can't drift apart
+(plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md).
+It runs from an operator machine and does everything over
+`ssh root@homelab` (`RESTORE_DRILL_HOST=root@<addr>` overrides the
+target — useful when the sink is rebuilt or only reachable by IP), where
+`zbackup` and the restic wrapper live.
+
+Every restore path below was first exercised against real backup data on
+2026-09-09. Run the whole drill periodically (and after any change to
+the backup stack) with:
+
+```
+scripts/restore-drill drill        # all paths, scratch targets, PASS/FAIL summary
+scripts/restore-drill cleanup      # remove scratch after an interrupted run
+```
+
+An all-PASS `drill` touches `/var/lib/restore-drill/last-drill-success`
+on homelab, and `myHealthAlerts.staleMarkerFiles` alerts once that
+marker is 90 days old — so an overdue drill pages like any other backup
+staleness instead of relying on anyone remembering this paragraph.
+
+A destination argument (`--dest`/`--to`) selects a real restore and
+requires that subcommand's full argument set — a recovery never
+silently inherits a drill default. Without one the subcommand drills;
+`--src`/`--snap`/`--id` alone just point the drill at other data.
+
+Scratch lives under `zbackup/restore-drill` (tagged with a
+`org.dotfiles:restore-drill` ZFS property that cleanup verifies before
+destroying anything) and `/mnt/restore-drill` on homelab; it is torn
+down at exit unless `--keep` holds it for inspection. Real backups
+are only ever read.
 
 ## First: work out where the data is
 
@@ -36,30 +64,40 @@ backup.
 
 ## Recovering a few files
 
-Cheapest option, no rollback, no send/recv. Every ZFS filesystem exposes
-its snapshots read-only under `.zfs/snapshot/`:
-
 ```
-ls /zbackup/backup/torrent/zroot/local/home/.zfs/snapshot/
-cp -a /zbackup/backup/torrent/zroot/local/home/.zfs/snapshot/zrepl_.../path/to/file  /somewhere
+scripts/restore-drill file --src zbackup/backup/torrent/zroot/local/home \
+  --glob '*/lilijoy/some/path/*' --dest /where/to/put/them
 ```
 
-If the dataset isn't mounted (backup datasets normally aren't), either
-mount it read-only or clone the snapshot:
+A real recovery needs `--src`, `--glob` and `--dest` together; bare
+`file` drills instead (a few sample files to scratch). Either way the
+newest `zrepl_*` snapshot is used unless `--snap <name>` picks one, and
+every copied file is `cmp`-verified against the snapshot before the
+script reports success.
+
+What it runs, and why not to improvise it by hand: backup datasets are
+deliberately never mounted, and everything under `zbackup` is
+`mountpoint=none` — so a bare `zfs clone` gives you a clone you can't
+read. The working form needs explicit properties:
 
 ```
-zfs clone zbackup/backup/torrent/zroot/local/home@zrepl_... zbackup/restore-scratch
-# ... copy what you need out of /zbackup/restore-scratch ...
-zfs destroy zbackup/restore-scratch
+zfs clone -o readonly=on -o mountpoint=<scratch> <snap> zbackup/restore-drill/file-clone
+# ... copy out ...
+zfs destroy zbackup/restore-drill/file-clone
 ```
 
 A clone is cheap — it shares blocks with the snapshot and costs only what
 you change. Destroy it when done, or it pins the snapshot it came from.
+(`.zfs/snapshot/` also works, but only on datasets that are actually
+mounted, which `zbackup`'s never are — it's the right tool on a *source*
+host's own datasets, e.g. recovering from torrent's local snapshots.)
 
 ## Rolling a host's dataset back in place
 
-Destroys everything written since the snapshot. Make sure that's what you
-want.
+Destroys everything written since the snapshot. Deliberately not wrapped
+in the script
+(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#D1) —
+make sure this is what you want, then on the affected host:
 
 ```
 zfs rollback -r zroot/local/home@zrepl_...
@@ -67,65 +105,92 @@ zfs rollback -r zroot/local/home@zrepl_...
 
 `-r` destroys any newer snapshots in the way. If the snapshot you want is
 only on `zbackup` and no longer on the host, you need a full restore
-instead.
+instead. The drill's `rollback` mode proves the snapshot → mutate →
+rollback mechanics on a scratch dataset each run.
 
-## Restoring a whole dataset back to a host
+## Restoring a whole dataset
 
-This sends from `zbackup` back to the source host — the reverse of normal
-replication. **Stop zrepl on the target host first**, or its jobs will race
-you:
-
-```
-systemctl stop zrepl
-```
-
-Then send. Run this on homelab, where `zbackup` lives:
+**Onto homelab** (including anywhere on `zbackup`/`zdata`):
 
 ```
-zfs send zbackup/backup/torrent/zroot/local/home@zrepl_... \
-  | ssh root@torrent zfs recv -F zroot/local/home-restored
+scripts/restore-drill dataset --src zbackup/backup/torrent/zroot/local/home \
+  --to zdata/home-restored
 ```
 
-Restoring alongside the original (`-restored`) rather than over it is the
-safe default — you can compare, then swap mountpoints or `zfs rename` once
-satisfied. Only `zfs recv -F` directly onto the live dataset if you have
-accepted losing whatever is currently there.
+Runs `zfs send -c | zfs recv -u -o mountpoint=none -o readonly=on` into a
+**new** dataset (it refuses to touch an existing one; `-c` sends blocks
+as stored on disk — measured ~2:1 stream shrink on lz4 datasets), then proves
+integrity by comparing the source and received snapshots' GUIDs — ZFS
+preserves the GUID through send/recv, so equality is an end-to-end
+identity check. Inspect the data, then `zfs set` mountpoint/readonly and
+`zfs rename` into place once satisfied. Drill mode also clones both
+sides and readback-verifies them with an `rsync --checksum` dry-run —
+content plus permissions, owners, xattrs, ACLs, hardlinks and special
+files, the metadata a byte-diff can't see.
 
-For a large dataset add `-v` for progress, and consider running it under
-`tmux` — a multi-terabyte send over this hardware has previously taken
-~40 hours (see
-`2026-08-21-torrent-s-initial-full-backup-send-to-homelab-is-t.md`).
-
-Restart zrepl when done:
+**Onto another host** (torrent/thinkpad): those hosts only accept root
+SSH for zrepl's forced command — homelab *cannot* push a stream into
+them. Pull instead, from the target host (root via `run0`):
 
 ```
-systemctl start zrepl
+scripts/restore-drill stream --src zbackup/backup/torrent/zroot/local/home \
+  | run0 zfs recv -u -o mountpoint=none -o readonly=on -o canmount=off \
+      zroot/local/home-restored
 ```
 
-Expect the next replication run to reconcile. If the restored dataset has
-diverged from what `zbackup` holds, zrepl will refuse rather than clobber —
-it reports a conflict and needs a decision, which is the intended
+`stream` is a raw `zfs send` on stdout over SSH from homelab. The `-o`
+overrides matter: a send stream's bytes come entirely from the sink, so
+never let one choose where or how the received dataset mounts
+(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F3) —
+inspect first, then deliberately `zfs set canmount=on readonly=off` and
+a real `mountpoint`. Restoring alongside the original (`-restored`)
+rather than over it is the safe
+default — compare, then swap mountpoints or `zfs rename` once satisfied.
+Only `zfs recv -F` directly onto the live dataset if you have accepted
+losing whatever is currently there, and **stop zrepl on the target host
+first** (`systemctl stop zrepl`) so its jobs don't race you; restart it
+when done. Expect the next replication run to reconcile — if the restored
+dataset has diverged from what `zbackup` holds, zrepl reports a conflict
+and waits for a decision rather than clobbering, which is intended
 behaviour, not a fault.
+
+Timing, measured: 5.0G restored in ~2.5min (drill default); a
+multi-terabyte send has previously taken ~40 hours (see
+`2026-08-21-torrent-s-initial-full-backup-send-to-homelab-is-t.md`) —
+run big ones under `tmux`.
 
 ## Restoring from the offsite restic backup
 
 Only `zroot/local/state` and `zdata/storage/storage` go offsite —
 `storage-bulk` does not, and neither does anything from `torrent` or
-`thinkpad`. Backblaze is the last resort, for when `zbackup` itself is gone.
+`thinkpad`. Backblaze is the last resort, for when `zbackup` itself is
+gone.
 
-`createWrapper = true` in the restic config means a preconfigured
-`restic-backblazeWeekly` wrapper exists on homelab with the repository and
-credentials already wired:
+```
+scripts/restore-drill restic --include '/run/restic-backups-backblazeWeekly/zroot/...' \
+  --dest /restore
+```
+
+A real restore needs `--include` and `--dest` together (`--id
+<short-id>` picks a snapshot, newest otherwise); bare `restic` drills —
+restores one small real file to scratch and verifies its size. Under
+the hood it uses the preconfigured
+`restic-backblazeWeekly` wrapper on homelab (`createWrapper = true`
+wires the repository and credentials), which is also what to use by hand
+for browsing:
 
 ```
 restic-backblazeWeekly snapshots
-restic-backblazeWeekly restore <snapshot-id> --target /restore
+restic-backblazeWeekly ls <snapshot-id> /run/restic-backups-backblazeWeekly
+restic-backblazeWeekly restore <snapshot-id> --target /restore --include <path>
 ```
 
-Paths inside the repo reflect the temporary mount layout used at backup
-time (`/tmp/restic/<dataset>@<snapshot>/...`), not the live filesystem
-layout — browse with `restic-backblazeWeekly ls <snapshot-id>` before
-restoring so you target the right subtree.
+Paths inside the repo reflect the temporary snapshot-mount layout used at
+backup time — `/run/restic-backups-backblazeWeekly/<dataset
+path>@<zrepl-snapshot>/...` (top level: `includes`, `zdata`, `zroot`) —
+not the live filesystem layout, and the `@<snapshot>` component changes
+every run, so browse with `ls` before restoring to target the right
+subtree.
 
 Retention there is `--keep-daily 2`, meaning two weekly runs — roughly two
 weeks of offsite history, not two days.
