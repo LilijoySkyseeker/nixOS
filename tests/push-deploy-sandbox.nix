@@ -114,7 +114,12 @@
   nixpkgsUnstableFlake,
 }:
 let
-  inherit (import "${pkgs.path}/nixos/tests/ssh-keys.nix" pkgs)
+  # path concatenation, not "${pkgs.path}/..." interpolation: interpolating
+  # copies the whole nixpkgs tree into a new store path that GC can later
+  # remove, after which eval dies with "path ... is not valid" (same trap
+  # the zrepl test documents; same upstream bug family as
+  # 2026-09-10-nix-flake-check-fails-on-master-base16-schemes-drv-is-not-valid.md#G1)
+  inherit (import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs)
     snakeOilEd25519PrivateKey
     snakeOilEd25519PublicKey
     ;
