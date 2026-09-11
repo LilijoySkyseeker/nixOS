@@ -152,6 +152,23 @@ in
       # factorio.com (F-P4-04); this only stops the next disclosure.
       systemd.tmpfiles.settings."10-factorio-state"."/srv/factorio/main".z.mode = "0700";
 
+      # F-P4-07 / RESUME.md item 4: myDockerUserns's ownership migration
+      # for docker userns-remap. Declared here rather than in the host
+      # file for the same reason as the tmpfiles rule above: 845 is the
+      # factoriotools image's baked-in uid, not pinned by this repo, so
+      # this and the tmpfiles rule must move together if the image ever
+      # changes it. If they drift, this fails silently (`chown --from`
+      # matches nothing, not an error) -- keeping both declarations next
+      # to the path they protect makes that a one-file check instead of
+      # a cross-file one.
+      myDockerUserns.migrations = [
+        {
+          path = "/srv/factorio/main";
+          uid = 845;
+          gid = 845;
+        }
+      ];
+
       # server-settings.json was previously hand-edited directly on the
       # host — not sops-managed, not declarative, and not reproducible.
       # The factoriotools image doesn't support injecting these via env

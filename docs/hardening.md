@@ -127,10 +127,16 @@ here; it is already applied in the SSH bullet below.
       in every snapshot and every offsite backup of that dataset**, and
       leave sops's control the moment they do. (`F-P4-04`)
 
-    Container uid 0 is host uid 0 on bind mounts unless
-    `userns-remap` is configured in
-    `virtualisation.docker.daemon.settings`; it is not, today.
-    (`F-P4-07`)
+    Container uid 0 is host uid 0 on bind mounts unless `userns-remap`
+    is configured in `virtualisation.docker.daemon.settings`.
+    `modules/nixos/docker-userns-remap.nix` (`myDockerUserns`) does
+    this declaratively, including migrating pre-existing bind-mount
+    ownership (Docker never adjusts that itself), VM-verified in
+    `tests/docker-userns-remap.nix`. Wired into homelab, build-verified,
+    **not deployed** — enabling it is disruptive, not a quiet flip:
+    it forces a full `dockerd` restart (not live-reloadable) and both
+    game containers re-pull their images on first activation, since
+    Docker's storage path changes per remap user. (`F-P4-07`)
 
 ### Observability
 
