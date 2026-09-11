@@ -137,7 +137,15 @@ must not hold a credential and must not run on fork PRs.
 (D3). No CI means branch protection is the *only* remaining control, so
 AR-5 makes D3 more urgent, not less.
 
-### AR-6 — The NFS shares are `nosuid,nodev` but not `noexec`
+### AR-6 — ~~The NFS shares are `nosuid,nodev` but not `noexec`~~
+
+**Superseded 2026-09-03 — no longer accepted, fixed instead.** The user
+decided D12 toward the fix, not acceptance: `noexec` is now in
+`modules/nixos/nfs-homelab-mounts.nix`'s shared `mountOpts`, closing the
+last execution path from a homelab-controlled filesystem onto both
+laptops. Build-verified on `thinkpad`/`torrent`. See
+`2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md`. Original
+acceptance text kept below for history.
 
 **Sits on:** [threat model](threat-model.md) §4.5 ·
 **Evidence:** `F-P6-05`; applied in `516ef31`
@@ -145,15 +153,16 @@ AR-5 makes D3 more urgent, not less.
 Both laptop mounts of `/home/lilijoy/storage{,-bulk}` carry `nosuid` and
 `nodev`. `noexec` was considered and declined.
 
-**Why accepted:** a media share will eventually have something legitimate
-run off it, and a `noexec` that gets removed under pressure is worse
-than one never set. A scan found nothing that is a program there today,
-so the risk accepted is small and the reasoning is about the future, not
-the present.
+**Why accepted (superseded, see above):** a media share will eventually
+have something legitimate run off it, and a `noexec` that gets removed
+under pressure is worse than one never set. A scan found nothing that is
+a program there today, so the risk accepted is small and the reasoning
+is about the future, not the present.
 
-**What would change the answer:** D12. If the answer is "nothing will
+**What would change the answer:** ~~D12. If the answer is "nothing will
 ever be run from those shares", `noexec` is one word and closes the last
-execution path from a homelab-controlled filesystem onto both laptops.
+execution path from a homelab-controlled filesystem onto both
+laptops.~~ **Answered — see superseded note above.**
 
 ### AR-7 — The game servers auto-update their mods, and the mod set decides the game version
 
@@ -213,6 +222,52 @@ ceilings.
 
 ---
 
+### AR-8 — The recovery ISO serves the whole filesystem, unauthenticated
+
+**Sits on:** [threat model](threat-model.md) §8, open question 6 ·
+**Evidence:** `findings.md` H6, `F-P4-01`, `F-P5-10` · **Decides D8**
+
+copyparty's rendered config on the isoimage has an empty `[accounts]`
+block with `A: *` on volume `/` — copyparty 1.20.20 expands `A` to
+`rgwmda.`: anonymous read, write, move, delete, and admin over the
+**entire filesystem**, on a host-wide port 3923, with the module's own
+sandbox nullified by `BindPaths=["/var/lib/copyparty", "/"]`. Only Unix
+DAC limits it. The ISO separately bakes in `vars.publicSshKeys` as root's
+`authorizedKeys` — these are SSH *public* keys, already plaintext
+elsewhere in this public repo, so this is not a credential leak; it is
+how the admin SSHes into the booted rescue environment as root. The
+distinct, LOW-rated issue here (`F-P5-10`/`L-03`) is the built ISO
+*artefact* sitting unverified in a user-writable `~/Downloads` with no
+checksum — since the flake is public and pinned, a swapped or
+attacker-built ISO with a matching filename would go undetected. That is
+an integrity/tampering concern, not a confidentiality one, and is tracked
+separately (a `.sha256` written alongside the build, verified before
+boot) rather than folded into this acceptance.
+
+**Why accepted:** confirmed by the user 2026-09-03 — the ISO is not
+meant to be secure, it is meant to make recovery of these hosts, or a
+third party's system it's booted on, as easy as possible. Unimpeded
+read/write access to a broken box's entire filesystem, with no
+credential to look up or type, is the point, not an oversight. This
+also covers using the media to help recover machines outside this
+fleet, where no pre-shared credential could exist in the first place.
+
+**What is being accepted, stated plainly:** anyone who boots this ISO on
+any network — not just the machine it's meant to rescue — gets
+unauthenticated full filesystem read/write/delete on the booted host. The
+ISO's physical and network handling (don't leave it plugged into an
+untrusted network, don't leave the built image sitting in a user-writable
+directory longer than needed) is the actual control, not anything in
+`copyparty-iso.nix`.
+
+**What would change the answer:** if the ISO's role changed from
+"disaster recovery, plugged in deliberately" to something routinely
+network-attached or handed to someone else unsupervised, this trade
+would need revisiting — that scenario is out of scope for what this
+image is for today.
+
+---
+
 ## 2. Not yet acceptable — blocked on a decision
 
 **These are not accepted.** Each is a risk whose acceptance is a real
@@ -224,23 +279,25 @@ it leaves this file entirely.
 
 | # | If accepted, what is being accepted | Bears on |
 |---|---|---|
-| D1 | That ten credentials exposed in public history stay live | C1, `F-P8-02` |
+| ~~D1~~ | **Answered — not accepted, and fixed.** All ten credentials from `F-P8-02` were rotated (rotation-runbook.md, closed 2026-09-01); the old exposed values no longer authenticate to anything. | C1, `F-P8-02` |
 | D2 | That `origin/master` is unsigned and unattended fleet root | H1 |
 | ~~D3~~ | **Answered 2026-08-27.** `master` had no protection and no rulesets at all; a ruleset now blocks force pushes and deletions with no bypass actors. Signed commits deliberately not enabled yet — that is D2. | H1, AR-5 |
 | D4 | That no backup copy is out of reach of a single root | C3 |
 | D5 | That neither laptop has FDE, and thinkpad hibernates RAM to unencrypted swap | H7 |
 | D6 | That any tailnet device reaches nearly everything | ACL cluster |
-| D7 | That homelab has no intrusion detection at all | H8 |
-| D8 | That the recovery ISO serves the whole filesystem unauthenticated | H6 |
+| ~~D7~~ | **Answered 2026-09-03 — not accepted, implementing.** Tracked as `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`. | H8 |
+| ~~D8~~ | **Answered 2026-09-03 — accepted, see AR-8.** Intended: not meant to be secure, meant to make recovery (of these hosts, or a third party's) as easy as possible. | H6 |
 | ~~D9~~ | **Answered 2026-08-27 — nothing accepted, all three fixed.** KDE Connect scoped to `tailscale0`; Steam remote play and avahi/mDNS removed outright. | `F-P1-04`, `F-P5-06` |
 | ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
 | D11 | That `flake-update-test` auto-merges upstream updates to fleet root on build success alone | `F-P7-10` |
-| D12 | That the NFS shares stay executable — see AR-6 | `F-P6-05` |
+| ~~D12~~ | **Answered 2026-09-03 — not accepted, and fixed.** `noexec` added to `nfs-homelab-mounts.nix`, closing the last execution path from a homelab-controlled filesystem onto both laptops. AR-6 marked superseded. | `F-P6-05` |
 | ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
 | ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |
 
-Two of these have a written home waiting for them: **D2** must land in
+~~Two of these have a written home waiting for them: **D2** must land in
 this file as an explicit accepted risk if accepted (`findings.md` §5),
 and **D8** needs a written justification either way — "plausibly
 deliberate for recovery media" is not one, and threat model §8.6 asked
-for it directly.
+for it directly.~~ **D8 done, 2026-09-03** — see AR-8 above. **D2** is
+still open; note its accepted-risk slot (if accepted) is not AR-7 —
+that's D14's — it would be the next free number.

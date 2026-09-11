@@ -132,6 +132,18 @@ blocked_by:
 
 ## Progress
 
+- [x] **2026-09-10: the `/var/lib/samba` persistence question is
+  verified live on homelab.** `findmnt` shows `/var/lib/samba` bind-
+  mounted from `zroot/local/state[/var/lib/samba]` (the impermanence
+  path samba.nix declares); `private/passdb.tdb` was created
+  2026-08-21 and is still there after the 2026-09-03 reboot (boot
+  19:13, `samba-user-provision` idempotently re-synced it 19:17, as
+  designed; `secrets.tdb` untouched since Aug 21 — proof the directory
+  itself survived rather than being rebuilt); `pdbedit -L` lists
+  `android-smb` from the persisted db. The only remaining box is the
+  password-rotation drill, which starts with the user editing the sops
+  secret.
+
 
 ## Decisions (D)
 
