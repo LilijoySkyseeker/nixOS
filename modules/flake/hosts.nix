@@ -80,6 +80,7 @@ in
         nixosModules."push-deploy"
         nixosModules."zrepl"
         nixosModules."docker-publish-guard"
+        nixosModules."docker-userns-remap"
         nixosModules."zfs-dataset-properties"
         nixosModules."datasets"
         nixosModules.jellyfin

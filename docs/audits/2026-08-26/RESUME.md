@@ -4,29 +4,76 @@ Self-contained pick-up point for the **2026-08-26 fleet-wide security
 audit + needed/used review**. Written to be read cold: everything a new
 session needs is here or linked from here.
 
-**Last updated: 2026-09-01, end of the eleventh session.**
+**Last updated: 2026-09-03, end of the sixteenth session.**
 
-> ## START HERE — state as of the eleventh session
+> ## START HERE — state as of the sixteenth session
+>
+> **Sixteenth session (2026-09-03)** worked the batch of D-decisions the
+> user gave directly: **D1 closed** (rotation already done); **D2, D4,
+> D6 explained in detail, still open, not superseded** (D2 cross-refs
+> `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`'s own
+> D5 and `D11-analysis.md`); **D5 cross-referenced** to the existing
+> `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+> (no new plan needed); **D7 answered → implement**, new todo plan
+> `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+> not started; **D8 answered → accept**, written up as `accepted-risks.md`
+> AR-8 — **first draft was wrong and the user caught it** (claimed the
+> recovery ISO "leaks admin SSH keys"; they're public keys, not a leak —
+> fixed to correctly blame the real, separate LOW issue instead, an
+> unverified ISO artefact); **D12 answered → fix**, `noexec` added to
+> `modules/nixos/nfs-homelab-mounts.nix`, build-verified on
+> `thinkpad`/`torrent`, **security subagent pass run before closing this
+> time** (fifteenth session's own lesson, applied not skipped) — one
+> INFO doc-sync finding, fixed, plan closed to `done/`, **not deployed**;
+> **D16 raised for review, still open**, plus a new wrinkle: fleet-wide
+> `scheduleEnable = false` means these thresholds currently validate
+> "was this host manually switched recently," not "did a scheduled
+> deploy silently stop," which is what they were sized for. Full detail:
+> "What happened in the sixteenth session" below.
 >
 > **Branch:** `worktree-worktree-security-audit-plan`, worktree
-> `.claude/worktrees/worktree-security-audit-plan`. Merged up to date with
-> `origin/master` as of the sixth session (no conflicts). Ahead of master
-> by the fifth through eleventh sessions' commits — **open a PR when it is
-> time to land them.** All five `nixosConfigurations` build. The eighth
-> session fixed two LOW findings from the tail (L-01 anubis egress on
-> vps, L-02 restic's `/tmp` mount on homelab); the ninth deployed all four
-> hosts to this branch and closed out credential rotation; the tenth
-> corrected the restic staleness prediction and closed D1 of the
-> `.zfs`-traversal plan (`snapdir=disabled` on homelab); the eleventh
-> unified `myZfsDatasetProperties` and `disko.nix` — see "What happened in
-> the eleventh session" below. The L-01/L-02, D1, and unification fixes
-> are all build-verified only, not deployed to any host yet.
+> `.claude/worktrees/worktree-security-audit-plan`. **Merged to master via
+> PR #39 as of the twelfth session** (`6a68cb3`) — everything through the
+> eleventh session (waves 1-2, credential rotation, the two LOW findings,
+> the `.zfs`-traversal fix, the disko unification) is on `master` now.
+> The thirteenth session got `tests/push-deploy-sandbox.nix` fully green
+> (`0789429`) and closed F-P7-06 / wave 2 item 2.6 entirely. The
+> fourteenth session deployed that hardening (to homelab, not vps — see
+> below) plus vps's own small pending backlog. **The fifteenth session
+> VM-verified item 4, `userns-remap`** — new module
+> `modules/nixos/docker-userns-remap.nix`, new test
+> `tests/docker-userns-remap.nix`, fully green, build-verified into
+> homelab, **not deployed anywhere** — see "What happened in the
+> fifteenth session" below. **That same session also caught and fixed a
+> process gap**: the `userns-remap` plan was closed and committed
+> without the workflow skill's required `security` subagent pass. Since
+> a closed (`done/`) plan cannot be edited — ever, by the plan skill's
+> own hard rule — the follow-up review and its 3 fixes (1 MEDIUM: a
+> subuid-range collision with NixOS's own default allocator; 2 LOW:
+> unscoped capabilities, a migration failure that didn't block
+> `docker.service`) live in their own plan,
+> `2026-09-03-security-review-of-docker-userns-remap.md`, also closed.
+> **If you skip a required subagent pass on a plan you're about to
+> close, do the pass before closing, or open a follow-up plan
+> immediately — never write findings into an already-frozen file.**
 >
-> **NEXT UP:** nothing queued. Item 0 of "Agent-doable, unblocked" below
-> (the disko unification) is now done — see the eleventh session. The
-> remaining agent-doable items are 1 (`push-deploy-vps` sandboxing) and 4
-> (`userns-remap`), both deferred on purpose pending a real-target VM
-> test; everything else needs either a user decision or a live host.
+> **`push-deploy-vps`'s hardening is now live, and it's on homelab, not
+> vps.** `myPushDeploy.enable = true` (with `hostAttr = "vps"`) is set in
+> `hosts/homelab/configuration.nix` — the hardened `push-deploy-vps.service`
+> **runs on homelab**, builds vps's config there, and pushes+activates it
+> over SSH as `vps-deploy@vps`. vps itself never runs this unit at all;
+> it is purely the passive target. Earlier session notes (including this
+> file's own prior "deploy the hardening to vps" phrasing) described this
+> imprecisely — worth reading the fourteenth session's writeup before
+> assuming "vps" means the vps host for this item specifically.
+> **Confirmed live on homelab** (`systemctl show push-deploy-vps.service`):
+> `ProtectSystem=strict`, `PrivateTmp=yes`,
+> `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`. Zero failed units.
+> **vps was also switched, same session, on a separate explicit ask** —
+> its pending diff (`glow`, the `tmp.mount` tmpfs unit) is unrelated
+> backlog, now live: zero failed units, public site still `302`s. **All
+> four hosts are now fully caught up to this branch's HEAD** — nothing
+> build-verified-only remains fleet-wide as of this session's end.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
 > system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
@@ -46,10 +93,14 @@ session needs is here or linked from here.
 > **Deployed:** all four hosts — homelab, vps, torrent, and thinkpad — are
 > switched to this branch as of the ninth session (including the restic
 > `312h` threshold, `c6116ca`), zero failed units, WireGuard tunnel and
-> zrepl replication both healthy on rotated keys. **L-01/L-02 (eighth
+> zrepl replication both healthy on rotated keys. ~~**L-01/L-02 (eighth
 > session) and D1's `snapdir=disabled` fix (tenth session) are the only
-> build/VM-verified-but-undeployed changes left** — none need a host
-> switch to be true statements, only to take effect.
+> build/VM-verified-but-undeployed changes left**~~ — **stale as of the
+> fourteenth session**: homelab picked up the `push-deploy-vps` sandboxing
+> and the eleventh session's `zfs-dataset-properties` extension in the
+> same switch (2026-09-01). vps's own pending diff (`glow`, the tmpfs
+> mount unit) is still build-verified-only. None of these need a host
+> switch to be *true statements*, only to take effect.
 >
 > **All scheduled deploys remain OFF fleet-wide** (`scheduleEnable =
 > false`). Manual deploys are the only path anything takes. That is not
@@ -144,10 +195,12 @@ file.
 
 ## Where things are
 
-- **Branch:** `worktree-worktree-security-audit-plan`, pushed, clean,
-  **42 commits ahead of master**. Live worktree at
-  `.claude/worktrees/worktree-security-audit-plan` — enter that rather
-  than making a new one.
+- **Branch:** `worktree-worktree-security-audit-plan`, pushed, clean.
+  ~~42 commits ahead of master~~ **merged to master via PR #39, twelfth
+  session** (`6a68cb3`) — now just **one commit ahead** (`d470a61`,
+  WIP `push-deploy-vps` sandboxing, not yet VM-verified). Live worktree
+  at `.claude/worktrees/worktree-security-audit-plan` — enter that
+  rather than making a new one.
 - **All audit output:** `docs/audits/2026-08-26/`
 - **Plan of record:** ~~the 2026-08-26 entry at the top of `TODO.md`~~ —
   now the in-progress plan
@@ -922,6 +975,538 @@ move by design).
 **Not deployed anywhere.** All three rounds of this session's work are
 build-verified only.
 
+## What happened in the twelfth session (2026-09-01)
+
+**Landed PR #39**, closing out the backlog from the fifth through
+eleventh sessions (credential rotation, the two LOW findings, the
+`.zfs`-traversal fix, the disko/`myZfsDatasetProperties` unification).
+`origin/master` had moved on independently (a plan-file-system rework,
+including a new `plan-gate` CI check) — merged in first, one real
+conflict (`docs/plans/.checksums`, an append-only manifest, resolved as
+a union of both sides' lines). `plan-gate` then correctly blocked the PR
+on two genuinely unresolved findings (F1, F2) on
+`2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md`, both
+predating `plan-gate`'s own existence: F1 was already reasoned to INFO
+in-doc and just needed the formal `plan-resolve` marker; F2 was
+genuinely moot, since the code it was about (`/tmp/restic` mounts) had
+already been replaced for an unrelated reason (`a4f5e95`, the eighth
+session's L-02 fix) — its own `RuntimeDirectory` lives under `/run`,
+always tmpfs, independent of `boot.tmp.useTmpfs`. Resolved both, gate
+passed, merged (`6a68cb3`).
+
+**Then started item 1, `push-deploy-vps` sandboxing (F-P7-06 / wave 2
+item 2.6's deferred third) — in progress, not finished.** Grounded the
+design in `nixos-rebuild-ng`'s actual Python source
+(`nixos_rebuild/tmpdir.py`, `process.py`) rather than the guesswork the
+item was deferred to avoid: it opens its own SSH `ControlMaster=auto`
+through a tempdir under `$TMPDIR`/`nixos-rebuild.<rand>`, created once
+at import time via `tempfile.TemporaryDirectory()`. `ProtectSystem =
+"strict"` alone makes `/tmp` read-only and this fails immediately (a
+guaranteed, reproducible break, not a subtle one);  `PrivateTmp = true`
+fixes it, since the socket only ever needs to be reachable from this
+unit's own process tree, which shares one mount namespace for the life
+of a single oneshot run. `nix show-config` confirmed
+`use-xdg-base-directories = false` (the pinned default), so nix's own
+eval/build cache genuinely has to be `~/.cache`, ruling out an
+`XDG_CACHE_HOME` redirect.
+
+Applied to `modules/nixos/push-deploy.nix`:
+`ProtectSystem=strict`, `PrivateTmp=true`,
+`ReadWritePaths=[flakeDir "/root/.ssh" "/root/.cache"]`, plus
+`systemd.tmpfiles.rules` creating `.cache`/`.ssh` — added only after the
+VM test (below) proved `ReadWritePaths` does **not** auto-create its
+target, and that a `+`-prefixed `ExecStartPre` does **not** help (the
+mount namespace is set up once for the whole unit before any
+`ExecStartPre` runs — `+` only bypasses privilege-dropping, not
+sandboxing). Build-verified on all five `nixosConfigurations`, committed
+as explicit WIP (`d470a61`) — **not deployed, and the module's own
+sandboxing is not yet proven to actually work end-to-end.**
+
+**`tests/push-deploy-sandbox.nix`, a real two/three-node VM test (the
+finding's own stated requirement), is built and registered
+(`modules/flake/checks.nix`) but has not yet gone green.** Imports the
+real module (not a copy); `deployer` runs the genuine
+`push-deploy-target.service` against `target` (an unprivileged `deploy`
+user over real ssh, the same run0-alias-plus-polkit elevation vps's own
+dispatcher uses); `deployer-broken`, a second node identical except
+`PrivateTmp` forced off, is the negative control proving that flag is
+load-bearing rather than incidental. Six real, non-obvious bugs were
+found and fixed by iterating against actual failures, not guessed:
+
+1. `myPushDeploy.minSwitchInterval`'s type is `positive-int`, not
+   `>= 0` — the test's `0` needed to become `1`.
+2. `security.run0.enableSudoAlias` needs `security.run0.enable = true`
+   *and* `security.sudo.enable = false` alongside it (an assertion
+   failure without both — checked against `modules/profiles/default.nix`'s
+   own real pattern, not guessed).
+3. **The load-bearing one.** `ReadWritePaths` does not create the
+   directory it grants access to — on a genuinely fresh root user with
+   no prior `.cache`, mount-namespace setup fails outright with ENOENT
+   before the script even starts. The first fix attempt (a
+   `+`-prefixed `ExecStartPre` to `mkdir -p` it) **also failed with the
+   identical error**, empirically disproving the assumption that `+`
+   bypasses sandboxing — it only bypasses privilege-dropping. Fixed
+   properly with `systemd.tmpfiles.rules`, which runs at boot,
+   independent of this unit entirely.
+4. A local Python variable in the test script named `log` shadowed the
+   test driver's own built-in `log` symbol (its logger) — caught by the
+   test driver's static type checker, not a runtime failure. Renamed to
+   `unit_journal`.
+5. A VM test node boots straight from its built closure and never runs
+   a real install/`nixos-rebuild switch`, so
+   `/nix/var/nix/profiles/system` — which the script itself `stat`s
+   over ssh before proceeding — doesn't exist on `target`. Added the
+   symlink in the test setup, plus `touch -h -d @0` to keep its mtime
+   from racing `minSwitchInterval`'s skip guard on a same-second
+   coincidence.
+6. The minimal flake being pushed pulled in NixOS's default
+   `documentation.nixos.enable`, which needs `nixos-render-docs`
+   (Python) — not pre-cached in the sandboxed test VM, no network to
+   fetch a source tarball with. Added `documentation.enable = false;`
+   to the pushed flake's module.
+
+**Currently blocked on a seventh issue, not yet root-caused: the pushed
+flake's evaluation triggers a from-scratch rebuild of `glibc`/`stdenv`/
+Python inside the deployer VM**, rather than reusing store paths already
+present in its own closure — even though the flake's `nixpkgs` input is
+pinned via `path:${pkgs.path}` to the exact same nixpkgs the VMs
+themselves were built from. This is precisely the shape
+`remediation.md` originally predicted when it deferred this item
+("building a full system closure inside a test VM and pushing it to a
+second node, far heavier than the zrepl two-node test and probably
+impractical as written") — the *mechanism* under test (SSH/sandboxing)
+turned out tractable and caught six real bugs, but the *closure-build*
+half is the part proving genuinely heavy, exactly as warned.
+
+**Most promising next step, not yet tried:** force the pushed target's
+`toplevel` to already be present in `deployer`'s own store closure
+before the test VM ever boots, rather than relying on evaluation
+naturally reusing it. Concretely: evaluate the *same* minimal
+`nixosSystem` (same `pkgs.path` pin, same module) once in the **outer**
+Nix expression that builds `tests/push-deploy-sandbox.nix` itself (not
+inside the VM), reference its `.config.system.build.toplevel` from
+somewhere in `deployer`'s own node config (e.g.
+`environment.etc."prebuilt-target-marker".source = targetToplevel;`) so
+it becomes part of `deployer`'s closure and gets copied into the VM at
+boot — then when `nixos-rebuild` inside the VM evaluates the identical
+flake, it should get the identical derivation, already realized, with
+nothing left to build. Two secondary fallbacks if that doesn't pan out:
+(a) narrow the test to exercise just the SSH/sandboxing mechanics
+directly (control-master, `nix-store --serve --write`, sudo-elevated
+`switch-to-configuration`) as literal shell commands under the real
+`serviceConfig`, without a full flake evaluation at all — less
+end-to-end fidelity, but avoids the closure-build problem entirely; or
+(b) accept the audit's original judgment that a full closure-push VM
+test is impractical, and instead deploy the current build-verified
+hardening to vps directly on the user's explicit go-ahead, watching
+vps's own profile-staleness alert (now wired up, see item 2 below) to
+catch a wrong guess quickly rather than silently.
+
+**Nothing deployed.** The hardening in `modules/nixos/push-deploy.nix`
+must not be treated as done — it is unverified beyond a local build.
+
+## What happened in the thirteenth session (2026-09-01)
+
+Picked the twelfth session's `push-deploy-vps` VM test back up and got it
+fully green — `nix build .#checks.x86_64-linux.push-deploy-sandbox -L`
+now passes both subtests. Full blow-by-blow (nine distinct bugs, each
+found by iterating against a real failure) is in
+`2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`,
+opened this session specifically so this level of detail didn't live only
+in a conversation transcript; summary here:
+
+The twelfth session's own theory (registering a matching closure in
+`deployer`'s config so the guest's nix would trust it) turned out
+incomplete: nix's `path:` flake fetcher re-copies even an
+already-store-resident nixpkgs tree into a freshly-hashed location, so
+nixpkgs' own internal `./relative` imports resolve against a *different*
+copy than what's already built and registered on the host — the real
+reason a from-scratch bootstrap was being triggered, not fixable by
+registering a closure computed against the original, un-rewrapped path.
+`builtins.storePath`, `builtins.getFlake` on a store path, and a bare
+path literal were all tried as ways to reference an already-built path
+without re-evaluating nixpkgs at all, and all three are rejected outright
+in the pure evaluation `nix build --flake` always runs under. The fix
+that actually works: a declared, locked `path:` input with `flake =
+false`, pointed at an already-built *leaf* derivation (a finished system
+closure, a package) rather than at nixpkgs itself — a leaf has no
+internal relative-path references left to re-root, so the fetcher's
+re-copy is just a filesystem copy, not a rebuild.
+
+That got the deploy as far as a real `switch-to-configuration switch`
+actually running against the real remote target — which then surfaced a
+run of five more real bugs, each only visible once the mechanism was
+genuinely running end to end: the pushed config silently dropping sshd/
+the deploy user (hangs the deploy instead of erroring, since it's killing
+the very ssh session driving the switch); the test framework's own
+inter-VM network interface and 9p-store overlay torn down by the same
+gap (fixed properly by building the pushed config through `nixpkgs.lib.
+nixos.evalTest` — the same low-level function `runNixOSTest` itself uses
+to build every node — rather than hand-reconstructing each piece of
+config, which visibly failed a second time even after a near-exact
+reconstruction, since overlayfs can't remount with even identical
+parameters); `system.switch.enable` defaulting off for VM test nodes,
+silently dropping `switch-to-configuration` from the closure; a genuine
+switch attempting real bootloader installation that a test node's normal
+kernel/initrd boot never exercises; and an isolated single-node
+`evalTest` call computing different network addressing than the real
+three-node test, colliding with `deployer`'s own address. Every one of
+these, plus the general pattern each teaches, is now in
+`docs/procedures/vm-testing.md`'s "Things that will bite you" for the
+next VM test author.
+
+**Not deployed anywhere as of this session's own end.** VM-verified is
+not deployed — that is still a separate, explicit user decision, same as
+always. ~~Deployed the following session — see "What happened in the
+fourteenth session".~~
+
+## What happened in the fourteenth session (2026-09-01)
+
+Closed out the thirteenth session's one remaining formality, then
+deployed the VM-verified `push-deploy-vps` hardening for real — but not
+to the host its name suggests.
+
+**D1 closed properly.** The thirteenth session's plan
+(`2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`)
+had one open decision, D1, left formally unresolved on purpose (its
+premise — the VM test still failing — had gone moot, but the plan
+skill's freeze gate needs a real user confirmation, not a hand-written
+marker). Asked the user; they confirmed there's nothing to decide and no
+backlog carry is needed. Recorded via `plan-decide … D1 answered "…"`
+(a `deferred` first attempt didn't satisfy `plan-move`'s freeze gate,
+which requires either `answered` or a `deferred`-then-`plan-carry`d item
+— re-recorded as `answered` since the user's confirmation was real). Three
+other Progress checkboxes (RESUME.md update, `vm-testing.md` gotchas,
+commit+push) were already done in `0789429` but still showed unchecked —
+ticked by hand since they're plain progress items with no `D`/`G`/`F` id
+for `plan-tick` to target. `plan-lint` clean, `plan-move … done` succeeded,
+committed (`3e30d75`) and pushed.
+
+**The VM test was re-run for real, not just re-trusted.** A first
+`nix build .#checks.x86_64-linux.push-deploy-sandbox -L` came back exit 0
+with an **empty log** — a Nix store cache hit from the thirteenth
+session's own build, still valid in the local store, not a fresh
+execution. Re-ran with `--rebuild` to force a genuine re-execution: both
+subtests passed again, cleanly, including the negative control's exact
+`Read-only file system` failure on the unmodified `PrivateTmp`-forced-off
+node. Worth remembering for any "please re-run the test" ask on this repo:
+`nix build` alone proves the derivation is still valid, not that the test
+was re-executed — use `--rebuild` when the point is to reproduce, not just
+to check.
+
+**Correction: the hardening deploys to homelab, not vps.** Asked the user
+whether to deploy "to vps" (matching how the finding and prior sessions'
+notes phrased it) and they said yes — but before switching anything, a
+`grep` of `myPushDeploy.enable` found it set only in
+`hosts/homelab/configuration.nix` (line 462), not `hosts/vps/configuration.nix`.
+`modules/nixos/push-deploy.nix` names its unit
+`systemd.services."push-deploy-${cfg.hostAttr}"`, and with
+`hostAttr = "vps"` that renders to `push-deploy-vps.service` — but the
+unit lives wherever `myPushDeploy.enable = true` is set, which is
+homelab. homelab builds vps's config locally and pushes+activates it over
+SSH as `vps-deploy@vps`; vps itself never runs this service. Confirmed
+empirically before saying anything: a build-verify + `nvd diff` of vps's
+current running system against its newest build showed **zero**
+push-deploy-related changes (only unrelated pre-existing backlog — `glow`,
+the tmpfs mount unit) — proof that "deploy to vps" would not have put the
+hardening live at all. Flagged this to the user rather than proceeding on
+the literal ask; they confirmed deploying to homelab instead.
+
+**homelab deployed, hardening confirmed live.** Build-verified homelab
+(`nix build .#nixosConfigurations.homelab.config.system.build.toplevel`),
+diffed the result against `/run/current-system` (via `nix copy` +
+`nvd diff`, then a direct `diff` of the rendered
+`push-deploy-vps.service` unit file itself, since `nvd`'s package-level
+view didn't surface the in-place service-file content change under a
+same-named entry): the only changes were `push-deploy-vps.service` gaining
+`ProtectSystem=strict`, `PrivateTmp=true`, and the three `ReadWritePaths`,
+plus the already-decided, previously-undeployed `zfs-dataset-properties`
+unit from the eleventh session. Shown to the user, confirmed, then
+`nixos-rebuild switch --flake .#homelab --target-host root@homelab`.
+
+**One slow-but-legitimate wait during the switch, root-caused rather than
+assumed hung.** `systemd-tmpfiles-resetup.service` (triggered because
+`push-deploy.nix`'s two new tmpfiles rules — `/root/.cache`, `/root/.ssh`
+— changed the rendered tmpfiles config) took about 2.5 minutes, long
+enough to check for a real hang: `/proc/<pid>/stack` showed it blocked in
+`poll()` waiting on a job-completion socket (normal while a subordinate
+systemd job runs, not evidence of a deadlock), and the subordinate job's
+own CPU/IO counters climbed steadily across repeated checks rather than
+sitting static — genuine progress, not a stall. Checked what it could
+possibly delete before concluding nothing valuable was at risk: homelab's
+own custom tmpfiles rules are all `A`-type (ACL-only, no deletion), the
+unit's journal for this run has zero "Removed" lines, and NixOS's built-in
+age-cleanup rules only target `/tmp`/`/var/tmp`, both already tmpfs
+(wiped every boot since the seventh session's `boot.tmp.useTmpfs`). It
+finished in ~22s CPU, in line with its own prior-run average (21.27s).
+
+**Verified after the switch, not just that it exited 0:** `systemctl
+--failed` — zero. `systemctl show push-deploy-vps.service -p ProtectSystem
+-p PrivateTmp -p ReadWritePaths` on homelab —
+`ProtectSystem=strict`, `PrivateTmp=yes`,
+`ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`, live. `/run/current-system`
+matches the new build's store path.
+
+**vps deployed too, same session, on a separate explicit ask.** Its
+pending diff (`glow`, the `tmp.mount` tmpfs unit) was unrelated backlog
+from earlier sessions (`glow` from the ninth session's fleet-default
+profile addition, `tmp.mount` from the seventh session's
+`boot.tmp.useTmpfs`) — build-verified only until now. Re-verified the
+diff hadn't changed since the earlier check (`nvd diff` against
+`/run/current-system`, identical output), got confirmation, then
+`nixos-rebuild switch --flake .#vps --target-host root@vps`. Switch log:
+`anubis-jellyfin.service` and `polkit.service` restarted (dbus-broker/
+firewall reloaded), `tmp.mount` started fresh. Verified after, not just
+exit 0: `systemctl --failed` — zero; `/run/current-system` matches the
+new build; `tmp.mount` active as tmpfs; public site
+(`https://jellyfin.skyseekerlabs.net`) still returns `302`, unaffected.
+**All four hosts (homelab, vps, torrent, thinkpad) are now on this
+branch's exact HEAD** — nothing left build-verified-only fleet-wide.
+
+## What happened in the fifteenth session (2026-09-03)
+
+Picked up item 4, `userns-remap` (`F-P4-07`) — the last agent-doable item
+flagged as needing its own VM test rather than a plain build-verify,
+since it re-maps *existing* volume ownership and getting it wrong would
+strand the two live game servers' own data. Full detail, all nine
+gotchas, in
+`2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`;
+summary here.
+
+**Research before writing anything**, per this repo's own "check source,
+not assumption" rule: read NixOS's pinned stable nixpkgs `docker.nix`
+directly (rev `e4bae1bd10c9c57b2cf517953ab70060a828ee6f`, fetched via
+`nix flake prefetch`) — `daemon.settings` is a bare freeform passthrough,
+no special `userns-remap` handling at all, so `"default"`
+auto-provisioning (which relies on Docker itself writing
+`/etc/subuid`/`/etc/subgid` at daemon startup) is unreliable on this
+repo's `mutableUsers = false` hosts, where those files are regenerated
+declaratively on every switch. Fetched Docker's own
+`docs.docker.com/engine/security/userns-remap/` too, which confirmed
+four load-bearing facts none of which were previously written down
+anywhere in this repo: storage moves to `/var/lib/docker/<uid>.<gid>/`
+per remap user (masks existing pulled images — both game images need
+re-pulling on first activation); bind-mount ownership is **never**
+auto-adjusted by Docker itself; the setting is **not live-reloadable**
+(forces a full `dockerd` restart); and it's daemon-wide. Also read the
+real, live ownership off homelab directly (`stat`, not assumed):
+`/srv/factorio/main` is uniformly `845:845`, `/srv/minecraft/vanilla-plus`
+uniformly `1000:1000` — exactly the image-baked uids the module's
+migration needs to handle.
+
+**New reusable module: `modules/nixos/docker-userns-remap.nix`**
+(`myDockerUserns`). Declares a `dockremap` user with a fixed, declarative
+subuid/subgid range (`subIdStart`/`subIdCount`, default
+`100000`/`65536`) rather than trusting Docker's own auto-provisioning;
+sets `virtualisation.docker.daemon.settings.userns-remap = "dockremap"`;
+and a `migrations` list (`path`/`uid`/`gid` triples) drives a oneshot
+`docker-userns-remap-migrate.service` that runs `chown --from=<uid>:<gid>
+-R <uid+subIdStart>:<gid+subIdStart>` per entry — `--from` scopes the
+chown to files still at the old ownership, which is both surgical (never
+touches anything else already migrated or unrelated) and naturally
+idempotent. A `/simplify` pass (see the plan's G10) added a per-path
+completion marker in a `StateDirectory` (deliberately outside the
+migrated tree — a marker inside it would be owned by real host root,
+unreachable by the container's own remapped namespace, and factorio's
+entrypoint does its own whole-volume `chown -R` at every start) so a
+migrated tree is skipped outright on later boots rather than re-walked.
+Ordered `before`/`wantedBy` `docker.service` rather than tied to any
+specific container's unit name — every `docker-<name>.service` nixpkgs
+generates already carries `After = docker.service`, confirmed by reading
+`oci-containers.nix` directly, so this transitively runs before any
+container touches its bind mount without the module needing to know
+container names at all.
+
+**Wired into homelab**: `hosts/homelab/configuration.nix` sets only
+`myDockerUserns.enable = true` — the two real migrations
+(`/srv/factorio/main` at `845:845`, `/srv/minecraft/vanilla-plus` at
+`1000:1000`) live in `factorio.nix`/`minecraft.nix` themselves (also a
+`/simplify` fix, G10: the host file originally hardcoded both, which an
+altitude review caught as contradicting those same files' own stated
+rule for their neighboring tmpfiles line — "declared here, next to the
+path it protects... an image bump cannot lock the container out").
+Build-verified on all five `nixosConfigurations`.
+
+**`tests/docker-userns-remap.nix` fully green after five real,
+distinct bugs** (plus the marker mechanism above adding an 8th subtest),
+each found by iterating against an actual failure —
+`nix build .#checks.x86_64-linux.docker-userns-remap -L` passes all 8
+subtests. Two nodes, matching `push-deploy-sandbox.nix`'s
+positive/negative-control shape rather than a live toggle (Docker's own
+docs rule out a live toggle — see above): `remapped`
+(`myDockerUserns.enable = true`) and `plain` (identical container and
+pre-seeded bind-mount data, remap never enabled). A purely-Nix-built
+`pkgs.dockerTools.buildImage` probe image, no network needed. Proves,
+against real dockerd and a real running container: the subuid range and
+dockerd's own `userns` security option both render; a pre-seeded tree
+(standing in for the real game data) actually migrates to
+`100845:100845`; the container's own PID 1, read from the *host's*
+`/proc` via its real PID, is uid `100000` — not `0`; the container reads
+its migrated pre-existing data and writes new data into the same
+directory; a second migration run is a genuine no-op; and `plain`
+confirms both the original vulnerability (container root really is host
+uid 0) and that unmigrated data stays exactly as it was.
+
+The five bugs, none of them in the final module's actual design: a
+`tee`'d build reported exit 0 while the real error was "file not tracked
+by Git" — the same `if cmd | tail` exit-code trap this file's own "Rules
+and traps" already names, just with `tee`; a wrong assumption that NixOS
+writes `/etc/docker/daemon.json` (it doesn't — `docker.nix` passes
+`--config-file=<store path>` straight to `dockerd`'s `ExecStart`, fixed
+by asserting against `docker info --format '{{.SecurityOptions}}'`
+instead, dockerd's own live view); a ruff lint failure on the test
+script itself (an f-string with no placeholders); and a wrong expected
+uid in the test's own assertion (`100845` instead of the correct
+`100000` — the probe's PID 1 is the container's own root process, which
+never drops privileges, so it maps to `0 + subIdStart`, not
+`845 + subIdStart`; `845` is only the *bind-mount data*'s uid, an
+easy but real thing to conflate).
+
+**Not deployed anywhere.** Worth flagging plainly before anyone says
+yes, since it's genuinely more disruptive than this audit's other
+build-verified-and-waiting items: enabling `userns-remap` forces a full
+`dockerd` restart (both game containers go down, not a graceful
+rolling update) and both `factoriotools/factorio:2.1.14` and
+`itzg/minecraft-server` will need to re-pull from the internet on first
+activation, since Docker's storage path changes per remap user. That is
+a separate, explicit, still-open user decision — this session only
+VM-verified the mechanism.
+
+**Correction, same session: the required `security` subagent pass was
+skipped closing this plan, caught by the user afterward.** The plan
+above was already `plan-move`d to `done/` and committed (`97baeaf`)
+before the review ran — since a `done/` plan cannot be edited, ever, the
+review and its fixes live in a new plan instead,
+`2026-09-03-security-review-of-docker-userns-remap.md`, created
+*before* the review's result came back specifically so there was
+nowhere else to write findings. 3 CONFIRMED findings (1 MEDIUM, 2 LOW),
+all fixed: `subIdStart`'s default (`100000` above) collided with
+NixOS's own built-in `autoSubUidGidRange` pool start, invisible to its
+own collision check — moved to `10000000` (every `100845`/`100000` uid
+figure above is stale by that same delta, now `10000845`/`10000000`);
+the migration unit's `CapabilityBoundingSet` was unrestricted, scoped
+to `CAP_CHOWN`/`CAP_FOWNER`/`CAP_DAC_OVERRIDE`/`CAP_DAC_READ_SEARCH`;
+and a failed migration didn't block `docker.service` (`wantedBy` above
+is now `requiredBy` — fail-closed, the user's explicit choice when
+asked, since this is exactly the kind of trade-off decision that
+shouldn't be assumed). The fail-closed fix is proven empirically, not
+just configured: a new VM node forces a real migration failure and
+asserts `docker.service` never reaches `ActiveState=active`.
+`tests/docker-userns-remap.nix` is now 9 subtests (was 8 above), still
+green. **Lesson for next time**: if a required subagent pass gets
+skipped and caught only after a plan is already closed, open the
+follow-up plan *before* the pass returns, not after — there is no
+window where findings have anywhere valid to land otherwise.
+
+## What happened in the sixteenth session (2026-09-03)
+
+Worked through the batch of D-decisions the user gave directly in chat:
+D1, D2, D4, D5, D6, D7, D8, D12, D16. Used Claude's own task-tracking
+tool to go one at a time, per the user's ask.
+
+**D1 — closed.** Rotation is fully done (10/10 + 2 not-required, closed
+2026-09-01), so the old exposed credentials no longer authenticate to
+anything. `~~D1~~` struck in both `user-actions.md` and
+`accepted-risks.md` §2. Also fixed **D3**'s stale checkbox while there —
+it was already answered 2026-08-27 (branch-protection ruleset) but the
+decision table in `user-actions.md` had never been updated to match.
+
+**D2 — explained, not superseded.** Walked through H1 in detail (three
+unattended paths trust `origin/master` with zero authenticity check;
+laptops authenticate with the interactive user's own push-capable key;
+homelab re-TOFUs `github.com`/vps host keys every boot). Checked for
+supersession: not superseded by anything done, but cross-referenced —
+`2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` lists
+signature verification as its own design question D5, tied to this D2,
+unresolved there too; `D11-analysis.md` notes D2 compounds with D11.
+Noted in `user-actions.md`: if D2 is later accepted, its accepted-risk
+slot is **not** AR-7 (that's D14's) — needs the next free number.
+
+**D4 — explained in detail, not implemented.** Append-only B2 key +
+Object Lock: two independent defenses (compromised host vs. compromised
+B2 account), plus the real design wrinkle that Object Lock is in tension
+with restic's current aggressive prune (`--keep-daily 2`,
+`daysFromHidingToDeleting=1`) — pruning would need to move to a separate
+non-append-only pass, or storage grows during the lock window. Still the
+user's call; no plan created yet.
+
+**D5 — cross-referenced, no new plan needed.** Found it already fully
+tracked: `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+carries the exact `worktree-fde-secureboot-plan` branch (19 commits,
+FDE+Secure Boot+TPM2, predates the dendritic restructuring) as its own
+D2 (revive/rebase/abandon). Noted the cross-reference in
+`user-actions.md` rather than duplicating the plan.
+
+**D6 — explained in detail.** Flat tailnet ACL (`"ip": ["*"]`
+everywhere) bounded on three hosts by per-interface firewall rules but
+**unbounded on vps**, which sets `trustedInterfaces = ["tailscale0"]` —
+no packet filter at all on that interface. Live drift noted: an untagged
+Android phone is a tailnet member covered by `autogroup:member`, absent
+from the repo. homelab's subnet route + exit node turn any single
+compromised tailnet device into a LAN + egress pivot. Flagged that
+fixing vps's `trustedInterfaces` is required either way, independent of
+whether the ACL itself gets narrowed or the flat model gets accepted.
+
+**D7 — answered (implement, not accept) and given a todo plan.** New
+`2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+not started. Carries forward P3's own audit-time caveat that
+conventional log-based IDS is a poor fit here (sshd tailnet-only,
+game-server log formats have no CrowdSec parsers) — mechanism still
+needs picking; candidates recorded (network-layer anomaly detection,
+real CrowdSec parsers for the actual formats, file-integrity monitoring,
+scoped auth-anomaly detection) plus the requirement to wire into
+`myHealthAlerts` so a real detection isn't a repeat of C3's
+detector-that-alerts-nowhere failure mode. `accepted-risks.md` §2's D7
+row struck (not accepted, implementing).
+
+**D8 — answered (accept) and written up as AR-8, then corrected.**
+User's reasoning: the recovery ISO is not meant to be secure, it is
+meant to make recovery of these hosts, or a third party's, as easy as
+possible. Written into `accepted-risks.md` as AR-8. **First draft was
+wrong and the user caught it**: it claimed the ISO "bakes in the fleet's
+admin SSH keys" as part of the exposure, phrased as if that were a leak.
+Checked `hosts/isoimage/configuration.nix:98` — what's baked in is
+`vars.publicSshKeys`, literally SSH *public* keys, already plaintext
+elsewhere in this public repo. Nothing is leaked; that's just how the
+admin SSHes into the booted rescue environment as root. Fixed AR-8 to
+say so and to correctly attribute the real, separate, LOW-rated issue
+(`F-P5-10`/`L-03`): the built ISO artefact sits unverified in
+user-writable `~/Downloads` with no checksum, and because the flake is
+public/pinned an attacker could plausibly build a matching or swapped
+ISO — an integrity/tampering concern, not a confidentiality one. **Worth
+remembering for future write-ups in this file: don't restate a finding's
+language without checking the underlying mechanism yourself.**
+
+**D12 — answered (noexec) and fully implemented, deployed nowhere.**
+Added `noexec` to `modules/nixos/nfs-homelab-mounts.nix`'s shared
+`mountOpts` (alongside the existing `nosuid`/`nodev`), replacing the long
+inline "noexec declined" comment with a one-line plan citation per
+`style-guide.md`'s "why belongs in the plan file" rule. Went through a
+real plan file,
+`2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md`:
+build-verified clean on `thinkpad` and `torrent` (confirmed via `$?`
+directly, not through a `tail`-piped command, to avoid the exit-code
+trap this file already warns about), then ran the required `security`
+subagent pass **before** closing the plan — the fifteenth session's own
+lesson, applied this time instead of skipped. One INFO finding came
+back: the module change closed D12, but `accepted-risks.md` (AR-6 and
+its D12 row) and `user-actions.md`'s D12 checkbox still described the
+shares as executable and the decision as open — a doc-sync gap, not a
+security defect. Fixed: AR-6 marked superseded (risk no longer accepted,
+fixed instead), both D12 rows updated to the same `~~D#~~ **Answered**`
+convention already used for sibling decisions. Plan moved to `done/`
+only after the fix and the re-check, not before. **Not deployed
+anywhere** — build-verified only, per standing policy.
+
+**D16 — raised for review, not yet decided.** Laid out all four hosts'
+thresholds (homelab/vps/torrent 504h, thinkpad 720h) and flagged a
+wrinkle worth deciding alongside the numbers: `scheduleEnable = false`
+fleet-wide means there is currently no timer running for these
+thresholds to actually validate against — they're presently watching
+"has anyone manually switched this host in N weeks," not "did a
+scheduled deploy silently stop firing," which was the original intent.
+**Still open, waiting on the user.**
+
 ## What is left
 
 ### Rotation — done
@@ -957,12 +1542,37 @@ outstanding.**
    in the eleventh session" above and
    `2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md`.
    Build-verified only, not deployed.
-1. **`push-deploy-vps` sandboxing** — the last third of wave 2 item 2.6,
-   deferred on purpose. Needs a VM test with a **real remote target**,
-   because `PrivateTmp` + `ProtectSystem = "strict"` can break the SSH
-   control-master path and nix's fetcher cache. A wrong guess means vps
-   silently stops updating — though that is now *detectable*, since vps
-   watches its own profile mtime (see item 2).
+1. ~~**`push-deploy-vps` sandboxing**~~ — **VM test fully green as of the
+   thirteenth session (2026-09-01), re-confirmed with a forced fresh
+   rebuild and deployed in the fourteenth.** `nix build .#checks.x86_64-linux.
+   push-deploy-sandbox -L` passes both subtests: the real, hardened unit
+   builds locally, copies the closure over real ssh, and runs a real
+   remote `switch-to-configuration switch` that actually activates on
+   `target`; the negative control (`PrivateTmp` forced off) fails exactly
+   as predicted (`Read-only file system` creating nixos-rebuild-ng's own
+   ssh-controlmaster tmpdir), proving `PrivateTmp` is load-bearing, not
+   incidental. F-P7-06 / wave 2 item 2.6 is now fully closed — all three
+   deferred items are VM-tested. Getting here took nine more real,
+   distinct bugs beyond the twelfth session's six (root-caused, not
+   guessed) — the from-scratch-rebuild blocker turned out to be nix's
+   `path:` fetcher re-copying nixpkgs into a freshly-hashed location, not
+   fixable by registering a matching closure as originally planned; the
+   actual fix was building the pushed config through `nixpkgs.lib.nixos.
+   evalTest` (the same machinery `runNixOSTest` itself uses) instead of a
+   plain `nixosSystem` call, plus five smaller gaps that only that switch
+   surfaced. Full detail — every gotcha, the abandoned approaches and why
+   they didn't work, worth reading before touching this test again — is
+   in `2026-09-01-vm-verify-push-deploy-vps-sandboxing-f-p7-06-wave-2-item-2-6.md`
+   (`plan-move`d to `done/` in the fourteenth session, D1 formally
+   `answered`) and in `docs/procedures/vm-testing.md`'s own "Things that
+   will bite you". **Deployed 2026-09-01 (fourteenth session) — to
+   homelab, not vps.** The hardened unit (`push-deploy-vps.service`) runs
+   on homelab, which builds vps's config and pushes+activates it over
+   SSH; vps itself never runs this unit. Confirmed live via `systemctl
+   show`: `ProtectSystem=strict`, `PrivateTmp=yes`,
+   `ReadWritePaths=/etc/nixos /root/.ssh /root/.cache`, zero failed
+   units. See "What happened in the fourteenth session" above for the
+   full correction and verification detail.
 2. ~~**The skipped-deploy half of `F-P7-09`**~~ — **done in the fourth
    session.** All four hosts watch `/nix/var/nix/profiles/system` for
    staleness, and `onSuccess` is replaced by a gated
@@ -991,8 +1601,47 @@ outstanding.**
    Needs either a load-representative window or a user decision on a
    generous blast-radius bound. **That is the open question, and it is
    the user's.**
-4. **`userns-remap` unset** — container uid 0 is host uid 0 on every bind
-   mount. Re-maps existing volume ownership, so it needs its own VM test.
+4. ~~**`userns-remap` unset**~~ — **VM test fully green, 2026-09-03
+   (fifteenth session).** `nix build .#checks.x86_64-linux.docker-userns-remap -L`
+   passes all 8 subtests: a real `dockremap` subuid range and dockerd's
+   own `userns` security option both render; a pre-seeded bind-mount
+   tree (standing in for `/srv/factorio/main`'s real `845:845`) migrates
+   to `100845:100845`; the running container's PID 1 is confirmed, read
+   from the *host's* `/proc`, to be uid `100000` — not `0`; the
+   container reads its migrated pre-existing data and writes new data
+   into the same directory; a second migration run changes nothing
+   (idempotent); and a `plain` negative-control node (identical
+   container and pre-seeded data, remap never enabled) confirms both the
+   original vulnerability (container root really is host uid 0) and that
+   its own pre-seeded ownership is untouched. New reusable module,
+   `modules/nixos/docker-userns-remap.nix` (`myDockerUserns`), wired into
+   homelab for both game containers, build-verified on all five
+   `nixosConfigurations`. Full detail — five real bugs found by iterating
+   against actual failures (two were test-script mistakes, not design
+   mistakes), plus a `/simplify` pass that added a completion marker
+   (skip the recursive chown once migrated) and moved each migration
+   declaration into its owning service module next to the tmpfiles rule
+   it was disconnected from — in
+   `2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`.
+   **A required `security` subagent pass was skipped closing that plan
+   (caught after the fact) — done separately in
+   `2026-09-03-security-review-of-docker-userns-remap.md`, since a
+   `done/` plan cannot be edited.** 3 CONFIRMED findings (1 MEDIUM, 2
+   LOW), all fixed and re-VM-verified (9 subtests now): `dockremap`'s
+   subuid range collided with NixOS's own default auto-allocation start
+   (`subIdStart` moved to `10000000`); the migration unit's
+   `CapabilityBoundingSet` was unrestricted (scoped to `CAP_CHOWN`/
+   `CAP_FOWNER`/`CAP_DAC_OVERRIDE`/`CAP_DAC_READ_SEARCH`); a failed
+   migration didn't block `docker.service` (`requiredBy` now, not
+   `wantedBy` — fail-closed, user's explicit choice, empirically proven
+   with a VM node that forces a real failure). **Not deployed anywhere.**
+   Worth flagging before anyone says yes:
+   enabling this is disruptive, not a quiet config flip — Docker's own
+   docs confirm `userns-remap` is not live-reloadable (forces a full
+   `dockerd` restart) and changes Docker's storage path per remap user,
+   so both game containers will re-pull their images from the internet
+   on first activation. That is a separate, explicit, still-open user
+   decision.
 5. ~~**Deploy `torrent` and `thinkpad`**~~ — **done 2026-09-01**, as part
    of the ninth session's zrepl-key rotation; see above. ~~vps still
    carries a stale DNAT rule for the deleted 34198~~ — **vps deployed
@@ -1010,16 +1659,56 @@ rotate the ten credentials from `F-P8-02`.~~ **Also stale, same
 correction:** rotation closed 2026-09-01, see "Rotation — done" above —
 this line was contradicting that section in the same file.
 
-Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
+~~Still open: **D1, D2, D4, D5, D6, D7, D8, D12**, plus **D15** (container
 `--memory` ceiling — blocks half of the resource-ceilings item) and
 **D16** (confirm the new deploy-staleness thresholds; not blocking),
-both added in the fourth session. ~~D11 is time-critical.~~ **Not
+both added in the fourth session.~~ **Updated 2026-09-03 (sixteenth
+session)** — see "What happened in the sixteenth session" above for full
+detail on each:
+- **D1** — closed (rotation done, credentials dead).
+- **D2** — still open; explained in detail, not superseded, cross-referenced
+  from `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md`'s
+  own D5 and from `D11-analysis.md`.
+- **D4** — still open; explained in detail (append-only B2 key + Object
+  Lock, with the prune-strategy tension flagged). No plan yet.
+- **D5** — still open; already tracked in
+  `2026-08-25-stale-branches-and-distributed-builders-follow-up.md`
+  (its own D2) — no new plan needed, just cross-referenced.
+- **D6** — still open; explained in detail (flat ACL, vps's unbounded
+  `trustedInterfaces`, the untagged phone, homelab's pivot risk).
+- **D7** — **answered: implement.** New todo plan,
+  `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`,
+  not started — mechanism still needs picking per P3's own log-format
+  caveat.
+- **D8** — **answered: accept.** `accepted-risks.md` AR-8, corrected
+  after the user caught an inaccurate "admin keys leaked" claim in the
+  first draft (they're public keys — real issue is the unverified ISO
+  artefact, not a credential leak).
+- **D12** — **answered: fix, not accept.** `noexec` added and
+  build-verified on `thinkpad`/`torrent`, security-subagent pass clean,
+  plan closed to `done/`. `accepted-risks.md` AR-6 marked superseded.
+  **Not deployed.**
+- **D15** — the `--memory` half was already answered and done before
+  this session (50%/`7g` cap); only `--cpus` remains, still the user's
+  to size — see item 3 below, unchanged by this session.
+- **D16** — raised for review with the user; **still open**, plus a new
+  wrinkle surfaced: `scheduleEnable = false` fleet-wide means these
+  thresholds aren't currently validating against the timer cadence they
+  were sized for.
+
+~~D11 is time-critical.~~ **Not
 time-critical** — same stale-timer correction above; D11 itself (the
 `flake-update-test` auto-merge re-evaluation) is still genuinely
-unanswered, just not on a clock. Also the factorio
-account token is still exposed in ZFS snapshots and restic backups taken
-before `/srv/factorio/new` was deleted, and is the **same** credential
-`factorio-main` uses.
+unanswered, just not on a clock. ~~Also the factorio account token is
+still exposed in ZFS snapshots and restic backups taken before
+`/srv/factorio/new` was deleted, and is the **same** credential
+`factorio-main` uses.~~ **Stale as of 2026-09-01 — moot.** That claim
+was true only because the pre-exposure token was still live; rotation
+item 12 (`rotation-runbook.md`, done 2026-08-28) replaced
+`factorio_token`/`factorio_game_password` at factorio.com and in sops.
+The old value sitting in pre-2026-08-28 ZFS snapshots and restic backups
+no longer authenticates to anything — it is dead, not merely hidden.
+Nothing left to do here.
 
 ---
 

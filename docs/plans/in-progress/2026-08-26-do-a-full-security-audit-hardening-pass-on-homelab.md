@@ -10,6 +10,39 @@ blocked_by:
 
 # do a full security audit / hardening pass on homelab
 
+## State
+
+**2026-09-10.** Everything agent-doable is done and landing.
+Phases 0–4 complete; wave 3 items, credential rotation, and both
+deliberately-deferred hardening items (`push-deploy-vps` sandboxing,
+docker `userns-remap`) were finished and VM-verified in the later
+sessions (see `docs/audits/2026-08-26/RESUME.md`, which trails the
+final sessions slightly). All four hosts have been running the audit
+branch since the ninth session with zero failed units.
+
+The branch is landing as `security-audit-landing` — a merge of
+`worktree-worktree-security-audit-plan` with current master (conflicts:
+the retired `docs/plans/.checksums`, dropped; `modules/flake/checks.nix`,
+union of both sides' new checks) plus one fix: the push-deploy VM test
+imported nixpkgs' ssh-keys via `"''${pkgs.path}/…"` interpolation, which
+copies the whole tree into a GC-able store path — after GC, every
+`nix flake check` died with `path … is not valid` (the same upstream
+bug family as
+`2026-09-10-nix-flake-check-fails-on-master-base16-schemes-drv-is-not-valid.md#G1`);
+now path concatenation, like the zrepl test always warned.
+
+Verified to rung 5 (all four hosts switched to this branch's content
+since 2026-09-01 and observed healthy) for the audit work itself; the
+landing merge on top is verified to rung 3 (verify-ladder fully green:
+flake check + all five host builds).
+
+Open after landing: D1 (does homelab need its own intrusion detection
+on top of tailnet device auth — note the fleet log-monitoring stack,
+`2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md`,
+now gives homelab log-based alerting, which bears directly on this),
+and the user-action list in `docs/audits/2026-08-26/user-actions.md`.
+This plan stays in-progress until D1 is decided.
+
 ## Original plan
 
 - [ ] **2026-08-26: do a full security audit / hardening pass on

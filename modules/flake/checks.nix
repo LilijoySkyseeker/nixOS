@@ -38,6 +38,11 @@
           dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
         };
 
+        docker-userns-remap = import ../../tests/docker-userns-remap.nix {
+          pkgs = config.flake.pkgsUnstable;
+          dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
+        };
+
         deploy-guards = import ../../tests/deploy-guards.nix {
           pkgs = config.flake.pkgsUnstable;
           deployGuardsScript = config.flake.deployGuardsScript;
@@ -54,6 +59,16 @@
 
         vps-refused-connection-logging = import ../../tests/vps-refused-connection-logging.nix {
           pkgs = config.flake.pkgsUnstable;
+        };
+
+        push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
+          pkgs = config.flake.pkgsUnstable;
+          pushDeployModule = config.flake.modules.nixos."push-deploy";
+          # The exact flake, not just its already-instantiated `pkgs`, so the
+          # test can call `.lib.nixosSystem` itself and get the byte-identical
+          # derivation the pushed flake's own `nixpkgs.lib.nixosSystem` call
+          # will produce inside the VM -- see the test file's own comment.
+          nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
         };
       };
     };
