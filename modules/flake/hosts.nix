@@ -92,11 +92,7 @@ in
         nixosModules.nfs
         nixosModules.samba
         nixosModules.loki
-        # grafana stays unwired until secrets/secrets.yaml carries
-        # grafana_admin_password + grafana_secret_key (operator-added;
-        # sops-install-secrets fails the *build* on a missing key) --
-        # then add nixosModules.grafana here
-        # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#G9
+        nixosModules.grafana
         nixosModules."alloy"
       ];
     };
