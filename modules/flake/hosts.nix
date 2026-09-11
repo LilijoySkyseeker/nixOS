@@ -80,6 +80,7 @@ in
         nixosModules."docker-publish-guard"
         nixosModules."docker-userns-remap"
         nixosModules."zfs-dataset-properties"
+        nixosModules."datasets"
         nixosModules.jellyfin
         nixosModules.immich
         nixosModules.beets
