@@ -12,10 +12,41 @@ blocked_by:
 
 ## State
 
-**2026-09-10, built and VM-verified on branch
-`worktree-loki-grafana-alloy`; not yet deployed anywhere.** The branch
-stacks on `worktree-zfs-policy-tiers-mydatasets-rebased` (PR #76),
-which provides `zroot/persist/loki`.
+**2026-09-11, deployed to homelab and vps; working on homelab, blocked
+for vps on a tailnet ACL the user owns (G11).**
+
+Live on homelab: the three `myDatasets` datasets were created by hand
+(`zroot/persist` parent included — it did not exist; disko's `-p` covers
+fresh installs, so this was live-host-only), the two reclassified paths
+moved aside as `*.pre-dataset` and their datasets mounted, Grafana wired
+now that its sops keys exist, and the deploy started the whole stack:
+loki, grafana, alloy, alertmanager, docker and jellyfin all active, zero
+failed units. Verified on the real host: Loki ready and ingesting
+homelab's own journal (`host` label populated), the 11 ruler rules
+loaded, Alertmanager's webhook env rendered to a real URL, Grafana
+healthy on :3000. vps is deployed and its Alloy is up.
+
+**The one thing not working is vps→homelab log shipping, and it is not a
+config fault** — homelab's `tailscaled` drops the packets ("no rules
+matched"), i.e. the tailnet policy forbids vps from initiating to
+homelab at all (port 22 too), while torrent reaches both 3100 and NFS
+fine. That asymmetry looks deliberate and protective, so **the open
+question is the user's**: allow vps→homelab:3100 in the Tailscale ACL
+and accept that the internet-facing host gains an inbound path into the
+home network (the exact exposure F4/F10 are about), or ship vps's logs
+some other way. Until then homelab is self-monitoring only. See G11.
+
+D16 is answered in passing: Alloy settles at **~73MB RSS on vps, under
+D15's 100MB line** — the 174MB seen right after deploy is journal
+catch-up, not steady state (G12). D15's fallback is not needed.
+
+Torrent and thinkpad are built and wired but not deployed (the user
+authorized homelab and vps only).
+
+Previous state, 2026-09-10 — built and VM-verified on branch
+`worktree-loki-grafana-alloy`; the branch stacked on
+`worktree-zfs-policy-tiers-mydatasets-rebased` (PR #76), which provides
+`zroot/persist/loki`.
 
 What exists: `modules/services/loki.nix` (Loki 3.7.7 on homelab,
 tsdb/v13 schema, 30d retention via compactor, ruler with the 11-rule
@@ -104,10 +135,11 @@ application-level alert rules (D13).
       iptables LOG rule — see D7, G1
 - [x] persistence entries for Alloy's cursor on **all** hosts, including
       the two with no impermanence yet — see G3
-- [ ] VM test the whole pipeline (`tests/loki-pipeline.nix`), then
-      measure Alloy's RSS on vps against the 100MB line — test written
-      and wired into checks; run pending; the on-vps measurement needs
-      the real deploy — see D15, D16
+- [x] VM test the whole pipeline (`tests/loki-pipeline.nix`), then
+      measure Alloy's RSS on vps against the 100MB line — test passes
+      in `nix flake check`; measured on the real vps 2026-09-11 at
+      ~73MB steady state, under the line, so D15's fallback is unused
+      — see D15, D16, G12
 - [x] Loki ruler rules for the launch alert set — see D13; the
       vps-deploy and polkit events needed server-side log lines added
       (dispatcher `logger`, `polkit.log()`) before rules could match
@@ -490,6 +522,95 @@ overstates the D15 budget number — but it is enough signal that the
 real-vps measurement (D16) should be expected to land near or over the
 line, and D15's first lever (scope reduction on vps only) is the likely
 outcome. Measure on vps before reaching for it.
+
+> **Superseded 2026-09-11 by the real measurement (G12): Alloy on vps
+> settles at ~73MB RSS, under the line.** G10's prediction was wrong
+> because cgroup `MemoryCurrent` counts page cache the process can give
+> back. D15's fallback is not needed.
+
+### G11 — the tailnet ACL blocks vps from reaching Loki, by design
+
+Found 2026-09-11, immediately after deploying both hosts: vps's Alloy
+cannot push to homelab at all. Not a firewall or config fault —
+homelab's own `tailscaled` drops the packets before the host firewall
+sees them:
+
+```
+Drop: TCP{100.80.252.80:50834 > 100.98.142.41:3100} 60 no rules matched
+```
+
+`no rules matched` is the **Tailscale ACL** (the tailnet policy file in
+the admin console, outside this repo). It is scoped to vps specifically,
+not to the port: vps cannot open port 22 to homelab either, while
+torrent reaches homelab on both 3100 and 2049 (NFS) fine. So the tailnet
+policy deliberately allows the home hosts to initiate into homelab and
+forbids the internet-facing host from doing so — traffic to vps flows
+homelab→vps (push-deploy), never the reverse, so nothing had exercised
+this direction before.
+
+**This collides head-on with D11**, which assumed every host could push
+to the aggregator because "the tailnet is the fleet's existing trust
+boundary". For vps that is not true, and the asymmetry is a real
+security property rather than an oversight: it is exactly the control
+that would contain F4/F10's "a compromised tailnet node reads or deletes
+the whole fleet journal", where the node most likely to be compromised
+is the public-facing one. Opening it is therefore a genuine
+trust-boundary decision for the user, not a config fix — see the State
+section's open question.
+
+Everything else works: homelab ships its own journal, the ruler loaded
+the rules, Alertmanager rendered a real webhook URL, and Grafana is
+healthy. vps's Alloy stays up and retries harmlessly in the meantime.
+
+### G12 — Alloy's startup spike is not its steady state
+
+Measured on the real vps (1GB host, 2026-09-11): **~174MB RSS in the
+first minutes, settling to ~73MB and holding** (74592 → 74672 kB over
+45s). The early figure is journal catch-up (`max_age = 24h`), not a
+working-set floor, so a measurement taken right after a deploy
+overstates the number D15 is judged against by more than 2x.
+
+Caveat on the 73MB: it was measured while pushes were failing (G11), so
+it excludes whatever the write path holds when it is actually shipping.
+Streaming should not move it much, but re-measure once G11 is resolved
+before treating the D15 question as finally closed.
+
+### G13 — a root-rewritten config file crash-looped factorio under userns-remap
+
+Not a log-stack defect, but this deploy is what surfaced it, so it is
+recorded here. This switch was the first time homelab actually ran
+docker `userns-remap` (merged in PR #78, VM-verified, never deployed).
+Minecraft came up healthy; factorio crash-looped, exit 1, ~every 25s,
+with zero restarts on the same host earlier the same day or the day
+before.
+
+The container's own entrypoint runs `chown -R factorio:factorio
+/factorio` and died on:
+
+```
+chown: changing ownership of '/factorio/config/server-settings.json': Operation not permitted
+```
+
+Every sibling file had been migrated to `10000845` (the remapped uid)
+and `server-settings.json` alone was `0:0`, re-created root-owned
+minutes earlier. Cause: `modules/services/factorio.nix`'s `preStart`
+patches the secrets into that file with `jq … > "$settings.tmp"; mv
+"$settings.tmp" "$settings"`, and the `mv` installs a **new**
+root-created file, discarding the migrated ownership on every
+activation. Before remap that was invisible, because the container's
+root was real root and could chown anything; under remap, container
+root is an unprivileged host uid and can only chown files inside its
+mapped range, so a `0:0` file is permanently unchownable.
+
+Fixed by taking owner and mode from the enclosing `config/` directory
+(`chown --reference`), which the migration keeps correct — right both
+with and without remap, and it hardcodes no uid offset.
+
+**The general trap**: a userns-remap migration that fixes ownership
+*once* is not enough. Anything that recreates a file inside a bind mount
+as root re-breaks it at the next activation, and the failure appears at
+container start rather than at the activation that caused it. Worth
+checking any other root-written file under a remapped bind mount.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

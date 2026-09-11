@@ -35,5 +35,6 @@
     pkgs: with pkgs; [
       jq # JSON on the command line: `tailscale status --json`, webhook payloads
       ipset # inspect CrowdSec's blacklist sets, which the firewall rules match on
+      openssl # `rand` for generating secret values, `s_client` for inspecting TLS
     ];
 }

@@ -27,6 +27,17 @@ in
                | .tags = ["game"]
                | .non_blocking_saving = true' \
               "$settings" >"$settings.tmp"
+            # the replacement file is created by root (this runs as root on
+            # the host), and under docker userns-remap the container's root
+            # is an unprivileged host uid that cannot chown a real-root
+            # file -- the image entrypoint's `chown -R factorio /factorio`
+            # then fails EPERM and the container exits 1 on every start.
+            # Take owner and mode from the enclosing config/ directory,
+            # which the remap migration keeps correct, so this holds with
+            # or without userns-remap and hardcodes no uid offset.
+            # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#G13
+            chown --reference="${directory}/config" "$settings.tmp"
+            chmod --reference="$settings" "$settings.tmp"
             mv "$settings.tmp" "$settings"
           fi
         '';

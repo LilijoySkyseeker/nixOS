@@ -160,6 +160,17 @@ real gap -- interrupted runs need an explicit `restic prune` (or
 `unlock` + `prune`) as part of recovering from a failure, not just
 waiting for the next weekly run.
 
+**Resolved 2026-09-11, and the hypothesis was wrong in an instructive
+way.** The Fri 2026-09-11 03:00 run finished clean at 04:31:37 --
+`no errors were found`, no "additional files" warning, 399/399 packs
+checked. But it did not self-resolve on its own schedule: the orphans
+survived the 2026-09-04 run and only went away after the **manual
+`prune` run by hand on 2026-09-10**. So the second branch of the
+prediction is the true one -- an interrupted run leaves orphan packs
+that later scheduled `forget --prune` invocations do not clean up, and
+recovering from an interrupted run needs an explicit `unlock` + `prune`
+rather than waiting. Worth treating as the standing recovery step.
+
 ### G3 -- full manual-run timing/throughput benchmark (2026-08-29 22:50 -> 2026-08-30 08:46, 9h56m total)
 Captured while watching this run live (hourly ETA checks cross-referenced
 against `zpool iostat`, `/proc/<pid>/io`, and a Cloudflare upload-speed
