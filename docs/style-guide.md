@@ -18,9 +18,9 @@ live inside that one registration pattern:
 
 ### Custom options modules: the `my<Name>` convention
 
-A handful of `modules/nixos/` files (`auto-update.nix`,
-`health-alerts.nix`, `iso-autobuild.nix`, `pull-deploy.nix`,
-`push-deploy.nix`) define a real NixOS options surface, not just plain
+Many `modules/nixos/` files (`alloy.nix`, `auto-update.nix`,
+`health-alerts.nix`, `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`,
+among others) define a real NixOS options surface, not just plain
 config. These follow one consistent shape:
 
 ```nix

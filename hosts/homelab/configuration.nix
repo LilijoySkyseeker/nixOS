@@ -513,6 +513,11 @@
     # homelab's own myAutoUpdate switch, so this reuses the same
     # already-vetted master checkout instead of racing/duplicating it.
   };
+  # ship this host's own journal into its local Loki, same shipper as the
+  # rest of the fleet
+  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
+  myAlloy.enable = true;
+
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;

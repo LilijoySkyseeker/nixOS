@@ -60,11 +60,11 @@ _Auto-generated from `nixosConfigurations.homelab`. Regenerate with
 
 ### Services (enabled)
 
-acpid, dbus, fstrim, fwupd, immich, jellyfin, logind, logrotate, lvm, networkd-dispatcher, nixosManual, nscd, openssh, postgresql, resolved, rpcbind, samba, smartd, sshd, systembus-notify, tailscale, timesyncd, udev, udisks2, zrepl
+acpid, alloy, dbus, fstrim, fwupd, immich, jellyfin, logind, logrotate, loki, lvm, networkd-dispatcher, nixosManual, nscd, openssh, postgresql, resolved, rpcbind, samba, smartd, sshd, systembus-notify, tailscale, timesyncd, udev, udisks2, zrepl
 
 ### Packages
 
-acl, attr, audit, backblaze-b2, bash-interactive, bat, bcache-tools, bind, bitwarden-cli, btop, bzip2, comma-with-db-2.4.1, coreutils-full, cpio, cpupower, curl, dbus, dbus-broker, diffutils, direnv, docker, dosfstools, eza, ffmpeg, findutils, flac, fontconfig, fuse, fwupd, gawk, git, glibc, glibc-locales, glow, gnugrep, gnused, gnutar, gzip, helix, hicolor-icon-theme, hostname-debian, iproute2, ipset, iptables, iputils, jq, kbd, kexec-tools, keyutils, kmod, lazygit, less, libcap, libressl, linux-pam, lvm2, man-db, mkpasswd, modemmanager, mtools, nano, ncurses, neovim, networkmanager, nfs-utils, nh, nix, nix-bash-completions, nix-index-with-full-db-0.1.10, nix-info, nixfmt, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, nvidia-x11, openssh, patch, polkit, postgresql-and-plugins, procps, psmisc, redis, restic, restic-backblazeWeekly, rpcbind, rsync, samba, shadow, shared-mime-info, smartmontools, sops, sound-theme-freedesktop, sudo, systemd, tailscale, texinfo-interactive, time, tldr, tmux, topgrade, trippy, udisks, util-linux, wget, which, wireguard-tools, wpa_supplicant, xz, zfs, zfs-prune-snapshots, zoxide, zrepl, zstd
+acl, attr, audit, backblaze-b2, bash-interactive, bat, bcache-tools, bind, bitwarden-cli, btop, bzip2, comma-with-db-2.4.1, coreutils-full, cpio, cpupower, curl, dbus, dbus-broker, diffutils, direnv, docker, dosfstools, eza, ffmpeg, findutils, flac, fontconfig, fuse, fwupd, gawk, git, glibc, glibc-locales, glow, gnugrep, gnused, gnutar, grafana-loki, gzip, helix, hicolor-icon-theme, hostname-debian, iproute2, ipset, iptables, iputils, jq, kbd, kexec-tools, keyutils, kmod, lazygit, less, libcap, libressl, linux-pam, lvm2, man-db, mkpasswd, modemmanager, mtools, nano, ncurses, neovim, networkmanager, nfs-utils, nh, nix, nix-bash-completions, nix-index-with-full-db-0.1.10, nix-info, nixfmt, nixos-build-vms, nixos-configuration-reference-manpage, nixos-enter, nixos-firewall-tool, nixos-generate-config, nixos-help, nixos-install, nixos-manual-html, nixos-option, nixos-rebuild-ng, nixos-version, nvidia-x11, openssh, patch, polkit, postgresql-and-plugins, procps, psmisc, redis, restic, restic-backblazeWeekly, rpcbind, rsync, samba, shadow, shared-mime-info, smartmontools, sops, sound-theme-freedesktop, sudo, systemd, tailscale, texinfo-interactive, time, tldr, tmux, topgrade, trippy, udisks, util-linux, wget, which, wireguard-tools, wpa_supplicant, xz, zfs, zfs-prune-snapshots, zoxide, zrepl, zstd
 
 ### Containers
 
@@ -84,7 +84,7 @@ acl, attr, audit, backblaze-b2, bash-interactive, bat, bcache-tools, bind, bitwa
 
 ### Firewall
 
-- `tailscale0`: TCP 22,445,2049,2283,8096,25565 / UDP 19132,25565,34197
+- `tailscale0`: TCP 22,445,2049,2283,3100,8096,25565 / UDP 19132,25565,34197
 - `wg0`: TCP 8096,25565 / UDP 19132,25565,34197
 - plus custom `networking.firewall.extraCommands` iptables rules -- see the host's configuration.nix, not captured here
 
@@ -108,7 +108,7 @@ _none_
 
 System (excludes nixbld*/nobody; may include accounts a service
 module auto-creates, not just ones this repo hand-declares):
-`android-smb`, `beets`, `fwupd-refresh`, `health-check`, `immich`, `jellyfin`, `nm-iodine`, `nscd`, `octodns`, `redis-immich`, `sshd`, `systemd-oom`, `wpa_supplicant`
+`alloy`, `android-smb`, `beets`, `fwupd-refresh`, `health-check`, `immich`, `jellyfin`, `loki`, `nm-iodine`, `nscd`, `octodns`, `redis-immich`, `sshd`, `systemd-oom`, `wpa_supplicant`
 
 ### Secrets in use
 

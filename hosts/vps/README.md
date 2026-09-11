@@ -121,7 +121,7 @@ _Auto-generated from `nixosConfigurations.vps`. Regenerate with
 
 ### Services (enabled)
 
-caddy, cloud-init, crowdsec, crowdsec-firewall-bouncer, dbus, fstrim, fwupd, getty, logind, logrotate, lvm, mingetty, nixosManual, nscd, openssh, resolved, sshd, tailscale, timesyncd, udev, udisks2, zram-generator
+alloy, caddy, cloud-init, crowdsec, crowdsec-firewall-bouncer, dbus, fstrim, fwupd, getty, logind, logrotate, lvm, mingetty, nixosManual, nscd, openssh, resolved, sshd, tailscale, timesyncd, udev, udisks2, zram-generator
 
 ### Packages
 
@@ -155,7 +155,7 @@ _none_
 
 System (excludes nixbld*/nobody; may include accounts a service
 module auto-creates, not just ones this repo hand-declares):
-`anubis`, `crowdsec`, `fwupd-refresh`, `health-check`, `nscd`, `sshd`, `systemd-oom`, `vps-deploy`
+`alloy`, `anubis`, `crowdsec`, `fwupd-refresh`, `health-check`, `nscd`, `sshd`, `systemd-oom`, `vps-deploy`
 
 ### Secrets in use
 

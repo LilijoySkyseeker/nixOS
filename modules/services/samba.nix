@@ -45,7 +45,9 @@
             "server min protocol" = "SMB3";
             "map to guest" = "never";
             "invalid users" = [ "root" ];
-            "log level" = "1";
+            # the SambaAuthFailure alert rule depends on auth:3
+            # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D17
+            "log level" = "1 auth:3";
             # defense-in-depth on top of the tailscale0 firewall interface
             # scoping below — same belt-and-suspenders pattern as nfs.nix's
             # 100.64.0.0/10 export CIDR.

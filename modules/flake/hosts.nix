@@ -26,6 +26,7 @@ in
         nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
+        nixosModules."alloy"
       ];
     };
     #==================================================
@@ -47,6 +48,7 @@ in
         nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
+        nixosModules."alloy"
         # audio-switch's dedicated hotkeys hardcode this desk's three output
         # devices, so it's wired in here (torrent only), not profile-pc,
         # which thinkpad also uses.
@@ -89,6 +91,13 @@ in
         nixosModules.octodns
         nixosModules.nfs
         nixosModules.samba
+        nixosModules.loki
+        # grafana stays unwired until secrets/secrets.yaml carries
+        # grafana_admin_password + grafana_secret_key (operator-added;
+        # sops-install-secrets fails the *build* on a missing key) --
+        # then add nixosModules.grafana here
+        # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#G9
+        nixosModules."alloy"
       ];
     };
     #==================================================
@@ -104,6 +113,7 @@ in
         nixosModules."profile-default"
         nixosModules."profile-server"
         nixosModules."health-alerts"
+        nixosModules."alloy"
       ];
     };
     #==================================================
