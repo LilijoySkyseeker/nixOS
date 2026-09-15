@@ -33,7 +33,30 @@ operator machine, outputs verified in-band (cmp, GUID, rsync readback,
 size checks); no VM rung applies (nothing here is a service to boot)
 and no host switch has happened yet.
 
-Remaining before close: deploy homelab with the new
+**2026-09-15 — the deploy happened, and it wiped the marker.** homelab
+was switched on 2026-09-11 with the `staleMarkerFiles` and persistence
+entries in place. But impermanence created a **fresh empty**
+`/nix/state/var/lib/restore-drill` source and bind-mounted it over
+`/var/lib/restore-drill`, replacing the `last-drill-success` file the
+2026-09-10 drill had written to the non-persisted root. The directory is
+empty as of 2026-09-15.
+
+Consequence: homelab watches that path on a 2160h threshold, so
+`myHealthAlerts` has been reporting it missing since the deploy. This is
+the "expect one marker-missing page" the plan predicted, arriving for a
+different reason than predicted — **not after the first reboot, but at
+the activation that first created the persistence entry** (homelab has
+not rebooted; uptime is 11 days). Worth remembering generally: adding a
+persistence entry for a path that already holds state hides the existing
+content behind an empty dataset, silently.
+
+Remedy is unchanged and one command: re-run `scripts/restore-drill drill`
+on homelab, which recreates the marker on the now-persisted path, where
+it will survive reboots properly. Deliberately not run from an agent
+session — it performs real restores and is the operator's fire drill.
+
+Remaining before close: run that drill, then this can close. Historical
+note: deploy homelab with the new
 staleMarkerFiles/persistence entries (user-gated switch; note the
 marker predates the persistence entry, so the first post-deploy reboot
 pages "marker missing" once -- re-run the drill to clear it), and
