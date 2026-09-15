@@ -60,10 +60,19 @@ note: deploy homelab with the new
 staleMarkerFiles/persistence entries (user-gated switch; note the
 marker predates the persistence entry, so the first post-deploy reboot
 pages "marker missing" once -- re-run the drill to clear it), and
-decide whether the original bullet's "disaster-recovery-from-scratch"
+~~decide whether the original bullet's "disaster-recovery-from-scratch"
 (bare-metal host rebuild + restore, distinct from the dataset-level
 drills built here) stays in this plan's scope or spins into its own
-plan.
+plan.~~
+
+**2026-09-15 (user): spun out.** Bare-metal disaster-recovery-from-
+scratch is no longer in this plan's scope; it is
+`2026-09-15-rebuild-a-host-from-bare-metal-and-restore-it-disaster-recovery-from.md`.
+This plan is now exactly the dataset-level restore suite, which is
+finished and verified. The only thing left before it can close is
+re-running `scripts/restore-drill drill` on homelab to recreate the
+`last-drill-success` marker the 2026-09-11 deploy's persistence entry
+replaced -- which is the operator's to run, not an agent's.
 
 ## Original plan
 

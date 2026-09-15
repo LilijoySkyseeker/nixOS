@@ -187,6 +187,19 @@ This plan stays in-progress until D1 is decided.
 ### D1 -- is tailnet device authorization alone sufficient for homelab, or does it need its own intrusion detection (CrowdSec/fail2ban) like vps has?
 Standing question carried over from the original trigger, still open as of 2026-08-27 -- Phase 0/P3 confirmed access is gated entirely by tailscale device auth today, but whether that's sufficient long-term is explicitly a user decision, not an audit finding.
 
+**2026-09-15, re-decided against the current baseline rather than the August one.** No IDS on homelab.
+
+~~Every listener on homelab is interface-scoped to `tailscale0` or `wg0`, so there is no port an unauthorized party can reach.~~ **Corrected before this was relied on:** the `wg0` half of that is false, and the `security` review caught it the same day (`2026-09-15-manage-the-tailscale-acl-declaratively-and-unblock-vps-log-shipping.md#F2`, `#F5`). Jellyfin and Minecraft are *deliberately* published to the internet through vps over `wg0`, and vps forwards at kernel-default ACCEPT while SNATing everything onto its tunnel address -- so homelab's `wg0`-scoped ports are reachable from outside, by design for those two.
+
+The answer survives that correction, on better grounds. The traffic that reaches homelab over `wg0` from the internet arrives having already passed Caddy, Anubis and CrowdSec on vps: there *is* intrusion detection on that path, and it lives on the host that actually faces the internet, which is where it belongs and where the attack is still cheap to characterise. A second CrowdSec on homelab would be inspecting the same flows a second time, after the proxy has already filtered and re-originated them, with less context about the real client. Everything else on homelab is tailnet-only and gated by device auth.
+
+What genuinely changed since August is the detection half. homelab now runs the Loki/Grafana/Alloy stack with ruler alerts that fire on firewall-unit trouble, failed units, and the `FirewallFailed` case specifically (`modules/services/loki.nix`), so the question the August item was really asking -- "would we even notice" -- is now answered by log alerting rather than by a fail2ban-shaped tool.
+
+This unblocks `docs/accepted-risks.md`, which has listed D1 among the risks that cannot yet be accepted because the decision was open.
+
+
+**ANSWERED 2026-09-15:** no IDS on homelab: every listener is interface-scoped to tailscale0/wg0, and the detection gap is now covered by the Loki ruler alerts that did not exist in August
+
 ## Gotchas (G)
 
 ### G1 -- three Phase-4 judgement calls were decided by the agent, not the user, because they're documentation-only and cheap to reverse
