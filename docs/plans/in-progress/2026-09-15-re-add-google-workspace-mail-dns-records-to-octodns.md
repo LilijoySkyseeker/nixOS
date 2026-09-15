@@ -96,6 +96,9 @@ Proposing `p=none`.
 
 **DISCUSSED 2026-09-15:** Proposed p=none and the user accepted the record as written when answering D2, but has not separately signed off on the policy level. Confirm before the plan closes.
 
+
+**ANSWERED 2026-09-15:** Ship p=none, then tighten. User signed off 2026-09-15 on the staged path: p=none now; read the aggregate reports landing in the postmaster@ Group for 1-2 weeks; move to p=quarantine once every legitimate sender shows SPF/DKIM passing and aligned; then p=reject after another clean 1-2 weeks. Revisit F1's SPF ~all vs -all at the quarantine step, since the two together are what actually decide whether a forgery is rejected. F9 stays open until something reads or alerts on those reports -- the ladder above depends on someone actually looking.
+
 ### D2 -- DMARC `rua` reporting address
 
 `rua=` needs a mailbox that actually exists in Workspace to receive the
