@@ -22,7 +22,8 @@
       vpsPublicIp6 = "2604:a880:4:1d0:0:3:5045:8000";
 
       # Only jellyfin, minecraft, and factorio are meant to be publicly
-      # reachable (see hosts/vps/README.md).
+      # reachable (see hosts/vps/README.md); the mail records below point at
+      # Google Workspace, not at the vps.
       zoneRecords = {
         "" = [
           {
@@ -34,6 +35,50 @@
             type = "AAAA";
             ttl = 300;
             value = vpsPublicIp6;
+          }
+          # Google Workspace mail, single-MX form
+          # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F3
+          {
+            type = "MX";
+            ttl = 300;
+            value = {
+              preference = 1;
+              exchange = "smtp.google.com.";
+            };
+          }
+          # SPF and the site-verification token as one TXT with two values
+          # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G2
+          {
+            type = "TXT";
+            ttl = 300;
+            values = [
+              "v=spf1 include:_spf.google.com ~all"
+              "google-site-verification=rC01szyAkLHzaXQ9BS69zEDh0sW9Z2k7inhCN9LgWxs"
+            ];
+          }
+        ];
+        # DKIM public key, issued by the Workspace admin console (Gmail >
+        # Authenticate email); `\;` escaping, chunking, and why the key is in
+        # a public repo:
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G1
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G3
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F4
+        "google._domainkey" = [
+          {
+            type = "TXT";
+            ttl = 300;
+            value = "v=DKIM1\\;k=rsa\\;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsonrfzXTCC2+UEvz952v6fJgq6V/dUzIzORTEogwWdoBQHotImyklUGvhGhimwx49P4jDd+IezTeA7spO+EZpepXPidYPrDyzOnqtYyjgCM6z4SrD4RFGIcmtAIcVxYw8uy0LQ/L1L4JHxNf83LGQSRQpGo5HFwbwvAPsVCsE+t4CjFCIbWOlZuvHIuOLApKjrmYT2OBiu6jScKZvAiFTB98c9zJe7Arsws7SrSC41O0S5P/4v6bLCMq524TGiuVWPAJnvrJYJqXzj8nWfkqkZ5tVe/KeJi32pCGevfh1eGXU+IThT27Wcgl6QferAtYs10U/KiVMNRUV/Zeu+4IXwIDAQAB";
+          }
+        ];
+        # DMARC, monitor-only (`p=none`) to start; policy level and the rua
+        # mailbox:
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#D1
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#D2
+        "_dmarc" = [
+          {
+            type = "TXT";
+            ttl = 300;
+            value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
         jellyfin = [
@@ -166,9 +211,21 @@
             ProtectKernelModules = true;
             ProtectKernelTunables = true;
             ProtectKernelLogs = true;
+            ProtectClock = true;
             ProtectControlGroups = true;
             RestrictNamespaces = true;
             PrivateTmp = true;
+            # matches the baseline beets.nix already runs, likewise a
+            # python workload on this host; this unit holds the token
+            # that controls the whole zone, mail records included
+            # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F16
+            PrivateDevices = true;
+            CapabilityBoundingSet = "";
+            RestrictRealtime = true;
+            RestrictSUIDSGID = true;
+            LockPersonality = true;
+            MemoryDenyWriteExecute = true;
+            SystemCallArchitectures = "native";
           };
         };
 
