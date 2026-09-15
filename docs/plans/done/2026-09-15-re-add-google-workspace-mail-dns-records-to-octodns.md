@@ -1,8 +1,8 @@
 ---
 slug: re-add-google-workspace-mail-dns-records-to-octodns
 created: 2026-09-15
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -72,11 +72,27 @@ semicolons, not the `\;` the source declares, and the DKIM record
 arrives as two DNS strings of 253 and 155 bytes that reassemble to 408
 characters byte-identical to the declared value.
 
-Verified to rung 4 (observed on the real host, records confirmed in
-public DNS). Left in `in-progress/` deliberately: mail has not been
-observed flowing end to end yet, the two Admin-console confirmations are
-the user's to make, and F9 stays open until something actually reads the
-aggregate reports. D1 is answered -- ship `p=none`, then tighten.
+**2026-09-15, mail confirmed sending and receiving.** The user confirmed
+mail works end to end after the deploy, which is what this plan set out to
+restore. Receiving exercises the MX; sending plus delivery exercises the
+domain's verified state, since Workspace will not route mail for an
+unverified domain.
+
+Verified to rung 5 (observed working in production). Closing. Two things
+deliberately outlive this plan rather than holding it open:
+
+- **F9 stays open on its remaining half** -- the `postmaster@` Group exists
+  and reports will land, but nothing reads or alerts on them. That is the
+  substance behind the D1 ladder, and it is what tells you when it is safe
+  to tighten `p=`.
+- **DKIM-pass was inferred, not observed.** The republished key is
+  byte-identical to the one authenticating before the wipe and mail flows,
+  but no message header was inspected here. The first aggregate report
+  answers it definitively, which is another reason F9 matters.
+
+Follow-ups carried out rather than done here: alerting on destructive
+octodns runs (F10), per-host sops scoping (F11), and the CAA/MTA-STS/
+TLS-RPT records (F12, F13), each in its own `todo/` plan.
 
 ## Original plan
 
@@ -101,8 +117,13 @@ Declare the Google Workspace mail records in
 - [x] Harden the `octodns-sync` sandbox (F16)
 - [x] Deploy to homelab and confirm the records are back in Cloudflare
 - [x] Create the `postmaster@` Group in the Admin console (D2)
-- [ ] Confirm DKIM still reads *Authenticating* in Gmail > Authenticate email
-- [ ] Confirm the domain is still verified in Account > Domains
+- [x] Confirm DKIM still reads *Authenticating* in Gmail > Authenticate email
+      -- inferred, not observed: the republished key is byte-identical to the
+      one that was authenticating before the wipe, and mail now flows. The
+      definitive check is the first aggregate report (F9).
+- [x] Confirm the domain is still verified in Account > Domains
+      -- implied: Workspace will not route mail for an unverified domain,
+      and mail is both sending and receiving.
 
 ## Decisions (D)
 
