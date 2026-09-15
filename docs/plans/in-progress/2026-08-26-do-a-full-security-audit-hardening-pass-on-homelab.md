@@ -36,6 +36,27 @@ since 2026-09-01 and observed healthy) for the audit work itself; the
 landing merge on top is verified to rung 3 (verify-ladder fully green:
 flake check + all five host builds).
 
+**2026-09-15 — landed.** The branch merged to master via PR #78 on
+2026-09-11, so master finally matches what the fleet runs. One latent
+defect in the userns-remap work surfaced on the first real deploy rather
+than in its VM test: factorio crash-looped because
+`modules/services/factorio.nix`'s `preStart` re-creates
+`server-settings.json` as root on every activation, and a remapped
+container root cannot chown a `0:0` file. Fixed in PR #79 (the file now
+inherits owner/mode from its `config/` directory); four days stable
+since. The general lesson is recorded as G13 in
+`2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md`:
+a userns migration that fixes ownership *once* is not enough, because
+anything that rewrites a file inside a remapped bind mount as root
+re-breaks it at the next activation.
+
+D1 is now the only thing keeping this plan open, and the log-monitoring
+stack (deployed 2026-09-11) changes its inputs: homelab now has
+log-based alerting on run0 escalations, samba auth failures, firewall
+trouble and sops failures, which is a meaningful part of what an IDS
+would have bought. Decide D1 against that, not against the 2026-08-27
+baseline.
+
 Open after landing: D1 (does homelab need its own intrusion detection
 on top of tailnet device auth — note the fleet log-monitoring stack,
 `2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md`,

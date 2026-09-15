@@ -30,8 +30,28 @@ infinite recursion (`nixos-rebuild build` failing outright) and reverted
 back to the original `foldl'`/`recursiveUpdate` form — see F1. Every
 host build re-verified green after the revert.
 
-Outstanding: none of the three new datasets exist on the live homelab
-host yet (G2) — each needs a manual `zfs create` before the next deploy,
+**2026-09-15 — the outstanding step is done; this plan is complete.**
+All three datasets were created on live homelab on 2026-09-11 and are
+mounted and in use: `zroot/persist/loki` (`/nix/state/loki`, holding
+Loki's chunk store), `zroot/persist/docker` (bind-mounted to
+`/var/lib/docker`), `zroot/persist/jellyfin-cache`
+(`/srv/jellyfin/cache`). Both reclassified paths had their old contents
+moved aside, verified healthy after the deploy, then reclaimed (1.4G).
+
+**G2 gained a wrinkle worth keeping: the parent `zroot/persist` did not
+exist and the registry does not generate it.** Disko creates
+intermediates itself (`zfs create -up`, verified in the pinned source),
+so a fresh install is fine — but a live host needs the container dataset
+created by hand first (`zfs create -o mountpoint=none zroot/persist`)
+before any child. That is the only correction to step 5's recipe.
+
+Verified to rung 5 (deployed and observed on the real host): homelab
+switched 2026-09-11 with the datasets in place, zero failed units, and
+four days later `zfs list` shows all three carrying real data with
+`com.sun:auto-snapshot=false` as the tier intends.
+
+Historical note, superseded by the above: none of the three new datasets
+exist on the live homelab host yet (G2) — each needs a manual `zfs create` before the next deploy,
 or its mountpoint stays an ordinary directory inside its parent dataset.
 This is a live-host, one-way (cache/docker-layer loss on the two
 reclassified paths) action and was deliberately left for the operator

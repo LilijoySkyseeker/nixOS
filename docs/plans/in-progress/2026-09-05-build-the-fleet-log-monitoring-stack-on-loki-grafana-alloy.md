@@ -12,8 +12,35 @@ blocked_by:
 
 ## State
 
-**2026-09-11, deployed to homelab and vps; working on homelab, blocked
-for vps on a tailnet ACL the user owns (G11).**
+**2026-09-15 — four days live on homelab, still blocked for vps on the
+tailnet ACL (G11).** Grafana is wired and healthy (its sops keys landed
+2026-09-11); homelab has been self-monitoring continuously since. The
+label set is still `["homelab"]` only — vps's Alloy is up and retrying,
+but nothing of its journal has ever arrived, so **the fleet's most
+exposed host remains unmonitored**. G11 is the single open blocker and
+is a user decision in the Tailscale admin console, not a config change
+here.
+
+Settled since the deploy:
+- **Ingest is far smaller than first reported (see F9's 2026-09-15
+  correction).** 27.9 MiB/day for homelab over 3.87 days of real steady
+  state — ~0.8 GiB per retention window, ~3.3 GiB if all four hosts
+  ship. The 596 MiB/day figure merged on 2026-09-11 was sampled 90
+  seconds after a deploy and measured deploy churn; it is wrong by 21x.
+  D3's retention is comfortably predictable and F9's quota is a runaway
+  guard, not capacity planning.
+- **G13's factorio fix has held four days with zero restarts**, which is
+  the real evidence for it (the original report had 11 minutes).
+- No alert has fired spuriously in four days; Alertmanager shows an
+  empty active set, and the ruler has logged no send errors.
+
+Next, in order: G11 (user); then re-measure Alloy on vps once it
+actually ships (G12's ~73MB was taken while pushes were failing); then
+first-fire tuning of the alert patterns whose message text is sourced
+but never yet observed live (sops, tailscale, jellyfin).
+
+Previous state, 2026-09-11 — deployed to homelab and vps; working on
+homelab, blocked for vps on a tailnet ACL the user owns (G11).
 
 Live on homelab: the three `myDatasets` datasets were created by hand
 (`zroot/persist` parent included — it did not exist; disko's `-p` covers
