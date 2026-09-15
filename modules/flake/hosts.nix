@@ -27,6 +27,7 @@ in
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."alloy"
+        nixosModules."backup-canary"
       ];
     };
     #==================================================
@@ -49,6 +50,7 @@ in
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."alloy"
+        nixosModules."backup-canary"
         # audio-switch's dedicated hotkeys hardcode this desk's three output
         # devices, so it's wired in here (torrent only), not profile-pc,
         # which thinkpad also uses.
@@ -83,6 +85,8 @@ in
         nixosModules."docker-userns-remap"
         nixosModules."zfs-dataset-properties"
         nixosModules."datasets"
+        nixosModules."backup-canary"
+        nixosModules."backup-restore-test"
         nixosModules.jellyfin
         nixosModules.immich
         nixosModules.beets

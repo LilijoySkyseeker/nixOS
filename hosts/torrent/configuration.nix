@@ -163,6 +163,14 @@
     ];
   };
 
+  # Backup restore-test canaries -- content must match homelab's
+  # myBackupRestoreTest.zbackup.targets byte for byte. See
+  # 2026-09-04-automated-canary-based-backup-restore-and-verify-tier-1.md.
+  myBackupCanary.paths = {
+    "/home/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/home v1";
+    "/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/root v1";
+  };
+
   # failed-unit / stuck-switch alerts to Discord (F-P7-09)
   #
   # myPullDeploy runs unattended every Thursday, and until now a build
