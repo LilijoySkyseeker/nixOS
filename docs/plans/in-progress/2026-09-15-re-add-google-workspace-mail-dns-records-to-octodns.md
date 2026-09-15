@@ -40,10 +40,12 @@ returned 0 CRITICAL, 0 HIGH, 3 MEDIUM, 5 LOW, 2 INFO -- nothing blocking.
 F16 was fixed here: `octodns-sync`'s sandbox now matches the beets.nix
 baseline, moving `systemd-analyze security` from 6.6 MEDIUM to 3.5 OK.
 F10, F11, F12 and F13 were carried into their own `todo/` plans rather
-than widened into this branch. F9 is deliberately left open -- the `rua`
-mailbox does not exist yet and nothing reads the reports, so the
-monitoring phase F1 and F2 were both accepted on currently measures
-nothing.
+than widened into this branch.
+
+**2026-09-15, `postmaster@` and `abuse@` Groups created.** D2's dependency
+is satisfied: the `rua` mailbox exists, so reports will be delivered
+rather than bounce. F9 stays open on its remaining half -- nothing reads
+or alerts on those reports yet -- which is also what D1 now turns on.
 
 One useful correction from the review: adding the MX *reduces* the vps's
 exposure rather than adding to it. With no MX, RFC 5321 implicit-MX made
@@ -78,7 +80,7 @@ Declare the Google Workspace mail records in
 - [x] Review of the diff: inline, then `docs-updater` and `security`
 - [x] Harden the `octodns-sync` sandbox (F16)
 - [ ] Deploy to homelab and confirm the records are back in Cloudflare
-- [ ] Create the `postmaster@` Group in the Admin console (D2)
+- [x] Create the `postmaster@` Group in the Admin console (D2)
 - [ ] Confirm DKIM still reads *Authenticating* in Gmail > Authenticate email
 - [ ] Confirm the domain is still verified in Account > Domains
 
@@ -387,6 +389,14 @@ _`security` subagent pass, 2026-09-15, cold review of `google-workspace-mail-dns
   reports have been read is the failure mode in the other direction and
   will silently drop legitimate mail from any forwarder or third-party
   sender not yet in SPF.
+
+**2026-09-15, half of this closed.** The user created the `postmaster@`
+and `abuse@` Groups in the Admin console, so the `rua` mailbox now exists
+and aggregate reports will land instead of bouncing once the records are
+deployed. The second half stands: nothing reads or alerts on those
+reports, so `p=none` is still a guard whose outcome no one measures. That
+is what keeps this finding open, and it is the remaining substance behind
+D1.
 
 ### F10 — a silent zone prune is now a silent mail outage, and only *failures* are watched
 
