@@ -129,11 +129,11 @@ time octoDNS prunes something unexpectedly.
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
 
-**Note:** the `/simplify`, `docs-updater`, `security` and `spec-check`
-subagents named by `required-agents` were not run -- this session is
-configured not to spawn subagents unprompted. The two findings below come
-from an inline review of the diff instead, and the agent pass is still
-owed if the user wants it.
+**Note:** the `/simplify`, `security` and `spec-check` subagents named by
+`required-agents` were not run -- this session is configured not to spawn
+subagents unprompted. F1 and F2 come from an inline review of the diff
+instead, and those agent passes are still owed if the user wants them.
+F3-F6 are from a `docs-updater` pass run 2026-09-15 over the branch diff.
 
 ### F1 -- SPF uses `~all` (softfail) rather than `-all`
 
@@ -161,3 +161,87 @@ permanent. Whoever picks this up should read the aggregate reports and
 move to `quarantine`, then `reject`.
 
 **ACCEPTED 2026-09-15:** Intended starting state for the monitoring phase. Tracked as the reason the plan stays open past deploy.
+
+### F3 -- MX history moved out of the module comment
+
+`modules/services/octodns.nix:39-41` carried this verbatim, as an inline
+comment above the MX record:
+
+> Google Workspace mail. One MX record, not the five aspmx.l.google.com
+> ones -- those are the pre-2023 shape, kept only on domains that already
+> had them.
+
+That is background on Google's record shapes, not mechanics of the line
+below it, so it belongs here per `docs/style-guide.md`'s "Why context:
+the plan file, not comments". The comment is now
+`# Google Workspace mail, single-MX form` plus a citation to this entry.
+`smtp.google.com.` at preference 1 is the current single-record form;
+the five `aspmx.l.google.com`/`alt1..alt4` records are only kept on
+domains that already had them.
+
+### F4 -- DKIM comment carried plan-level prose
+
+`modules/services/octodns.nix:63-68` carried this verbatim above the
+`google._domainkey` record:
+
+> DKIM public key, issued by the Workspace admin console (Gmail >
+> Authenticate email). Public by definition -- it is published in DNS;
+> the private half stays with Google. 408 chars, so octoDNS splits it
+> across DNS's 255-byte strings on push. The `\;` escapes are required:
+> octoDNS rejects bare semicolons in a TXT value and the Cloudflare
+> provider unescapes them again on the way out.
+
+Three separate things, two of which were already written up here: the
+escaping is G1, the 408-char chunking is G3, and the third -- why a key
+is checked into a public repo -- is the "public half only" point in the
+State section. The comment kept the provenance (which console page
+reissues the key, which a reader cannot derive from the value) and now
+cites G1, G3 and this entry instead of restating them. The 408-char
+figure was re-checked against the shipped string and is correct: the
+`\;` escapes count as two characters each, so the value octoDNS sees is
+408 characters.
+
+### F5 -- the DMARC comment claimed the `postmaster@` Group already exists
+
+`modules/services/octodns.nix:77-82` said, in the present tense, that
+`postmaster@` "only exists as a Group, never a user". Creating that Group
+is still an open Progress item, so as shipped the `rua=` mailbox does not
+exist yet and aggregate reports will bounce until it does. The accurate
+version of that sentence is D2's: postmaster is a Workspace reserved word
+and therefore *can* only be created as a Group. The rest of the comment
+(the p=none-then-quarantine-then-reject ladder, and same-domain `rua`
+avoiding an external-reporting authorization record) restated D1 and D2
+in full. The comment is now a one-line label plus citations to D1 and D2.
+
+### F6 -- `docs/architecture.md`'s homelab row was stale before this change
+
+Not caused by this change, found while refreshing homelab's Host
+Inventory: `scripts/doc-host.sh homelab` pulled in `grafana` (service,
+package, port 3000, and the `grafana_admin_password`/`grafana_secret_key`
+secrets) and `dockremap`, none of which this branch touches. Those came
+from `dd86cf8 feat(homelab): wire grafana, fix factorio under docker
+userns-remap`, which wired `nixosModules.grafana` and
+`nixosModules."docker-userns-remap"` into homelab without regenerating
+the README or updating `docs/architecture.md`. Two fixes applied:
+the per-host table's `homelab` row now lists `docker-userns-remap` and
+`grafana`, and the `modules/services/` bullet no longer says "grafana is
+written but wired to no host yet, see the comment in
+`modules/flake/hosts.nix`" -- it is wired to homelab, and there is no
+such comment in `hosts.nix` any more.
+
+### F7 -- the 2026-08-26 audit's "domain that sends no mail" premise is now false
+
+`docs/audits/2026-08-26/findings-tail.md:842` (L-09, mirrored as
+F-P4-10 in `P4-services.md:922`) argues for `v=spf1 -all` and DMARC
+`p=reject` on the grounds that this is "a domain that sends no mail".
+That was true when the audit was written; it is not true now that
+Workspace mail is declared here. Left unedited on purpose -- the audit is
+a dated snapshot and rewriting its premises would falsify the record --
+but it is the same question F1 and F2 park, so whoever revisits the SPF
+qualifier and the DMARC policy level should read L-09 alongside them
+rather than treating the audit's recommendation as still applying to an
+unused domain. L-09's other half (no CAA record, and a hand-added one
+would be pruned within the hour by G4) is untouched by this change and
+still open.
+
+_docs-updater finished 2026-09-15T17:59:13Z (code 1fd137775f513d33) -- see Findings above._
