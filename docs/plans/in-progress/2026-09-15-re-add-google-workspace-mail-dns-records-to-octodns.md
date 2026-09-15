@@ -52,11 +52,31 @@ exposure rather than adding to it. With no MX, RFC 5321 implicit-MX made
 the apex A record the domain's mail exchanger, aiming every sending MTA
 at the vps on port 25; mail now goes to Google instead.
 
-Verified to rung 3 (ran it locally, output inspected). Rung 4+ is not
-reachable without a real deploy: the records only exist in Cloudflare
-once `octodns-sync` runs on homelab. Deliberately left in `in-progress/`
-until that happens and the remaining Progress items are done. D1 (the
-`p=none` policy level) still wants an explicit sign-off.
+**2026-09-15, deployed and live.** Checked first that homelab was not
+carrying unmerged test work: `/etc/nixos` sat on
+`worktree-worktree-security-audit-plan`, clean and 0 commits ahead of
+origin/master (248 behind), the auto-update units are `linked ignored`
+with no active timers, and the running system's systemd units were a
+strict subset of master's -- the only difference was the three
+`backup-restore-test-*` units master adds. Generation 382 turned out to
+be a pre-merge test deploy of the grafana work, which has since landed as
+`dd86cf8`, so nothing unmerged was at risk. `nvd diff` confirmed the
+switch carried no package version changes at all: 2196 -> 2196 paths,
+delta +0, +984B.
+
+Switched cleanly, then `octodns-sync` applied `Creates=4, Updates=0,
+Deletes=0`. All four records verified live against Cloudflare's
+authoritative nameserver. The G1/G3 chain is now confirmed end to end
+rather than by simulation: the published DMARC and DKIM values carry real
+semicolons, not the `\;` the source declares, and the DKIM record
+arrives as two DNS strings of 253 and 155 bytes that reassemble to 408
+characters byte-identical to the declared value.
+
+Verified to rung 4 (observed on the real host, records confirmed in
+public DNS). Left in `in-progress/` deliberately: mail has not been
+observed flowing end to end yet, the two Admin-console confirmations are
+the user's to make, and F9 stays open until something actually reads the
+aggregate reports. D1 is answered -- ship `p=none`, then tighten.
 
 ## Original plan
 
@@ -79,7 +99,7 @@ Declare the Google Workspace mail records in
 - [x] `verify-ladder` clean
 - [x] Review of the diff: inline, then `docs-updater` and `security`
 - [x] Harden the `octodns-sync` sandbox (F16)
-- [ ] Deploy to homelab and confirm the records are back in Cloudflare
+- [x] Deploy to homelab and confirm the records are back in Cloudflare
 - [x] Create the `postmaster@` Group in the Admin console (D2)
 - [ ] Confirm DKIM still reads *Authenticating* in Gmail > Authenticate email
 - [ ] Confirm the domain is still verified in Account > Domains
