@@ -318,6 +318,24 @@ deletion from a phone browser.
 
 **ANSWERED 2026-09-05:** Grafana anonymous read-only plus sops admin login
 
+**Revised 2026-09-15 (user), after F10 and after the stack went live.**
+Anonymous access is to be turned off in favour of a **shared Viewer
+account behind a sops-held password**. D12 was decided before anything
+was wired and reasoned about the wrong threat: it treated anonymous as
+"harmless browsing" whose risk was an accidental dashboard deletion. F10
+established the real shape -- a Viewer can drive Explore against the
+provisioned Loki datasource, so "read-only" is read-*everything*: the
+whole 30-day fleet journal including the auditd execve records, with no
+credential, from any tailnet device. Requiring a login keeps the read
+surface but stops a lost or compromised tailnet device from being an
+automatic full-journal read.
+
+Cost accepted: the frictionless phone browsing D12 wanted now needs a
+password. Implementation is **not** done -- it needs a new
+`grafana_viewer_password` secret, which only the user can add, and
+`sops-install-secrets` validates key existence at *build* time, so the
+module change cannot land before the secret exists (see G13).
+
 ### D13 — what earns a notification
 
 Security and operational classes at launch; application-level error-rate
@@ -638,6 +656,20 @@ with and without remap, and it hardcodes no uid offset.
 as root re-breaks it at the next activation, and the failure appears at
 container start rather than at the activation that caused it. Worth
 checking any other root-written file under a remapped bind mount.
+
+### G14 -- sops-nix rejects a missing secret at build time, not activation
+
+Learned the hard way while rebasing the CouchDB work: referencing a
+`sops.secrets.<name>` whose key is not in `secrets/secrets.yaml` fails
+`nixos-rebuild build` outright --
+`sops-install-secrets: manifest is not valid: secret <name> ... cannot be
+found` -- rather than failing later on the host. Consequence for any
+change that introduces a secret: the module wiring and the secret's
+existence are a single atomic step from the build's point of view, so an
+agent cannot land the wiring ahead of the user adding the value, and the
+pre-push hook (which builds every host) will block the push too. Plan
+secret-introducing changes as "user adds key, then wiring lands", never
+the reverse.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
