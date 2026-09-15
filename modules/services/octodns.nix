@@ -211,9 +211,21 @@
             ProtectKernelModules = true;
             ProtectKernelTunables = true;
             ProtectKernelLogs = true;
+            ProtectClock = true;
             ProtectControlGroups = true;
             RestrictNamespaces = true;
             PrivateTmp = true;
+            # matches the baseline beets.nix already runs, likewise a
+            # python workload on this host; this unit holds the token
+            # that controls the whole zone, mail records included
+            # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F16
+            PrivateDevices = true;
+            CapabilityBoundingSet = "";
+            RestrictRealtime = true;
+            RestrictSUIDSGID = true;
+            LockPersonality = true;
+            MemoryDenyWriteExecute = true;
+            SystemCallArchitectures = "native";
           };
         };
 
