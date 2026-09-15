@@ -48,7 +48,7 @@ key:
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy` |
 | `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `zfs-dataset-properties`, `datasets`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `alloy` |
+| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `grafana`, `alloy` |
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts`, `alloy` |
 | `isoimage` | unstable | `copyparty-iso` |
 
@@ -144,8 +144,7 @@ not the boundary itself:
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
   beets, copyparty, factorio, minecraft, octodns, nfs, samba, loki,
-  grafana — grafana is written but wired to no host yet, see the comment
-  in `modules/flake/hosts.nix`), each registering as
+  grafana), each registering as
   `flake.modules.nixos.<name>` and listed per-host in
   `modules/flake/hosts.nix`. No options surface (one exception:
   `loki.nix` exposes a single `myLoki.alertWebhookFile` option as a VM-test
