@@ -19,7 +19,7 @@ blocked_by:
 From `2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`'s
 security review (F3): `**ANSWERED**`/`**FIXED**`/`**ACCEPTED**`/`**MOOT**`
 markers are freeform text an agent can hand-write directly into a plan
-file with a normal `Edit`/`Write` call -- `docs/skills/plan/SKILL.md`'s
+file with a normal `Edit`/`Write` call -- `docs/skills/plan-file/SKILL.md`'s
 "never hand-edit these mechanics" is a documentation convention only,
 with no tool-level or hook-level enforcement (`.claude/settings.json` has
 no `PreToolUse` matcher on file-editing tools for this). This was already

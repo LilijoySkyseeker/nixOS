@@ -3,8 +3,8 @@ result-*
 .direnv/
 .claude/worktrees/
 .nelson/
-# ephemeral per-session markers written by the plan/workflow skills --
-# never repo content, see docs/skills/plan/scripts/lib.sh
+# ephemeral per-session markers written by the plan-file/task-gate skills --
+# never repo content, see docs/skills/plan-file/scripts/lib.sh
 .claude/.active-plan
 .claude/.trivial-ack
 # local-only, written by Claude Code on a "don't ask again" grant --

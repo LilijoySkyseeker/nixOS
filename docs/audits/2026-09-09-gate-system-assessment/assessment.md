@@ -406,5 +406,5 @@ Each step deletes more than it adds or it's being done wrong.
   hlissner/dotfiles, wimpysworld/nix-config
 - This repo: the 2026-09-07 schema plan (81 findings, pick-up points), the
   2026-08-27 origin plan and known-weak-points catalogue, the 2026-09-06
-  churn-measurement plan, `docs/skills/workflow/reference.md`,
+  churn-measurement plan, `docs/skills/task-gate/reference.md`,
   `.githooks/pre-push`, and the measurements tabulated in §1.

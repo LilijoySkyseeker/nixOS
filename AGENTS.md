@@ -38,7 +38,7 @@ encrypted with sops-nix.
 | `docs/procedures/remote-access.md` | SSH/Tailscale key model, which hosts are Tailscale-only, the `vps-deploy` account. |
 | `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (`plan-new`, see below). |
 | `docs/GIT_WORKFLOW.md` | Commit conventions, git hooks, day-to-day branching. |
-| `docs/plans/{todo,in-progress,done,rejected}/` | Per-task plan files — decisions, gotchas, findings, citeable by bare filename. Check before assuming a described feature is fully deployed. Mechanics: `docs/skills/plan/SKILL.md`. |
+| `docs/plans/{todo,in-progress,done,rejected}/` | Per-task plan files — decisions, gotchas, findings, citeable by bare filename. Check before assuming a described feature is fully deployed. Mechanics: `docs/skills/plan-file/SKILL.md`. |
 | `docs/skills/`, `docs/agents/` | Project skills/subagents (`plan`, `workflow`, `security`, `docs-updater`) — canonical source, symlinked into `.claude/skills/`/`.claude/agents/`. |
 
 ## Commands

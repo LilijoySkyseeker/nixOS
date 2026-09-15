@@ -22,7 +22,7 @@ Update docs in the same commit as the code change, not as a follow-up:
 - **Changed a host's services, packages, containers, storage, firewall,
   timers, users, or secrets** — re-run `scripts/doc-host.sh <host>` to
   refresh that README's machine-generated "Host Inventory" block. Outside
-  the `workflow` skill's gate (e.g. a manual edit), this is still on
+  the `task-gate` skill's gate (e.g. a manual edit), this is still on
   discipline; inside it, the `docs-updater` subagent checks and refreshes
   this block itself as part of its normal pass — see
   `docs/agents/docs-updater.md`. Decided in
@@ -72,7 +72,7 @@ them.
 Whenever a documentation issue is *noticed* but isn't being fixed right
 now — spotted mid-task, out of scope for the current change, or too large
 to fix inline — run `plan-new` immediately, the same session it was found
-in (see `docs/skills/plan/SKILL.md`). Don't rely on memory or a mental
+in (see `docs/skills/plan-file/SKILL.md`). Don't rely on memory or a mental
 note. Include:
 
 - What's stale or wrong, and where (file + what it currently says).

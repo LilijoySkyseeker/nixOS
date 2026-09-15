@@ -11,8 +11,8 @@
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=../../plan/scripts/lib.sh
-. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
+# shellcheck source=../../plan-file/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan-file/scripts/lib.sh"
 
 root="$(plan_repo_root)" || exit 1
 cd "$root" || plan_die "cannot cd to repo root"

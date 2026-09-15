@@ -8,7 +8,7 @@ existing number and incrementing.
 
 They answer different questions and neither replaces the other.
 
-- A **plan file** (`docs/plans/`, see the `plan` skill) tracks *a piece of
+- A **plan file** (`docs/plans/`, see the `plan-file` skill) tracks *a piece of
   work*: what is being done, what is still open, what was found along the
   way. It moves `todo` → `in-progress` → `done` and freezes.
 - An **ADR** records *a decision that outlives the work that produced it*.

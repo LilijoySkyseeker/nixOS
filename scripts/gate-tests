@@ -17,9 +17,9 @@
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-PLAN_SCRIPTS="$SCRIPT_DIR/../docs/skills/plan/scripts"
-WORKFLOW_SCRIPTS="$SCRIPT_DIR/../docs/skills/workflow/scripts"
-# shellcheck source=../docs/skills/plan/scripts/lib.sh
+PLAN_SCRIPTS="$SCRIPT_DIR/../docs/skills/plan-file/scripts"
+WORKFLOW_SCRIPTS="$SCRIPT_DIR/../docs/skills/task-gate/scripts"
+# shellcheck source=../docs/skills/plan-file/scripts/lib.sh
 . "$PLAN_SCRIPTS/lib.sh"
 
 # The fixture calls `git init`, `add -A` and `commit`. Inherit a GIT_DIR
@@ -208,8 +208,8 @@ git -C "$repo" config user.name t
 git -C "$repo" config commit.gpgsign false
 git -C "$repo" config core.hooksPath /dev/null
 mkdir -p "$repo/docs/skills"
-cp -r "$PLAN_SCRIPTS/.." "$repo/docs/skills/plan"
-cp -r "$WORKFLOW_SCRIPTS/.." "$repo/docs/skills/workflow"
+cp -r "$PLAN_SCRIPTS/.." "$repo/docs/skills/plan-file"
+cp -r "$WORKFLOW_SCRIPTS/.." "$repo/docs/skills/task-gate"
 # The copied skills cite this repo's plans, which the fixture does not
 # have, so plan-citations would refuse here for an unrelated reason and
 # the sabotage baseline below would prove nothing. Stripped rather than
@@ -276,10 +276,10 @@ expect_fail() {
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F4
 expect_fail "plan-gate refuses an unresolvable base ref" "cannot resolve ref" \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" nosuchref HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" nosuchref HEAD
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F3
 expect_fail "required-agents refuses an unresolvable range" "cannot diff" \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" nosuchref HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/required-agents" nosuchref HEAD
 # A helper refuses silently, so there is no diagnostic to require. The
 # exit code carries the whole assertion instead, and it must be the
 # helper's own 1 -- not bash's 127 for a function that no longer exists,
@@ -296,15 +296,15 @@ expect_rc() { # <name> <want-rc> <command...>
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
 expect_rc "plan_worktree_files refuses a broken GIT_DIR" 1 \
   env -C "$repo" GIT_DIR=/nonexistent bash -c \
-  '. docs/skills/plan/scripts/lib.sh; declare -F plan_worktree_files >/dev/null || exit 3; plan_worktree_files "*.nix"'
+  '. docs/skills/plan-file/scripts/lib.sh; declare -F plan_worktree_files >/dev/null || exit 3; plan_worktree_files "*.nix"'
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F32
 expect_rc "the fingerprint refuses outside a repository" 1 \
   env -C "$scratch" bash -c \
   ". '$PLAN_SCRIPTS/lib.sh'; declare -F plan_code_fingerprint >/dev/null || exit 3; plan_code_fingerprint"
 
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F37
-fp_root="$(cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_code_fingerprint')"
-fp_sub="$(cd "$repo/docs/skills" && bash -c '. ../../docs/skills/plan/scripts/lib.sh 2>/dev/null || . '"$repo"'/docs/skills/plan/scripts/lib.sh; plan_code_fingerprint')"
+fp_root="$(cd "$repo" && bash -c '. docs/skills/plan-file/scripts/lib.sh; plan_code_fingerprint')"
+fp_sub="$(cd "$repo/docs/skills" && bash -c '. ../../docs/skills/plan-file/scripts/lib.sh 2>/dev/null || . '"$repo"'/docs/skills/plan-file/scripts/lib.sh; plan_code_fingerprint')"
 if [ -n "$fp_root" ] && [ "$fp_root" = "$fp_sub" ]; then
   ok "the fingerprint does not change with the working directory"
 else
@@ -314,9 +314,9 @@ fi
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
 expect_fail "required-agents refuses an agent missing from the order" "missing from PLAN_AGENT_ORDER" \
   env -C "$repo" bash -c '
-    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"spec-check\")/" docs/skills/plan/scripts/lib.sh
-    docs/skills/workflow/scripts/required-agents HEAD~1 HEAD'
-git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
+    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"spec-check\")/" docs/skills/plan-file/scripts/lib.sh
+    docs/skills/task-gate/scripts/required-agents HEAD~1 HEAD'
+git -C "$repo" checkout -q -- docs/skills/plan-file/scripts/lib.sh
 
 # The one finding class that still blocks a merge, in both directions: an
 # unresolved CRITICAL/HIGH security finding refuses, and anything below
@@ -326,10 +326,10 @@ git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 ( cd "$repo" && printf '\n### F1 -- a live critical finding\n\n- **Severity:** HIGH\n' \
     >> "docs/plans/in-progress/$fixture_plan" )
 expect_fail "plan-gate refuses a cited plan with an unresolved CRITICAL/HIGH finding" "unresolved CRITICAL/HIGH" \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" HEAD~1 HEAD
 ( cd "$repo" && printf '\n**ACCEPTED 2026-01-01:** user signed off.\n\n### F2 -- a parked medium finding\n\n- **Severity:** MEDIUM\n' \
     >> "docs/plans/in-progress/$fixture_plan" )
-parked_out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
+parked_out="$(env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
 if [ $? -ne 0 ]; then
   bad "plan-gate passes a cited plan whose only open finding is parkable" "it refused: $(printf '%s' "$parked_out" | tail -n 1)"
 elif ! printf '%s' "$parked_out" | grep -qF 'parked'; then
@@ -348,7 +348,7 @@ fi
   printf 'tampered\n' >> "docs/plans/done/${fixture_date}-sealed.md" &&
   git add docs/plans/done && git commit -qm tamper )
 expect_fail "plan-gate refuses a range that edits a done/ plan" "modifies or deletes frozen plan" \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" HEAD~1 HEAD
 ( cd "$repo" && git reset -q --hard HEAD~2 )
 
 section "awkward filenames still oblige review"
@@ -361,7 +361,7 @@ section "awkward filenames still oblige review"
 obliges_security() { # <filename> -- does a new file of this name oblige review?
   local name="$1" out
   ( cd "$repo" && printf '{ }\n' > "$name" ) 2>/dev/null || return 2
-  out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" 2>/dev/null)"
+  out="$(env -C "$repo" "$repo/docs/skills/task-gate/scripts/required-agents" 2>/dev/null)"
   ( cd "$repo" && rm -f -- "$name" )
   printf '%s' "$out" | grep -qx security
 }
@@ -384,7 +384,7 @@ section "fail-closed: an honest sequence must end green"
 # The success *line*, not just rc=0: "nothing to gate" also exits 0, and
 # a control that accepts it stays green while the gate examines nothing.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F7
-control_out="$(env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
+control_out="$(env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" HEAD~1 HEAD 2>&1)"
 if [ $? -ne 0 ]; then
   bad "plan-gate passes a cited plan with no critical findings" "it refused an honest sequence"
 elif ! printf '%s' "$control_out" | grep -qF 'no unresolved CRITICAL/HIGH' ; then
@@ -438,16 +438,16 @@ created: ${fixture_date}
 status: todo
 frozen: true" "## Progress")"
 expect_fail "plan-lint still applies the schema rules to a self-declared frozen plan" "missing required section" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" "$self_frozen_probe"
 expect_fail "plan-lint reports a plan that declares itself frozen" "may freeze a plan" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$self_frozen_probe"
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" "$self_frozen_probe"
 
 # Both directions of the fence rule, because each was live: sections that
 # exist only inside a fence must not count, and a correct plan that quotes
 # the template inside State must not be blocked.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F13
 expect_fail "plan-lint does not count sections quoted inside a fence" "missing required section" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" \
   "$(lint_probe "$lint_full_fm" '```
 ## State
 
@@ -484,7 +484,7 @@ The last section is:
 ## Gotchas (G)
 
 ## Findings (F)")"
-if env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" "$probe" >/dev/null 2>&1; then
+if env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" "$probe" >/dev/null 2>&1; then
   ok "plan-lint passes a plan that quotes the template inside State"
 else
   bad "plan-lint passes a plan that quotes the template inside State" \
@@ -508,7 +508,7 @@ kind: task
 priority: normal
 blocked_by:" "$lint_sections")"
 dup_readers="$( cd "$repo" && bash -c '
-  . docs/skills/plan/scripts/lib.sh
+  . docs/skills/plan-file/scripts/lib.sh
   printf "%s|%s" \
     "$(plan_get_field "'"$dup_probe"'" frozen)" \
     "$(plan_frontmatter "'"$dup_probe"'" | awk -F"\t" "\$1==\"frozen\"{v=\$2} END{print v}")"' )"
@@ -524,7 +524,7 @@ fi
 # reference here is the final one, so a reader that stops early goes green.
 # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F17
 expect_fail "plan-lint checks the last entry of a reference list" "must be a bare plan filename" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" \
   "$(lint_probe "slug: probe
 created: ${fixture_date}
 status: todo
@@ -536,7 +536,7 @@ blocked_by: ${fixture_date}-lint-clean.md, not-a-plan" "$lint_sections")"
 # check is satisfied and only the order rule can refuse this -- and until it
 # existed, deleting that rule outright changed no verdict in this file.
 expect_fail "plan-lint reports required sections that appear out of order" "required order is" \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" \
   "$(lint_probe "$lint_full_fm" '## State
 
 x
@@ -561,7 +561,7 @@ rm -f "$repo/docs/plans/todo/${fixture_date}-probe.md"
 marker_problem() { # <marker-contents, or nothing to remove the marker>
   if [ $# -eq 0 ]; then rm -f "$repo/.claude/.active-plan"
   else mkdir -p "$repo/.claude"; printf '%s\n' "$1" > "$repo/.claude/.active-plan"; fi
-  ( cd "$repo" && bash -c '. docs/skills/plan/scripts/lib.sh; plan_active_plan_problem .' )
+  ( cd "$repo" && bash -c '. docs/skills/plan-file/scripts/lib.sh; plan_active_plan_problem .' )
 }
 [ -z "$(marker_problem)" ] &&
   ok "no active-plan marker is not a problem" ||
@@ -581,7 +581,7 @@ section "plan-citations resolves what exists and refuses what does not"
 # never entered that code at all. Both directions, because a checker that
 # resolves everything and one that resolves nothing are the same defect.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
-cite_out="$(env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations" 2>&1)"
+cite_out="$(env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-citations" 2>&1)"
 if printf '%s' "$cite_out" | grep -qE 'OK \([1-9][0-9]* citations resolve'; then
   ok "plan-citations resolves a citation that exists"
 else
@@ -596,7 +596,7 @@ fi
 expect_fail "plan-citations refuses a plan cited by path" "never by path" \
   env -C "$repo" bash -c '
     printf "See docs/plans/in-progress/%s here.\n" "$1" > docs/gone.md
-    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+    docs/skills/plan-file/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
   _ "$lint_plan"
 
 # The cited name arrives as an argument for the same reason it is
@@ -605,13 +605,13 @@ expect_fail "plan-citations refuses a plan cited by path" "never by path" \
 expect_fail "plan-citations refuses a citation to no such plan" "no such plan file" \
   env -C "$repo" bash -c '
     printf "Cites %s here.\n" "$1" > docs/gone.md
-    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+    docs/skills/plan-file/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
   _ "$fixture_absent"
 # shellcheck disable=SC2016
 expect_fail "plan-citations refuses a citation to no such anchor" "### G9" \
   env -C "$repo" bash -c '
     printf "Cites %s#G9 here.\n" "$1" > docs/gone.md
-    docs/skills/plan/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
+    docs/skills/plan-file/scripts/plan-citations; rc=$?; rm -f docs/gone.md; exit $rc' \
   _ "$fixture_plan"
 
 # ------------------------------------------------------------- properties
@@ -851,18 +851,18 @@ sabotage_sweep() { # <name> <success-fragment> <max-calls> <command...>
 }
 
 sabotage_sweep "plan-gate over a real range" "no unresolved CRITICAL/HIGH" 25 \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/plan-gate" HEAD~1 HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/plan-gate" HEAD~1 HEAD
 sabotage_sweep "required-agents over a real range" "security" 25 \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents" HEAD~1 HEAD
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/required-agents" HEAD~1 HEAD
 # A dirty doc, so the working-tree form actually obliges someone: the
 # fixture's tree is otherwise clean here and an empty obligation set is a
 # baseline that proves nothing.
 printf '\nsweep fodder\n' >> "$repo/docs/note.md"
 sabotage_sweep "required-agents over the working tree" "docs-updater" 25 \
-  env -C "$repo" "$repo/docs/skills/workflow/scripts/required-agents"
+  env -C "$repo" "$repo/docs/skills/task-gate/scripts/required-agents"
 git -C "$repo" checkout -q -- docs/note.md
 sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-lint" \
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-lint" \
   "docs/plans/in-progress/$lint_plan"
 # "citations resolve", not "plan-citations: OK": the latter is a prefix of
 # the "no files matched the scan set" line too -- the one F2's fix added to
@@ -870,7 +870,7 @@ sabotage_sweep "plan-lint over a well-formed plan" "lint-clean.md: OK" 25 \
 # scanned nothing. Only the working line can print this.
 # plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#F15
 sabotage_sweep "plan-citations over a working tree" "citations resolve" 25 \
-  env -C "$repo" "$repo/docs/skills/plan/scripts/plan-citations"
+  env -C "$repo" "$repo/docs/skills/plan-file/scripts/plan-citations"
 
 # ------------------------------------------- sabotage: the gates that write
 
@@ -893,8 +893,8 @@ git -C "$mpristine" config commit.gpgsign false
 git -C "$mpristine" config core.hooksPath /dev/null
 mkdir -p "$mpristine/docs/skills" "$mpristine/docs/plans/todo" \
   "$mpristine/docs/plans/in-progress" "$mpristine/docs/plans/done" "$mpristine/.claude"
-cp -r "$PLAN_SCRIPTS/.." "$mpristine/docs/skills/plan"
-cp -r "$WORKFLOW_SCRIPTS/.." "$mpristine/docs/skills/workflow"
+cp -r "$PLAN_SCRIPTS/.." "$mpristine/docs/skills/plan-file"
+cp -r "$WORKFLOW_SCRIPTS/.." "$mpristine/docs/skills/task-gate"
 cp -r "$SCRIPT_DIR/../.githooks" "$mpristine/.githooks"
 find "$mpristine/docs/skills" -type f -exec sed -i '/^[[:space:]]*#[[:space:]]*plan:/d' {} +
 # Closeable on purpose: every required section, no open decision or finding,
@@ -929,12 +929,12 @@ mreset() { rm -rf "$mrepo"; cp -a "$mpristine" "$mrepo"; }
 SWEEP_RESET=mreset
 
 sabotage_sweep "plan-move into in-progress" "docs/plans/in-progress/$move_plan" 25 \
-  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  env -C "$mrepo" "$mrepo/docs/skills/plan-file/scripts/plan-move" \
   "docs/plans/todo/$move_plan" in-progress
 # Covers plan-freeze in the same sweep: `plan-move ... done` execs it, so
 # every git call the freeze makes is one of the calls swept here.
 sabotage_sweep "plan-move into done, which execs plan-freeze" "frozen" 40 \
-  env -C "$mrepo" "$mrepo/docs/skills/plan/scripts/plan-move" \
+  env -C "$mrepo" "$mrepo/docs/skills/plan-file/scripts/plan-move" \
   "docs/plans/todo/$move_plan" done
 
 # The hook succeeds silently, so there is no success line to require. The

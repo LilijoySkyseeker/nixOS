@@ -1,4 +1,4 @@
-# `workflow` skill reference
+# `task-gate` skill reference
 
 ## Trust hierarchy
 
@@ -34,7 +34,7 @@ and `plan-move ... done`/`plan-freeze` refuse without it — see
 
 Which agents a change obliges is decided **mechanically, from the diff**
 -- never by judging whether one is "relevant".
-`docs/skills/workflow/scripts/required-agents` prints the set for the
+`docs/skills/task-gate/scripts/required-agents` prints the set for the
 current working tree and is the authority; this table only explains it.
 
 | Agent | Fires when | Built? |
@@ -51,7 +51,7 @@ one hard reviewer rule sits downstream, in what they *report*: an
 unresolved CRITICAL/HIGH `security` finding blocks `plan-gate` and the
 plan's close.
 
-"Code" is `PLAN_CODE_GLOBS` in `docs/skills/plan/scripts/lib.sh`, which
+"Code" is `PLAN_CODE_GLOBS` in `docs/skills/plan-file/scripts/lib.sh`, which
 is the authority. It is deliberately wider than Nix: the skill and repo
 scripts (`*/scripts/*`, `scripts/*`), the git hooks (`.githooks/*`), the
 hook wiring (`.claude/settings.json`), the agent and skill entries under
@@ -152,7 +152,7 @@ substantively risky:
 - **Not trivial, despite being "just a comment"**: a comment describing
   *why* a security-relevant decision was made — that's exactly the kind
   of thing that should be cited to a plan file (see
-  `docs/skills/plan/SKILL.md`), which means a plan file needs to exist.
+  `docs/skills/plan-file/SKILL.md`), which means a plan file needs to exist.
 
 If genuinely unsure, don't skip the gate — `plan-new` is cheap.
 
@@ -172,7 +172,7 @@ is not a hard gate — confirmed Claude Code behavior (and a live GitHub
 issue, closed "not planned") is that a subagent invocation does not
 reliably block the calling context by default; skill auto-invocation
 itself is documented as unreliable. So this system does not rely on the
-`workflow` skill's own sequencing to actually enforce anything. Instead:
+`task-gate` skill's own sequencing to actually enforce anything. Instead:
 
 - `plan-touch-guard` (`PreToolUse`, blocks `git commit`) checks one
   mechanical fact: did this session touch a plan file, or explicitly

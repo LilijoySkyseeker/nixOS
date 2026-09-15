@@ -270,7 +270,7 @@ later requires remembering to update this hook; there's no dynamic
 discovery from `.claude/agents/*.md`'s actual frontmatter names.
 
 ### F8 — host-build detection logic is duplicated between `pre-push` and `verify-ladder`
-Both `.githooks/pre-push` and `docs/skills/workflow/scripts/verify-ladder`
+Both `.githooks/pre-push` and `docs/skills/task-gate/scripts/verify-ladder`
 independently re-implement "which hosts does this change affect" (diff
 changed paths against `hosts/<name>/`, `modules/`, `flake.nix`/`flake.lock`,
 loop over `hosts/*`). A future change to this logic (e.g. adding a new
@@ -419,7 +419,7 @@ for which, and the two ID schemes don't cross-reference each other at all.
 **RESOLVED 2026-08-28:** documented in
 `2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md`,
 which added "Findings graduating from a fleet-wide security audit" to
-`docs/skills/plan/reference.md`: the two schemes stay deliberately
+`docs/skills/plan-file/reference.md`: the two schemes stay deliberately
 separate (fleet findings are per-audit-part, task findings are per-plan-
 file), and a fleet finding graduating into task-scoped follow-up work gets
 a fresh, local `F<N>` in the new plan citing its fleet origin in the
@@ -428,7 +428,7 @@ scheme. This is a documentation/convention fix, not a code change; when/
 which-subagent-to-reach-for is still governed by `workflow/reference.md`'s
 existing subagent-selection table, unchanged by this.
 
-**FIXED 2026-09-08:** carried over from this item's own 2026-08-28 resolution note above: the two ID schemes stay deliberately separate and the convention is documented in `docs/skills/plan/reference.md`, fixed in 2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md
+**FIXED 2026-09-08:** carried over from this item's own 2026-08-28 resolution note above: the two ID schemes stay deliberately separate and the convention is documented in `docs/skills/plan-file/reference.md`, fixed in 2026-08-28-plan-file-rework-mutable-state-section-f-item-resolution-gating-and-a.md
 
 ### F27 — `docs/agents/security/reference.md` is a copied/adapted rubric, not single-sourced from the audit's own reference material
 Harvested deliberately (per the user's own instruction) from
@@ -444,7 +444,7 @@ strings (`<slug>-<date>.md`) and confirms each one resolves to a real file
 under `docs/plans/` — a citation could go stale (its target renamed or
 deleted outside the normal scripts) with nothing catching it.
 
-**FIXED 2026-09-08:** `docs/skills/plan/scripts/plan-citations` is the checker this asked for -- it scans every `*.md` and script in the repo, resolves each bare-filename citation and each `#`-anchor against `docs/plans/*/`, and is a hard gate in `verify-ladder`. It also enforces the bare-filename form itself, per 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
+**FIXED 2026-09-08:** `docs/skills/plan-file/scripts/plan-citations` is the checker this asked for -- it scans every `*.md` and script in the repo, resolves each bare-filename citation and each `#`-anchor against `docs/plans/*/`, and is a hard gate in `verify-ladder`. It also enforces the bare-filename form itself, per 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#D3
 
 ### F29 — no chain-of-custody view for multi-hop `plan-carry`/supersession chains
 A deferred decision can be carried into a new plan, which can itself later
@@ -498,7 +498,7 @@ build --flake .#<host>` there over SSH — was corrected by the user:
 don't build on the target host itself, since it's a live
 storage/service host and a full Nix evaluation+build burns its own
 CPU/IO for no benefit when a separate build machine exists. The `workflow`
-skill's step sequence (`docs/skills/workflow/SKILL.md`) covers triviality
+skill's step sequence (`docs/skills/task-gate/SKILL.md`) covers triviality
 check → plan → work → `verify-ladder` → commit, but says nothing about
 *this* shape of task — validate an unmerged change on a specific host
 before merging — and there's no equivalent of
@@ -560,7 +560,7 @@ its own scale or can reuse an existing convention, and whether the index
 should sort/group by it.
 
 ### F35 — `/simplify` is mandated unconditionally in step 6, even for docs-only changes
-`docs/skills/workflow/SKILL.md` step 6 says `/simplify` is "required for
+`docs/skills/task-gate/SKILL.md` step 6 says `/simplify` is "required for
 any non-trivial change... always," no judgment call. Observed firing on a
 docs-only change (`2026-08-29-fold-the-trust-hierarchy-and-verify-ladder-
 automation-into-testing.md`, editing only `.md` files) where there was no

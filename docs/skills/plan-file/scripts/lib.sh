@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared helpers for the plan-* scripts. Sourced, never executed directly.
 
-# also hardcoded in workflow/scripts/plan-touch-guard, which must not
+# also hardcoded in task-gate/scripts/plan-touch-guard, which must not
 # depend on this file -- keep in sync
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F15
 PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
@@ -11,7 +11,7 @@ PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
 # Recorded, not proven -- see plan_stamp_line for what a stamp is and is
 # not evidence of.
 # Deliberately narrower than the set of agents a change obliges (see
-# workflow/scripts/required-agents) -- /simplify is a slash command with
+# task-gate/scripts/required-agents) -- /simplify is a slash command with
 # no such event, and spec-check does not exist yet. Both the writer
 # (subagent-stamp) and the reader (plan-gate) take the list from here, so
 # adding an agent cannot half-land: a stamper with no checker silently
@@ -457,7 +457,7 @@ plan_do_freeze() {
 
 # plan_mark_touched <repo-root> <rel-path> -- records "this plan file was
 # just worked on" for the current session. Never git-added (ephemeral,
-# gitignored) -- read by the workflow skill's commit-time and SubagentStop
+# gitignored) -- read by the task-gate skill's commit-time and SubagentStop
 # hooks, which is the whole reason it exists: they need *some* concrete,
 # on-disk fact to check, since a skill invoking a subagent doesn't reliably
 # block on it.
@@ -528,7 +528,7 @@ plan_is_stampable() {
 
 # Behavior, not prose: what a change to this file set can alter is what
 # the machine does. Plan files and explanatory docs stay out so a stamp
-# cannot invalidate itself -- see workflow/reference.md, "What a
+# cannot invalidate itself -- see task-gate/reference.md, "What a
 # completion stamp proves". Wider than "*.nix" because the enforcement
 # machinery is not all Nix.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G11
@@ -716,7 +716,7 @@ plan_worktree_files() {
 #
 # A stamp records that an agent of that type ran to completion against
 # code with that fingerprint. It is a record, not proof -- see
-# workflow/reference.md, "What a completion stamp proves".
+# task-gate/reference.md, "What a completion stamp proves".
 plan_stamp_line() {
   printf '_%s finished %s (code %s) -- see Findings above._' "$1" "$2" "$3"
 }

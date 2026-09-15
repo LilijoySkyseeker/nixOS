@@ -2,7 +2,7 @@
 # verify-ladder -- docs/procedures/testing-changes.md's lint gate plus
 # the mechanical half of its rung 3 (eval, targeted build). Passing does
 # not reach rung 3, which is earned by reading the output. Wired in as a
-# hard gate in the `workflow` skill's own step sequence instead of left to
+# hard gate in the `task-gate` skill's own step sequence instead of left to
 # memory. Hard-blocks on gate-tests, a working-tree edit to a frozen plan,
 # nixfmt --check, nix flake check, a targeted nixos-rebuild build, and
 # statix/deadnix -- but only for *newly introduced* warnings (line falls
@@ -16,8 +16,8 @@
 # switches anything.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=../../plan/scripts/lib.sh
-. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
+# shellcheck source=../../plan-file/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan-file/scripts/lib.sh"
 root="$(plan_repo_root)" || exit 1
 cd "$root" || plan_die "cannot cd to repo root"
 
@@ -41,7 +41,7 @@ echo "== plan-citations (warn-only) =="
 # Warns, never blocks: a dangling citation in a personal knowledge base is
 # a broken link, not a build failure.
 # plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D4
-if ! "$SCRIPT_DIR/../../plan/scripts/plan-citations"; then
+if ! "$SCRIPT_DIR/../../plan-file/scripts/plan-citations"; then
   echo "WARNING: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
 fi
 
@@ -80,7 +80,7 @@ echo "== plan-lint (active plan, warn-only) =="
 # The active plan only. Warns, never blocks: the D/G/F structure is the
 # house convention, not a gate, per the dismantle plan's refined D5.
 if active_plan="$(plan_active_plan)"; then
-  if ! "$SCRIPT_DIR/../../plan/scripts/plan-lint" "$active_plan"; then
+  if ! "$SCRIPT_DIR/../../plan-file/scripts/plan-lint" "$active_plan"; then
     echo "WARNING: the active plan has lint problems. See above." >&2
   fi
 elif marker_problem="$(plan_active_plan_problem)"; [ -n "$marker_problem" ]; then

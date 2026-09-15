@@ -15,7 +15,7 @@ blocked_by:
 Tabled during `2026-08-27-establish-the-workflow-and-plan-file-system.md`
 (D2/D14 area, see that plan's Gotchas for the surrounding context): the
 `workflow` skill hard-gates the cheap verification ladder (nixfmt, flake
-check, targeted build — `docs/skills/workflow/scripts/verify-ladder`), but
+check, targeted build — `docs/skills/task-gate/scripts/verify-ladder`), but
 VM-testing (`docs/procedures/vm-testing.md`'s `system.build.vm` boot-check
 and `runNixOSTest`) is not yet part of the gated roster. A single
 `vm-testing` subagent may be the wrong shape — it might need to be split

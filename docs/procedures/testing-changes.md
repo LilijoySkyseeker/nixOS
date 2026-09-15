@@ -4,7 +4,7 @@ Two different questions live here, deliberately kept apart (see
 2026-09-06-split-testing-changes-into-an-evidence-ladder-and-a-deploy-sequence.md):
 
 - **The evidence ladder** — how much a claim about a change is warranted,
-  1:1 with the trust hierarchy in `docs/skills/workflow/reference.md`.
+  1:1 with the trust hierarchy in `docs/skills/task-gate/reference.md`.
   Climbing it costs more and proves more.
 - **The deploy sequence** — the order of operations when landing a change
   on a live host. It is chronology, not evidence: `nvd diff` costs
@@ -15,7 +15,7 @@ The hierarchy's corollary applies throughout: **a fix that is not
 declarative and reproducible is no fix at all** — a value patched by hand
 on a live host doesn't count as tested or fixed until it's expressed in
 this repo's Nix and deployed from it (see
-`docs/skills/workflow/reference.md` for the full rationale).
+`docs/skills/task-gate/reference.md` for the full rationale).
 
 ## The evidence ladder
 
@@ -161,7 +161,7 @@ of operations — chronology, not evidence:
   same rule over the PR range in CI for any commit that skipped local
   hooks. The third, `scripts/claude-links-check`, blocks a
   `docs/skills/`/`docs/agents/` entry whose `.claude/` symlink is
-  missing or wrong (see `docs/skills/workflow/reference.md`, "Why a
+  missing or wrong (see `docs/skills/task-gate/reference.md`, "Why a
   hook at all").
 - **`commit-msg` hook** — enforces Conventional Commits format on the
   subject line (`<type>(<scope>)?: <subject>`), skipping merge/
@@ -182,7 +182,7 @@ of operations — chronology, not evidence:
   `origin/master`, and refuses the push outright rather than deciding
   the build set from a merge-base it could not compute
   (2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73).
-- **`docs/skills/workflow/scripts/verify-ladder`** — the `workflow`
+- **`docs/skills/task-gate/scripts/verify-ladder`** — the `workflow`
   skill's step-4 gate for any non-trivial agentic change, run before
   commit rather than at push time. Hard-blocks on `scripts/gate-tests`
   (the gate scripts' own failure-mode tests, next bullet), a
@@ -196,7 +196,7 @@ of operations — chronology, not evidence:
   warn-only (ADR-0002): `plan-citations` (a plan citation that no longer
   resolves, or one cited by path rather than bare filename) and
   `plan-lint` on the active plan. This is a skill-invoked script, not a
-  git hook, so it only fires when the `workflow` skill's sequence is
+  git hook, so it only fires when the `task-gate` skill's sequence is
   actually followed — it does not backstop a commit made outside that
   skill the way `pre-push` does.
 - **`scripts/gate-tests`** — the failure-mode tests for the scripts that

@@ -41,7 +41,7 @@ Enforced by the `commit-msg` hook.
 No `Co-Authored-By: Claude ...` or `Claude-Session:` trailer in commit
 messages — the git author/committer identity already records who/what made
 the commit, so both are redundant noise in history. Hard-blocked, not just
-documented: `docs/skills/workflow/scripts/footer-guard` (a `PreToolUse`
+documented: `docs/skills/task-gate/scripts/footer-guard` (a `PreToolUse`
 hook) denies any `git commit`/`gh pr create`/`gh pr edit` whose text
 contains one.
 
@@ -49,7 +49,7 @@ Same for PR descriptions: no "🤖 Generated with Claude Code" footer or
 `claude.ai/code/session_...` link. Let the body end at its last real
 content line (e.g. the test plan).
 
-A commit for work tracked in a plan file (`docs/skills/plan/SKILL.md`) may
+A commit for work tracked in a plan file (`docs/skills/plan-file/SKILL.md`) may
 add a `Plan: <date>-<slug>.md` trailer for traceability — but never inline
 the plan's decisions/findings into the commit body; the body stays short
 and human, the reasoning stays in the plan.

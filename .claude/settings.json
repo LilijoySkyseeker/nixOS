@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/workflow/scripts/plan-touch-guard",
+            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/task-gate/scripts/plan-touch-guard",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/workflow/scripts/footer-guard",
+            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/task-gate/scripts/footer-guard",
             "timeout": 10
           }
         ]
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/workflow/scripts/fresh-branch-guard",
+            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/task-gate/scripts/fresh-branch-guard",
             "timeout": 15
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/workflow/scripts/subagent-stamp",
+            "command": "${CLAUDE_PROJECT_DIR}/docs/skills/task-gate/scripts/subagent-stamp",
             "timeout": 10
           }
         ]

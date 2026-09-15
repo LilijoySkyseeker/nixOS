@@ -40,7 +40,7 @@ already-solved problem (a boot-time sops identity issue, a gid collision,
 a `nixos-rebuild-ng --sudo` behavior) because the reasoning behind a
 specific config shape wasn't recorded anywhere findable.
 
-Before the plan-file system (`docs/skills/plan/SKILL.md`) existed, the
+Before the plan-file system (`docs/skills/plan-file/SKILL.md`) existed, the
 commit message was that findable place — and a commit message with real
 rationale is still better than a bare "what." But a commit message can't
 be appended to once decisions keep evolving, can't be cited by a typed ID
@@ -55,7 +55,7 @@ message — there's no plan file to cite for those.
 
 ## Why the trust hierarchy is ordered this way
 
-`docs/skills/workflow/reference.md`'s trust hierarchy (documentation →
+`docs/skills/task-gate/reference.md`'s trust hierarchy (documentation →
 source → local build → VM testing → an actual switch) generalizes
 something the 2026-08-26 security audit learned the hard way at a larger
 scale: each rung can lie in a way the next rung can't. Documentation

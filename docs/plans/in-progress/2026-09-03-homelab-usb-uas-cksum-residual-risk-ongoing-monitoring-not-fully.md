@@ -39,7 +39,7 @@ Continuation of two frozen plans:
 (confirmed the 2026-09-02 alert was the same accepted residual risk,
 now also hitting `zbackup`). Both are frozen (`done/` plans get zero
 further edits by design -- `plan_require_not_frozen` in
-`docs/skills/plan/scripts/lib.sh`), so new information goes here
+`docs/skills/plan-file/scripts/lib.sh`), so new information goes here
 instead. Purpose of *this* plan: track the residual USB-UAS CKSUM
 trickle as an open, ongoing condition rather than a closed
 investigation -- the underlying enclosure/bridge-chip vulnerability is

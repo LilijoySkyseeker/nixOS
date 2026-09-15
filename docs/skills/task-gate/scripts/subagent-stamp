@@ -6,16 +6,16 @@
 # timestamped completion stamp to the currently-active plan file (per
 # .claude/.active-plan) recording that the step ran, and against which
 # code -- a record that defeats forgetting, not one that resists a lie;
-# see plan_stamp_line in the plan skill's lib.sh. This is
+# see plan_stamp_line in the plan-file skill's lib.sh. This is
 # what closes the gap where a skill invoking a subagent doesn't reliably
 # block on it (confirmed Claude Code behavior, not an assumption -- see
-# docs/skills/workflow/reference.md).
+# docs/skills/task-gate/reference.md).
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=hook-lib.sh
 . "$SCRIPT_DIR/hook-lib.sh"
-# shellcheck source=../../plan/scripts/lib.sh
-. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
+# shellcheck source=../../plan-file/scripts/lib.sh
+. "$SCRIPT_DIR/../../plan-file/scripts/lib.sh"
 
 input="$(cat)"
 [ "$(hook_json_str "$input" hook_event_name)" = "SubagentStop" ] || exit 0

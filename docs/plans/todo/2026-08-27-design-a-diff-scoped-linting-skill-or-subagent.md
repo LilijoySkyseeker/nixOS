@@ -41,7 +41,7 @@ a code-*cleanliness* subagent (reuse, simplification, condensing into
 reused modules), not this plan's diff-*scoping* concern. User's framing:
 "let's try 2 first" — for now, `workflow` mandates the existing
 `/simplify` skill for every non-trivial change instead of building
-anything new (see `docs/skills/workflow/reference.md`'s subagent-selection
+anything new (see `docs/skills/task-gate/reference.md`'s subagent-selection
 table) — "and make a note that we may need to be 1 in the future": a
 dedicated repo-gated subagent, matching `security`/`docs-updater`'s shape
 (auto-invoked, appends findings into the plan file, repo-aware of this
