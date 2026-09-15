@@ -22,7 +22,8 @@
       vpsPublicIp6 = "2604:a880:4:1d0:0:3:5045:8000";
 
       # Only jellyfin, minecraft, and factorio are meant to be publicly
-      # reachable (see hosts/vps/README.md).
+      # reachable (see hosts/vps/README.md). The mail records below are
+      # separate: they point at Google Workspace, not at the vps.
       zoneRecords = {
         "" = [
           {
@@ -34,6 +35,57 @@
             type = "AAAA";
             ttl = 300;
             value = vpsPublicIp6;
+          }
+          # Google Workspace mail. One MX record, not the five
+          # aspmx.l.google.com ones — those are the pre-2023 shape, kept
+          # only on domains that already had them.
+          {
+            type = "MX";
+            ttl = 300;
+            value = {
+              preference = 1;
+              exchange = "smtp.google.com.";
+            };
+          }
+          # SPF and the site-verification token are one record with two
+          # values, not two records: a duplicate name+type is an error
+          # here, since populate_should_replace defaults to false.
+          # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G2
+          {
+            type = "TXT";
+            ttl = 300;
+            values = [
+              "v=spf1 include:_spf.google.com ~all"
+              "google-site-verification=rC01szyAkLHzaXQ9BS69zEDh0sW9Z2k7inhCN9LgWxs"
+            ];
+          }
+        ];
+        # DKIM public key, issued by the Workspace admin console (Gmail >
+        # Authenticate email). Public by definition — it is published in
+        # DNS; the private half stays with Google. 408 chars, so octoDNS
+        # splits it across DNS's 255-byte strings on push. The `\;` escapes
+        # are required: octoDNS rejects bare semicolons in a TXT value and
+        # the Cloudflare provider unescapes them again on the way out.
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G1
+        "google._domainkey" = [
+          {
+            type = "TXT";
+            ttl = 300;
+            value = "v=DKIM1\\;k=rsa\\;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsonrfzXTCC2+UEvz952v6fJgq6V/dUzIzORTEogwWdoBQHotImyklUGvhGhimwx49P4jDd+IezTeA7spO+EZpepXPidYPrDyzOnqtYyjgCM6z4SrD4RFGIcmtAIcVxYw8uy0LQ/L1L4JHxNf83LGQSRQpGo5HFwbwvAPsVCsE+t4CjFCIbWOlZuvHIuOLApKjrmYT2OBiu6jScKZvAiFTB98c9zJe7Arsws7SrSC41O0S5P/4v6bLCMq524TGiuVWPAJnvrJYJqXzj8nWfkqkZ5tVe/KeJi32pCGevfh1eGXU+IThT27Wcgl6QferAtYs10U/KiVMNRUV/Zeu+4IXwIDAQAB";
+          }
+        ];
+        # Monitor-only to start: p=none delivers everything and only
+        # collects reports, so a misconfiguration can't bounce real mail.
+        # Tighten to quarantine and then reject once reports come back
+        # clean. rua stays on this domain so no external-reporting
+        # authorization record is needed; postmaster@ is a Workspace
+        # reserved word, so it only exists as a Group, never a user.
+        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#D1
+        "_dmarc" = [
+          {
+            type = "TXT";
+            ttl = 300;
+            value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
         jellyfin = [
