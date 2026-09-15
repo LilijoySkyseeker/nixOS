@@ -98,6 +98,7 @@ in
         nixosModules.loki
         nixosModules.grafana
         nixosModules."alloy"
+        nixosModules."tailscale-acl"
       ];
     };
     #==================================================

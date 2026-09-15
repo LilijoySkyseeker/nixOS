@@ -1,7 +1,22 @@
-// Tailnet ACL / policy file, managed in the Tailscale admin console
-// (https://login.tailscale.com/admin/acls/file) — not applied by Nix.
-// Kept here only as a reference copy; update this file whenever the
-// console policy changes so the two don't drift.
+// Tailnet ACL / policy file for this fleet.
+//
+// STATUS (2026-09-15): becoming the source of truth, not there yet.
+// `modules/services/tailscale-acl.nix` pushes this file to the Tailscale
+// API, but ships with its `enable` flag off, because turning it on needs
+// three things only the operator can do: create an OAuth client with the
+// `policy_file` scope, add its credentials to sops, and reconcile this
+// file against the live policy. Until that flag is flipped, the admin
+// console (https://login.tailscale.com/admin/acls/file) is still
+// authoritative and changes here must also be applied there by hand.
+// plan: 2026-09-15-manage-the-tailscale-acl-declaratively-and-unblock-vps-log-shipping.md#D1
+//
+// The reconcile is not optional paperwork. This file spent its whole life
+// as a hand-maintained reference copy with nothing checking it, so it
+// cannot be assumed to match the live tailnet. Pushing it before diffing
+// it would apply whatever drift exists to every device at once — and
+// tailnet lock would not catch that, because lock signs node keys and
+// does not cover the policy file at all.
+// plan: 2026-09-15-manage-the-tailscale-acl-declaratively-and-unblock-vps-log-shipping.md#G3
 //
 // Notes:
 // - All hosts in this repo join as tagged devices (see
@@ -49,13 +64,41 @@
             "ip":  ["*"],
         },
         // vps is reachable for admin SSH by you and by all your other
-        // tailnet devices (all tagged devices here belong to you) — it
-        // doesn't need outbound access to anything beyond what the
-        // internet grant below already covers
+        // tailnet devices (all tagged devices here belong to you).
         {
             "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["tag:vps"],
             "ip":  ["*"],
+        },
+        // vps -> homelab's Loki push endpoint, and nothing else.
+        //
+        // This is the ONE grant where vps appears as a source, and it is a
+        // deliberate reversal of the rule that used to be stated here —
+        // that vps "doesn't need outbound access". It does: it is the
+        // internet-facing host, so it is the one whose journal most needs
+        // to survive its own compromise, and until 2026-09-15 it was the
+        // only host shipping nothing (homelab's tailscaled was dropping
+        // its pushes with "no rules matched", which is this file saying no).
+        //
+        // Kept as narrow as the grant system allows: one source tag naming
+        // exactly one device, one destination port, no reverse direction.
+        // A WireGuard route was evaluated and rejected — same breadth, but
+        // revoking it would need a rebuild-and-switch on a CGNAT'd host
+        // instead of an edit here, it gets no per-packet node-key
+        // enforcement, and it would have split the fleet's access rules
+        // across two mechanisms with only one of them written down.
+        // plan: 2026-09-15-manage-the-tailscale-acl-declaratively-and-unblock-vps-log-shipping.md#D2
+        //
+        // Residual risk accepted with it: Loki runs auth_enabled = false,
+        // so this also grants unauthenticated read of the whole fleet's
+        // 30-day journal to a compromised vps, and lets it assert any
+        // `host` label it likes. The erase path is already closed
+        // (limits_config.deletion_mode = "disabled").
+        // plan: 2026-09-15-manage-the-tailscale-acl-declaratively-and-unblock-vps-log-shipping.md#F3
+        {
+            "src": ["tag:vps"],
+            "dst": ["tag:homelab"],
+            "ip":  ["tcp:3100"],
         },
         // let members and tagged devices use homelab as an exit node
         {
