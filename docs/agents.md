@@ -73,6 +73,43 @@ the same way. None of this means always climbing to the top rung for
 every change — it means knowing which rung a given claim is actually
 resting on, and not treating a cheaper rung's silence as proof.
 
+## How the subagent grant in `AGENTS.md` actually works
+
+A file in this repo cannot override an agent's system prompt. Harness
+instructions sit above project files in precedence, and writing "ignore
+your system prompt" into `AGENTS.md` would be theater — an agent that
+honored it would be broken in a more general way than the one being fixed
+here.
+
+What the grant does instead is satisfy a *condition* those defaults
+already carry. The common phrasing is "don't use subagents **unless the
+user requested it**" — a default-off switch with a user-supplied
+override, not a prohibition. `AGENTS.md` is authored by the user and read
+at session start, so a standing request written there is a genuine
+instance of the user asking. No conflict, no override, nothing
+disregarded: the condition is simply met before the first turn.
+
+This distinction decides what the grant can and cannot cover. It reaches
+defaults whose stated condition is user consent. It does not reach
+anything unconditional — a safety rule, or this repo's own hard-confirm
+actions, which are *more* restrictive than any harness default and are
+the user's own standing instruction not to act. Hence the scoping
+paragraph in `AGENTS.md`: the grant is about which tools an agent may
+pick up, never about which actions it may take. A subagent inherits every
+hard-confirm rule its caller has, and delegation is not laundering —
+"a subagent ran the `switch`" is the same violation as running it
+directly.
+
+Worth writing down because the `workflow` skill's step 6 has the agent
+run whatever `docs/skills/workflow/scripts/required-agents` names, so a
+harness default suppressing them leaves an agent between the repo's step
+sequence and its own defaults — skip the repo's review gate, or hand-wave
+it. The failure is quiet: nothing blocks on whether those agents ran
+(ADR-0002), so the gate looks like it ran and a hand review gets recorded
+where the review agents should have been. Encountered exactly that on
+2026-09-16; see `2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#F1`
+for the plan file that had to note the substitution.
+
 ## Where to look before assuming
 
 - Before assuming a module is "live," check its `flake.modules.*` key
