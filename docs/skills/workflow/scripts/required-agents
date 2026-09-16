@@ -82,8 +82,8 @@ fi
 
 # Emitted in PLAN_AGENT_ORDER, never in the order the tests above happen
 # to run: an agent reading this output top-to-bottom must get a sequence
-# it can actually execute, and running security before docs-updater
-# leaves security's stamp stale by construction.
+# it can actually execute, with docs-updater last so it documents what the
+# reviewers left behind rather than what they found.
 emitted=()
 for a in "${PLAN_AGENT_ORDER[@]}"; do
   if plan_in_list "$a" "${obliged[@]}"; then

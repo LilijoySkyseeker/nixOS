@@ -18,14 +18,22 @@ PLAN_ACTIVE_MARKER_RELPATH=".claude/.active-plan"
 # degrades the gate to a no-op.
 PLAN_STAMPABLE_AGENTS=("security" "docs-updater")
 
-# Canonical run order. Every agent that writes runs before every agent
-# whose stamp must stay valid, so a later edit cannot invalidate an
-# earlier reviewer's fingerprint. required-agents emits in this order,
-# which makes the script authoritative on both which agents a change
-# obliges and when each runs -- printing them in any other order invites
-# exactly the stale-stamp block the ordering exists to prevent.
+# Canonical run order: the agent that rewrites code runs first, the
+# read-only reviewers next, and docs-updater last so it describes the
+# state the change actually merges in -- a review that finds something
+# usually changes the code, so a documenter running before the reviewers
+# documents a version that never ships. required-agents emits in this
+# order, which makes the script authoritative on both which agents a
+# change obliges and when each runs.
+#
+# The pre-2026-09-09 order put every writer ahead of every stampable
+# reader, because a later edit invalidated an earlier reviewer's
+# fingerprint and plan-gate blocked on it. That machinery is gone
+# (ADR-0002): stamps are provenance now and plan-gate does not read them,
+# so a writer after a reader has no gate consequence to weigh.
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#D7
-PLAN_AGENT_ORDER=("/simplify" "docs-updater" "security" "spec-check")
+# plan: 2026-09-16-run-docs-updater-last-so-it-documents-the-post-review-final-state.md#D1
+PLAN_AGENT_ORDER=("/simplify" "security" "spec-check" "docs-updater")
 
 # the plan-file schema's vocabularies and key sets; plan-new, plan-lint and
 # the skill docs read these lists from here instead of restating them
