@@ -40,9 +40,9 @@ current working tree and is the authority; this table only explains it.
 | Agent | Fires when | Built? |
 |---|---|---|
 | `/simplify` | any code change (see below) | yes |
-| `docs-updater` | any of the above **or** any `.md` changed | yes |
 | `security` | any code change | yes |
 | `spec-check` | the active plan has any `### D<N>` | not yet |
+| `docs-updater` | any code change **or** any `.md` changed | yes |
 
 Listed in run order; `required-agents` prints them in that order too.
 All of it is advisory (ADR-0002): the agents run because they find
@@ -81,17 +81,31 @@ batch, even though the review agents are read-only and would seem safe to
 overlap:
 
 ```
-/simplify -> docs-updater -> security -> spec-check -> apply what's worth applying
+/simplify -> security -> spec-check -> docs-updater -> apply what's worth applying
 ```
 
-**Every agent that writes runs before every agent that reads.**
-`/simplify` and `docs-updater` edit; `security` and `spec-check` are
-read-only, and each needs to see the code *after* the previous one's
-fixes landed. A real session had `/simplify` land a refactor that was
-later reverted for an eval-time infinite recursion, while `docs-updater`
-ran concurrently and had already written the reverted design into the
-plan's Findings as settled fact -- leaving plan and code contradicting
-each other until hand-reconciled.
+**The agent that rewrites code runs first; the documenter runs last.**
+`/simplify` edits code, so it goes ahead of the read-only reviewers, which
+each need to see the code *after* the previous one's fixes landed. A real
+session had `/simplify` land a refactor that was later reverted for an
+eval-time infinite recursion, while `docs-updater` ran concurrently and
+had already written the reverted design into the plan's Findings as
+settled fact -- leaving plan and code contradicting each other until
+hand-reconciled.
+
+`docs-updater` runs last for the complementary reason: a review that
+finds something usually *changes* the code, so a documenter that ran
+before the reviewers documents a version that never ships. Observed on
+2026-09-16, when `security` found a missing `TimeoutStartSec` and the fix
+landed after `docs-updater` had already reported.
+
+Until 2026-09-09 this ordering was not available. Every writer had to run
+ahead of every stampable reader, because a later edit invalidated the
+earlier reviewer's fingerprint and `plan-gate` blocked on it. ADR-0002
+deleted that machinery -- stamps are provenance now, `plan-gate` does not
+read them -- so putting the documenter last costs nothing. If the
+staleness block is ever rebuilt, this ordering is one of the things it
+would break; re-litigate here before restoring it.
 
 The two read-only reviewers stay serialized too, for a different reason:
 both append `### F<N>` findings to the same plan file, numbering from the
