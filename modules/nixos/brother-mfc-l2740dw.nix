@@ -64,6 +64,18 @@ _: {
           # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#G3
           Restart = "on-failure";
           RestartSec = 30;
+
+          # Without this the unit inherits systemd's 90s default, and a
+          # printer that accepts the TCP connect but never answers stretches
+          # each cycle past RestartSec -- five starts then outlast
+          # startLimitIntervalSec, the burst resets instead of being spent,
+          # and the retry never terminates. A unit stuck retrying also never
+          # reaches `failed`, so health-alerts' `systemctl --failed` sweep
+          # never reports it. 45s keeps the worst case (5x45 + 4x30 = 345s)
+          # inside the window while still leaving a slow-but-awake printer
+          # room to answer Get-Printer-Attributes.
+          # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#F3
+          TimeoutStartSec = 45;
         };
       };
 
