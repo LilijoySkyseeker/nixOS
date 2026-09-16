@@ -56,9 +56,11 @@ in
         # which thinkpad also uses.
         { home-manager.users.lilijoy.imports = [ homeManagerModules."audio-switch" ]; }
         # The Brother printer/scanner is wired in here (torrent only), not
-        # profile-pc: its static-IP queue and sane-airscan's WSD discovery
-        # are network-supplied-identity risks on thinkpad, a roaming
-        # laptop -- see modules/nixos/brother-mfc-l2740dw.nix.
+        # profile-pc: its static-IP print queue and static-IP scanner
+        # entry are network-supplied-identity risks on thinkpad, a roaming
+        # laptop, and scanning pulls in an unfree vendor blob confined to
+        # this one host (ADR-0003) -- see
+        # modules/nixos/brother-mfc-l2740dw.nix.
         nixosModules."brother-mfc-l2740dw"
       ];
     };
