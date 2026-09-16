@@ -39,14 +39,44 @@ _: {
 
       # ensurePrinters' own module only orders after cups.service, but
       # `-m everywhere` does a live IPP query against the printer at
-      # setup time -- it needs the network up too, or it fails outright
-      # with no retry (Type=oneshot, no Restart=). Hit this for real: a
+      # setup time -- it needs the network up too. Hit this for real: a
       # 2026-09-02 boot ran lpadmin the same second NetworkManager
       # started, before torrent had a route to the LAN.
       # plan: 2026-09-03-ensure-printers-service-boot-race-on-torrent-order-after-network.md#G1
       systemd.services.ensure-printers = {
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
+
+        # A waited-for network still isn't a reachable printer: this one
+        # sleeps, and lpadmin's probe fails outright against a sleeping or
+        # powered-off device. Type=oneshot has no retry of its own, and the
+        # generated script is `set -e` with the probing lpadmin first, so a
+        # single miss leaves the queue half-built and ensureDefaultPrinter
+        # never applied. Retry a few times so a waking printer self-heals,
+        # then give up rather than spin against an unplugged one.
+        # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#D1
+        # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#G2
+        startLimitIntervalSec = 600;
+        startLimitBurst = 5;
+        serviceConfig = {
+          # on-failure, not always -- systemd refuses always/on-success on
+          # Type=oneshot.
+          # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#G3
+          Restart = "on-failure";
+          RestartSec = 30;
+
+          # Without this the unit inherits systemd's 90s default, and a
+          # printer that accepts the TCP connect but never answers stretches
+          # each cycle past RestartSec -- five starts then outlast
+          # startLimitIntervalSec, the burst resets instead of being spent,
+          # and the retry never terminates. A unit stuck retrying also never
+          # reaches `failed`, so health-alerts' `systemctl --failed` sweep
+          # never reports it. 45s keeps the worst case (5x45 + 4x30 = 345s)
+          # inside the window while still leaving a slow-but-awake printer
+          # room to answer Get-Printer-Attributes.
+          # plan: 2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#F3
+          TimeoutStartSec = 45;
+        };
       };
 
       # WSD's reply comes back unicast from the printer to whatever
