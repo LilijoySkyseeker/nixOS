@@ -310,10 +310,11 @@ in
       #
       # Base only -- shared by both PC hosts. The actual printer queue and
       # scanning are declared in nixosModules."brother-mfc-l2740dw" and
-      # wired into torrent only (modules/flake/hosts.nix), not here: both
-      # ensurePrinters' deviceUri and sane-airscan's WSD discovery are
-      # network-supplied-identity risks D9 was written to avoid on a
-      # roaming laptop.
+      # wired into torrent only (modules/flake/hosts.nix), not here:
+      # ensurePrinters' deviceUri and the scanner's static-IP device entry
+      # are network-supplied-identity risks D9 was written to avoid on a
+      # roaming laptop, and scanning also pulls in an unfree vendor blob
+      # confined to that host (ADR-0003).
       # plan: 2026-08-27-set-up-the-new-network-printer-scanner-brother-mfc.md#F1
       services.printing = {
         enable = true;
