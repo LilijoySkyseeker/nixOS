@@ -1,6 +1,6 @@
 ---
-name: workflow
-description: Gate and orchestrate any non-trivial task in this repo through a citeable plan file (see the `plan` skill) and the relevant review subagents before it's committed. Trivial one-off changes (a typo fix, a single-line correction) skip this entirely -- see the triviality bar below. Use for anything else: new/changed modules, hosts, services, multi-step fixes, anything security- or secrets-adjacent, anything that will eventually be committed as more than a one-line diff.
+name: task-gate
+description: Gate and orchestrate any non-trivial task in this repo through a citeable plan file (see the `plan-file` skill) and the relevant review subagents before it's committed. Trivial one-off changes (a typo fix, a single-line correction) skip this entirely -- see the triviality bar below. Use for anything else: new/changed modules, hosts, services, multi-step fixes, anything security- or secrets-adjacent, anything that will eventually be committed as more than a one-line diff.
 ---
 
 Read `reference.md` in this skill's directory for the trust hierarchy that
@@ -11,11 +11,11 @@ stays short on purpose (progressive disclosure).
 ## The step sequence
 
 1. **Triviality check.** Genuinely trivial (a typo, a one-line wording
-   fix)? Run `docs/skills/workflow/scripts/mark-trivial "<reason>"`, then
+   fix)? Run `docs/skills/task-gate/scripts/mark-trivial "<reason>"`, then
    skip straight to step 9. Otherwise continue below. This is the one
    deliberately judgment-based step in the whole system -- everything
    else here is a hardcoded script or hook, not something to remember.
-2. **Find or create the plan file** (see `docs/skills/plan/SKILL.md`).
+2. **Find or create the plan file** (see `docs/skills/plan-file/SKILL.md`).
    Grep `docs/plans/{todo,in-progress}/` for something already covering
    this task; `plan-move <file> in-progress` an existing `todo/` match,
    or `plan-new "<title>"` if nothing exists. Grep `docs/plans/done/`
@@ -29,7 +29,7 @@ stays short on purpose (progressive disclosure).
    `docs-updater` to clean it up afterward; that subagent is a backstop
    for what slips through, not the primary mechanism.
 4. **Run the scriptable verification floor**:
-   `docs/skills/workflow/scripts/verify-ladder`. Hard-blocks on
+   `docs/skills/task-gate/scripts/verify-ladder`. Hard-blocks on
    `scripts/gate-tests` (the gate scripts' own failure-mode tests), a
    working-tree edit to any frozen plan (anything under `done/` or
    `rejected/`), `nixfmt --check`, `nix flake check --no-build`, a
@@ -42,7 +42,7 @@ stays short on purpose (progressive disclosure).
 5. **Append to the plan as you go** -- `plan-tick`, new `### D<N>`/
    `### G<N>` entries, append-only.
 6. **Run the review agents
-   `docs/skills/workflow/scripts/required-agents` names**, in the order
+   `docs/skills/task-gate/scripts/required-agents` names**, in the order
    it prints them, one at a time -- never two in the same parallel
    batch. They are advisory, run because they find things (ADR-0002):
    apply the findings worth applying once the read-only reviewers have
@@ -56,7 +56,7 @@ stays short on purpose (progressive disclosure).
    plan file. See reference.md, "Order" for why nothing runs
    concurrently.
 7. **Resolve `D*` items via `plan-decide`** -- `answered`, `discussed`, or
-   `deferred`, exactly per `docs/skills/plan/reference.md`. Only on the
+   `deferred`, exactly per `docs/skills/plan-file/reference.md`. Only on the
    user's actual input, never inferred.
 8. **Close or leave open, before committing.** `plan-move <file> done`
    now, in this same branch, if the work is actually complete and

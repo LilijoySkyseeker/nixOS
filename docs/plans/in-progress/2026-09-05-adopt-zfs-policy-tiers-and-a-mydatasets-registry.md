@@ -67,7 +67,7 @@ service state is migrated here.
 **2026-09-10, resumed.** Branch rebased onto current master (eight
 merges of drift, including the plan-schema revision and the ADR-0002
 gate dismantle). Conflict resolutions: this plan file schema-migrated
-(State first, new frontmatter fields); `docs/skills/workflow/reference.md`
+(State first, new frontmatter fields); `docs/skills/task-gate/reference.md`
 taken from master, whose post-ADR-0002 rewrite already carries this
 branch's /simplify-race incident lesson in updated form;
 `hosts/homelab/README.md` regenerated with `scripts/doc-host.sh homelab`

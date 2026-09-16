@@ -1,4 +1,4 @@
-# `plan` skill reference
+# `plan-file` skill reference
 
 ## Filename and frontmatter
 
@@ -26,7 +26,7 @@
   The block above is a shape example, not the vocabulary. What `kind` and
   `priority` may contain, which keys are core and which the map plan's
   `#D4` added, and which vocabulary governs which field, are the
-  `PLAN_*` arrays in `docs/skills/plan/scripts/lib.sh` — `plan-lint`
+  `PLAN_*` arrays in `docs/skills/plan-file/scripts/lib.sh` — `plan-lint`
   reads them from there, so read the arrays rather than a prose copy of
   them. `status` is the exception: it has no array, it is checked
   against the folder name.

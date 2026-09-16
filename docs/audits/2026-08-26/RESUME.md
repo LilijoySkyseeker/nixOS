@@ -76,8 +76,8 @@ session needs is here or linked from here.
 > build-verified-only remains fleet-wide as of this session's end.
 >
 > **`TODO.md` no longer exists.** Master retired it for the plan-file
-> system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan`
-> and `workflow` skills. Plans are cited by **bare filename**, and
+> system (`docs/plans/{todo,in-progress,done,rejected}/`) — see the `plan-file`
+> and `task-gate` skills. Plans are cited by **bare filename**, and
 > filenames are **date-first** (`2026-08-28-<slug>.md`). Older text in
 > this file still says `TODO.md`; read that as "the plan files".
 >
@@ -1741,8 +1741,8 @@ expensive.
 
 - **Log the plan and its state in a plan file**, not only in this file.
   `TODO.md` was **retired on master 2026-08-28** in favour of
-  `docs/plans/{todo,in-progress,done,rejected}/` — load the `plan` skill
-  for the scripts and the append-only rules, and the `workflow` skill for
+  `docs/plans/{todo,in-progress,done,rejected}/` — load the `plan-file` skill
+  for the scripts and the append-only rules, and the `task-gate` skill for
   when a change needs a plan at all. Two things that bite: plans are
   cited by **bare filename with no folder path** (so a citation survives
   the file moving between folders, and a stale one fails *silently*

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared JSON-payload helpers for the workflow skill's hooks. Sourced,
+# Shared JSON-payload helpers for the task-gate skill's hooks. Sourced,
 # never executed directly. Same jq-or-awk-fallback approach as
 # tcr-skill/scripts/tcr-guard-hook, since this sandbox and some minimal
 # systems don't ship jq.

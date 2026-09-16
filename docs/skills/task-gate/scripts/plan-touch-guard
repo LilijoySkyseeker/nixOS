@@ -4,8 +4,8 @@
 # points at a real file) or explicitly recorded a trivial-change
 # acknowledgment (.claude/.trivial-ack, via mark-trivial). Deliberately
 # does NOT -- and cannot -- judge which subagents ran or whether the plan
-# content is any good; that's the workflow skill's job, not this hook's.
-# See docs/skills/workflow/reference.md, "Why a hook at all".
+# content is any good; that's the task-gate skill's job, not this hook's.
+# See docs/skills/task-gate/reference.md, "Why a hook at all".
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=hook-lib.sh
@@ -38,4 +38,4 @@ if [ -f "$active" ]; then
   fi
 fi
 
-hook_deny "PreToolUse" "BLOCKED: no docs/plans/ file was touched this session, and no trivial-change acknowledgment was recorded. Run the plan skill (plan-new/plan-move/plan-tick/plan-decide) first -- or if this really is a typo/one-line fix, run docs/skills/workflow/scripts/mark-trivial \"<reason>\" first."
+hook_deny "PreToolUse" "BLOCKED: no docs/plans/ file was touched this session, and no trivial-change acknowledgment was recorded. Run the plan-file skill (plan-new/plan-move/plan-tick/plan-decide) first -- or if this really is a typo/one-line fix, run docs/skills/task-gate/scripts/mark-trivial \"<reason>\" first."

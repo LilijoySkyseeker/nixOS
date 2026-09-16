@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mark-trivial "<one-line reason>" -- records that the workflow skill
+# mark-trivial "<one-line reason>" -- records that the task-gate skill
 # judged the current task genuinely trivial (a typo fix, a single-line
 # correction) and is intentionally skipping the plan-file gate for it.
 # Read by the commit-time PreToolUse hook (plan-touch-guard). This is the

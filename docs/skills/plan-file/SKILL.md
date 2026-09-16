@@ -1,5 +1,5 @@
 ---
-name: plan
+name: plan-file
 description: Conventions and scripts for creating, updating, and closing citeable plan files under docs/plans/{todo,in-progress,done,rejected}/ -- the repo's replacement for TODO.md/docs/DONE.md. Use whenever creating a new plan, recording a decision/gotcha/finding, ticking progress, moving a plan between todo/in-progress/done, or rejecting/abandoning one.
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/plan-new *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-move *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-decide *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-carry *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-freeze *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-tick *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-reject *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-resolve *) Bash(${CLAUDE_SKILL_DIR}/scripts/plan-lint *)
 ---

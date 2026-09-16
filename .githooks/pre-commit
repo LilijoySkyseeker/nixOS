@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Block obviously-plaintext secrets from being committed, and enforce that
 # frozen docs/plans/{done,rejected}/ files never change (see
-# docs/skills/plan/reference.md) -- both git-level, so they apply to any
+# docs/skills/plan-file/reference.md) -- both git-level, so they apply to any
 # tool or human, not just a Claude Code session.
 set -euo pipefail
 
@@ -44,7 +44,7 @@ if [[ -x "$repo_root/scripts/claude-links-check" ]]; then
 fi
 
 # core.quotePath=false, and what it does not cover -- see
-# plan_worktree_files in docs/skills/plan/scripts/lib.sh
+# plan_worktree_files in docs/skills/plan-file/scripts/lib.sh
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
 # ACMRT excludes deletions and nothing else; ACM also dropped renames
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45

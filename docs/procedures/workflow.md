@@ -37,8 +37,8 @@ testing → an actual switch on a real host.**
 
 Canonical statement — the full ladder, its "not declarative and
 reproducible is no fix at all" corollary, and how it gates a plan's
-close-out — lives in `docs/skills/workflow/reference.md`'s Trust hierarchy
-section, since that's what the `workflow` skill's step sequence applies
+close-out — lives in `docs/skills/task-gate/reference.md`'s Trust hierarchy
+section, since that's what the `task-gate` skill's step sequence applies
 directly when deciding a plan is actually done. The rationale for why it's
 ordered this way is in `docs/agents.md`; the concrete commands behind each
 rung are in `docs/procedures/testing-changes.md`.

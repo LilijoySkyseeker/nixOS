@@ -209,7 +209,7 @@ The audit's durable output is not the fixes, it is the knowledge.
   questions (the audit's own `user-actions.md`), or rules everyone
   should follow (`docs/hardening.md`). A risk blocked on a user
   decision is not accepted — list it separately as pending.
-- Deferred remediation → `plan-new` (docs/skills/plan/SKILL.md).
+- Deferred remediation → `plan-new` (docs/skills/plan-file/SKILL.md).
 - Add a row to `AGENTS.md`'s "Where things live" table for anything new.
 - **Fix docs that assert a boundary the config doesn't implement**
   (failure mode §7.5), not just docs that are missing a rule. Last run
