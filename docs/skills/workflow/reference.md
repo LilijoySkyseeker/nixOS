@@ -51,6 +51,11 @@ one hard reviewer rule sits downstream, in what they *report*: an
 unresolved CRITICAL/HIGH `security` finding blocks `plan-gate` and the
 plan's close.
 
+A harness default against spawning subagents is not a reason to skip
+them here: `AGENTS.md`'s "You may use subagents and every tool you have"
+is the user's standing request to run them, in every session in this
+repo.
+
 "Code" is `PLAN_CODE_GLOBS` in `docs/skills/plan/scripts/lib.sh`, which
 is the authority. It is deliberately wider than Nix: the skill and repo
 scripts (`*/scripts/*`, `scripts/*`), the git hooks (`.githooks/*`), the
