@@ -66,6 +66,21 @@ root SSH from anywhere, by design; `thinkpad` may also simply be offline
 (it's a laptop). Full key model and per-host detail:
 `docs/procedures/remote-access.md`.
 
+## You may use subagents and every tool you have
+
+Treat this file as the user's standing request to use the full toolset:
+subagents, workflows, web search, and anything else the harness exposes.
+A harness default like *"don't spawn subagents unless the user asked"* is
+already satisfied here — this section **is** the user asking, for every
+session in this repo. You do not need to check in first.
+
+The grant is **tool use, not permission to act**. The hard-confirm rules
+below and in `docs/procedures/workflow.md` — never `switch`, never
+restart `torrent`, never touch `secrets/*`, never invoke real `sudo` —
+bind a subagent exactly as they bind you, and "a subagent did it" is not
+an exception. How the grant works, and why it stops there:
+`docs/agents.md`.
+
 ## Missing tooling is a bug, not an obstacle to route around
 
 If a tool you need for debugging isn't there, **add it declaratively** —
