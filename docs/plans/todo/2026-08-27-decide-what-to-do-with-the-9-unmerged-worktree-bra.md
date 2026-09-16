@@ -12,42 +12,48 @@ blocked_by:
 
 ## State
 
-**2026-09-09: re-inventoried; the "9" in the title is now 20, and 17
-merged worktrees have re-accumulated.** The 2026-08-27 snapshot in
-"Original plan" is stale — kept as history. Current picture (`git
-worktree list`, `git branch --merged/--no-merged origin/master`):
+**2026-09-15: steps (a) and (b) are done. Only (c), the actual judgement
+call this plan exists for, is left.**
 
-**36 worktrees on disk** under `.claude/worktrees/` (one is the active
-`plan-bookkeeping` session doing this triage). Three buckets:
+**(a) Backup — done.** All 9 local-only branches are now on `origin`, so
+none of them is one `rm -rf` from gone: `worktree-nix-cache` (10
+commits), `worktree-distributed-build-todo` (7),
+`worktree-printer-setup` (5), `worktree-crowdsec-bouncer-fix` (3),
+`worktree-plan-cleanup` (3), `worktree-crowdsec-bouncer-docs` (2),
+`worktree-statusline-spacing-effort` (2), `worktree-sops-reorg` (1),
+`worktree-readme-human-style` (1). Pure backup, no decision implied.
 
-1. **17 fully-merged worktrees — safe to prune, nothing lost.** Their
-   branches are entirely in `master`. From the *main checkout* (not an
-   isolated session — the worktree-isolation guard blocks sibling git
-   ops): `git worktree remove <path>` for each, which self-protects by
-   refusing any that still hold uncommitted changes (no `--force`), then
-   `git branch -d` the local branch. This is the bulk of the clutter and
-   the clean automated step.
-2. **9 unmerged AND local-only — the real risk, one `rm -rf` from lost.**
-   No remote copy exists: `worktree-nix-cache` (10 commits, 2026-08-19),
-   `worktree-distributed-build-todo` (7), `worktree-printer-setup` (5),
-   `worktree-crowdsec-bouncer-fix` (3), `worktree-plan-cleanup` (3),
-   `worktree-crowdsec-bouncer-docs` (2), `worktree-statusline-spacing-effort`
-   (2), `worktree-sops-reorg` (1), `worktree-readme-human-style` (1).
-   Recommended: `git push origin <branch>` each as a pure backup (additive,
-   reversible) *before* any decision to rebase or abandon — so a decision
-   can be taken later without a disk loss foreclosing it.
-3. **~11 unmerged but pushed** — already backed up on `origin`; decide
-   rebase-and-land vs. abandon at leisure, no urgency.
+**(b) Prune — done.** 39 worktrees down to 18. 20 fully-merged
+worktrees removed with `git worktree remove` (no `--force`, so the
+command's own refusal was the safety net), plus their local branches via
+`git branch -d`. 11 merged remote branches deleted:
+`worktree-zfs-policy-tiers-mydatasets{,-rebased}`,
+`worktree-worktree-security-audit-plan`, `security-audit-landing`,
+`worktree-loki-grafana-alloy`, `worktree-flake-check-base16-ifd`,
+`worktree-grafana-wire`, `loki-ingest-{measurement,correction}`,
+`secrets-grafana`, `plan-state-refresh`.
 
-**Recommended order for the executing session:** (a) push the 9
-local-only branches as backup, (b) prune the 17 merged worktrees, (c)
-then, unhurried, triage the ~20 unmerged branches for
-rebase-and-land vs. `plan-reject`-and-delete. Steps (a) and (b) are
-mechanical and safe; (c) is the judgment this plan was filed for.
+Two self-protected and were left alone, correctly:
+`worktree-doio-audio-switch-plasma-manager` still holds uncommitted
+changes, and `origin/worktree-zfs-policy-tiers-mydatasets` carried one
+commit not in master — checked before deleting, and its
+`modules/nixos/datasets.nix` is byte-identical to master's, so it was
+superseded rather than lost.
 
-Verified to rung 2 (source: the git commands above, run 2026-09-09;
-counts are commits ahead of `origin/master`). Not closing — the decision
-in (c) is the actual work and is unstarted.
+Every remaining worktree holds commits not in `master`. Two of them are
+being landed separately and should not be pruned yet:
+`worktree-backup-restore-test-tier1` (landed as #84, branch kept until
+its worktree is dropped) and `worktree-homelab-obsidian-livesync`
+(rebased, blocked on secrets).
+
+**(c) Triage — still open, and still the point.** ~16 unmerged branches
+now all have remote backups, so nothing is urgent and nothing is at
+risk. Each needs a rebase-and-land or a `plan-reject`-and-delete
+decision, which is a judgement call per branch, not a sweep.
+
+Verified to rung 3 (ran it locally with output inspected): counts and
+merge status from `git worktree list`, `git rev-list --count
+origin/master..<branch>`, and per-branch remote checks run 2026-09-15.
 
 ## Original plan
 
