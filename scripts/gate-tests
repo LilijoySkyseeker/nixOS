@@ -314,7 +314,7 @@ fi
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F47
 expect_fail "required-agents refuses an agent missing from the order" "missing from PLAN_AGENT_ORDER" \
   env -C "$repo" bash -c '
-    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"security\" \"spec-check\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"docs-updater\" \"spec-check\")/" docs/skills/plan/scripts/lib.sh
+    sed -i "s/PLAN_AGENT_ORDER=(\"\/simplify\" \"security\" \"spec-check\" \"docs-updater\")/PLAN_AGENT_ORDER=(\"\/simplify\" \"spec-check\" \"docs-updater\")/" docs/skills/plan/scripts/lib.sh
     docs/skills/workflow/scripts/required-agents HEAD~1 HEAD'
 git -C "$repo" checkout -q -- docs/skills/plan/scripts/lib.sh
 
