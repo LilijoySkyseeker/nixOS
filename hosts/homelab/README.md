@@ -90,6 +90,7 @@ acl, attr, audit, backblaze-b2, bash-interactive, bat, bcache-tools, bind, bitwa
 
 ### Scheduled jobs (systemd timers)
 
+- `backup-restore-test-zbackup`: *-*-* 04:30:00
 - `beets-import`: -
 - `fstrim`: weekly
 - `fwupd-refresh`: -

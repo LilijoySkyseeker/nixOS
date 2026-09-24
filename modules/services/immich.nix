@@ -8,6 +8,12 @@ in
     {
       # immich: self-hosted photo/video backup, tailnet-only.
       # plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md
+
+      # version-exact so a bump re-breaks the build instead of silently
+      # inheriting the exemption; accepted risk: docs/accepted-risks.md AR-9
+      # plan: 2026-09-24-routine-flake-update-2026-09-24-and-the-journald-extraconfig-removal.md#D1
+      nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ];
+
       services.immich = {
         enable = true;
         # bind broad, restrict at the firewall below -- same shape as

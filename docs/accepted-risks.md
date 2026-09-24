@@ -266,6 +266,62 @@ network-attached or handed to someone else unsupervised, this trade
 would need revisiting — that scenario is out of scope for what this
 image is for today.
 
+### AR-9 — homelab runs immich 2.x, which is EOL and marked insecure
+
+**Sits on:** [threat model](threat-model.md) §4.4 ·
+**Evidence:** CVE-2026-59258, CVE-2026-82272 ·
+**Decided:** 2026-09-24, by the user, during the routine flake update
+(2026-09-24-routine-flake-update-2026-09-24-and-the-journald-extraconfig-removal.md#D1)
+
+nixpkgs-stable 26.05.10478 began marking `immich-2.7.5` insecure: the 2.x
+series is end-of-life upstream and will receive no further fixes, and two
+CVEs are named against it. 3.x ships in 26.11, which homelab — pinned to
+nixpkgs-stable — is not on. Left alone this blocks homelab's evaluation
+entirely, so the update could not land without an answer either way.
+
+`modules/services/immich.nix` therefore sets
+`nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ]`.
+
+**Why accepted:** the alternative fix is a major-version jump with a real
+database migration on a live photo library, which needs its own verified
+backup, a VM test and an observed switch — not a bolt-on to a lockfile
+bump. The service is tailnet-only (`host = "0.0.0.0"` bound broad but
+restricted at the firewall, per
+2026-09-03-add-immich-tailscale-only-to-homelab.md#G3), so it is not
+reachable from the public internet; the exposure is to anything already
+on the tailnet, which is the standing D6 cluster.
+
+**Scope of the exemption:** deliberately narrow, but be precise about
+*how*. It is declared in the immich module rather than in a host file or
+the fleet-wide `modules/flake/pkgs.nix`, so only a host importing that
+module carries it at all — verified: homelab has it, the other four hosts
+have no such attribute. Within homelab it is still an ordinary host-level
+`nixpkgs.config`, i.e. it would permit that exact package anywhere in
+homelab's closure; it is not scoped *to the immich derivation*. It names
+the version exactly, so a future `immich-2.7.6` re-breaks the build on
+purpose rather than silently inheriting the exemption.
+
+**One gap in that tripwire, stated plainly:** immich ships as two
+derivations, and only `immich-2.7.5` carries `knownVulnerabilities`.
+`immich-machine-learning-2.7.5` has its own `meta` without them, so it is
+not what the exemption names and not what a future bump would trip on —
+and it is the component that parses untrusted uploads. The version-exact
+guard therefore covers the server package only. This does not change the
+acceptance (the whole service is tailnet-only either way), but a reader
+should not infer more coverage than the one entry provides.
+
+**What would change the answer:** an exploit for either CVE that does not
+require tailnet access, or any move to expose immich beyond the tailnet.
+
+**What retires this entry:** the 3.x migration, tracked as item 1 of
+2026-09-24-migrate-homelab-s-immich-from-the-eol-2-x-to-3-x.md (which also
+carries an unrelated journald cleanup gated on the same stable move). Note this
+does *not* retire itself when stable rolls to 26.11 — at that point the
+version string simply stops matching anything and goes quietly dead,
+while the 2.x→3.x database migration would run unsupervised on the next
+switch. The channel move is the deadline for doing this properly, not the
+fix.
+
 ---
 
 ## 2. Not yet acceptable — blocked on a decision
