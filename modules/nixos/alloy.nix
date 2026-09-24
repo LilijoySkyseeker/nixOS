@@ -10,6 +10,7 @@ in
   flake.modules.nixos."alloy" =
     {
       config,
+      options,
       lib,
       pkgs-stable,
       ...
@@ -41,6 +42,25 @@ in
         ProtectControlGroups = true;
         RestrictNamespaces = true;
       };
+
+      # 26.05 has journald's `extraConfig`, 26.11 only the freeform
+      # `settings.Journal`; stable- and unstable-pinned consumers both
+      # evaluate this module, so both spellings have to exist
+      # plan: 2026-09-24-routine-flake-update-2026-09-24-and-the-journald-extraconfig-removal.md#G4
+      # dead arm's removal: 2026-09-24-migrate-homelab-s-immich-from-the-eol-2-x-to-3-x.md#G1
+      journalSizeCap =
+        if options.services.journald ? settings then
+          {
+            # 26.11 dropped nixos's Storage pin; re-pinned here rather
+            # than left to systemd's compile-time default
+            settings.Journal = {
+              Storage = "persistent";
+              SystemMaxUse = cfg.journalMaxUse;
+            };
+          }
+        else
+          # 26.05's journald module still emits Storage=persistent itself
+          { extraConfig = "SystemMaxUse=${cfg.journalMaxUse}"; };
     in
     {
       options.myAlloy = {
@@ -145,12 +165,11 @@ in
           }
         '';
 
-        # Storage=persistent is already the nixos default (F11); only the
-        # burst-sized cap needs setting
+        # persistent storage plus the burst-sized cap; 26.11 stopped pinning
+        # the former, so the branch above sets it there
         # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D9
-        services.journald.extraConfig = ''
-          SystemMaxUse=${cfg.journalMaxUse}
-        '';
+        # plan: 2026-09-24-routine-flake-update-2026-09-24-and-the-journald-extraconfig-removal.md#G6
+        services.journald = journalSizeCap;
 
         # 10x journald's 10000/30s default, which has already eaten a real
         # port-scan burst on vps; raised, not disabled
