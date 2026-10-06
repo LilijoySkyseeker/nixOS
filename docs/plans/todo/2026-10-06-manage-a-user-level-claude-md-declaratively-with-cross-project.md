@@ -130,6 +130,7 @@ Source of the reasoning: `~/Projects/agenticsandbox/` (`README.md`,
 - [ ] D2 -- read-only symlink, not a writable copy
 - [ ] D3 -- what happens to the duplicate memories
 - [ ] G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
+- [x] ship the review method as a `first-principles-review` skill through the same module (user, 2026-10-06; test-first, see the skill's `tests/README.md`)
 - [ ] build torrent and thinkpad
 - [ ] user switches; a session in a non-dotfiles project shows the lessons in context
 

@@ -197,6 +197,9 @@
       home = {
         file.".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
         file.".claude/skills/tcr".source = tcrSkill;
+        # Cross-project review method (the five steps + the doghouse check);
+        # plain markdown, so no build step like tcr's.
+        file.".claude/skills/first-principles-review".source = ./first-principles-review;
 
         # Reads happen unconditionally, but every write goes through `run` so
         # that `home-manager build`/dry-run stays side-effect free - a bare
