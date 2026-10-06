@@ -81,8 +81,10 @@ design record lives in `~/Projects/agenticsandbox/`, decisions D1–D23).
   mounted at `/home/agent/research`, with bindfs `force-user=agent`,
   `force-group=agent`, `create-for-user=lilijoy` and `create-for-group=users`.
 - **Egress:** the agent uid is rejected to `10.0.0.0/8`, `172.16.0.0/12`,
-  `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, plus `fc00::/7` and
-  `fe80::/10` on IPv6. Loopback stays allowed.
+  `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, ~~plus `fc00::/7` and
+  `fe80::/10` on IPv6~~. Loopback stays allowed. 2026-10-06: what shipped
+  adds multicast and broadcast on IPv4, refuses **all** IPv6 except loopback,
+  and also jumps gid `nixbld` through the chain (F1, F2).
 - **No home-manager, settings files or `CLAUDE.md`** for the agent.
 - **Repo rules:**
   - dendritic registration (`flake.modules.nixos."agent-user"`);
@@ -576,3 +578,5 @@ and the generated inventory. Changed:
   block was already current.
 
 **FIXED 2026-10-06:** docs updated in the same docs pass
+
+_docs-updater finished 2026-10-06T17:58:31Z (code 948e00a745ba7d31) -- see Findings above._
