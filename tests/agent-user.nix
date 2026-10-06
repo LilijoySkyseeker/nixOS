@@ -69,7 +69,7 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("cat /home/lilijoy/secret"))
         groups = machine.succeed("id -nG agent").strip()
         assert groups == "agent", f"agent groups: {groups!r}"
-        for d in ["/home/agent", "/home/agent/work", "/home/agent/repos"]:
+        for d in ["/home/agent", "/home/agent/work"]:
             got = machine.succeed(f"stat -c '%a %U' {d}").strip()
             assert got == "700 agent", f"{d}: {got!r}"
         machine.succeed(as_agent("nix-store --query --hash /run/current-system"))
@@ -153,6 +153,14 @@ pkgs.testers.runNixOSTest {
         check("agent" in sshd, f"sshd denyusers: {sshd!r}")
 
         assert not failures, "review-fix checks failed:\n" + "\n".join(failures)
+
+    with subtest("orientation"):
+        # the agent reads where it is from a declared CLAUDE.md
+        md = machine.succeed(as_agent("cat /home/agent/.claude/CLAUDE.md"))
+        for phrase in ["torrent", "~/research", "~/work/repos", "pull request"]:
+            assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
+        # the unused ~/repos is gone; clones live in ~/work/repos
+        machine.fail("test -e /home/agent/repos")
 
     with subtest("remote control service"):
         def prop(p):
