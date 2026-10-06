@@ -599,3 +599,28 @@ and the generated inventory. Changed:
 **FIXED 2026-10-06:** docs updated in the same docs pass
 
 _docs-updater finished 2026-10-06T17:58:31Z (code 948e00a745ba7d31) -- see Findings above._
+
+### F13 -- the full-scope login brings account-level session tools into the agent
+
+Found in the done-check, 2026-10-06. `/mcp` in a phone session showed one
+server, `claude-code-remote`, injected by Remote Control. Its tools act on the
+user's whole claude.ai account:
+- **`create_session`, `send_message`, `list_sessions`:** messages to the
+  user's other sessions are held by default, because the agent bypasses
+  permission prompts (`docs/en/cross-session-messaging`).
+- **`create_trigger`, `send_later`:** cloud sessions and routines, which run
+  **with the user's claude.ai connectors and their Claude GitHub App**.
+
+Those are outside every wall here, so the agent's place could start work with
+the user's authority. That's the crossing the design forbids (README, D19/D20).
+
+**Fix:** the oneshot `claude-agent-settings` merges
+`deniedMcpServers: [{serverName: "claude-code-remote"}]` and
+`disableClaudeAiConnectors: true` into `~agent/.claude/settings.json`. That file
+is CLI-owned, so the keys are merged rather than symlinked. The VM test pins
+the merge and that CLI keys survive it.
+
+**Not verified:** whether `deniedMcpServers` blocks a server Remote Control
+injects itself. The docs say "wherever it's defined" but don't list this case.
+Check on the host after switching: a new phone session's MCP list must show
+no `claude-code-remote`.

@@ -18,7 +18,10 @@ pkgs.testers.runNixOSTest {
       nix.settings.allowed-users = [ "@wheel" ];
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
-      environment.systemPackages = [ pkgs.curl ];
+      environment.systemPackages = [
+        pkgs.curl
+        pkgs.jq
+      ];
       services.openssh.enable = true;
       # a fixed-output build: runs as nixbld with host networking
       environment.etc."fod.nix".text = ''
@@ -161,6 +164,18 @@ pkgs.testers.runNixOSTest {
             assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
         # the unused ~/repos is gone; clones live in ~/work/repos
         machine.fail("test -e /home/agent/repos")
+        # account-level tools stay out: remote session/routine tools would run
+        # cloud work with the user's GitHub App and connectors
+        machine.wait_for_unit("claude-agent-settings.service")
+        cfg = machine.succeed("cat /home/agent/.claude/settings.json")
+        assert '"claude-code-remote"' in cfg, f"remote tools not denied: {cfg!r}"
+        assert '"disableClaudeAiConnectors": true' in cfg, f"connectors not off: {cfg!r}"
+        # a CLI-owned key survives the merge
+        # as_agent() single-quotes its command, so write the CLI key as root
+        machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")
+        machine.succeed("systemctl restart claude-agent-settings")
+        cfg = machine.succeed("cat /home/agent/.claude/settings.json")
+        assert '"theme": "dark"' in cfg and '"claude-code-remote"' in cfg, f"merge clobbered: {cfg!r}"
 
     with subtest("remote control service"):
         def prop(p):
