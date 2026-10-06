@@ -26,6 +26,20 @@ pkgs.testers.runNixOSTest {
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
       environment.systemPackages = [ pkgs.curl ];
+      services.openssh.enable = true;
+      # a fixed-output build: runs as nixbld with host networking
+      environment.etc."fod.nix".text = ''
+        { url }:
+        derivation {
+          name = "egress-probe";
+          system = "x86_64-linux";
+          builder = builtins.storePath "${pkgs.bash}/bin/bash";
+          args = [ "-c" "''${builtins.storePath "${pkgs.curl}"}/bin/curl -sS --max-time 5 ''${url} >&2; exit 1" ];
+          outputHashMode = "flat";
+          outputHashAlgo = "sha256";
+          outputHash = "0000000000000000000000000000000000000000000000000000";
+        }
+      '';
     };
 
   # a LAN host the agent must not reach (the test net is 192.168.1.0/24)
@@ -33,9 +47,11 @@ pkgs.testers.runNixOSTest {
     { pkgs, ... }:
     {
       networking.firewall.allowedTCPPorts = [ 8000 ];
+      environment.etc."marker".text = "LAN-MARKER-7f3a";
+      # dual-stack: python's http.server binds IPv4 only by default
       systemd.services.http = {
         wantedBy = [ "multi-user.target" ];
-        serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8000 --directory /etc";
+        serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8000 --bind :: --directory /etc";
       };
     };
 
@@ -47,6 +63,13 @@ pkgs.testers.runNixOSTest {
 
     def as_agent(cmd):
         return f"su agent -s /bin/sh -c '{cmd}'"
+
+    # review-fix checks report every failure, not just the first
+    failures = []
+
+    def check(ok, msg):
+        if not ok:
+            failures.append(msg)
 
     with subtest("user boundary"):
         machine.fail(as_agent("ls /home/lilijoy"))
@@ -60,8 +83,14 @@ pkgs.testers.runNixOSTest {
 
     with subtest("research mount"):
         src = "/home/lilijoy/Documents/Vault/Research"
+        # before the user creates the folder, access fails visibly but must
+        # not hit the start limit and wedge the automount until reboot
+        for _ in range(8):
+            machine.execute(as_agent("ls /home/agent/research"))
         # the user makes this folder once; the module never writes into their home
         machine.succeed(f"su lilijoy -s /bin/sh -c 'mkdir -p {src}'")
+        rc, out = machine.execute(as_agent("touch /home/agent/research/after-missing.md 2>&1"))
+        check(rc == 0, f"mount wedged after missing source: {out!r}")
         # a sibling vault folder the agent must never reach
         machine.succeed("install -d -o lilijoy -g users /home/lilijoy/Documents/Vault/Library")
         machine.succeed("su lilijoy -s /bin/sh -c 'echo mine > /home/lilijoy/Documents/Vault/Library/x.md'")
@@ -86,15 +115,51 @@ pkgs.testers.runNixOSTest {
         for net in ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"]:
             assert f"-d {net}" in v4 and "REJECT" in v4, f"missing v4 {net}: {v4!r}"
         v6 = machine.succeed("ip6tables -S agent-egress")
-        for net in ["fc00::/7", "fe80::/10"]:
-            assert f"-d {net}" in v6, f"missing v6 {net}: {v6!r}"
+        assert "-A agent-egress -j REJECT" in v6, f"v6 not refused by default: {v6!r}"
 
     with subtest("egress survives a firewall restart without duplicating"):
         machine.succeed("systemctl restart firewall")
-        n4 = machine.succeed("iptables -S OUTPUT | grep -c agent-egress").strip()
-        n6 = machine.succeed("ip6tables -S OUTPUT | grep -c agent-egress").strip()
+        n4 = machine.succeed("iptables -S OUTPUT | grep -c -- '--uid-owner .* agent-egress'").strip()
+        n6 = machine.succeed("ip6tables -S OUTPUT | grep -c -- '--uid-owner .* agent-egress'").strip()
         assert n4 == "1" and n6 == "1", f"jumps after restart: v4={n4} v6={n6}"
         machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
+
+    with subtest("review fixes: egress, builds, reload, sandbox, sshd"):
+        # IPv6: the LAN's global prefix is dynamic, so all v6 but loopback is refused
+        machine.succeed("curl -6 --fail --max-time 5 http://lan:8000/marker")
+        rc, _ = machine.execute(as_agent("curl -6 --fail --max-time 5 http://lan:8000/marker"))
+        check(rc != 0, "agent reached the LAN over IPv6")
+        v4 = machine.succeed("iptables -S agent-egress")
+        for net in ["224.0.0.0/4", "255.255.255.255/32"]:
+            check(f"-d {net} -j REJECT" in v4, f"v4 missing {net}")
+        # fixed-output builds run as nixbld with host networking
+        rc, out = machine.execute(as_agent("nix-build /etc/fod.nix --argstr url http://lan:8000/marker 2>&1"))
+        check("LAN-MARKER-7f3a" not in out, "a fixed-output build reached the LAN")
+        # switch reloads the firewall; the walls must survive a reload too
+        machine.succeed("systemctl reload firewall")
+        for cmd in ["iptables", "ip6tables"]:
+            for match in ["--uid-owner", "--gid-owner"]:
+                n = machine.succeed(f"{cmd} -S OUTPUT | grep -c -- '{match} .* agent-egress' || true").strip()
+                check(n == "1", f"{cmd} {match} jumps after reload: {n}")
+        rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
+        check(rc != 0, "agent reached the LAN after a firewall reload")
+
+        def sprop(p):
+            return machine.succeed(f"systemctl show claude-remote-control -p {p} --value").strip()
+        for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"), ("ProtectSystem", "strict")]:
+            check(sprop(p) == want, f"{p}={sprop(p)!r}")
+        check("/home/agent" in sprop("ReadWritePaths"), f"ReadWritePaths={sprop('ReadWritePaths')!r}")
+        inacc = sprop("InaccessiblePaths")
+        for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
+            check(sock in inacc, f"{sock} not inaccessible: {inacc!r}")
+        check(sprop("MemoryMax") not in ("infinity", ""), f"MemoryMax={sprop('MemoryMax')!r}")
+        check("firewall.service" in sprop("BindsTo"), f"BindsTo={sprop('BindsTo')!r}")
+        check("firewall.service" in sprop("After"), "not ordered after firewall.service")
+        # no inbound shell: its own authorized_keys would be outside the sandbox
+        sshd = machine.succeed("sshd -T -C user=agent,host=x,addr=127.0.0.1 | grep -i '^denyusers' || true")
+        check("agent" in sshd, f"sshd denyusers: {sshd!r}")
+
+        assert not failures, "review-fix checks failed:\n" + "\n".join(failures)
 
     with subtest("remote control service"):
         def prop(p):

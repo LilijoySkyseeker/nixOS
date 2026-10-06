@@ -6,22 +6,28 @@
   flake.modules.nixos."agent-user" =
     { lib, pkgs, ... }:
     let
+      # agent-egress rules per family. IPv6 refuses everything but loopback:
+      # the LAN's v6 is a dynamic ISP global prefix that can't be listed,
+      # and the internet still works over IPv4
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F1
       egress = [
         {
           cmd = "iptables";
-          nets = [
+          rules = map (net: "-d ${net} -j REJECT") [
             "10.0.0.0/8"
             "172.16.0.0/12"
             "192.168.0.0/16"
             "100.64.0.0/10" # tailnet
             "169.254.0.0/16"
+            "224.0.0.0/4" # multicast
+            "255.255.255.255/32" # broadcast
           ];
         }
         {
           cmd = "ip6tables";
-          nets = [
-            "fc00::/7" # includes the tailnet's fd7a:115c:a1e0::/48
-            "fe80::/10"
+          rules = [
+            "-o lo -j RETURN"
+            "-j REJECT"
           ];
         }
       ];
@@ -41,6 +47,11 @@
         ];
       };
 
+      # no inbound ssh: it can write its own authorized_keys, and a login
+      # shell would sit outside the service sandbox
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F8
+      services.openssh.settings.DenyUsers = [ "agent" ];
+
       # may use the nix daemon to build; never trusted-users
       nix.settings.allowed-users = [ "agent" ];
 
@@ -49,14 +60,16 @@
       # loopback stays reachable for DNS via resolved
       networking.firewall.extraCommands = ''
         ${lib.concatMapStrings (
-          { cmd, nets }:
+          { cmd, rules }:
           ''
             ${cmd} -N agent-egress 2>/dev/null || ${cmd} -F agent-egress
-            ${lib.concatMapStrings (net: ''
-              ${cmd} -A agent-egress -d ${net} -j REJECT
-            '') nets}
+            ${lib.concatMapStrings (rule: ''
+              ${cmd} -A agent-egress ${rule}
+            '') rules}
             ${cmd} -C OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null \
               || ${cmd} -A OUTPUT -m owner --uid-owner agent -j agent-egress
+            ${cmd} -C OUTPUT -m owner --gid-owner nixbld -j agent-egress 2>/dev/null \
+              || ${cmd} -A OUTPUT -m owner --gid-owner nixbld -j agent-egress
           ''
         ) egress}
       '';
@@ -65,6 +78,7 @@
           { cmd, ... }:
           ''
             ${cmd} -D OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null || true
+            ${cmd} -D OUTPUT -m owner --gid-owner nixbld -j agent-egress 2>/dev/null || true
             ${cmd} -F agent-egress 2>/dev/null || true
             ${cmd} -X agent-egress 2>/dev/null || true
           ''
@@ -87,7 +101,13 @@
           description = "Claude Code Remote Control server for the agent user";
           wantedBy = [ "multi-user.target" ];
           wants = [ "network-online.target" ];
-          after = [ "network-online.target" ];
+          # stop with the firewall: a stopped or failed firewall drops agent-egress
+          # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F9
+          bindsTo = [ "firewall.service" ];
+          after = [
+            "network-online.target"
+            "firewall.service"
+          ];
           unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
           environment = {
             HOME = "/home/agent";
@@ -102,6 +122,24 @@
             ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
             Restart = "always";
             RestartSec = 30;
+
+            # sandbox: every agent session is a child of this unit
+            # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
+            NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
+            PrivateTmp = true;
+            PrivateDevices = true; # no /dev/kvm or /dev/net/tun (F4)
+            ProtectSystem = "strict";
+            ReadWritePaths = [ "/home/agent" ];
+            # world-writable daemon sockets: VPN, tailnet and VM control (F5)
+            InaccessiblePaths = [
+              "-/run/mullvad-vpn"
+              "-/run/tailscale"
+              "-/run/libvirt"
+            ];
+            # a runaway agent can't take the desktop down with it
+            MemoryMax = "24G";
+            TasksMax = 4096;
+            CPUWeight = 50;
           };
         };
 
@@ -119,6 +157,9 @@
             where = "/home/agent/research";
             type = "fuse.bindfs";
             options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
+            # a missing source fails each access; never let that hit the start
+            # limit and wedge the automount until reboot
+            unitConfig.StartLimitIntervalSec = 0;
           }
         ];
         automounts = [

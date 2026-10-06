@@ -12,7 +12,20 @@ blocked_by:
 
 ## State
 
-Todo. Spec approved 2026-10-06. Nothing built. Branch `agent-place`.
+Tasks 1–5 are built on branch `agent-place`, and everything passes: one VM
+test with 6 subtests, a build of both hosts, and `nix flake check`.
+- **Review fix pass done.** The security review found F1–F8; the whole-branch
+  review confirmed F1 and F2 in a VM and added F9 and F10.
+  - **Fixed**, each with a test that failed first: F1, F2, F3, F4, F5, F8, F9
+    and F10.
+  - **Open, low:** F6 (bindfs symlinks and modes) and F7 (snapdirs, routed to
+    the existing snapdir plan).
+- **Not built yet:** Task 6, the user's part. Switch, then the one-time steps,
+  starting with creating `Vault/Research`.
+- **Not verified:** whether the sandboxed service runs the real `claude` on
+  torrent. The VM can't log in. If the unit fails after the first-run step,
+  check `journalctl -u claude-remote-control` for an `EROFS` caused by
+  `ProtectSystem=strict`.
 
 ## Original plan
 
@@ -77,11 +90,12 @@ design record lives in `~/Projects/agenticsandbox/`, decisions D1–D23).
 
 ### Review focus
 
-1. **Boot with the source folder missing, or `/home` (ZFS) mounting late.** The
-   bindfs mount must not block boot (`nofail`) and must order after
-   `zfs-mount.service`. The agent then sees an empty folder, and Obsidian is
-   unaffected because the real files never move. Pinned in Task 2's eval check,
-   and verified on the real host in Task 6.
+1. **The source folder is missing, or `/home` mounts late.** ~~nofail /
+   zfs-mount ordering / "agent sees an empty folder"~~ (superseded by the
+   rulings). It's an automount, so it never blocks boot, and on torrent
+   `/home` is an ordinary `home.mount`. A missing source gives the agent a
+   visible error on access and must never wedge the automount: F10, pinned in
+   the research-mount subtest.
 2. **Firewall restart or stop duplicates or loses the egress jump.** Restarting
    the firewall should leave exactly one `OUTPUT → agent-egress` jump. Pinned in
    Task 3's restart subtest.
@@ -242,21 +256,30 @@ design record lives in `~/Projects/agenticsandbox/`, decisions D1–D23).
 
 ### Task 6: The user switches and does the one-time steps (manual, not an agent)
 
-All of these are from the spec, section 2, and run on torrent by you:
-1. `systemctl status home-agent-research.mount` shows it active after a
-   reboot, and `run0 -u agent getent hosts github.com` resolves (Review focus
-   items 1 and 5).
-2. **The bot account:** create it, add it to `nixOS` and `project-elysian` with
+All of these are from the spec, section 2, and run on torrent by you. Do
+them in this order:
+1. **Create the research folder before switching:**
+   `mkdir -p ~/Documents/Vault/Research`. The module never writes inside your
+   home.
+2. **Switch.** Then check, *by access*, because the mount is an automount and
+   looks inactive until something touches it:
+   - `run0 -u agent touch /home/agent/research/.probe` succeeds;
+   - `.probe` shows up in your `Vault/Research`, owned by you;
+   - `run0 -u agent getent hosts github.com` resolves (Review focus 5).
+3. **The bot account:** create it, add it to `nixOS` and `project-elysian` with
    write access, and protect `master` (PR + 1 review, admin bypass on).
-3. `run0 -u agent gh auth login` (as the bot), then
+4. `run0 -u agent gh auth login` (as the bot), then
    `run0 -u agent git config --global user.name/user.email` (bot noreply).
-4. `run0 -u agent claude auth login` (with your account).
-5. **The first interactive run:**
+5. `run0 -u agent claude auth login` (with your account).
+6. **The first interactive run:**
    - `run0 -u agent --chdir=/home/agent/work claude remote-control --spawn same-dir`;
    - answer **y** and **y**, then press Ctrl+C;
    - `systemctl start claude-remote-control`.
-6. **Trusted Devices on.**
-7. **The done-check from your phone:**
+
+   If it fails, check `journalctl -u claude-remote-control` (see State: the
+   sandbox isn't verified against the real `claude`).
+7. **Trusted Devices on.**
+8. **The done-check from your phone:**
    - a note lands in `Vault/Research/`;
    - a bot PR on `nixOS`;
    - a push to `project-elysian`;
@@ -265,11 +288,11 @@ All of these are from the spec, section 2, and run on torrent by you:
 
 ## Progress
 
-- [ ] Task 1 -- the `agent` user, its Nix access and its directories
-- [ ] Task 2 -- the `Vault/Research` mount
-- [ ] Task 3 -- egress chain
-- [ ] Task 4 -- the Remote Control service
-- [ ] Task 5 -- wire into torrent, build, docs, security, PR
+- [x] Task 1 -- the `agent` user, its Nix access and its directories
+- [x] Task 2 -- the `Vault/Research` mount
+- [x] Task 3 -- egress chain
+- [x] Task 4 -- the Remote Control service
+- [x] Task 5 -- wire into torrent, build, docs, security, PR
 - [ ] Task 6 -- the user switches and does the one-time steps
 
 ## Decisions (D)
@@ -305,3 +328,144 @@ unsafe path transition). A missing source shows up as an error on access.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+Security review, 2026-10-06, against `bba23ef..6eaa865`. All checks are
+read-only: torrent's live permissions plus `nix eval` of
+`nixosConfigurations.torrent`. Nothing was deployed, and no secret was read.
+
+### F1 — IPv6 egress misses the LAN's own global /64, and multicast/broadcast are unfiltered
+
+- **File:** `modules/nixos/agent-user.nix:20-26`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (rule gap and torrent's addressing); PLAUSIBLE (which LAN devices listen on their global address)
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent process (uid `agent`) can reach any LAN device that has a SLAAC global address. On torrent, `enp8s0` carries a global address in the RA-delegated `2600:1010:a023:9663::/64`, and that prefix is an on-link route (`ip -6 route`). So `agent-egress`, which rejects only `fc00::/7` and `fe80::/10`, passes traffic straight to LAN neighbours on that /64. Examples are the router (seen in `ip -6 neigh` with several global addresses), the printer, and any IoT device. The IPv4 chain also leaves `224.0.0.0/4` and `255.255.255.255` open, so mDNS, SSDP and broadcast to the LAN still work.
+- **Rule:** violates `docs/hardening.md` rule 5 in spirit: it trusts a belief that the LAN is RFC1918-only. The same rule records that this LAN hands out globally routable IPv6.
+- **Finding:** "No LAN" holds for IPv4 unicast only. homelab's LAN NIC opens nothing (host-wide `allowedTCPPorts = []`), so I can't name a vulnerable service. The design goal is still unmet for every other device on the segment.
+- **Fix risk:** the prefix is ISP-delegated and dynamic, so a hard-coded /64 will go stale silently. Options: a dispatcher hook that keeps an ipset of on-link prefixes up to date; a policy-routing table for the agent uid that has only the default route; or REJECT on `-o enp8s0` for anything except the gateway. Also add `ff00::/8`, `224.0.0.0/4` and `255.255.255.255/32`. Test IPv6 in the VM: the current test is IPv4-only (`lan` on 192.168.1.0/24), so this gap passed CI.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F2 — Builds through the nix daemon run as `nixbld*`, so `--uid-owner agent` doesn't cover them
+
+- **File:** `modules/nixos/agent-user.nix:43-44` (`allowed-users = [ "agent" ]`), `:48-61`
+- **Severity:** MEDIUM
+- **Confidence:** PLAUSIBLE. I didn't test it, and deliberately didn't build a proof. What is confirmed: `agent` is in the effective `allowed-users`; `sandbox = true`; and `agent-egress` matches only the agent uid. The untested part is the documented Nix behaviour that fixed-output derivations get host network access inside the sandbox.
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent can use the nix daemon, an allowed user, to build a fixed-output derivation. The fetch runs as a `nixbld` uid with host networking. The OUTPUT match never sees it, so the LAN and the flat tailnet are reachable, including homelab's `tailscale0` ports 22/445/2049/2283/3000/3100/8096 (Loki and Grafana among them). The build log goes back to the agent, so responses can be read as well as requests sent.
+- **Rule:** new-rule candidate: "a uid-owner egress rule does not cover work the principal delegates to a daemon."
+- **Finding:** this is the main gap the chain was meant to close. The VM test only checks `nix-store --query` and never runs an egress check from a build.
+- **Fix risk:** adding `-m owner --gid-owner nixbld` to the jump would apply to *every* user's builds, including lilijoy's. That's fine unless something fetches from a LAN or tailnet cache, so check before applying. The other option is to remove the agent from `allowed-users`, which loses `nix build`/`nix develop` for the agent. Either way, add a VM subtest that runs a fixed-output fetch against `lan:8000` as the agent.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F3 — The unit that runs untrusted code with no prompts has no systemd sandboxing at all
+
+- **File:** `modules/nixos/agent-user.nix:85-106`
+- **Severity:** MEDIUM
+- **Confidence:** CONFIRMED (the effective `serviceConfig` is only ExecStart/User/Group/Restart/RestartSec/WorkingDirectory)
+- **Axis:** hardening
+- **Reachability:** every session spawned by `claude remote-control` inherits this unit, and an injected agent runs arbitrary code in it. Today that code sees the whole filesystem (all world-readable paths and `/tmp`), keeps every setuid wrapper on PATH (`/run/wrappers/bin` is listed explicitly), has `/dev/kvm` and `/dev/net/tun` (both 0666), and has no memory or task ceiling on the desktop host.
+- **Rule:** violates `docs/hardening.md` "Custom `systemd.services` sandboxing" (`NoNewPrivileges` plus the full stack when the job allows). This job allows it: no activation, no root.
+- **Finding:** the boundary is meant to be "this user", but the unit gives up the cheap second layer. `NoNewPrivileges=true` alone would neutralise the setuid path in F4. Useful settings here: `ProtectHome=tmpfs` with `BindPaths=/home/agent` (lilijoy's home and the snapdirs simply don't exist for the agent), `PrivateTmp`, `PrivateDevices`, `ProtectSystem=strict` + `ReadWritePaths=/home/agent`, `ProtectKernel*`, `ProtectControlGroups`, `MemoryMax`/`TasksMax`, and `IPAddressDeny=` for the LAN ranges. The last one is a cgroup-level second egress layer that doesn't depend on the iptables chain surviving a firewall reload. Note that interactive `run0 -u agent` sessions (Task 6) don't get any of this.
+- **Fix risk:** `ProtectHome`/`BindPaths` must keep the bindfs automount at `/home/agent/research` working inside the namespace. Test the mount from inside the unit, not with `su`. `RestrictNamespaces` would break rootless podman and nix's own sandbox if the agent uses them. `PrivateDevices` removes `/dev/kvm`. Confirm the result with `systemd-analyze security claude-remote-control`.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F4 — The setuid `qemu-bridge-helper` lets the agent put a VM on `virbr0`, outside the uid match
+
+- **File:** not in this diff. It comes from `modules/nixos/virtual-machines.nix` (libvirtd on, `allowedBridges = [ "virbr0" ]`, `/etc/qemu/bridge.conf: allow virbr0`) and becomes reachable because of this diff's new principal.
+- **Severity:** MEDIUM
+- **Confidence:** PLAUSIBLE. Confirmed: the helper is setuid and runnable by any user (`/run/wrappers/bin/qemu-bridge-helper`, `-r-s--x--x`), `/dev/kvm` and `/dev/net/tun` are 0666, and qemu is on the system PATH. Conditional: `virbr0` isn't up right now (no bridges on torrent). It exists whenever lilijoy's libvirt default network is started.
+- **Axis:** hardening
+- **Reachability:** while `virbr0` is up, a prompt-injected agent can start an unprivileged qemu VM attached to it. The VM's traffic is forwarded and NATed by the host, not generated by a local socket owned by `agent`, so `OUTPUT --uid-owner` never matches and LAN/tailnet reach is restored.
+- **Rule:** new-rule candidate (same class as F2: the boundary is a uid match, and this path doesn't run as that uid).
+- **Finding:** F3's `NoNewPrivileges=true` closes this for the service. It doesn't close it for interactive `run0 -u agent` sessions.
+- **Fix risk:** restricting the helper (e.g. a group-gated wrapper) affects lilijoy's own unprivileged qemu or gnome-boxes networking. Test with quickemu and gnome-boxes.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F5 — World-accessible daemon sockets give the agent control over lilijoy's VPN and a view of the tailnet
+
+- **File:** not in this diff (`/run/mullvad-vpn` `srwxrw-rw-`, `/run/tailscale/tailscaled.sock` 0666, `/run/libvirt/libvirt-sock-ro` 0666). It becomes reachable because of this diff's new principal.
+- **Severity:** MEDIUM. It becomes HIGH if the Mullvad account number can be read by a non-root uid (it's the account's only credential, so a secret exposed to a principal that shouldn't hold it).
+- **Confidence:** PLAUSIBLE. Socket modes confirmed live. Not verified against source: that the Mullvad daemon applies no per-uid check to its management RPCs (including reading the account), and that tailscaled grants a non-operator uid read-only LocalAPI. Torrent sets no `--operator`. I deliberately did not query the account value.
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent can connect to these sockets directly: no network involved, and the egress chain doesn't apply. Through Mullvad it could disconnect or reconfigure the system VPN and possibly read the account. Through tailscaled it gets the tailnet peer list (names and IPs: reconnaissance for F1/F2). Through libvirt read-only it gets VM inventory.
+- **Rule:** violates the threat model's "must not reach lilijoy's authority" (VPN state is hers). It isn't covered by a `hardening.md` rule.
+- **Finding:** the user should check, not the agent: as `run0 -u agent`, see what `mullvad account get` returns. If it shows the account number, rate this HIGH and rotate the account number.
+- **Fix risk:** F3's sandbox can't block a Unix socket by path unless `InaccessiblePaths=/run/mullvad-vpn /var/run/mullvad-vpn /run/tailscale /run/libvirt` is set. That covers the service but not interactive sessions. Changing socket modes upstream-wide affects lilijoy's own GUI clients.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F6 — The default bindfs policies let the agent put symlinks, exec bits and arbitrary modes into lilijoy's real tree
+
+- **File:** `modules/nixos/agent-user.nix:118-124`
+- **Severity:** LOW
+- **Confidence:** CONFIRMED for the policies (pinned bindfs 1.18.1 man page: `chmod-normal` and `chown-normal` are the defaults, and symlink creation is allowed unless `resolve-symlinks` is set). PLAUSIBLE for what consumes them.
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent writes to `/home/agent/research`. The results land as `lilijoy:users` in `~/Documents/Vault/Research`: symlinks pointing anywhere, files chmodded executable or setuid (the dataset has `setuid=on`), and so on. The agent gains nothing itself, because `force-user=agent` makes everything look agent-owned on its side, and symlinks resolve in the agent's own context, so they can't read lilijoy's files. The risk is lilijoy-side consumers following them: Obsidian, baloo, any sync tool, or lilijoy opening an agent-planted "note" that's really a symlink into `~/.config`. The vault has no community plugins today (`community-plugins.json` is `[]`). Enabling Dataview JS or Templater later would turn agent-written notes into code that runs as lilijoy.
+- **Rule:** new-rule candidate (data the untrusted principal writes is executable config for the trusted one; same shape as rule 7).
+- **Fix risk:** `chmod-ignore`, or `chmod-filter` plus `create-with-perms=f-xst:d-st`, strips exec and setuid. Blocking new symlinks via `resolve-symlinks` is **not** safe: bindfs would then resolve existing symlinks as root (the mounter). Prefer a periodic symlink sweep or simply living with them. Add a VM check that a file chmodded 4755 by the agent lands without `s`/`x`.
+
+### F7 — ZFS snapdirs are now traversable by an untrusted uid
+
+- **File:** not in this diff. `zroot/local/home` and `zroot/local/root` are `snapdir=hidden`, with `/home/.zfs/snapshot` and `/.zfs/snapshot` at 0777. Tracked in `docs/plans/todo/2026-09-01-extend-the-zfs-snapshot-traversal-fix-to-the-pc-hosts-without.md`.
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (mechanism); nothing exploitable demonstrated
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent can walk 67 snapshots of each dataset and read anything that was world-readable when the snapshot was taken.
+- **Rule:** n/a (existing open plan)
+- **Finding:** spot checks were clean. `/home/.zfs/snapshot/*/lilijoy` is 0700 in all 67 snapshots, and `var/lib/sops-nix/key.txt` and `etc/ssh/ssh_host_ed25519_key` are 0600 in the snapshot sampled. It isn't exploitable today, but that plan's "the PCs run nothing comparable" premise no longer holds: torrent now runs untrusted code by design. F3's `ProtectHome=tmpfs` hides `/home/.zfs` from the service. `/.zfs` needs `InaccessiblePaths` or the plan's own fix.
+- **Fix risk:** as recorded in that plan (losing snapshot browsing).
+
+### F8 — The agent can authorize its own SSH key, a persistent inbound shell from any tailnet device
+
+- **File:** not in this diff (torrent sshd: `tailscale0:22` open, no `AllowUsers`, `AuthorizedKeysFile` includes `%h/.ssh/authorized_keys`). Reachable because of `users.users.agent` (`isNormalUser`, bash shell).
+- **Severity:** LOW
+- **Confidence:** CONFIRMED (eval)
+- **Axis:** hardening
+- **Reachability:** a prompt-injected agent writes `~agent/.ssh/authorized_keys`. Any device on the flat tailnet holding that key can then log in as `agent` whether or not the remote-control service is running, and outside the service's (future) sandbox.
+- **Rule:** new-rule candidate
+- **Finding:** inbound only (sshd-forwarded sockets for the session still run as `agent` and stay matched), but it's a persistence channel that doesn't depend on Remote Control.
+- **Fix risk:** `DenyUsers agent` (or `AllowUsers lilijoy`) as structured `settings`, verified with `sshd -T`. Check it doesn't block anything Task 6 needs; `run0 -u agent` doesn't use sshd.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### Checked and clean
+
+Checked and found fine: `id -nG agent` is exactly `agent` (no `users`, `libvirtd` or `podman`). `/home/lilijoy` is 0700 live and in every snapshot. `/run/user/1000` and `/tmp/claude-1000` are 0700. `/run/secrets.d` is 0751 with 0400 root-owned secrets, and `/var/lib/sops-nix/key.txt` and the SSH host keys are 0600. The polkit rules in `10-nixos.rules` are all gated on groups or users the agent doesn't hold, so libvirt read-write (`org.libvirt.unix.manage`) and NetworkManager are denied. `/run/podman/podman.sock` is `root:podman` 0660. The nix daemon config: `trusted-users = [ "root" ]`, `require-sigs = true`, `sandbox = true` (no fallback), no `buildMachines`/`distributedBuilds`, no impure-derivations feature, and `trusted-substituters` empty. The store canonicalises modes, so no setuid store paths. Rootless podman (auto subuid) runs its network helper as `agent`, so it stays matched. `mullvad-exclude` changes routing but not the uid, so it stays matched. The firewall backend is iptables, as assumed. The chain's create/flush and `-C` idempotency look correct, and the stop path tolerates absence. `100.64.0.0/10` and `fc00::/7` cover the tailnet, including MagicDNS `100.100.100.100`. DNS goes through `127.0.0.53` (resolved, its own uid), which is intended, and LAN names that resolve to RFC1918 are still rejected on connect. Loopback listeners the agent can reach: CUPS (631, auth for admin), alloy (127.0.0.1:12345), KDE Connect (1716, pairing-gated), sshd (key-only, but see F8). bindfs: `force-user=agent` means a setuid bit set through the mount runs as `agent`, not lilijoy. Symlinks resolve in the agent's own context, cross-mount hardlinks fail with EXDEV, and `/home/agent` (0700) keeps the `allow_other` mount private. Two things I didn't verify. First, whether Xwayland (`@/tmp/.X11-unix/X0`, an abstract socket reachable from the host netns) accepts any local uid beyond the xauth cookie. `xhost` isn't installed, so this is PLAUSIBLE-unchecked, and it would be HIGH if open. Second, whether systemd refuses to automount over a `/home/agent/research` the agent swapped for a symlink between boots. I believe it does (the "not canonical, contains a symlink" refusal), but haven't confirmed it on the pinned systemd.
+
+_security finished 2026-10-06T17:45:09Z (code 7dd86d9021fc1e95) -- see Findings above._
+
+### F9 -- the egress wall fails open when the firewall is stopped or a reload fails
+
+Whole-branch review, confirmed in a VM.
+- After `systemctl stop firewall`, the agent reached the LAN.
+- `firewall-reload` runs `extraStopCommands` first, and the stop script on a
+  failed start. So any broken `extraCommands` anywhere on the host removes the
+  agent's walls while `claude-remote-control` keeps running.
+
+**Fix:** the service gets `bindsTo` + `after` on `firewall.service`.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F10 -- a missing Research folder wedges the automount until reboot
+
+Whole-branch review, confirmed in a VM. A few quick accesses while the source
+is missing hit the mount unit's start limit. The automount then fails with
+`mount-start-limit-hit`, and the agent gets "Permission denied" even after the
+folder exists, until `reset-failed` or a reboot.
+
+**Fix:** `StartLimitIntervalSec = 0` on the mount. Task 6 now creates the
+folder before switching.
+
+
+**FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
