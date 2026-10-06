@@ -34,3 +34,12 @@ days, not weeks.
     Common-mistakes row.
 - **After the fix (1 run):** all 7 criteria met. It deleted the cheap part with
   a trigger and landed on the known-good destination (a Unix user, 1–3 days).
+- **2026-10-06, after re-checking against the original texts (1 run):** all 7
+  criteria met. The restored points came through in use:
+  - the goal was traced up several levels;
+  - the chain rule was used 4 times ("falls with its sources");
+  - it landed on the known-good destination, 1–3 days.
+
+  Restored points: "even if the requirement came from me", "remove in-process
+  testing once diagnosed", "additions beget additions", "refocus during work",
+  and the user's framing that "the real goal wasn't solid".

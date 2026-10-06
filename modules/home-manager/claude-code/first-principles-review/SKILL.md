@@ -10,8 +10,10 @@ description: Use when reviewing, designing or questioning a plan, architecture, 
 This review asks whether each part should exist *before* improving it. Two
 rules drive it:
 
-- **The doghouse check.** The thing being built is a means. Judge it by the
-  goal one level above it: a doghouse serves being a good dog owner.
+- **The doghouse check.** Projects grow from a doghouse into a moonbase when
+  **the real goal isn't solid**: the doghouse forgot that the fundamental goal
+  was to be a good dog owner. So make the goal solid first, then judge every
+  part by whether it serves that goal or only the thing being built.
 - **The five steps** (SpaceX):
   1. make the requirements less dumb by tracing each one to a named source;
   2. delete;
@@ -21,8 +23,10 @@ rules drive it:
 
 ## The review: produce these parts, in this order
 
-1. **The real goal, one level up.** What is this *for*? Not "a secure X", but
-   what the person is trying to get done that X serves. If they haven't said,
+1. **The real goal, traced upward.** What is this *for*? Not "a secure X",
+   but what the person is trying to get done that X serves. Keep going up a
+   level at a time (the doghouse → the dog comfortable outdoors → being a good
+   dog owner) until you reach what they actually care about. If they haven't said,
    state your best guess, label it as an assumption, and make confirming it
    your question.
 2. **The facts that decide it.**
@@ -34,8 +38,11 @@ rules drive it:
    `part | source | real problem it serves | verdict`.
    - **Source** is a named person or a concrete external constraint.
      "Security", "best practice", a doc, an audit finding or "borrowed from
-     tool X" counts as *unknown* until traced. Mark the parts you (Claude)
-     introduced.
+     tool X" counts as *unknown* until traced. Question the person's own
+     requirements too, and mark the parts you (Claude) introduced.
+   - **Additions beget additions** (the light needs power, power needs a
+     generator). A part whose only source is another part stands or falls
+     with it.
    - **Start with the central part** (the platform, the VM, the framework
      itself), not the edges.
    - **Verdict** is one of: **keep**; **delete**, with an add-back trigger (the
@@ -49,7 +56,8 @@ rules drive it:
    - The net part count must go down: add a part only if it replaces more than
      it adds.
    - Polish (hardening details, tuning) and automation come last, after
-     deletion.
+     deletion. Once a problem is diagnosed and the output is reliably good,
+     drop the in-process checks that were added for it.
 6. **The one question** whose answer would change the design most. Ask one.
 
 Then offer another pass on what's left, and stop when a pass deletes nothing.
