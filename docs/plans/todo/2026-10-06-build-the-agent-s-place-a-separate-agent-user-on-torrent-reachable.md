@@ -292,5 +292,16 @@ pinned nixpkgs, 2026-10-06.
 That's your group too, so it would expose anything of yours that's
 group-readable. Hence the explicit `group = "agent"`.
 
+### G3 -- NixOS VM tests replace `fileSystems` wholesale
+
+`qemu-vm.nix` sets `fileSystems = mkVMOverride cfg.fileSystems`, so a
+module's `fileSystems` mount silently disappears inside `runNixOSTest`, and
+the test would pass without ever exercising it. The mount is therefore
+`systemd.mounts` plus `systemd.automounts`, which behave the same on the host
+and in the test. It's an automount because `/home` is a late ZFS mount.
+The source folder is your data: you create it once, and the module never
+writes inside your home (root creating paths in a user-owned tree is an
+unsafe path transition). A missing source shows up as an error on access.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

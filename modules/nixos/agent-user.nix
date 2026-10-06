@@ -27,5 +27,29 @@
         "d /home/agent/work 0700 agent agent -"
         "d /home/agent/repos 0700 agent agent -"
       ];
+
+      # bindfs: only Vault/Research, shown to the agent as its own; anything
+      # it creates lands lilijoy:users in the real folder Obsidian syncs.
+      # automount, not boot-time: /home is a late ZFS mount, and the source is
+      # user data (created once by the user), never by root inside their home
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G1
+      system.fsPackages = [ pkgs.bindfs ];
+      # systemd units, not fileSystems: NixOS VM tests replace fileSystems
+      # wholesale (qemu-vm mkVMOverride), which would leave the mount untested
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
+      systemd.mounts = [
+        {
+          what = "/home/lilijoy/Documents/Vault/Research";
+          where = "/home/agent/research";
+          type = "fuse.bindfs";
+          options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
+        }
+      ];
+      systemd.automounts = [
+        {
+          where = "/home/agent/research";
+          wantedBy = [ "multi-user.target" ];
+        }
+      ];
     };
 }
