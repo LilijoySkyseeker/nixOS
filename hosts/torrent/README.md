@@ -38,6 +38,19 @@ reconsidering that posture.
 The impermanence migration has not happened on this host yet, and unlike
 thinkpad it has no `@blank` snapshots to preserve.
 
+## Agent user
+
+This host (only) runs `agent-user`: an `agent` Unix user whose
+`claude-remote-control` service runs agent sessions with no permission
+prompts. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
+`/home/agent/research`) and can't reach the LAN or tailnet. Its
+`agent-egress` chain is also jumped for `gid nixbld`, so **your own**
+fixed-output builds on this host can't fetch from LAN/tailnet addresses or
+over IPv6 either. The one-time setup steps are Task 6 of
+`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`;
+mechanics in [`docs/hardening.md`](../../docs/hardening.md) ("The `agent`
+user").
+
 <!-- inventory:start -->
 ## Host Inventory
 

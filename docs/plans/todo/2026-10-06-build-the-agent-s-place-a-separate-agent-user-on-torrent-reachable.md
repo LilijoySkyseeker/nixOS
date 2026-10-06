@@ -20,6 +20,9 @@ test with 6 subtests, a build of both hosts, and `nix flake check`.
     and F10.
   - **Open, low:** F6 (bindfs symlinks and modes) and F7 (snapdirs, routed to
     the existing snapdir plan).
+- **Docs pass done.** Comment rationale moved here (F11). The new principal
+  is now in `docs/hardening.md`, `docs/architecture.md`,
+  `docs/threat-model.md` and `hosts/torrent/README.md` (F12).
 - **Not built yet:** Task 6, the user's part. Switch, then the one-time steps,
   starting with creating `Vault/Research`.
 - **Not verified:** whether the sandboxed service runs the real `claude` on
@@ -321,10 +324,19 @@ group-readable. Hence the explicit `group = "agent"`.
 module's `fileSystems` mount silently disappears inside `runNixOSTest`, and
 the test would pass without ever exercising it. The mount is therefore
 `systemd.mounts` plus `systemd.automounts`, which behave the same on the host
-and in the test. It's an automount because `/home` is a late ZFS mount.
+and in the test. ~~It's an automount because `/home` is a late ZFS mount.~~
 The source folder is your data: you create it once, and the module never
 writes inside your home (root creating paths in a user-owned tree is an
 unsafe path transition). A missing source shows up as an error on access.
+
+**2026-10-06 (docs pass):** the struck reason is wrong. On torrent `/home`
+is `zroot/local/home` mounted by an ordinary `home.mount` (`fileSystems`,
+`zfsutil`), not late by `zfs-mount.service`; Review focus 1 already says so.
+It's an automount because the source is user data that may not exist yet:
+a plain mount would fail at boot, while the automount retries on each
+access and never blocks boot (F10 keeps a missing source from wedging it).
+The same wrong reason was in the comment at `modules/nixos/agent-user.nix:90`
+and is gone; the mount's comment cites this entry.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
@@ -347,6 +359,14 @@ read-only: torrent's live permissions plus `nix eval` of
 
 **FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
 
+**2026-10-06 (docs pass):** the fix chosen was none of the options above:
+IPv6 is rejected outright for the chain except on loopback (`-o lo -j
+RETURN`, then `-j REJECT`), plus `224.0.0.0/4` and `255.255.255.255/32` on
+IPv4. Reason, moved verbatim from the comment at
+`modules/nixos/agent-user.nix:9-11`: "IPv6 refuses everything but loopback:
+the LAN's v6 is a dynamic ISP global prefix that can't be listed, and the
+internet still works over IPv4".
+
 ### F2 — Builds through the nix daemon run as `nixbld*`, so `--uid-owner agent` doesn't cover them
 
 - **File:** `modules/nixos/agent-user.nix:43-44` (`allowed-users = [ "agent" ]`), `:48-61`
@@ -360,6 +380,15 @@ read-only: torrent's live permissions plus `nix eval` of
 
 
 **FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+**2026-10-06 (docs pass):** the fix chosen is the `--gid-owner nixbld`
+jump, so it applies to every user's sandboxed builds, lilijoy's included,
+and (with F1's fix) those builds also lose IPv6. The "check before
+applying" from Fix risk: torrent's only substituter is
+`https://cache.nixos.org/` (`nix eval` of `nix.settings.substituters`), and
+substitution is done by the daemon, not a `nixbld` uid; no `fetch*` in the
+repo points at a LAN or tailnet address. Now documented in
+`docs/hardening.md` ("The `agent` user") and `hosts/torrent/README.md`.
 
 ### F3 — The unit that runs untrusted code with no prompts has no systemd sandboxing at all
 
@@ -469,3 +498,81 @@ folder before switching.
 
 
 **FIXED 2026-10-06:** fixed in the review fix pass; pinned by tests/agent-user.nix (test failed first, then passed)
+
+### F11 -- comment rationale moved out of the code (docs pass, 2026-10-06)
+
+`docs/style-guide.md` keeps inline comments to mechanics and labels. This
+prose was removed from comments and is kept here verbatim. Line numbers are
+as of `f377d40`. Where an existing entry already says the same thing, it's
+named.
+
+- `modules/nixos/agent-user.nix:1-3` (file header, now cites this entry):
+  "The agent's place: a separate Unix user on torrent where all
+  non-sensitive agent work runs with no prompts. It never holds root, the
+  user's keys or private data, so the boundary is this user, not a rule."
+- `modules/nixos/agent-user.nix:36`: "own group, not the isNormalUser
+  default `users` (lilijoy's group)". Same as G2.
+- `modules/nixos/agent-user.nix:50-51`: "no inbound ssh: it can write its
+  own authorized_keys, and a login shell would sit outside the service
+  sandbox". Same as F8.
+- `modules/nixos/agent-user.nix:58-60`: "agent-egress: the agent uid can't
+  reach the LAN or tailnet (the tailnet ACL is flat); the rest of the
+  internet stays open, and loopback stays reachable for DNS via resolved".
+  The DNS part is Review focus 5. The comment didn't mention the `nixbld`
+  jump; it now does and cites F2.
+- `modules/nixos/agent-user.nix:88-91`: "bindfs: only Vault/Research, shown
+  to the agent as its own; anything it creates lands lilijoy:users in the
+  real folder Obsidian syncs. automount, not boot-time: /home is a late ZFS
+  mount, and the source is user data (created once by the user), never by
+  root inside their home". The "late ZFS mount" part was wrong; see G3's
+  dated note.
+- `modules/nixos/agent-user.nix:95-99` (the `claude-remote-control` unit,
+  now cites this entry): "the phone reaches the agent through this: Remote
+  Control server mode, sessions spawned in ~/work with no permission
+  prompts (the walls are this user, agent-egress and the Research-only
+  mount). ~ itself can't be the cwd: Claude never saves trust for a home
+  dir. Skipped until the one-time `claude auth login` writes credentials".
+  The cwd reason is also in Global constraints.
+- `modules/nixos/agent-user.nix:151-152`: "systemd units, not fileSystems:
+  NixOS VM tests replace fileSystems wholesale (qemu-vm mkVMOverride), which
+  would leave the mount untested". Same as G3.
+- `modules/nixos/agent-user.nix:160-161`: "a missing source fails each
+  access; never let that hit the start limit and wedge the automount until
+  reboot". Same as F10.
+- `modules/flake/hosts.nix:47` (now cites this entry): "the agent's place:
+  torrent only, not profile-pc". Same as Global constraints, "Torrent only".
+- `tests/agent-user.nix:1-8` (now cites this entry): "Does the agent user
+  actually live in its own place? The agent's place is a separate Unix user
+  on torrent: everything non-sensitive runs there with no prompts, so the
+  boundary has to hold without anyone watching. A build can't show that — a
+  home dir's mode, a group membership or a nix-daemon allow-list only exist
+  at runtime — so this boots a VM with a stand-in for the real user's home
+  and asserts from the agent's side."
+- `tests/agent-user.nix:128`: "IPv6: the LAN's global prefix is dynamic, so
+  all v6 but loopback is refused". Same as F1's dated note.
+- `tests/agent-user.nix:158`: "no inbound shell: its own authorized_keys
+  would be outside the sandbox". Same as F8.
+
+
+**FIXED 2026-10-06:** prose moved here, comments now cite plan anchors
+
+### F12 -- docs didn't mention the new principal (docs pass, 2026-10-06)
+
+The code shipped without any mention of the `agent` user outside the plan
+and the generated inventory. Changed:
+- `docs/architecture.md`: the host table was stale. torrent was missing
+  `agent-user`, and `backup-canary` was missing on thinkpad, torrent and
+  homelab, as was `backup-restore-test` on homelab (checked against
+  `modules/flake/hosts.nix`). A short note on torrent's second principal
+  now follows the "structurally unusual" hosts.
+- `docs/hardening.md`: a new "The `agent` user" convention covering the
+  user, the `agent-egress` chain, the `nixbld` jump and its effect on
+  lilijoy's own builds, the firewall binding, and the uid-match limit.
+- `docs/threat-model.md`: an "Added since the current model" table with
+  the `agent` principal. The current model is a dated audit file, so it
+  was left alone.
+- `hosts/torrent/README.md`: an "Agent user" section, outside the inventory
+  markers. `scripts/doc-host.sh torrent` was re-run and the inventory
+  block was already current.
+
+**FIXED 2026-10-06:** docs updated in the same docs pass

@@ -1,14 +1,10 @@
-# The agent's place: a separate Unix user on torrent where all
-# non-sensitive agent work runs with no prompts. It never holds root, the
-# user's keys or private data, so the boundary is this user, not a rule.
-# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md
+# agent-user: unprivileged `agent` user on torrent for prompt-free agent work
+# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
 {
   flake.modules.nixos."agent-user" =
     { lib, pkgs, ... }:
     let
-      # agent-egress rules per family. IPv6 refuses everything but loopback:
-      # the LAN's v6 is a dynamic ISP global prefix that can't be listed,
-      # and the internet still works over IPv4
+      # agent-egress rules per family; IPv6 rejects all but loopback
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F1
       egress = [
         {
@@ -33,7 +29,7 @@
       ];
     in
     {
-      # own group, not the isNormalUser default `users` (lilijoy's group)
+      # own group, not isNormalUser's default `users`
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G2
       users.groups.agent = { };
       users.users.agent = {
@@ -47,17 +43,16 @@
         ];
       };
 
-      # no inbound ssh: it can write its own authorized_keys, and a login
-      # shell would sit outside the service sandbox
+      # no inbound ssh
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F8
       services.openssh.settings.DenyUsers = [ "agent" ];
 
-      # may use the nix daemon to build; never trusted-users
+      # nix daemon access, not trusted-users
       nix.settings.allowed-users = [ "agent" ];
 
-      # agent-egress: the agent uid can't reach the LAN or tailnet (the
-      # tailnet ACL is flat); the rest of the internet stays open, and
-      # loopback stays reachable for DNS via resolved
+      # agent-egress: jumped from OUTPUT for uid agent and gid nixbld (every
+      # user's sandboxed builds, lilijoy's included)
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2
       networking.firewall.extraCommands = ''
         ${lib.concatMapStrings (
           { cmd, rules }:
@@ -85,18 +80,12 @@
         ) egress}
       '';
 
-      # bindfs: only Vault/Research, shown to the agent as its own; anything
-      # it creates lands lilijoy:users in the real folder Obsidian syncs.
-      # automount, not boot-time: /home is a late ZFS mount, and the source is
-      # user data (created once by the user), never by root inside their home
+      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G1
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
-        # the phone reaches the agent through this: Remote Control server
-        # mode, sessions spawned in ~/work with no permission prompts (the
-        # walls are this user, agent-egress and the Research-only mount).
-        # ~ itself can't be the cwd: Claude never saves trust for a home dir.
-        # Skipped until the one-time `claude auth login` writes credentials
+        # claude remote-control server: prompt-free sessions spawned in ~/work
+        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
         services.claude-remote-control = {
           description = "Claude Code Remote Control server for the agent user";
           wantedBy = [ "multi-user.target" ];
@@ -108,6 +97,7 @@
             "network-online.target"
             "firewall.service"
           ];
+          # skipped until the one-time `claude auth login`
           unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
           environment = {
             HOME = "/home/agent";
@@ -148,8 +138,7 @@
           "d /home/agent/repos 0700 agent agent -"
         ];
 
-        # systemd units, not fileSystems: NixOS VM tests replace fileSystems
-        # wholesale (qemu-vm mkVMOverride), which would leave the mount untested
+        # systemd mount + automount, not fileSystems
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
         mounts = [
           {
@@ -157,8 +146,8 @@
             where = "/home/agent/research";
             type = "fuse.bindfs";
             options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
-            # a missing source fails each access; never let that hit the start
-            # limit and wedge the automount until reboot
+            # no start limit: a missing source must not wedge the automount
+            # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F10
             unitConfig.StartLimitIntervalSec = 0;
           }
         ];

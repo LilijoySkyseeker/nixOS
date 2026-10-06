@@ -46,9 +46,9 @@ key:
 
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
-| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `grafana`, `alloy` |
+| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `backup-canary` |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
+| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `grafana`, `alloy` |
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts`, `alloy` |
 | `isoimage` | unstable | `copyparty-iso` |
 
@@ -174,6 +174,12 @@ Two hosts are still structurally unusual, same as before the migration:
 - **`isoimage`** skips the profile hierarchy entirely — it only pulls in
   `"copyparty-iso"`, not the tailscale/sops/security baseline every other
   host gets.
+
+`torrent` also carries a second, untrusted principal: `agent-user` adds an
+`agent` Unix user that runs `claude remote-control` with no permission
+prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
+mechanics are in `docs/hardening.md` ("The `agent` user"); the design
+record lives outside the repo, in `~/Projects/agenticsandbox/`.
 
 ## Navigating: "what does host X actually run?"
 

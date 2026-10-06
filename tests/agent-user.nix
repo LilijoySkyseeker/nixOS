@@ -1,12 +1,5 @@
-# Does the agent user actually live in its own place?
-#
-# The agent's place is a separate Unix user on torrent: everything
-# non-sensitive runs there with no prompts, so the boundary has to hold
-# without anyone watching. A build can't show that — a home dir's mode, a
-# group membership or a nix-daemon allow-list only exist at runtime — so
-# this boots a VM with a stand-in for the real user's home and asserts
-# from the agent's side.
-# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md
+# VM test: agent-user's boundary, asserted from the agent's side
+# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
 { pkgs, agentUserModule }:
 pkgs.testers.runNixOSTest {
   name = "agent-user";
@@ -125,7 +118,7 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
 
     with subtest("review fixes: egress, builds, reload, sandbox, sshd"):
-        # IPv6: the LAN's global prefix is dynamic, so all v6 but loopback is refused
+        # IPv6: all but loopback rejected (F1)
         machine.succeed("curl -6 --fail --max-time 5 http://lan:8000/marker")
         rc, _ = machine.execute(as_agent("curl -6 --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN over IPv6")
@@ -155,7 +148,7 @@ pkgs.testers.runNixOSTest {
         check(sprop("MemoryMax") not in ("infinity", ""), f"MemoryMax={sprop('MemoryMax')!r}")
         check("firewall.service" in sprop("BindsTo"), f"BindsTo={sprop('BindsTo')!r}")
         check("firewall.service" in sprop("After"), "not ordered after firewall.service")
-        # no inbound shell: its own authorized_keys would be outside the sandbox
+        # sshd denies agent (F8)
         sshd = machine.succeed("sshd -T -C user=agent,host=x,addr=127.0.0.1 | grep -i '^denyusers' || true")
         check("agent" in sshd, f"sshd denyusers: {sshd!r}")
 
