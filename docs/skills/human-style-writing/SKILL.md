@@ -1,6 +1,6 @@
 ---
 name: human-style-writing
-description: Manual checklist for editing text to remove the telltale wording, structure, and formatting tics of LLM-generated prose, distilled from Wikipedia's "Signs of AI writing" essay. This is a tool the user reaches for by hand when polishing a specific piece of writing -- it is not part of the workflow/plan/review gate and should not be self-invoked while writing code, commits, docs, or plans; only use it when the user explicitly asks to check or clean up writing style.
+description: Manual checklist for editing text to remove the telltale wording, structure, and formatting tics of LLM-generated prose, distilled from Wikipedia's "Signs of AI writing" essay. This is a tool the user reaches for by hand when polishing a specific piece of writing -- it is not part of the workflow/review process and should not be self-invoked while writing code, commits, docs, or plans; only use it when the user explicitly asks to check or clean up writing style.
 ---
 
 Source: [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing).

@@ -59,8 +59,8 @@ way, mark it `PLAUSIBLE` — don't guess.
 
 ## Finding format
 
-Append to the active plan file's `## Findings (F)` section, one `###`
-block per finding, `<N>` = next unused number in that file:
+Report findings back to the calling session, one `###` block per
+finding, numbered from 1:
 
 ```markdown
 ### F<N> — <short title, the claim itself>
@@ -81,7 +81,7 @@ address, not a diff.
 
 ## Checked and clean
 
-End your report (in the plan file, as a short paragraph, not a new
-Findings entry) with what you examined and found fine. This is not
+End your report (as a short paragraph, not a new finding) with what you
+examined and found fine. This is not
 optional filler -- it's what tells the next person what was actually
 covered, and stops the same ground being re-derived later.

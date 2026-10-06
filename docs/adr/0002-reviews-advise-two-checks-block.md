@@ -1,9 +1,14 @@
 ---
-status: accepted
+status: superseded
 date: 2026-09-09
 ---
 
 # Reviews advise; two checks block
+
+> **Superseded 2026-10-06.** The plan-file system both blocking rules
+> depended on was removed (see `git log -- docs/skills/plan`). Reviews
+> are still advisory; a CRITICAL/HIGH security finding is now fixed or
+> accepted by the user before the PR opens, with no mechanical gate.
 
 Review agents, lint scripts and completion stamps are advisory. Exactly
 two mechanical rules block work from landing:

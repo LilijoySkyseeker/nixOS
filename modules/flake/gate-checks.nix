@@ -2,7 +2,7 @@
 #
 # Separate from checks.nix deliberately: that file's checks boot real VMs to
 # catch what only breaks at runtime, and these do not. They run the scripts
-# that guard every commit -- the plan-file and workflow gates -- against
+# that guard every commit -- required-agents and the git hooks -- against
 # their own fixtures. Keeping them apart also means one `checks` key per
 # file rather than a repeated one.
 #

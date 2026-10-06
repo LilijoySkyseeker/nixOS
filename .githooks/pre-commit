@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Block obviously-plaintext secrets from being committed, and enforce that
-# frozen docs/plans/{done,rejected}/ files never change (see
-# docs/skills/plan/reference.md) -- both git-level, so they apply to any
-# tool or human, not just a Claude Code session.
+# Block obviously-plaintext secrets from being committed, and catch a
+# docs/skills or docs/agents entry missing its .claude/ symlink -- both
+# git-level, so they apply to any tool or human, not just a Claude Code
+# session.
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -11,26 +11,6 @@ repo_root="$(git rev-parse --show-toplevel)"
 # and needs git's own exit status rather than a pipeline's.
 blob="$(mktemp)" || { echo "BLOCKED: cannot create a temporary file." >&2; exit 1; }
 trap 'rm -f "$blob"' EXIT
-
-# Frozen plans, by residence: docs/plans/{done,rejected}/ is append-never
-# -- a file that lands there is never modified or deleted again, and git
-# history is the integrity record. No checksum manifest: the one this
-# check used to read produced the largest defect cluster in the system's
-# own finding log while duplicating what git content-addressing already
-# proves. plan-gate runs the same rule over the PR range in CI, so it
-# holds for every tool and human at the merge boundary even when this
-# hook is skipped. Additions pass (that is plan-move/plan-reject landing
-# a file); --no-renames so a rename out of the folder shows as the
-# deletion it is.
-# plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D2
-frozen_changed="$(git -c core.quotePath=false diff --cached --no-renames --name-only --diff-filter=MDT -- 'docs/plans/done/*.md' 'docs/plans/rejected/*.md')"
-if [[ -n "$frozen_changed" ]]; then
-  echo "BLOCKED: frozen plan(s) staged for modification or deletion -- new information becomes a new plan file that cites them, not an edit:" >&2
-  echo "$frozen_changed" >&2
-  echo "" >&2
-  echo "If this is deliberate (e.g. undoing a mistaken plan-move before it ever merged), commit with 'git commit --no-verify'." >&2
-  exit 1
-fi
 
 # Every docs/skills/<name>/ and docs/agents/<name>.md must have a correct
 # symlink under .claude/ -- otherwise it silently vanishes from Claude Code
@@ -43,8 +23,8 @@ if [[ -x "$repo_root/scripts/claude-links-check" ]]; then
   fi
 fi
 
-# core.quotePath=false, and what it does not cover -- see
-# plan_worktree_files in docs/skills/plan/scripts/lib.sh
+# core.quotePath=false: git otherwise C-quotes a non-ASCII path, which
+# `git show :<path>` below then cannot read
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
 # ACMRT excludes deletions and nothing else; ACM also dropped renames
 # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45

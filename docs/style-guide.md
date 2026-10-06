@@ -92,23 +92,23 @@ shouldn't have to reverse-engineer the key from the file's contents.
 See `docs/architecture.md`'s "Navigating: what does host X actually run?"
 for how this is used in practice.
 
-## Why context: the plan file, not comments
+## Why context: the commit message, not comments
 
 Non-obvious rationale — a workaround, a surprising constraint, a
 tradeoff, an incident the config is defending against — belongs in the
-task's plan file (`docs/skills/plan/SKILL.md`), not an inline comment. A
-one-line citation pointing at it is fine inline (`# plan:
-<date>-<slug>.md#D2`) — that's a citation, not the rationale itself, and
-is exempt from the "mechanics/labeling only" rule below. Anchor the
-citation to the specific `D`/`G`/`F` id it's about, not just the bare
-filename — a reader shouldn't have to search the whole plan to find the
-one section that explains this line. For a trivial change that never got
-a plan file, a short note in the commit message is still fine; see
-`docs/agents.md` for why the plan file is the primary home for anything
-that went through the `workflow` gate.
+commit message (and the PR description for the bigger picture), not an
+inline comment. `git blame` on the line leads straight to it. Split a
+change into several commits if different parts need different reasons.
 
-Inline comments (beyond a citation pointer) are for mechanics/labeling
-only — see below.
+A comment may carry the *constraint* when the code would look wrong
+without it (`# must come after the recursive acl rule or the next boot
+wipes it`), in one or two lines. Not the history: no "originally",
+"found in review", incident narrative, alternatives considered, or plan
+ids.
+
+Older code carries `# plan: <date>-<slug>.md#D2` citations into the
+archived plans under `docs/plans/`. They still resolve; don't add new
+ones.
 
 ## Inline comments
 

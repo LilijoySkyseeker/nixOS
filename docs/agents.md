@@ -30,28 +30,21 @@ pin while existing on another's — this isn't a hypothetical, it's an
 active split maintained on purpose. Don't assume parity between hosts
 just because they're in the same repo.
 
-## Why rationale lives in the plan file, not inline comments (or the commit)
+## Why rationale lives in commit messages, not inline comments
 
-The stated policy (`docs/style-guide.md`) is that inline comments cover
-mechanics/labeling only; non-obvious rationale doesn't belong there. The
-reasoning: this repo's failure mode historically hasn't been
-"insufficiently documented code," it's been re-deriving the same
-already-solved problem (a boot-time sops identity issue, a gid collision,
-a `nixos-rebuild-ng --sudo` behavior) because the reasoning behind a
-specific config shape wasn't recorded anywhere findable.
+The stated policy (`docs/style-guide.md`) is that comments say what the
+code does; non-obvious rationale goes in the commit message. This repo's
+failure mode historically hasn't been "insufficiently documented code,"
+it's been re-deriving an already-solved problem (a boot-time sops
+identity issue, a gid collision, a `nixos-rebuild-ng --sudo` behavior)
+because the reasoning wasn't recorded anywhere findable. `git blame` on
+the line, then `git show`/`gh pr view`, is that findable place.
 
-Before the plan-file system (`docs/skills/plan/SKILL.md`) existed, the
-commit message was that findable place — and a commit message with real
-rationale is still better than a bare "what." But a commit message can't
-be appended to once decisions keep evolving, can't be cited by a typed ID
-from multiple places, and isn't grouped with the gotchas/findings that
-came out of the same task. The plan file supersedes the commit message for
-anything that went through the `workflow` gate: the reasoning lives there,
-a comment/doc cites it with a one-line pointer
-(`// plan: <date>-<slug>.md#D2`), and the commit stays short and human,
-optionally with a `Plan:` trailer for traceability. A trivial change that
-skipped the gate entirely can still put its one-line "why" in the commit
-message — there's no plan file to cite for those.
+From 2026-08-27 to 2026-10-06 this repo tried a plan-file system as the
+home for reasoning instead. It kept the reasoning, but agents wrote it
+into comments as well (the comment share of added Nix lines rose from
+33% to 38%), and the bookkeeping slowed every change. The plans remain
+as an archive under `docs/plans/`.
 
 ## Why the trust hierarchy is ordered this way
 
@@ -100,15 +93,12 @@ hard-confirm rule its caller has, and delegation is not laundering —
 "a subagent ran the `switch`" is the same violation as running it
 directly.
 
-Worth writing down because the `workflow` skill's step 6 has the agent
+Worth writing down because the `workflow` skill's step 5 has the agent
 run whatever `docs/skills/workflow/scripts/required-agents` names, so a
 harness default suppressing them leaves an agent between the repo's step
-sequence and its own defaults — skip the repo's review gate, or hand-wave
-it. The failure is quiet: nothing blocks on whether those agents ran
-(ADR-0002), so the gate looks like it ran and a hand review gets recorded
-where the review agents should have been. Encountered exactly that on
-2026-09-16; see `2026-09-16-ensure-printers-fails-every-boot-on-torrent-undeployed-fix-plus-no.md#F1`
-for the plan file that had to note the substitution.
+sequence and its own defaults. The failure is quiet: nothing blocks on
+whether those agents ran, so a hand review quietly stands in for them.
+That happened on 2026-09-16.
 
 ## Where to look before assuming
 
