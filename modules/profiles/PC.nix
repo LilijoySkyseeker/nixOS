@@ -1,4 +1,4 @@
-{ config, inputs, ... }:
+{ config, ... }:
 let
   nixosModules = config.flake.modules.nixos;
   homeManagerModules = config.flake.modules.homeManager;

@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # Single shared zrepl module covering every role this repo needs:
   # snapshotting, local replication, and both ends of remote replication.
   # zrepl is one daemon per host driven by one YAML file, so unlike the
@@ -307,7 +306,7 @@
         # (PullJob.GetAppendClientIdentity() returns false, unlike
         # SinkJob's true), so each remote needs its own explicit root_fs.
         root_fs = r.rootFs;
-        interval = r.interval;
+        inherit (r) interval;
         recv = mkRecv;
         pruning = mkPruning r.keepSender r.keepReceiver;
       }) cfg.pull.remotes;

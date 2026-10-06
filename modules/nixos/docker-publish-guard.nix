@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.nixos."docker-publish-guard" =
     {
       config,

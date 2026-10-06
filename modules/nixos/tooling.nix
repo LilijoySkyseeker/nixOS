@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.nixos.tooling =
     { pkgs-stable, lib, ... }:
     {

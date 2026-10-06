@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.nixos.kde =
     { pkgs-stable, pkgs-unstable, ... }:
     {

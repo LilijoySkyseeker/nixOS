@@ -48,15 +48,13 @@ in
 pkgs.testers.runNixOSTest {
   name = "deploy-guards";
 
-  nodes.machine =
-    { ... }:
-    {
-      environment.systemPackages = [ pkgs.git ];
-      users.users.alice = {
-        isNormalUser = true;
-        home = "/home/alice";
-      };
+  nodes.machine = _: {
+    environment.systemPackages = [ pkgs.git ];
+    users.users.alice = {
+      isNormalUser = true;
+      home = "/home/alice";
     };
+  };
 
   testScript = ''
     machine.wait_for_unit("multi-user.target")

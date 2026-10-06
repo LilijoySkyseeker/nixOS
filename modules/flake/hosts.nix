@@ -14,7 +14,7 @@ in
         inherit inputs;
         pkgs-unstable = pkgsUnstable;
         pkgs-stable = pkgsStable;
-        vars = vars;
+        inherit vars;
       };
       modules = [
         ../../hosts/thinkpad/configuration.nix
@@ -36,7 +36,7 @@ in
         inherit inputs;
         pkgs-unstable = pkgsUnstable;
         pkgs-stable = pkgsStable;
-        vars = vars;
+        inherit vars;
       };
       modules = [
         ../../hosts/torrent/configuration.nix
@@ -72,7 +72,7 @@ in
       specialArgs = {
         pkgs-unstable = pkgsUnstable;
         pkgs-stable = pkgsStable;
-        vars = vars;
+        inherit vars;
         # use the home-manager release matching nixpkgs-stable to avoid a version mismatch
         inputs = inputs // {
           home-manager = inputs.home-manager-stable;
@@ -111,7 +111,7 @@ in
         inherit inputs;
         pkgs-unstable = pkgsUnstable;
         pkgs-stable = pkgsStable;
-        vars = vars;
+        inherit vars;
       };
       modules = [
         ../../hosts/vps/configuration.nix
@@ -126,7 +126,7 @@ in
       specialArgs = {
         inherit inputs;
         pkgs-unstable = pkgsUnstable;
-        vars = vars;
+        inherit vars;
       };
       modules = [
         ../../hosts/isoimage/configuration.nix
