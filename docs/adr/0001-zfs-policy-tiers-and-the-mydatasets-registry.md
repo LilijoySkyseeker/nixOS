@@ -105,7 +105,7 @@ The same reasoning reclassifies `/var/lib/docker` and Jellyfin's
 ## The registry
 
 `myDatasets` is a normal `my<Name>` options module
-(`docs/style-guide.md`), keyed by full dataset name:
+(`.claude/rules/nix.md`), keyed by full dataset name:
 
 ```nix
 myDatasets."zroot/persist/loki" = {

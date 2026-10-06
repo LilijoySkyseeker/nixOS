@@ -30,7 +30,7 @@ actually run" — it lists, per host, which `flake.modules.*` entries get
 pulled in. A module existing under `modules/` doesn't mean any host uses
 it; that's still decided by `hosts.nix`. For how it all fits together — see
 [`docs/architecture.md`](./docs/architecture.md).
-[`docs/style-guide.md`](./docs/style-guide.md) covers conventions
+[`.claude/rules/nix.md`](./.claude/rules/nix.md) covers conventions
 (formatting, when a custom NixOS options module is worth writing vs. a
 plain config file). [`docs/procedures/`](./docs/procedures/) has
 runbooks for adding a host, adding a service, rotating a secret.
@@ -41,7 +41,7 @@ nixos-rebuild build --flake .#<host>
 ```
 
 The dev shell wires up git hooks and `pull.rebase true` automatically.
-See [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md).
+Conventions for changes and PRs are in [`AGENTS.md`](./AGENTS.md).
 
 ## Hosts
 

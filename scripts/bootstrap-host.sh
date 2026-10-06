@@ -77,8 +77,8 @@ done
 extra_args=("$@")
 
 # Resolved from the script's own location, not the caller's cwd -- this
-# is meant to be invoked from a scratch directory (see docs/procedures/
-# vm-testing.md) so nixos-anywhere's qcow2/log artifacts don't land in
+# is meant to be invoked from a scratch directory (see .claude/skills/
+# verify-a-change/vm-testing.md) so nixos-anywhere's qcow2/log artifacts don't land in
 # the repo checkout.
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 host_dir="$repo_root/hosts/$host"

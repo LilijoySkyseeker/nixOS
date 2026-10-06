@@ -30,7 +30,7 @@
 #     research, and asserted here so nobody "fixes" this test by making it
 #     pass without the property module or deploy story accounting for it
 #
-# Writing or debugging one of these: docs/procedures/vm-testing.md.
+# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   zfsDatasetPropertiesModule,

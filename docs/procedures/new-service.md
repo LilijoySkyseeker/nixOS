@@ -10,7 +10,7 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    needs to be parameterized across multiple hosts with different
    settings, the inner module should be a plain config attrset setting
    NixOS module options directly — no custom `options`/`config`
-   surface. See `docs/style-guide.md` for when a real options module
+   surface. See `.claude/rules/nix.md` for when a real options module
    (the `my<Name>` pattern) is actually warranted instead.
 2. Add its registration key to whichever host's `modules = [ ... ]`
    list in `modules/flake/hosts.nix` needs it. Creating the file makes
@@ -18,7 +18,7 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    `modules/`) but not used by any host until it's listed there.
 3. If the service is genuinely reusable/parameterized across hosts, it
    likely belongs in `modules/nixos/` instead, following the
-   `my<Name>` options convention — see `docs/style-guide.md` and
+   `my<Name>` options convention — see `.claude/rules/nix.md` and
    `docs/architecture.md`'s module-organization boundary.
 4. Validate with `nixos-rebuild build --flake .#<host>` (never
    `switch` unprompted — see `AGENTS.md`).
@@ -63,8 +63,6 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    just when asked.
 
 There's no service-specific README requirement — `modules/services/`
-has no README of its own (see `docs/procedures/updating-documentation.md`:
-only the `hosts/<name>/README.md` files and the root `README.md` exist).
-Re-run `scripts/doc-host.sh <host>` so the host's inventory block picks
-up the new service; a non-obvious host-specific gotcha goes in that
+has no README of its own; only the `hosts/<name>/README.md` files and the
+root `README.md` exist. A non-obvious host-specific gotcha goes in that
 host's `hosts/<name>/README.md`.

@@ -1,22 +1,25 @@
-# Style guide
+---
+paths:
+  - "**/*.nix"
+---
+
+# Nix conventions
 
 Conventions actually in use in this repo, not aspirational ones. See
 `docs/architecture.md` for the dendritic module-organization boundary.
 
 ## Formatting
 
-`nixfmt <file>` is the formatter of record — 2-space indent, trailing
-commas, `with pkgs; [ ... ]` package lists. Run it before committing;
-`statix check .` and `deadnix .` catch lint issues nixfmt doesn't.
+`nixfmt` is the formatter of record: 2-space indent, trailing commas,
+`with pkgs; [ ... ]` package lists. The pre-commit hook runs
+`nixfmt --check`, `statix` and `deadnix` on every staged `.nix` file.
 
-A purely stylistic statix finding is not a reason to restructure. For
-example, `repeated_keys` flags several top-level `systemd.foo = …` /
-`systemd.bar = …` assignments, each with its own comment. Separate,
-clearly commented top-level statements beat one deeply nested block
-written only to silence the linter, so keep that shape and resolve the
-finding another way (an inline statix disable, or accepting it). The user
-on the immich module: "as long as things are organized and have the
-correct comment info next to them they are fine."
+Separate, clearly commented top-level statements (`systemd.foo = …;`,
+`systemd.bar = …;`) beat one deeply nested block, which is why
+`statix.toml` turns off `repeated_keys`. Don't restructure code just to
+silence a purely stylistic finding. The user on the immich module: "as
+long as things are organized and have the correct comment info next to
+them they are fine."
 
 ## Module registration: `flake.modules.<class>.<name>`
 

@@ -37,7 +37,7 @@
 # or not actually reclaiming space) is exactly the kind of thing you'd only
 # discover under real pressure. Delete it if the module is ever replaced.
 #
-# Writing or debugging one of these: docs/procedures/vm-testing.md.
+# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   zfsSpaceGuardModule,
