@@ -299,6 +299,7 @@ them in this order:
 - [x] Task 4 -- the Remote Control service
 - [x] Task 5 -- wire into torrent, build, docs, security, PR
 - [ ] Task 6 -- the user switches and does the one-time steps
+- [x] D2 -- add back a minimal agent `CLAUDE.md`, and drop the unused `~/repos`
 
 ## Decisions (D)
 
@@ -307,6 +308,24 @@ them in this order:
 The reasoning (D1–D23, the spikes, the threat ratings) is in
 `~/Projects/agenticsandbox/`. This plan carries only what implementation needs.
 The spec's decisions S1–S5 are settled there. Don't re-litigate them here.
+
+### D2 -- add back a minimal agent `CLAUDE.md`, and drop the unused `~/repos`
+
+This part was deleted in the five-step pass (design D21), and its add-back
+trigger was "the agent doesn't know something it needs". It fired twice in
+the first real sessions (2026-10-06):
+- the agent believed it ran "in a cloud container, not on your machine";
+- it cloned repos into `~/work/repos`, not the planned `~/repos`.
+
+So the module now declares `~agent/.claude/CLAUDE.md` as a store symlink
+(edits go through the repo). It holds orientation facts only: where the agent
+runs, `~/research`, `~/work/repos`, its limits, and the bot-PR crossing. The
+`~/repos` tmpfiles dir is dropped, and the agent's own choice of
+`~/work/repos` is kept. The two core working lessons are deliberately not in
+it; they arrive through the user-level `CLAUDE.md` plan (its G3).
+
+
+**ANSWERED 2026-10-06:** user 2026-10-06: do it now as a small PR
 
 ## Gotchas (G)
 

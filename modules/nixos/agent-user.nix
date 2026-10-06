@@ -135,7 +135,10 @@
 
         tmpfiles.rules = [
           "d /home/agent/work 0700 agent agent -"
-          "d /home/agent/repos 0700 agent agent -"
+          # orientation for the agent; a store symlink, so edits go through the repo
+          # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#D2
+          "d /home/agent/.claude 0700 agent agent -"
+          "L+ /home/agent/.claude/CLAUDE.md - - - - ${./agent-user-CLAUDE.md}"
         ];
 
         # systemd mount + automount, not fileSystems
