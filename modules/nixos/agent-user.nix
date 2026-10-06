@@ -86,6 +86,38 @@
       systemd = {
         # claude remote-control server: prompt-free sessions spawned in ~/work
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
+        # merge the keys this repo owns into the agent's CLI-owned settings.json
+        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F13
+        services.claude-agent-settings = {
+          description = "Merge repo-owned keys into the agent's Claude settings";
+          wantedBy = [ "multi-user.target" ];
+          before = [ "claude-remote-control.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            User = "agent";
+            Group = "agent";
+          };
+          script =
+            let
+              managed = pkgs.writeText "agent-claude-settings.json" (
+                builtins.toJSON {
+                  # account-level session and routine tools (cloud work with the
+                  # user's GitHub App and connectors)
+                  deniedMcpServers = [ { serverName = "claude-code-remote"; } ];
+                  disableClaudeAiConnectors = true;
+                }
+              );
+            in
+            ''
+              f=/home/agent/.claude/settings.json
+              mkdir -p /home/agent/.claude
+              [ -s "$f" ] || echo '{}' > "$f"
+              ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$f" ${managed} > "$f.tmp"
+              mv "$f.tmp" "$f"
+            '';
+        };
+
         services.claude-remote-control = {
           description = "Claude Code Remote Control server for the agent user";
           wantedBy = [ "multi-user.target" ];
