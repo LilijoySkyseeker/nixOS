@@ -78,6 +78,33 @@
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G1
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
+        # the phone reaches the agent through this: Remote Control server
+        # mode, sessions spawned in ~/work with no permission prompts (the
+        # walls are this user, agent-egress and the Research-only mount).
+        # ~ itself can't be the cwd: Claude never saves trust for a home dir.
+        # Skipped until the one-time `claude auth login` writes credentials
+        services.claude-remote-control = {
+          description = "Claude Code Remote Control server for the agent user";
+          wantedBy = [ "multi-user.target" ];
+          wants = [ "network-online.target" ];
+          after = [ "network-online.target" ];
+          unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
+          environment = {
+            HOME = "/home/agent";
+            # keep the account's claude.ai connectors (and their data) out
+            ENABLE_CLAUDEAI_MCP_SERVERS = "false";
+            PATH = lib.mkForce "/run/wrappers/bin:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin";
+          };
+          serviceConfig = {
+            User = "agent";
+            Group = "agent";
+            WorkingDirectory = "/home/agent/work";
+            ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
+            Restart = "always";
+            RestartSec = 30;
+          };
+        };
+
         tmpfiles.rules = [
           "d /home/agent/work 0700 agent agent -"
           "d /home/agent/repos 0700 agent agent -"

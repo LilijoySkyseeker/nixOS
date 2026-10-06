@@ -95,5 +95,20 @@ pkgs.testers.runNixOSTest {
         n6 = machine.succeed("ip6tables -S OUTPUT | grep -c agent-egress").strip()
         assert n4 == "1" and n6 == "1", f"jumps after restart: v4={n4} v6={n6}"
         machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
+
+    with subtest("remote control service"):
+        def prop(p):
+            return machine.succeed(f"systemctl show claude-remote-control -p {p} --value").strip()
+        # before the one-time login there's no credential: skipped, not crash-looping
+        assert prop("ConditionResult") == "no", f"ConditionResult: {prop('ConditionResult')!r}"
+        assert prop("ActiveState") != "failed", f"ActiveState: {prop('ActiveState')!r}"
+        assert prop("User") == "agent", f"User: {prop('User')!r}"
+        assert prop("WorkingDirectory") == "/home/agent/work", f"WorkingDirectory: {prop('WorkingDirectory')!r}"
+        unit = machine.succeed("systemctl cat claude-remote-control")
+        for flag in ["remote-control", "--spawn same-dir", "--name torrent-agent", "--permission-mode bypassPermissions"]:
+            assert flag in unit, f"missing {flag!r} in unit"
+        env = prop("Environment")
+        assert "ENABLE_CLAUDEAI_MCP_SERVERS=false" in env, f"Environment: {env!r}"
+        assert "HOME=/home/agent" in env, f"Environment: {env!r}"
   '';
 }
