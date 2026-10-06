@@ -191,7 +191,8 @@ pkgs.testers.runNixOSTest {
     with subtest("agent-setup --check"):
         rc, out = machine.execute(as_agent("agent-setup --check 2>&1"))
         assert rc == 2 and "run0 agent-setup" in out, f"non-root: rc={rc} {out!r}"
-        rc, out = machine.execute("agent-setup --check 2>&1")
+        # run0 keeps the caller's cwd; the agent can't read /root (like ~lilijoy)
+        rc, out = machine.execute("cd /root && agent-setup --check 2>&1")
         # no logins can exist in the VM, so it must report failures, not fix them
         assert rc == 1, f"rc={rc}: {out}"
         for good in ["✓ agent-user module deployed", "✓ research folder", "✓ research mount",

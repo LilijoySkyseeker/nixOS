@@ -71,5 +71,17 @@ confirm before each change, a closing summary). Dropped: the template itself.
 
 ## Gotchas (G)
 
+### G1 -- run0 keeps the caller's cwd, and git refuses to run in an unreadable one
+
+First real run on torrent (2026-10-06): `git identity` showed ✗, although
+both config files said `LilijoySkyseeker-agent`.
+- `run0 agent-setup` started in lilijoy's directory.
+- `runuser -u agent -- git config` then ran inside it, and the agent can't
+  read that directory.
+- The VM test missed it because it ran from `/`.
+
+**Fix:** both helpers `env -C` into their user's home. The test now runs from
+`/root`, which the agent can't read.
+
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*

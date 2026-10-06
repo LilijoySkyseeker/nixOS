@@ -14,8 +14,10 @@ research=/home/lilijoy/Documents/Vault/Research
 settings=$agent_home/.claude/settings.json
 state=$agent_home/.claude.json
 
-as_agent() { runuser -u agent -- env HOME="$agent_home" PATH="$PATH:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin" "$@"; }
-as_user() { runuser -u lilijoy -- env HOME=/home/lilijoy PATH="$PATH:/etc/profiles/per-user/lilijoy/bin:/run/current-system/sw/bin" "$@"; }
+# run0 keeps the caller's cwd, which the other user may not be able to read
+# (git then refuses to run), so each helper starts in that user's home
+as_agent() { runuser -u agent -- env -C "$agent_home" HOME="$agent_home" PATH="$PATH:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin" "$@"; }
+as_user() { runuser -u lilijoy -- env -C /home/lilijoy HOME=/home/lilijoy PATH="$PATH:/etc/profiles/per-user/lilijoy/bin:/run/current-system/sw/bin" "$@"; }
 
 if [ -t 1 ]; then green=$'\033[32m' red=$'\033[31m' dim=$'\033[2m' reset=$'\033[0m'; else green='' red='' dim='' reset=''; fi
 failed=0
