@@ -135,7 +135,15 @@ must not hold a credential and must not run on fork PRs.
 
 **Not covered by this acceptance:** whether `master` is protected at all
 (D3). No CI means branch protection is the *only* remaining control, so
-AR-5 makes D3 more urgent, not less.
+AR-5 makes D3 more urgent, not less. 2026-10-06: the agent user's bot
+account gets write access to this repo, so `master` protection (PR + 1
+review) is now a step of
+`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`
+(Task 6), done by the user in GitHub's settings.
+
+Stale since 2026-08-28: `.github/workflows/plan-gate.yml` exists, so "no
+workflow file has ever existed" no longer holds. It runs on `pull_request`
+and holds no credential, so the posture the acceptance protects is intact.
 
 ### AR-6 — ~~The NFS shares are `nosuid,nodev` but not `noexec`~~
 
