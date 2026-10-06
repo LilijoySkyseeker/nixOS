@@ -284,7 +284,7 @@
         # last-success goes over 336h/14 days stale (see below).
         Persistent = false;
       };
-      # daily means keep n runs, so actully 2 snapshots, 1 per week
+      # daily means keep n runs, so actually 2 snapshots, 1 per week
       pruneOpts = [
         "--retry-lock 15m"
         "--keep-daily 2"
