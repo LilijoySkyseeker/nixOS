@@ -182,6 +182,25 @@ pkgs.testers.runNixOSTest {
         cfg = machine.succeed("cat /home/agent/.claude/settings.json")
         assert '"theme": "dark"' in cfg and '"claude-code-remote"' in cfg, f"merge clobbered: {cfg!r}"
 
+    with subtest("git identity is declared"):
+        name = machine.succeed(as_agent("git config user.name")).strip()
+        email = machine.succeed(as_agent("git config user.email")).strip()
+        assert name == "LilijoySkyseeker-agent", f"user.name: {name!r}"
+        assert email == "338765425+LilijoySkyseeker-agent@users.noreply.github.com", f"user.email: {email!r}"
+
+    with subtest("agent-setup --check"):
+        rc, out = machine.execute(as_agent("agent-setup --check 2>&1"))
+        assert rc == 2 and "run0 agent-setup" in out, f"non-root: rc={rc} {out!r}"
+        rc, out = machine.execute("agent-setup --check 2>&1")
+        # no logins can exist in the VM, so it must report failures, not fix them
+        assert rc == 1, f"rc={rc}: {out}"
+        for good in ["✓ agent-user module deployed", "✓ research folder", "✓ research mount",
+                     "✓ agent settings merged", "✓ LAN/tailnet egress blocked", "✓ git identity"]:
+            assert good in out, f"missing {good!r} in:\n{out}"
+        for missing in ["✗ gh logged in as LilijoySkyseeker-agent", "✗ Claude login and workspace trust"]:
+            assert missing in out, f"missing {missing!r} in:\n{out}"
+        machine.fail("test -e /home/agent/.config/gh/hosts.yml")
+
     with subtest("remote control service"):
         def prop(p):
             return machine.succeed(f"systemctl show claude-remote-control -p {p} --value").strip()

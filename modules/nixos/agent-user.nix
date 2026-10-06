@@ -4,6 +4,31 @@
   flake.modules.nixos."agent-user" =
     { lib, pkgs, ... }:
     let
+      bot = "LilijoySkyseeker-agent";
+      # git identity: the bot's noreply address (its public GitHub id)
+      gitIdentity = pkgs.writeText "agent-git-identity" ''
+        [user]
+          name = ${bot}
+          email = 338765425+${bot}@users.noreply.github.com
+      '';
+      # check-and-fix for the parts that can't be declared
+      # plan: 2026-10-06-make-the-agent-s-place-reproducible-with-an-agent-setup-check-and-fix.md
+      agentSetup = pkgs.writeShellApplication {
+        name = "agent-setup";
+        runtimeInputs = with pkgs; [
+          coreutils
+          gh
+          jq
+          util-linux
+        ];
+        text = ''
+          BOT=${bot}
+          OWNER=LilijoySkyseeker
+          BOT_REPOS="nixOS project-elysian"
+          NAME=torrent-agent
+        ''
+        + builtins.readFile ./agent-setup.sh;
+      };
       # agent-egress rules per family; IPv6 rejects all but loopback
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F1
       egress = [
@@ -48,6 +73,8 @@
       services.openssh.settings.DenyUsers = [ "agent" ];
 
       # nix daemon access, not trusted-users
+      environment.systemPackages = [ agentSetup ];
+
       nix.settings.allowed-users = [ "agent" ];
 
       # agent-egress: jumped from OUTPUT for uid agent and gid nixbld (every
@@ -175,6 +202,10 @@
           # orientation for the agent; a store symlink, so edits go through the repo
           # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#D2
           "d /home/agent/.claude 0700 agent agent -"
+          # ~/.gitconfig stays writable: gh auth setup-git puts its helper there
+          "d /home/agent/.config 0700 agent agent -"
+          "d /home/agent/.config/git 0700 agent agent -"
+          "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
           "L+ /home/agent/.claude/CLAUDE.md - - - - ${./agent-user-CLAUDE.md}"
         ];
 
