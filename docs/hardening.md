@@ -266,6 +266,25 @@ here; it is already applied in the SSH bullet below.
   forced command in `authorized_keys` pinning the key to exactly
   `zrepl stdinserver <identity>`, with the identity fixed server-side
   rather than asserted by the client (see `docs/backups.md`).
+- **The `agent` user (torrent only, `modules/nixos/agent-user.nix`).** An
+  untrusted local principal: a normal user in its own `agent` group with
+  no extra groups, `nix.settings.allowed-users` but never `trusted-users`,
+  `DenyUsers agent` in sshd, and a sandboxed `claude-remote-control` unit
+  that runs agent sessions with no permission prompts. Its egress wall is
+  the `agent-egress` iptables/ip6tables chain, jumped from `OUTPUT` for
+  `--uid-owner agent` **and** `--gid-owner nixbld`: IPv4 RFC1918, the
+  tailnet's `100.64.0.0/10`, link-local, multicast and broadcast are
+  rejected, and IPv6 is rejected outright except on loopback. The
+  `nixbld` jump applies to **every** user's fixed-output builds, lilijoy's
+  included, so on torrent no build can fetch from a LAN or tailnet address,
+  or over IPv6 at all. The unit is `bindsTo` `firewall.service`, because a
+  stopped or failed firewall drops the chain. Interactive `run0 -u agent`
+  shells get the chain but not the unit's sandbox. A uid match does not
+  cover work the principal hands to a daemon or a setuid helper, so check
+  that whenever the agent gains a new tool.
+  (`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2`,
+  `#F9`; the design record lives outside the repo, in
+  `~/Projects/agenticsandbox/`.)
 - **Custom `systemd.services` sandboxing**: add `NoNewPrivileges = true`
   plus, when the unit's actual job allows it, the full stack —
   `ProtectSystem = "strict"` (with `ReadWritePaths` for whatever it
