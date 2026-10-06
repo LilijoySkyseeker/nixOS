@@ -9,6 +9,15 @@ Conventions actually in use in this repo, not aspirational ones. See
 commas, `with pkgs; [ ... ]` package lists. Run it before committing;
 `statix check .` and `deadnix .` catch lint issues nixfmt doesn't.
 
+A purely stylistic statix finding is not a reason to restructure. For
+example, `repeated_keys` flags several top-level `systemd.foo = …` /
+`systemd.bar = …` assignments, each with its own comment. Separate,
+clearly commented top-level statements beat one deeply nested block
+written only to silence the linter, so keep that shape and resolve the
+finding another way (an inline statix disable, or accepting it). The user
+on the immich module: "as long as things are organized and have the
+correct comment info next to them they are fine."
+
 ## Module registration: `flake.modules.<class>.<name>`
 
 Every `.nix` file under `modules/` self-registers into

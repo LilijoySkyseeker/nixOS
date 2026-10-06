@@ -5,6 +5,14 @@
     { lib, pkgs, ... }:
     let
       bot = "LilijoySkyseeker-agent";
+      # orientation + the user's two working lessons (the same file as their own
+      # user-level CLAUDE.md, so there's no copy to drift)
+      # plan: 2026-10-06-manage-a-user-level-claude-md-declaratively-with-cross-project.md#D4
+      agentClaudeMd = pkgs.writeText "agent-CLAUDE.md" (
+        builtins.readFile ./agent-user-CLAUDE.md
+        + "\n"
+        + builtins.readFile ../home-manager/claude-code/user-claude.md
+      );
       # git identity: the bot's noreply address (its public GitHub id)
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
@@ -206,7 +214,7 @@
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
-          "L+ /home/agent/.claude/CLAUDE.md - - - - ${./agent-user-CLAUDE.md}"
+          "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentClaudeMd}"
         ];
 
         # systemd mount + automount, not fileSystems

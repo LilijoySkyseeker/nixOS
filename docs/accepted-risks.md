@@ -15,6 +15,15 @@ a decision nobody has made yet (that is
 §4), or a rule everyone should follow (that is
 [`hardening.md`](hardening.md)).
 
+**Not accepted, ever:** a finding that's hard to fix only because agents
+run as `lilijoy`. That is a same-uid problem the agent-separation work is
+meant to remove: the agent's own Unix user, plus the "your place"
+hardening, both in `~/Projects/agenticsandbox`. Leave such a finding
+**open** in its plan with a dated note naming which of those fixes it.
+Don't record it here, and don't offer "accept" as the recommended option.
+(User, 2026-10-05; first applied to OpenRig F1/F3/F6/F7 in
+`2026-10-05-package-openrig-and-add-it-to-the-pc-profile.md#D4`.)
+
 **Scaffolded 2026-08-27**, during the 2026-08-26 audit's Phase 4. §1 is
 complete as far as it can be. **§2 is not acceptance** — it is the list
 of risks that cannot move into §1 until decisions D1–D14 are answered,
