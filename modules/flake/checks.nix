@@ -38,6 +38,11 @@
           dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
         };
 
+        agent-user = import ../../tests/agent-user.nix {
+          pkgs = config.flake.pkgsUnstable;
+          agentUserModule = config.flake.modules.nixos."agent-user";
+        };
+
         docker-userns-remap = import ../../tests/docker-userns-remap.nix {
           pkgs = config.flake.pkgsUnstable;
           dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
