@@ -106,6 +106,11 @@
                   # user's GitHub App and connectors)
                   deniedMcpServers = [ { serverName = "claude-code-remote"; } ];
                   disableClaudeAiConnectors = true;
+                  # the built-in twins: routines and messages into the user's sessions
+                  permissions.deny = [
+                    "RemoteTrigger"
+                    "SendMessage"
+                  ];
                 }
               );
             in

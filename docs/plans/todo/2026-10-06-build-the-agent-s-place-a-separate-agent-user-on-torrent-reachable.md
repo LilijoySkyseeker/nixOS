@@ -624,3 +624,13 @@ the merge and that CLI keys survive it.
 injects itself. The docs say "wherever it's defined" but don't list this case.
 Check on the host after switching: a new phone session's MCP list must show
 no `claude-code-remote`.
+
+2026-10-06 (F13 follow-up): verified on the host. A new phone session lists
+**no** MCP servers, so `deniedMcpServers` does block the server Remote Control
+injects. The same session's tool list showed the **built-in** twins of that
+door:
+- `RemoteTrigger`: routines, which run in the cloud with the user's authority;
+- `SendMessage`: messages into the user's sessions, held by default.
+
+Both are now denied through `permissions.deny` in the same merged settings.
+Deny rules apply in `bypassPermissions` too.
