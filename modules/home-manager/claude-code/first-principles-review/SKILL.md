@@ -17,17 +17,24 @@ should exist at all. Two rules carry this:
   the generator needs fuel. Meanwhile the dog is still waiting outside. So
   make the goal solid first, and judge every part by whether it serves that
   goal or only the thing being built. Sometimes the answer is to build nothing.
-- **The five steps** (SpaceX), in order:
-  1. Make the requirements less dumb.
-  2. Delete the part or process.
-  3. Simplify what survived.
-  4. Speed up the cycle.
-  5. Automate last.
-
-  Every design is wrong; the only question is how wrong. Every requirement has
-  a named source (a person or a real constraint, never "best practice"), and it
-  gets questioned however smart that source is, the person's own requirements
-  and yours included.
+- **The five steps** (SpaceX), in this order. Most people start at step 5 and
+  automate something that should never have existed.
+  1. **Make the requirements less dumb.**
+     - Every design is wrong; the only question is how wrong.
+     - Each requirement carries the name of the person who made it. A
+       "department" can't be asked *why*, but a person can. The departments
+       here are "security", "best practice", a doc, an audit finding and "how
+       tool X does it".
+     - Question each requirement however smart its source. Smart sources are
+       the most dangerous, because they get questioned least. That includes the
+       person's own requirements and yours.
+  2. **Try very hard to delete the part or process.** The bias runs strongly
+     toward keeping things "in case". If about 10% of deletions aren't coming
+     back over time, you aren't deleting enough.
+  3. **Simplify** only what survived. Don't optimize something that shouldn't
+     exist.
+  4. **Speed up the cycle**, so a wrong deletion is cheap to undo.
+  5. **Automate last.**
 
 ## What a good review does
 

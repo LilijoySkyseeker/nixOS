@@ -62,3 +62,17 @@ days, not weeks.
     - **Process:** prose plus one table, 11 parts → 3, and it reached the
       dog-owner level ("take on less, not plan better").
     - **Small:** about 200 words of prose, "build nothing", one question.
+- **2026-10-06, SpaceX section re-checked against the original text** (user: is
+  the simplified form still serving the original, more general purpose?).
+  - **Restored:**
+    - why requirements need a name (a department can't be asked why);
+    - smart sources are the most dangerous;
+    - what counts as a "department" here (security, best practice, a doc, an
+      audit, how tool X does it);
+    - the bias toward keeping things "in case";
+    - the ~10% add-back calibration;
+    - why speed is step 4 (it makes a wrong deletion cheap);
+    - "most people start at step 5".
+  - **Regression (design + small):** all criteria met. The design run used the
+    restored framing directly ("it came from 'how a multi-agent tool does
+    it'"). The small question stayed short (~250 words of prose).
