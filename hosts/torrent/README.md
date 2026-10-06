@@ -46,7 +46,10 @@ prompts. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
 `/home/agent/research`) and can't reach the LAN or tailnet. Its
 `agent-egress` chain is also jumped for `gid nixbld`, so **your own**
 fixed-output builds on this host can't fetch from LAN/tailnet addresses or
-over IPv6 either. The one-time setup steps are Task 6 of
+over IPv6 either. After a reinstall, or to check it's healthy, run
+**`run0 agent-setup`**: it checks every piece the module can't declare (the
+logins, the first-run consent, the GitHub side) and walks you through only
+what's missing. `--check` only reports. The original one-time steps are Task 6 of
 `2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`;
 mechanics in [`docs/hardening.md`](../../docs/hardening.md) ("The `agent`
 user").
