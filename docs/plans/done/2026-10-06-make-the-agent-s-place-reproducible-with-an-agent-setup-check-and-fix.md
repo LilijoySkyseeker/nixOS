@@ -1,8 +1,8 @@
 ---
 slug: make-the-agent-s-place-reproducible-with-an-agent-setup-check-and-fix
 created: 2026-10-06
-status: todo
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,13 +12,21 @@ blocked_by:
 
 ## State
 
-Built on branch `agent-setup`.
-- The VM test passes, including the `agent-setup --check` and git-identity
-  subtests, which failed first.
-- shellcheck passes, via `writeShellApplication`.
+Verified to rung 5 (a real switch, observed) on torrent, 2026-10-06. After
+switching to #102 and #103, the user ran `run0 agent-setup --check` and every
+item was ✓:
+- the module, research folder and mount, merged settings and egress;
+- the git identity (declared);
+- `gh` as the bot, the Claude login and trust, the Remote Control consent and
+  the service;
+- on GitHub, the bot's collaborator access and `master` protection.
 
-Waiting on the user to run `run0 agent-setup --check` on torrent after
-switching.
+The first run found G1 (cwd), fixed in #103.
+
+The agent's place can now be rebuilt from the repo plus one guided command.
+The only parts that stay outside the machine are the bot account and Trusted
+Devices. `agent-setup` prints Trusted Devices as a reminder; the bot account
+survives a reinstall, because it lives on GitHub.
 
 ## Original plan
 
@@ -55,7 +63,7 @@ undocumented, and they sit inside the login flow, which is interactive anyway
 - [x] D1 -- the wizard template isn't used
 - [x] declared git identity + `agent-setup`, with a VM subtest for `--check`
 - [x] build torrent and thinkpad
-- [ ] the user runs `run0 agent-setup --check` on torrent and sees everything ✓
+- [x] the user runs `run0 agent-setup --check` on torrent and sees everything ✓
 
 ## Decisions (D)
 
