@@ -200,6 +200,10 @@
         # Cross-project review method (the five steps + the doghouse check);
         # plain markdown, so no build step like tcr's.
         file.".claude/skills/first-principles-review".source = ./first-principles-review;
+        # user-level instructions, loaded in every project: the two core lessons.
+        # read-only by design; the agent user gets the same file appended to its own
+        # plan: 2026-10-06-manage-a-user-level-claude-md-declaratively-with-cross-project.md#D2
+        file.".claude/CLAUDE.md".source = ./user-claude.md;
 
         # Reads happen unconditionally, but every write goes through `run` so
         # that `home-manager build`/dry-run stays side-effect free - a bare

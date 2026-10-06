@@ -162,6 +162,9 @@ pkgs.testers.runNixOSTest {
         md = machine.succeed(as_agent("cat /home/agent/.claude/CLAUDE.md"))
         for phrase in ["torrent", "~/research", "~/work/repos", "pull request"]:
             assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
+        # plus the user's two working lessons, from the same file their own CLAUDE.md uses
+        for phrase in ["## Five steps", "## Doghouse vs dog owner"]:
+            assert phrase in md, f"CLAUDE.md lacks the lesson {phrase!r}"
         # the unused ~/repos is gone; clones live in ~/work/repos
         machine.fail("test -e /home/agent/repos")
         # account-level tools stay out: remote session/routine tools would run

@@ -12,11 +12,17 @@ blocked_by:
 
 ## State
 
-Todo, nothing built. The content is decided in principle: **only the two
-lessons**, the five steps and the doghouse check (user, 2026-10-06). See
-"Draft content, revised". D1–D3 are proposals, not yet answered.
-`~/.claude/CLAUDE.md` currently exists on torrent as an empty, unmanaged file
-(G1).
+Built on branch `plan-user-claude-md`, rebased onto master after #96–#104.
+- `~/.claude/CLAUDE.md` is a home-manager store symlink to
+  `modules/home-manager/claude-code/user-claude.md`. That file holds the two
+  core lessons, word for word from the cold-read-tested memory text.
+- The `agent` user's `CLAUDE.md` is its orientation plus the same file (D4).
+- The `first-principles-review` skill ships in the same branch.
+- The VM test pins the agent side; `nix eval` pins the user side.
+- Both hosts build.
+
+Waiting on: the user switches, and a session in a non-dotfiles project shows
+the lessons. Then delete the duplicate memories (D3).
 
 ## Original plan
 
@@ -126,12 +132,13 @@ Source of the reasoning: `~/Projects/agenticsandbox/` (`README.md`,
 
 ## Progress
 
-- [ ] D1 -- where the content lives
-- [ ] D2 -- read-only symlink, not a writable copy
+- [x] D1 -- where the content lives
+- [x] D2 -- read-only symlink, not a writable copy
 - [ ] D3 -- what happens to the duplicate memories
-- [ ] G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
+- [x] G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
 - [x] ship the review method as a `first-principles-review` skill through the same module (user, 2026-10-06; test-first, see the skill's `tests/README.md`)
-- [ ] build torrent and thinkpad
+- [x] D4 -- the agent user gets the lessons too
+- [x] build torrent and thinkpad
 - [ ] user switches; a session in a non-dotfiles project shows the lessons in context
 
 ## Decisions (D)
@@ -144,6 +151,9 @@ wired with `home.file.".claude/CLAUDE.md".source`. import-tree only loads
 (`tcr-skill/reference.md`). Alternative: an inline `text = ''…''`, which is
 harder to read and edit.
 
+
+**ANSWERED 2026-10-06:** user 2026-10-06: as recommended
+
 ### D2 -- read-only symlink, not a writable copy
 
 Proposal: a plain `home.file` store symlink, read-only. Edits go through the
@@ -151,6 +161,9 @@ repo, which is the point of declaring it. Cost: Claude Code's in-session
 shortcuts for editing user memory (`#` / `/memory` on the user file) would fail
 on a read-only file. Alternative: an activation-time copy like the
 `settings.json` merge in the same module, which is writable but drifts.
+
+
+**ANSWERED 2026-10-06:** user 2026-10-06: as recommended
 
 ### D3 -- what happens to the duplicate memories
 
@@ -177,6 +190,19 @@ file landing. Memory went from 25 files to 11.
 The 11 remaining memories are cross-project. They are this plan's content
 once it lands.
 
+
+**ANSWERED 2026-10-06:** user 2026-10-06: as recommended
+
+### D4 -- the agent user gets the lessons too
+
+Resolves G3. The agent's `CLAUDE.md` is its orientation file plus
+`user-claude.md`, joined at build time. It's one source with no copy to
+drift. The agent does research and dotfiles work for the user, so the lessons
+apply to it.
+
+
+**ANSWERED 2026-10-06:** user 2026-10-06: as recommended
+
 ## Gotchas (G)
 
 ### G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
@@ -184,6 +210,10 @@ once it lands.
 0 bytes, dated 2026-10-04, on torrent. home-manager refuses to replace an
 unmanaged file unless it's removed or a backup extension is configured. Remove
 it right before the switch (it's empty, so nothing is lost). Check thinkpad too.
+
+2026-10-06: moot. `home-manager.backupFileExtension = "backup"`
+(`modules/profiles/default.nix`) moves the empty file aside to
+`CLAUDE.md.backup` at switch. No manual step needed.
 
 ### G2 -- Claude auto-memory is per project
 
