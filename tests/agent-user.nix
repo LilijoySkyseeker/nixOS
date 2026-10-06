@@ -23,10 +23,26 @@ pkgs.testers.runNixOSTest {
       };
       # mirror profile-pc: only wheel may talk to the nix daemon
       nix.settings.allowed-users = [ "@wheel" ];
+      # mirror torrent: iptables firewall backend
+      networking.nftables.enable = false;
+      environment.systemPackages = [ pkgs.curl ];
+    };
+
+  # a LAN host the agent must not reach (the test net is 192.168.1.0/24)
+  nodes.lan =
+    { pkgs, ... }:
+    {
+      networking.firewall.allowedTCPPorts = [ 8000 ];
+      systemd.services.http = {
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8000 --directory /etc";
+      };
     };
 
   testScript = ''
+    start_all()
     machine.wait_for_unit("multi-user.target")
+    lan.wait_for_open_port(8000)
     machine.succeed("su lilijoy -s /bin/sh -c 'echo private > /home/lilijoy/secret'")
 
     def as_agent(cmd):
@@ -61,5 +77,23 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("cat /home/lilijoy/Documents/Vault/Library/x.md"))
         listing = machine.succeed(as_agent("ls -a /home/agent/research/.."))
         assert "Library" not in listing, f"parent listing: {listing!r}"
+
+    with subtest("egress"):
+        # root still reaches the LAN; the agent uid does not
+        machine.succeed("curl --fail --max-time 5 http://lan:8000/hostname")
+        machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
+        v4 = machine.succeed("iptables -S agent-egress")
+        for net in ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"]:
+            assert f"-d {net}" in v4 and "REJECT" in v4, f"missing v4 {net}: {v4!r}"
+        v6 = machine.succeed("ip6tables -S agent-egress")
+        for net in ["fc00::/7", "fe80::/10"]:
+            assert f"-d {net}" in v6, f"missing v6 {net}: {v6!r}"
+
+    with subtest("egress survives a firewall restart without duplicating"):
+        machine.succeed("systemctl restart firewall")
+        n4 = machine.succeed("iptables -S OUTPUT | grep -c agent-egress").strip()
+        n6 = machine.succeed("ip6tables -S OUTPUT | grep -c agent-egress").strip()
+        assert n4 == "1" and n6 == "1", f"jumps after restart: v4={n4} v6={n6}"
+        machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
   '';
 }
