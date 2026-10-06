@@ -13,6 +13,7 @@
         + "\n"
         + builtins.readFile ../home-manager/claude-code/user-claude.md
       );
+      sharedSkills = ../home-manager/claude-code/skills;
       # git identity: the bot's noreply address (its public GitHub id)
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
@@ -141,6 +142,12 @@
                   # user's GitHub App and connectors)
                   deniedMcpServers = [ { serverName = "claude-code-remote"; } ];
                   disableClaudeAiConnectors = true;
+                  # no AI attribution in commits or PRs, as in the user's own settings
+                  attribution = {
+                    commit = "";
+                    pr = "";
+                    sessionUrl = false;
+                  };
                   # the built-in twins: routines and messages into the user's sessions
                   permissions.deny = [
                     "RemoteTrigger"
@@ -215,7 +222,12 @@
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
           "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentClaudeMd}"
-        ];
+          "d /home/agent/.claude/skills 0755 agent agent -"
+        ]
+        # the user's skills, from the same directory their home-manager links
+        ++ lib.mapAttrsToList (
+          name: _: "L+ /home/agent/.claude/skills/${name} - - - - ${sharedSkills}/${name}"
+        ) (builtins.readDir sharedSkills);
 
         # systemd mount + automount, not fileSystems
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
