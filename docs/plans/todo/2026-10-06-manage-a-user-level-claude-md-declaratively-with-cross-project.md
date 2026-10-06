@@ -12,9 +12,11 @@ blocked_by:
 
 ## State
 
-Todo, nothing built. A draft of the content is below under "Draft content".
-D1–D3 are proposals, not yet answered. `~/.claude/CLAUDE.md` currently exists
-on torrent as an empty, unmanaged file (G1).
+Todo, nothing built. The content is decided in principle: **only the two
+lessons**, the five steps and the doghouse check (user, 2026-10-06). See
+"Draft content, revised". D1–D3 are proposals, not yet answered.
+`~/.claude/CLAUDE.md` currently exists on torrent as an empty, unmanaged file
+(G1).
 
 ## Original plan
 
@@ -68,6 +70,37 @@ lines.
 > (undoable or public-tolerant): agents work alone, without prompts. Sensitive
 > work (secrets, private data, root, deploys, irreversible actions, acting as
 > me): only with me present. Work crosses the line only when I pull it.
+
+~~The five-lesson draft above.~~ 2026-10-06: the user named the SpaceX
+engineering rules and the doghouse as **the two most important lessons**.
+Applying step 2 to the draft deleted the other three: "problem before
+solution" is step 1 plus the doghouse check, "friction is a cost" is step 2,
+and "the agent is never me" is a design decision for the sandbox project, not
+a working lesson (it lives in `~/Projects/agenticsandbox`).
+
+### Draft content, revised
+
+> **The real goal is the work (the doghouse check).**
+> - The real goal is learning and research, a fleet that quietly serves me,
+>   and finished projects.
+> - Projects go doghouse → moonbase when the real goal isn't solid and the means
+>   becomes the goal. The builder forgot that the point was to be a good dog
+>   owner.
+> - Before adding any part, check one level above the thing being built: does
+>   this serve the work, or only the doghouse?
+> - Where the work needs nothing built, build nothing.
+>
+> **Five steps, in order (SpaceX's engineering rules):**
+> 1. **Make the requirements less dumb.** Every requirement names the person
+>    who made it, never a department or "best practice". Question it however
+>    smart the source is, Claude's own requirements included.
+> 2. **Delete the part or process.** If nothing is ever added back (~10%), too
+>    little was deleted. Give each deletion an add-back trigger.
+> 3. **Simplify and optimize** only what survived. Don't optimize what shouldn't
+>    exist.
+> 4. **Speed up the cycle.**
+> 5. **Automate last.** Automating a process that shouldn't exist is the most
+>    common mistake.
 
 Source of the reasoning: `~/Projects/agenticsandbox/` (`README.md`,
 `ENGINEERING-RULES.md`, `DECISIONS.md` D16–D21).
