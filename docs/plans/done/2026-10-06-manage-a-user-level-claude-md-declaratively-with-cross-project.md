@@ -1,8 +1,8 @@
 ---
 slug: manage-a-user-level-claude-md-declaratively-with-cross-project
 created: 2026-10-06
-status: todo
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,17 +12,17 @@ blocked_by:
 
 ## State
 
-Built on branch `plan-user-claude-md`, rebased onto master after #96–#104.
+Verified to rung 5 (a real switch, observed) on torrent, 2026-10-06: after
+#105 merged and the user switched, the two lessons loaded in a session outside
+dotfiles (user: "success, all working").
 - `~/.claude/CLAUDE.md` is a home-manager store symlink to
-  `modules/home-manager/claude-code/user-claude.md`. That file holds the two
-  core lessons, word for word from the cold-read-tested memory text.
-- The `agent` user's `CLAUDE.md` is its orientation plus the same file (D4).
-- The `first-principles-review` skill ships in the same branch.
-- The VM test pins the agent side; `nix eval` pins the user side.
-- Both hosts build.
+  `modules/home-manager/claude-code/user-claude.md`, which holds the two core
+  lessons. The `agent` user gets its orientation plus the same file (D4).
+- The `first-principles-review` skill ships through the same module.
+- The duplicate memories are deleted; `MEMORY.md` keeps one pointer to the
+  repo file (D3).
 
-Waiting on: the user switches, and a session in a non-dotfiles project shows
-the lessons. Then delete the duplicate memories (D3).
+Nothing open.
 
 ## Original plan
 
@@ -134,12 +134,12 @@ Source of the reasoning: `~/Projects/agenticsandbox/` (`README.md`,
 
 - [x] D1 -- where the content lives
 - [x] D2 -- read-only symlink, not a writable copy
-- [ ] D3 -- what happens to the duplicate memories
+- [x] D3 -- what happens to the duplicate memories
 - [x] G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
 - [x] ship the review method as a `first-principles-review` skill through the same module (user, 2026-10-06; test-first, see the skill's `tests/README.md`)
 - [x] D4 -- the agent user gets the lessons too
 - [x] build torrent and thinkpad
-- [ ] user switches; a session in a non-dotfiles project shows the lessons in context
+- [x] user switches; a session in a non-dotfiles project shows the lessons in context
 
 ## Decisions (D)
 
@@ -192,6 +192,14 @@ once it lands.
 
 
 **ANSWERED 2026-10-06:** user 2026-10-06: as recommended
+
+2026-10-06, after the user confirmed the switch: deleted
+`feedback_five_step_algorithm.md` and `feedback_doghouse_dog_owner.md` (the
+other two had already been folded in). `MEMORY.md` now says where the lessons
+live and to edit them there; the one `[[link]]` to them, in the agentic-sandbox
+project memory, points at `~/.claude/CLAUDE.md` instead.
+`~/Projects/agenticsandbox/ENGINEERING-RULES.md` names the repo file as its
+canonical source.
 
 ### D4 -- the agent user gets the lessons too
 
