@@ -1,8 +1,8 @@
 ---
 slug: replace-plan-files-with-short-handoff-notes-and-git-native-rationale
 created: 2026-10-06
-status: in-progress
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,8 +12,17 @@ blocked_by:
 
 ## State
 
-In progress: removing the plan machinery and rewriting the docs that
-point at it.
+Verified to rung 3 (ran it locally, output inspected).
+
+`verify-ladder` passes: the trimmed `gate-tests` (12 passed; a
+deliberate fail-open mutation in `lib.sh` was caught), `nix flake check
+--no-build`, and builds of all five hosts. statix/deadnix were not on
+PATH; the only .nix change is a comment. `security` review: 0 above
+INFO. `docs-updater` pass applied. `/simplify` skipped: the change is
+almost entirely deletion. Rung 4 not applicable: nothing here changes a
+host.
+
+The plan scripts are deleted in this same PR, after this file closes.
 
 ## Original plan
 
@@ -29,9 +38,9 @@ removes the system.
 
 ## Progress
 
-- [ ] D1 -- notes replace plan files
-- [ ] D2 -- remove plan-gate
-- [ ] D3 -- no global comment-density rule
+- [x] D1 -- notes replace plan files
+- [x] D2 -- remove plan-gate
+- [x] D3 -- no global comment-density rule
 
 ## Decisions (D)
 
