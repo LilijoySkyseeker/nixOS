@@ -170,6 +170,11 @@ pkgs.testers.runNixOSTest {
         cfg = machine.succeed("cat /home/agent/.claude/settings.json")
         assert '"claude-code-remote"' in cfg, f"remote tools not denied: {cfg!r}"
         assert '"disableClaudeAiConnectors": true' in cfg, f"connectors not off: {cfg!r}"
+        # the built-in twins: routines (cloud, with the user's authority) and
+        # cross-session messages into the user's sessions
+        deny = machine.succeed("jq -c .permissions.deny /home/agent/.claude/settings.json").strip()
+        for tool in ["RemoteTrigger", "SendMessage"]:
+            assert f'"{tool}"' in deny, f"{tool} not denied: {deny!r}"
         # a CLI-owned key survives the merge
         # as_agent() single-quotes its command, so write the CLI key as root
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")
