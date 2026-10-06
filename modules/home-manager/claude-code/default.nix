@@ -128,37 +128,6 @@
         '';
       };
 
-      # The tcr skill is a plain file tree, but its scripts run from whatever
-      # PATH the invoking terminal has (same problem as statusline), so each
-      # entry point is wrapped with its own deps. lib.sh is deliberately left
-      # unwrapped: the scripts `source` it, and a wrapper is an exec shim that
-      # cannot be sourced.
-      tcrSkill =
-        pkgs-unstable.runCommandLocal "claude-tcr-skill"
-          {
-            nativeBuildInputs = [ pkgs-unstable.makeWrapper ];
-          }
-          ''
-            cp -r ${./tcr-skill} $out
-            chmod -R u+w $out
-            for script in $out/scripts/tcr-*; do
-              wrapProgram "$script" --prefix PATH : ${
-                lib.makeBinPath (
-                  with pkgs-unstable;
-                  [
-                    bash
-                    coreutils
-                    git
-                    jq
-                    gnused
-                    gnugrep
-                    gawk
-                  ]
-                )
-              }
-            done
-          '';
-
       claudeDir = "${config.home.homeDirectory}/.claude";
 
       # Keys this repo owns in ~/.claude/settings.json. Anything absent here
@@ -171,18 +140,13 @@
         };
         # The tips shown next to the spinner.
         spinnerTipsEnabled = false;
-        hooks.PreToolUse = [
-          {
-            matcher = "Bash";
-            hooks = [
-              {
-                type = "command";
-                command = "${claudeDir}/skills/tcr/scripts/tcr-guard-hook";
-                timeout = 10;
-              }
-            ];
-          }
-        ];
+        # no AI attribution in commits or PRs (docs/GIT_WORKFLOW.md); sub-keys
+        # rather than `attribution = false` so older CLI versions read it too
+        attribution = {
+          commit = "";
+          pr = "";
+          sessionUrl = false;
+        };
       };
 
       jsonFormat = pkgs-unstable.formats.json { };
@@ -197,15 +161,15 @@
       home = {
         file = {
           ".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
-          ".claude/skills/tcr".source = tcrSkill;
-          # Cross-project review method (the five steps + the doghouse check);
-          # plain markdown, so no build step like tcr's.
-          ".claude/skills/first-principles-review".source = ./first-principles-review;
           # user-level instructions, loaded in every project: the two core lessons.
           # read-only by design; the agent user gets the same file appended to its own
           # plan: 2026-10-06-manage-a-user-level-claude-md-declaratively-with-cross-project.md#D2
           ".claude/CLAUDE.md".source = ./user-claude.md;
-        };
+        }
+        # every skill under ./skills; the agent user links the same directory
+        // lib.mapAttrs' (
+          name: _: lib.nameValuePair ".claude/skills/${name}" { source = ./skills + "/${name}"; }
+        ) (builtins.readDir ./skills);
 
         # Reads happen unconditionally, but every write goes through `run` so
         # that `home-manager build`/dry-run stays side-effect free - a bare
