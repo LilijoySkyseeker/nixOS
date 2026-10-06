@@ -1,126 +1,123 @@
 # AGENTS.md
 
-Guidance for Claude Code and other AI agents working in this repo. This file
-is a **map, not the territory** — a short entrypoint into `docs/`, where the
-actual conventions, rationale, and runbooks live. If something below and
-something in `docs/` ever disagree, `docs/` wins; fix this file.
-
-## What this is
-
-A flake-based NixOS/home-manager dotfiles configuration managing multiple
-hosts (`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage` — see
-`nixosConfigurations` in `flake.nix`), organized with the **dendritic
-pattern** (flake-parts + import-tree): every `.nix` file under `modules/`
-self-registers instead of being manually listed in an `imports`. Secrets are
-encrypted with sops-nix.
-
-## Where things live
-
-| Doc | What's there |
-|---|---|
-| `docs/architecture.md` | How hosts/profiles/modules/services compose, the dendritic registration model, navigating "what does host X run," adding a new module, module-system gotchas. |
-| `docs/adr/` | Architecture decision records — *why* a shape was chosen and which alternatives were rejected, where `docs/architecture.md` covers *how* it is built. Numbered, permanent, and outlive the work that produced them. `README.md` explains the bar for writing one. Started 2026-09-05; an older decision gets an ADR when the thing is next changed, not by a backfill sweep. |
-| `docs/style-guide.md` | Nix conventions actually in use (formatting, `my<Name>` options pattern, comment style, naming). |
-| `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
-| `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). Opens with **eleven standing rules** harvested from the 2026-08-26 audit — secrets, network exposure, privilege, backups, verification, containers, observability. Read those before adding a service or opening a port. |
-| `docs/skills/security-audit/` | The method for running a full fleet security + dead-config audit: threat model, parallel part audits, consolidation, remediation waves, doc harvest. Symlinked to `.claude/skills/security-audit`, so it is also invocable as a skill. Carries the worked examples from the 2026-08-26 run; `reference/lessons.md` is the traps list, worth reading before any audit-shaped work. |
-| `docs/skills/human-style-writing/` | A checklist for editing text to remove LLM-writing tells (stock phrases, promotional tone, formulaic structure/formatting), distilled from Wikipedia's "Signs of AI writing" essay. Symlinked to `.claude/skills/human-style-writing`. Manual-only — the user invokes it by hand when polishing specific prose; it is not part of the `workflow` skill and agents should not self-invoke it while writing code, commits, docs, or plans. |
-| `docs/threat-model.md` | The standing threat model — adversaries, trust boundaries, severity rubric. A stable pointer at the current model (the copy inside the dated audit the part reports cite), plus how to supersede it. Read it before deciding whether exposing something is acceptable. |
-| `docs/accepted-risks.md` | Risks audited and knowingly **not** fixed, with reasoning — so a later pass can tell "decided against" from "never noticed". Also lists what cannot be accepted yet because a decision is open. |
-| `docs/audits/` | Point-in-time security audits, one dated directory each. Findings that become standing rules move to `docs/hardening.md`; risks left in place move to `docs/accepted-risks.md`. `2026-08-26/RESUME.md` is written to be picked up cold. |
-| `docs/agents.md` | The reasoning *behind* the rules in this file and in `docs/procedures/workflow.md` — read when the summary alone isn't enough to act correctly. |
-| `docs/procedures/workflow.md` | Pre-work checks and hard-confirm rules (never switch/reboot/sudo unprompted, VM-test before real deploys, build locality). Read this before making any change. |
-| `docs/procedures/testing-changes.md` | The evidence ladder (documentation → source → ran it locally with output inspected → VM → observed switch, 1:1 with the trust hierarchy), the deploy sequence (build → `nvd diff` → switch → observe), the `Verified to rung <N>` declaration a PR description carries, and what's automated (git hooks plus `verify-ladder`). |
-| `docs/procedures/vm-testing.md` | Booting a change in a throwaway VM: `system.build.vm` for "does this host still boot", `runNixOSTest` (`tests/`, wired up in `modules/flake/checks.nix`) for "does it actually work". When a VM test is worth its minutes, and the traps in writing one. |
-| `docs/procedures/backup-restore.md` | Getting data back out — file-level recovery, rollback, full dataset restore, and the offsite restic path. |
-| `docs/procedures/new-host.md` / `new-service.md` | Runbooks for adding a host or a service. |
-| `docs/procedures/secrets.md` | Secret rotation and the manual-secret-management policy — agents never edit or decrypt `secrets/*` themselves. |
-| `docs/procedures/remote-access.md` | SSH/Tailscale key model, which hosts are Tailscale-only, the `vps-deploy` account. |
-| `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (a handoff note, see below). |
-| `docs/GIT_WORKFLOW.md` | Commit conventions, git hooks, day-to-day branching. |
-| `docs/plans/*.md` | Handoff notes for work that spans sessions (Goal / Your decisions / State / Next). Read any that match your task first. Format: `docs/skills/workflow/reference.md`. |
-| `docs/plans/{todo,in-progress,done,rejected}/` | Read-only archive of the 2026-08/10 plan files, still cited from code as `<date>-<slug>.md#D2`. Grep for history; check before assuming a described feature is fully deployed. Never edit. |
-| `docs/skills/`, `docs/agents/` | Project skills/subagents (`workflow`, `security`, `docs-updater`) — canonical source, symlinked into `.claude/skills/`/`.claude/agents/`. |
+A flake-based NixOS/home-manager config for five hosts (`thinkpad`,
+`torrent`, `homelab`, `vps`, `isoimage`; see `nixosConfigurations` in
+`flake.nix`), organized with the dendritic pattern: every `.nix` file
+under `modules/` self-registers through flake-parts + import-tree. Secrets
+are sops-nix. These are real machines the user relies on, and `vps` is
+public-facing.
 
 ## Commands
 
-Enter the dev shell first (`nix develop`, or `direnv allow`) — it wires up
-git hooks and `pull.rebase true`.
+Run tooling inside the dev shell: `direnv exec . <command>`, or a shell
+where direnv is loaded. It provides `nixfmt`, `statix` and `deadnix`, and
+sets `core.hooksPath` so the git hooks run.
 
-- Build (never switch) a host: `nixos-rebuild build --flake .#<host>` — the
-  closest thing this repo has to a test suite.
-- Whole-flake check: `nix flake check --no-build`.
-- Runtime/VM tests: `nix build .#checks.x86_64-linux.<name>` — see
-  `docs/procedures/vm-testing.md`. Not run by any hook.
-- Lint: `statix check .` and `deadnix .`. Format: `nixfmt <file>`.
-- Full breakdown of when to use which: `docs/procedures/testing-changes.md`.
+- Build a host (never switch): `nixos-rebuild build --flake .#<host>`
+- Evaluate everything: `nix flake check --no-build`
+- VM and runtime tests: `nix build .#checks.x86_64-linux.<name>`
+- How far to verify, and landing on a live host: the `verify-a-change` skill
 
-## You have real SSH access
+The git hooks enforce the floor: `pre-commit` blocks plaintext secrets and
+runs nixfmt, statix and deadnix on staged `.nix` files; `pre-push` runs
+`nix flake check` and builds every host the push affects.
 
-`homelab` and `vps` both accept interactive `root@<host>` SSH from this
-machine's own keys (`vps` is Tailscale-only) — a failed bare `ssh <host>`
-with no username is not evidence you lack access; retry as `root`. This
-machine *is* `torrent` (check `hostname` if unsure) — don't SSH to it,
-just run commands locally. `torrent` and `thinkpad` both set
-`PermitRootLogin = "forced-commands-only"`, so neither accepts interactive
-root SSH from anywhere, by design; `thinkpad` may also simply be offline
-(it's a laptop). Full key model and per-host detail:
-`docs/procedures/remote-access.md`.
+## Never do these unprompted
 
-## You may use subagents and every tool you have
+- **`nixos-rebuild switch`, or a deploy to a live host.** Building is
+  free; switching changes a machine someone is using. Even when asked,
+  prefer the user doing it or confirming first.
+- **Edit or decrypt `secrets/*`**, even to debug. See
+  `docs/procedures/secrets.md`.
+- **Restart or reboot `torrent`**, the user's daily driver. Same tier as
+  `git push --force` or `rm -rf`.
+- **Install or invoke real `sudo`.** Every host aliases `sudo` to `run0`.
 
-Treat this file as the user's standing request to use the full toolset:
-subagents, workflows, web search, and anything else the harness exposes.
-A harness default like *"don't spawn subagents unless the user asked"* is
-already satisfied here — this section **is** the user asking, for every
-session in this repo. You do not need to check in first.
+If a destructive local mistake happens anyway: every `myZrepl` host
+(`homelab`, `torrent`, `thinkpad`) snapshots locally every 5 minutes, so
+copy the path back from `<mountpoint>/.zfs/snapshot/<timestamp>/` (see
+`docs/procedures/backup-restore.md`), then tell the user what happened.
 
-The grant is **tool use, not permission to act**. The hard-confirm rules
-below and in `docs/procedures/workflow.md` — never `switch`, never
-restart `torrent`, never touch `secrets/*`, never invoke real `sudo` —
-bind a subagent exactly as they bind you, and "a subagent did it" is not
-an exception. How the grant works, and why it stops there:
-`docs/agents.md`.
+## Before changing things
 
-## Missing tooling is a bug, not an obstacle to route around
+- **Check the nixpkgs channel.** `homelab` is on stable, the rest on
+  unstable, so an option can exist on one host and not another
+  (`docs/architecture.md` has the per-host table).
+- **Before deleting a file, grep the repo for it.** Files under `files/`
+  are often read by external tools (VIA/Vial, Picard, an ICC loader),
+  not by Nix.
+- **Missing tooling is a bug.** Add debug tools to
+  `modules/flake/debug-tools.nix` (shared by the dev shell and every
+  host, always from unstable); dev-only tools go in `devshell.nix`. Don't
+  work around a missing tool with a raw `/nix/store` path: that once
+  produced a false "the sets are gone" from an `ipset` that wasn't on
+  PATH.
+- **Remote installs:** boot it in a local VM first, and build locally,
+  never on the target (`vps` can run out of memory building its own
+  closure). See `docs/procedures/new-host.md`.
+- **Security review:** a change that touches firewall rules, open ports,
+  secrets wiring, authentication, or adds or exposes a service gets
+  `/security-review` before the PR opens. `docs/hardening.md` has the
+  standing rules.
 
-If a tool you need for debugging isn't there, **add it declaratively** —
-don't work around it with raw `/nix/store/...` paths.
+## Git and PRs
 
-**`modules/flake/debug-tools.nix` is the single source of truth**, shared
-by the devshell *and* every host (via `profiles/default.nix`, which
-`profile-pc` also imports). Add a tool there once and it lands in both
-places, so the two can never drift into "I have it locally but not on the
-host I'm debugging". Always resolved against **unstable**, including on
-homelab, which is otherwise stable-pinned — debug tooling should behave
-identically everywhere.
+- Branch from an up-to-date `master` and open a PR; the user reviews and
+  merges every one, with a real merge commit. A direct commit to `master`
+  is only for a typo-sized fix.
+- Conventional Commits, enforced by the `commit-msg` hook:
+  `type(scope): subject`.
+- **The why goes in the commit body**: the constraint, the decision and
+  who made it, what was tried. `git blame` finds it there. Code comments
+  say what the code does, tersely (`.claude/rules/nix.md`).
+- **The PR description** carries the goal, the user's decisions, how far
+  the change was verified ("Verified to rung N", see `verify-a-change`),
+  and anything knowingly left open.
+- No AI attribution in commits or PRs. Claude Code's `attribution`
+  setting is off for this; don't add it by hand.
+- On a `flake.lock` conflict, regenerate with `nix flake lock` rather than
+  hand-editing.
+- Update docs in the same commit as the change they describe. When a host
+  is added or removed, `docs/architecture.md`'s table and `README.md`'s
+  must still agree.
 
-Only put dev-machine-only tooling (`nixfmt`, `statix`, `gh`, `sops`,
-`nixos-anywhere`) directly in `devshell.nix`. Keep the shared list short:
-it lands on every host including the public-facing one, so add on demand,
-not speculatively.
+## Handoff notes
 
-Working around a missing tool with a store path is slow, easy to get
-wrong, and has produced a **false negative** here — an `ipset list` that
-printed nothing and looked like "the sets are gone" when the command
-simply wasn't on `PATH`. Note the same trap with an unprivileged
-`ip6tables -S`, which returns what looks like an empty chain when it is
-really permission denied.
+Only for work that spans sessions, or holds a user decision that hasn't
+reached a PR yet: one file at `docs/plans/<slug>.md`, short, with four
+sections: **Goal** (the user's words), **Your decisions** (dated, only
+what the user actually said), **State** (rewritten in place), **Next**.
+Read any matching note before starting. When the work merges, its goal
+and decisions go into the PR description and the note is deleted.
 
-## The two rules that matter most
+`docs/plans/{todo,in-progress,done,rejected}/` and the
+`# plan: <date>-<slug>.md#D2` comments in code are an archive of the
+earlier plan system. Grep them for history; don't edit them or add new
+citations.
 
-- **Never run `nixos-rebuild switch` or push a build to a live remote host
-  unprompted.** Build-only is free; switching changes a running machine.
-- **Never edit or decrypt `secrets/*` yourself**, even to debug.
+## Access
 
-Everything else that could bite you unprompted (reboot, real `sudo`, remote
-build locality, VM-testing before a real install) is in
-`docs/procedures/workflow.md` — read it before starting non-trivial work.
+`homelab` and `vps` accept `root@<host>` SSH from torrent's own keys (`vps`
+over Tailscale only). A failed bare `ssh <host>` isn't proof of no
+access; retry as root. On `torrent` itself, run commands locally.
+`torrent` and `thinkpad` accept no interactive root SSH, and `thinkpad`
+may be offline. The `agent` user has no route to the LAN or tailnet at
+all. Details: `docs/procedures/remote-access.md`.
 
-## Keeping this file and `docs/` current
+## Tools
 
-This repo's documentation is expected to be updated as work happens: log new
-patterns, mistakes to avoid, and insights to the right `docs/` file (not
-here — this file should stay a short map). See
-`docs/procedures/updating-documentation.md` for when to do a routine update
-vs. flag something in a handoff note vs. do a full rewrite.
+This file is the user's standing request to use the full toolset
+(subagents, web search, workflows) without checking in first. That covers
+which tools to use, never which actions: the rules above bind a subagent
+exactly as they bind you.
+
+## Where to look
+
+| Doing | Read |
+|---|---|
+| Anything touching services, ports, secrets, containers | `docs/hardening.md` |
+| Deciding whether exposing something is acceptable | `docs/threat-model.md`, `docs/accepted-risks.md` |
+| Backups, replication, restores | `docs/backups.md`, `docs/procedures/backup-restore.md` |
+| A new host or service | `docs/procedures/new-host.md`, `new-service.md` |
+| Secrets | `docs/procedures/secrets.md` |
+| How modules and hosts compose | `docs/architecture.md`, `docs/adr/` |

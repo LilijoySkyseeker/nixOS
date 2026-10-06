@@ -208,5 +208,4 @@ weeks of offsite history, not two days.
   the next pull succeeds rather than reporting a conflict:
   `journalctl -u zrepl -n 50` on homelab.
 - Record what happened in the affected host's `hosts/<name>/README.md` if
-  it revealed anything worth knowing next time, per
-  `docs/procedures/updating-documentation.md`.
+  it revealed anything worth knowing next time.

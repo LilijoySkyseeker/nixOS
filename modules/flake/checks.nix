@@ -1,7 +1,7 @@
 # Integration tests, run with `nix build .#checks.x86_64-linux.<name>` or
 # all at once with `nix flake check`. These are the rung above
 # `nixos-rebuild build`: they boot real VMs, so they can catch what only
-# breaks at runtime. See docs/procedures/testing-changes.md.
+# breaks at runtime. See .claude/skills/verify-a-change/SKILL.md.
 { config, inputs, ... }:
 {
   perSystem = _: {

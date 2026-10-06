@@ -6,7 +6,7 @@ questions — pick deliberately, because the second costs minutes.
 
 This is rung 4 of the evidence ladder — above a local build with its
 output inspected, below an observed switch — see
-[`testing-changes.md`](testing-changes.md).
+[SKILL.md](SKILL.md).
 
 ## The two kinds
 
@@ -22,7 +22,7 @@ QEMU_KERNEL_PARAMS="console=ttyS0" QEMU_OPTS="-nographic -m 4096" \
 
 Answers "does this host still boot, and do its units start?" — the thing
 `nixos-rebuild build` cannot tell you. Cheap to reach for, and the
-`workflow.md` convention for a remote install or a risky activation.
+`AGENTS.md` convention for a remote install or a risky activation.
 
 It does **not** answer whether a service does its job, because the VM has
 none of the host's real state: no zpools, no sops host key, no network.

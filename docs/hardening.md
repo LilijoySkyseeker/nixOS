@@ -6,7 +6,7 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
 
 ## Standing rules
 
-Ten rules harvested from the 2026-08-26 fleet audit
+Eleven rules harvested from the 2026-08-26 fleet audit
 ([`docs/audits/2026-08-26/`](audits/2026-08-26/)). They are the classes
 of mistake that audit found **more than once** — mostly *because* this
 document did not say them. They are deliberately short and imperative;

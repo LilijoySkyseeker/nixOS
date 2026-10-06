@@ -36,7 +36,7 @@
 # failure mode is a backup that silently stops working -- which you find
 # out about when you need a restore. Delete it if zrepl is ever replaced.
 #
-# Writing or debugging one of these: docs/procedures/vm-testing.md.
+# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   zreplModule,
