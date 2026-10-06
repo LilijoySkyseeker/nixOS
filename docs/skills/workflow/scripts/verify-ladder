@@ -1,95 +1,32 @@
 #!/usr/bin/env bash
-# verify-ladder -- docs/procedures/testing-changes.md's lint gate plus
-# the mechanical half of its rung 3 (eval, targeted build). Passing does
-# not reach rung 3, which is earned by reading the output. Wired in as a
-# hard gate in the `workflow` skill's own step sequence instead of left to
-# memory. Hard-blocks on gate-tests, a working-tree edit to a frozen plan,
-# nixfmt --check, nix flake check, a targeted nixos-rebuild build, and
-# statix/deadnix -- but only for *newly introduced* warnings (line falls
-# inside the actual diff), never pre-existing debt elsewhere in a touched
-# file; linting a whole file over a one-line edit would otherwise block on
-# unrelated history. plan-citations and plan-lint run warn-only
-# (2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D4).
-# Requires jq for the diff-scoped precision; falls back to
-# informational-only if jq is missing.
-# Independent of the tabled vm-testing question -- never VM-boots or
+# verify-ladder -- docs/procedures/testing-changes.md's lint gate plus the
+# mechanical half of its rung 3 (eval, targeted build). Passing does not
+# reach rung 3, which is earned by reading the output. Blocks on
+# gate-tests, nixfmt --check, nix flake check, a targeted nixos-rebuild
+# build, and statix/deadnix issues on changed lines only (pre-existing
+# debt elsewhere in a touched file never blocks). Needs jq for the
+# diff-scoping; without it lint is informational. Never VM-boots or
 # switches anything.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=../../plan/scripts/lib.sh
-. "$SCRIPT_DIR/../../plan/scripts/lib.sh"
-root="$(plan_repo_root)" || exit 1
-cd "$root" || plan_die "cannot cd to repo root"
+# shellcheck source=lib.sh
+. "$SCRIPT_DIR/lib.sh"
+root="$(wf_repo_root)" || exit 1
+cd "$root" || wf_die "cannot cd to repo root"
 
 fail=0
-# Untracked included (see plan_worktree_files): a brand-new module was
-# obliging review from required-agents while skipping nixfmt/statix/
-# deadnix here entirely. Deleted-but-not-yet-committed paths are dropped
-# -- the linters below take filenames and would block on a legitimate
-# deletion. The targeted-build set further down keeps them, because a
-# deleted module still has to rebuild.
-changed_nix="$(plan_worktree_files '*.nix' | plan_existing_files)" || {
+# untracked included, staged deletions dropped (the linters take filenames)
+changed_nix="$(wf_worktree_files '*.nix' | wf_existing_files)" || {
   echo "BLOCKED: cannot list working-tree changes; refusing to lint an empty set." >&2
   exit 1
 }
 
-echo "== plan-citations (warn-only) =="
-# Cheap (one awk pass over the working tree's code and docs, tracked and
-# untracked), so it runs on every pass rather than only when a plan file
-# changed: a citation breaks from the *target* side -- a renamed plan or
-# a retyped id -- and that edit need not touch the file doing the citing.
-# Warns, never blocks: a dangling citation in a personal knowledge base is
-# a broken link, not a build failure.
-# plan: 2026-09-09-dismantle-the-blocking-gate-tier-and-keep-the-plan-corpus.md#D4
-if ! "$SCRIPT_DIR/../../plan/scripts/plan-citations"; then
-  echo "WARNING: broken plan citation(s) above. Fix the citation, or wrap a deliberate example in the plan-citations ignore markers." >&2
-fi
-
 echo "== gate-tests =="
-# The gates' own failure-mode tests, run unconditionally for the same
-# reason plan-citations is: a gate breaks from the *library* side, so the
-# edit that breaks it need not touch the script being tested. ~2.1s, no
-# network, scratch repos under TMPDIR.
-# plan: 2026-09-06-harden-the-workflow-system-against-the-failure-classes-it-exposed.md#G2
-#
-# Called directly even though `checks.gate-tests` now runs the same suite.
-# That is not a double run: the flake-check step below passes --no-build,
-# which nix documents as "Do not build checks" -- it evaluates them and
-# stops. Drop this call and nothing runs the suite before a commit.
-# plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F46
+# called directly: the flake check below passes --no-build, which does not
+# run checks.gate-tests
 if ! "$SCRIPT_DIR/../../../../scripts/gate-tests"; then
-  echo "BLOCKED: a gate script no longer fails where it must, or no longer passes an honest sequence. See above." >&2
+  echo "BLOCKED: a gate script no longer fails where it must. See above." >&2
   fail=1
-fi
-
-echo "== frozen plans =="
-# Folder is the authority (see plan_folder_frozen): a working-tree edit to
-# anything under done/ or rejected/ is flagged here so it surfaces before
-# the commit-time hook refuses it. Tracked changes only -- an untracked
-# file under done/ is an addition, which freezing allows.
-frozen_dirty="$(git -c core.quotePath=false diff --no-renames --name-only --diff-filter=MDT HEAD -- 'docs/plans/done/*.md' 'docs/plans/rejected/*.md')"
-if [ -n "$frozen_dirty" ]; then
-  echo "BLOCKED: frozen plan(s) modified in the working tree -- new information becomes a new plan file that cites them:" >&2
-  echo "$frozen_dirty" >&2
-  fail=1
-else
-  echo "(no frozen plan modified)"
-fi
-
-echo "== plan-lint (active plan, warn-only) =="
-# The active plan only. Warns, never blocks: the D/G/F structure is the
-# house convention, not a gate, per the dismantle plan's refined D5.
-if active_plan="$(plan_active_plan)"; then
-  if ! "$SCRIPT_DIR/../../plan/scripts/plan-lint" "$active_plan"; then
-    echo "WARNING: the active plan has lint problems. See above." >&2
-  fi
-elif marker_problem="$(plan_active_plan_problem)"; [ -n "$marker_problem" ]; then
-  # A marker naming nothing usable is not the same as no marker, and
-  # plan_active_plan returns 1 for both.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F10
-  echo "WARNING: $marker_problem. Fix or remove the marker." >&2
-else
-  echo "(no active plan this session)"
 fi
 
 echo "== nixfmt --check =="
@@ -190,7 +127,7 @@ fi
 # mid-session before a commit even exists. Untracked included, same as
 # the lint set above -- a brand-new hosts/ or modules/ file must trigger
 # a build too, not just linting.
-changed_all="$(plan_worktree_files hosts/ modules/ files/ flake.nix flake.lock)" || {
+changed_all="$(wf_worktree_files hosts/ modules/ files/ flake.nix flake.lock)" || {
   echo "BLOCKED: cannot list working-tree changes; refusing to skip the targeted build." >&2
   exit 1
 }
@@ -201,7 +138,6 @@ if [ -n "$changed_all" ]; then
   # listed path is a trigger, and any line outside hosts/ (modules/,
   # files/, flake.*) affects all hosts. Same logic as .githooks/pre-push,
   # deliberately -- the two build gates must not diverge
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
   if printf '%s\n' "$changed_all" | grep -qv '^hosts/'; then
     global=1
   else

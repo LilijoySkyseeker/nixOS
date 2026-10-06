@@ -19,27 +19,28 @@ encrypted with sops-nix.
 | Doc | What's there |
 |---|---|
 | `docs/architecture.md` | How hosts/profiles/modules/services compose, the dendritic registration model, navigating "what does host X run," adding a new module, module-system gotchas. |
-| `docs/adr/` | Architecture decision records — *why* a shape was chosen and which alternatives were rejected, where `docs/architecture.md` covers *how* it is built. Numbered, permanent, and outlive the plan that produced them. `README.md` explains the ADR-vs-plan-file split and the bar for writing one. Started 2026-09-05; an older decision gets an ADR when the thing is next changed, not by a backfill sweep. |
+| `docs/adr/` | Architecture decision records — *why* a shape was chosen and which alternatives were rejected, where `docs/architecture.md` covers *how* it is built. Numbered, permanent, and outlive the work that produced them. `README.md` explains the bar for writing one. Started 2026-09-05; an older decision gets an ADR when the thing is next changed, not by a backfill sweep. |
 | `docs/style-guide.md` | Nix conventions actually in use (formatting, `my<Name>` options pattern, comment style, naming). |
 | `docs/backups.md` | ZFS snapshotting and replication (zrepl): roles the shared module exposes, retention presets, the pruning/transport behaviours that are easy to get wrong, and what happens when a host is offline. |
 | `docs/hardening.md` | Security-hardening conventions (sudo/run0, dedicated service users, systemd sandboxing, SSH lockdown, swap, rate-limiting). Opens with **eleven standing rules** harvested from the 2026-08-26 audit — secrets, network exposure, privilege, backups, verification, containers, observability. Read those before adding a service or opening a port. |
 | `docs/skills/security-audit/` | The method for running a full fleet security + dead-config audit: threat model, parallel part audits, consolidation, remediation waves, doc harvest. Symlinked to `.claude/skills/security-audit`, so it is also invocable as a skill. Carries the worked examples from the 2026-08-26 run; `reference/lessons.md` is the traps list, worth reading before any audit-shaped work. |
-| `docs/skills/human-style-writing/` | A checklist for editing text to remove LLM-writing tells (stock phrases, promotional tone, formulaic structure/formatting), distilled from Wikipedia's "Signs of AI writing" essay. Symlinked to `.claude/skills/human-style-writing`. Manual-only — the user invokes it by hand when polishing specific prose; it is not part of the workflow gate and agents should not self-invoke it while writing code, commits, docs, or plans. |
+| `docs/skills/human-style-writing/` | A checklist for editing text to remove LLM-writing tells (stock phrases, promotional tone, formulaic structure/formatting), distilled from Wikipedia's "Signs of AI writing" essay. Symlinked to `.claude/skills/human-style-writing`. Manual-only — the user invokes it by hand when polishing specific prose; it is not part of the `workflow` skill and agents should not self-invoke it while writing code, commits, docs, or plans. |
 | `docs/threat-model.md` | The standing threat model — adversaries, trust boundaries, severity rubric. A stable pointer at the current model (the copy inside the dated audit the part reports cite), plus how to supersede it. Read it before deciding whether exposing something is acceptable. |
 | `docs/accepted-risks.md` | Risks audited and knowingly **not** fixed, with reasoning — so a later pass can tell "decided against" from "never noticed". Also lists what cannot be accepted yet because a decision is open. |
 | `docs/audits/` | Point-in-time security audits, one dated directory each. Findings that become standing rules move to `docs/hardening.md`; risks left in place move to `docs/accepted-risks.md`. `2026-08-26/RESUME.md` is written to be picked up cold. |
 | `docs/agents.md` | The reasoning *behind* the rules in this file and in `docs/procedures/workflow.md` — read when the summary alone isn't enough to act correctly. |
 | `docs/procedures/workflow.md` | Pre-work checks and hard-confirm rules (never switch/reboot/sudo unprompted, VM-test before real deploys, build locality). Read this before making any change. |
-| `docs/procedures/testing-changes.md` | The evidence ladder (documentation → source → ran it locally with output inspected → VM → observed switch, 1:1 with the trust hierarchy), the deploy sequence (build → `nvd diff` → switch → observe), the `Verified to rung <N>` declaration `plan-move ... done` and `plan-freeze` require in a plan's `## State`, and what's automated (git hooks plus `verify-ladder`). |
+| `docs/procedures/testing-changes.md` | The evidence ladder (documentation → source → ran it locally with output inspected → VM → observed switch, 1:1 with the trust hierarchy), the deploy sequence (build → `nvd diff` → switch → observe), the `Verified to rung <N>` declaration a PR description carries, and what's automated (git hooks plus `verify-ladder`). |
 | `docs/procedures/vm-testing.md` | Booting a change in a throwaway VM: `system.build.vm` for "does this host still boot", `runNixOSTest` (`tests/`, wired up in `modules/flake/checks.nix`) for "does it actually work". When a VM test is worth its minutes, and the traps in writing one. |
 | `docs/procedures/backup-restore.md` | Getting data back out — file-level recovery, rollback, full dataset restore, and the offsite restic path. |
 | `docs/procedures/new-host.md` / `new-service.md` | Runbooks for adding a host or a service. |
 | `docs/procedures/secrets.md` | Secret rotation and the manual-secret-management policy — agents never edit or decrypt `secrets/*` themselves. |
 | `docs/procedures/remote-access.md` | SSH/Tailscale key model, which hosts are Tailscale-only, the `vps-deploy` account. |
-| `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (`plan-new`, see below). |
+| `docs/procedures/updating-documentation.md` | Keeping this documentation itself in sync; where to log issues you spot but don't fix (a handoff note, see below). |
 | `docs/GIT_WORKFLOW.md` | Commit conventions, git hooks, day-to-day branching. |
-| `docs/plans/{todo,in-progress,done,rejected}/` | Per-task plan files — decisions, gotchas, findings, citeable by bare filename. Check before assuming a described feature is fully deployed. Mechanics: `docs/skills/plan/SKILL.md`. |
-| `docs/skills/`, `docs/agents/` | Project skills/subagents (`plan`, `workflow`, `security`, `docs-updater`) — canonical source, symlinked into `.claude/skills/`/`.claude/agents/`. |
+| `docs/plans/*.md` | Handoff notes for work that spans sessions (Goal / Your decisions / State / Next). Read any that match your task first. Format: `docs/skills/workflow/reference.md`. |
+| `docs/plans/{todo,in-progress,done,rejected}/` | Read-only archive of the 2026-08/10 plan files, still cited from code as `<date>-<slug>.md#D2`. Grep for history; check before assuming a described feature is fully deployed. Never edit. |
+| `docs/skills/`, `docs/agents/` | Project skills/subagents (`workflow`, `security`, `docs-updater`) — canonical source, symlinked into `.claude/skills/`/`.claude/agents/`. |
 
 ## Commands
 
@@ -122,4 +123,4 @@ This repo's documentation is expected to be updated as work happens: log new
 patterns, mistakes to avoid, and insights to the right `docs/` file (not
 here — this file should stay a short map). See
 `docs/procedures/updating-documentation.md` for when to do a routine update
-vs. flag something with `plan-new` vs. do a full rewrite.
+vs. flag something in a handoff note vs. do a full rewrite.

@@ -1,6 +1,6 @@
 ---
 name: docs-updater
-description: After a change lands, independently verify and tighten touched docs and code comments to match shipped behavior and docs/style-guide.md's shape, moving agent "why"-reasoning into the plan file instead. Invoke once the code-level work in a task is otherwise done, for anything that touched a doc, a comment, or a config surface a doc describes.
+description: After a change lands, independently verify and tighten touched docs and code comments to match shipped behavior and docs/style-guide.md's shape, handing any "why"-reasoning it removes back to the caller for the commit message. Invoke once the code-level work in a task is otherwise done, for anything that touched a doc, a comment, or a config surface a doc describes.
 tools: Read, Grep, Glob, Edit, Bash
 ---
 
@@ -12,13 +12,9 @@ the repo, not against what the main agent believes it did.
 ## Before anything else
 
 1. Read `docs/style-guide.md` for this repo's comment/doc conventions.
-2. Find the active plan file: `cat .claude/.active-plan` (repo root) gives
-   its path. If that file doesn't exist, or is frozen -- meaning it sits
-   under `docs/plans/done/` or `docs/plans/rejected/`; the folder is the
-   authority, not the `frozen:` field -- stop and report that rather than
-   guessing where findings should go.
-3. Find what actually changed: `git diff HEAD --stat` and `git diff
-   --cached --stat` (working tree + staged, combined against HEAD).
+2. Find what actually changed: `git diff HEAD --stat`, `git diff
+   --cached --stat` and `git status --short` (working tree, staged and
+   untracked, against HEAD).
 
 ## Host Inventory freshness
 
@@ -35,69 +31,40 @@ in place of a separate pre-commit hook or `nix flake check` derivation —
 do this on every pass where a host's config changed, not just when the
 diff already touched that host's README directly. If `scripts/doc-host.sh`
 itself fails (e.g. a new upstream nixpkgs compat-shim `abort` case it
-doesn't already exclude), report that as an `F<N>` finding rather than
+doesn't already exclude), report that rather than
 leaving the block stale.
 
 ## What to check, for every doc or comment touched by the diff
 
 - **Accuracy**: does it describe current behavior, not a stale prior
   state? Cross-check against the actual code it documents, not against
-  the diff's commit message or the main agent's stated intent.
-- **Brevity/register/concision**: per `docs/style-guide.md`'s Inline
-  Comments section, is it one terse, lowercase fragment (no terminal
-  period) naming what the code is/does, one line per branch for
-  multi-line scripts? Multi-sentence "why"/alternatives-considered prose,
-  an agent's reasoning process, padding, hedging, or a multi-clause
-  sentence that restates what an already-clear identifier says all fail
-  this check, whether or not the comment is otherwise accurate.
-- **Citation form**: if a comment or doc already cites a plan file, is it
-  the correct bare-filename+anchor form (`<date>-<slug>.md#D3`), not a
-  folder path?
+  the main agent's stated intent.
+- **Brevity**: per `docs/style-guide.md`, is a comment a terse,
+  lowercase fragment naming what the code is or does, plus at most a
+  line or two of constraint where the code would otherwise look wrong?
+  History, review narrative, alternatives considered, hedging, plan ids,
+  or restating what a clear identifier already says all fail this check,
+  however accurate.
 
 ## What to do about what you find
 
-If you find prose reasoning that belongs in the plan instead of a comment
-or doc:
-1. Move the reasoning, verbatim, into the active plan file's `## Findings
-   (F)` section as a new `### F<N>` entry (`<N>` = next unused number in
-   that file — check existing `### F` headings first). Cite the exact
-   file:line the reasoning came from.
-2. Replace the original comment/doc prose with a short, technical
-   one-liner plus a citation pointer to the `F<N>` entry you just added:
-   `// plan: <date>-<slug>.md#F<N>` (or the doc-appropriate equivalent).
-3. Do not invent a citation to a plan file or anchor that doesn't exist.
+- **Stale doc**: fix it directly.
+- **Comment carrying reasoning**: cut it to the style-guide shape. Hand
+  the reasoning you removed back to the main agent, verbatim and with
+  its file:line, so it can go into the commit message. Don't drop it
+  silently.
+- **Padding with no real why-content**: just rewrite it.
+- **Ambiguous** (unclear whether text is reasoning to move or real
+  technical content), or needs a decision only the user can make:
+  leave it and report it. Don't pick an interpretation silently.
+- Never edit anything under `docs/plans/{todo,in-progress,done,rejected}/`
+  (the archive), and don't add new `# plan:` citations. Existing ones
+  may stay.
 
-If you find a doc that's simply stale (describes removed/renamed
-behavior), fix it directly and record what you changed and why as an
-`F<N>` entry in the plan -- the fix itself stays in the doc; the "why it
-was wrong" belongs in the plan.
+## When you're done
 
-If a comment fails the Brevity/register/concision check above but carries
-no real why-content to move to the plan (it's just padding, hedging, or
-restating the obvious), rewrite it directly to that shape -- no plan
-finding needed, this is style tightening, not a policy or accuracy
-correction.
-
-## Findings you can't or shouldn't fix yourself
-
-If something is ambiguous (unclear whether text is "reasoning that should
-move" vs. legitimate technical content) or requires a decision only the
-user can make, record it as an `F<N>` finding describing the ambiguity --
-do not silently pick an interpretation and rewrite past it.
-
-## Rubric (what "done" means for this pass)
-
-- Every doc/comment touched by this task's diff reflects current behavior.
-- Every doc/comment touched by this task's diff passes the
-  Brevity/register/concision check above -- no leftover why-prose that
-  should have moved to the plan, no restating-the-obvious padding.
-- Every host whose config changed in this diff has had
-  `scripts/doc-host.sh <host>` re-run, so its README's Host Inventory
-  block matches current config.
-- `AGENTS.md`'s docs table and `docs/procedures/updating-documentation.md`
-  are consulted if the change is structural enough to require an update
-  there.
-- Every new plan citation you write uses the bare-filename+anchor form.
-- You never edit a frozen plan file, even to add a finding -- report the
-  problem instead if you believe one needs updating. Frozen means residing
-  under `docs/plans/done/` or `docs/plans/rejected/` (ADR-0002).
+Report back to the main agent: what you changed, the reasoning you moved
+out of comments (for the commit message), and anything ambiguous you
+left. Also check whether `AGENTS.md`'s docs table or
+`docs/procedures/updating-documentation.md` needs updating if the change
+was structural.

@@ -9,7 +9,7 @@ settled trade-off from scratch.
 place on purpose. Each entry names what the exposure actually is, why it
 is accepted, what would change the answer, and where the evidence lives.
 
-**What does not.** Work that is merely *deferred* (that is a plan file via `plan-new`),
+**What does not.** Work that is merely *deferred* (that is a handoff note in `docs/plans/`),
 a decision nobody has made yet (that is
 [`audits/2026-08-26/user-actions.md`](audits/2026-08-26/user-actions.md)
 §4), or a rule everyone should follow (that is
@@ -19,7 +19,8 @@ a decision nobody has made yet (that is
 run as `lilijoy`. That is a same-uid problem the agent-separation work is
 meant to remove: the agent's own Unix user, plus the "your place"
 hardening, both in `~/Projects/agenticsandbox`. Leave such a finding
-**open** in its plan with a dated note naming which of those fixes it.
+**open** (in the PR description or a handoff note) with a dated note
+naming which of those fixes it.
 Don't record it here, and don't offer "accept" as the recommended option.
 (User, 2026-10-05; first applied to OpenRig F1/F3/F6/F7 in
 `2026-10-05-package-openrig-and-add-it-to-the-pc-profile.md#D4`.)
@@ -153,6 +154,8 @@ review) is now a step of
 Stale since 2026-08-28: `.github/workflows/plan-gate.yml` exists, so "no
 workflow file has ever existed" no longer holds. It runs on `pull_request`
 and holds no credential, so the posture the acceptance protects is intact.
+2026-10-06: `plan-gate.yml` removed with the plan-file system; the repo has
+no workflow file again.
 
 ### AR-6 — ~~The NFS shares are `nosuid,nodev` but not `noexec`~~
 

@@ -4,20 +4,13 @@ Sequentially numbered, permanent records of decisions that shaped the
 fleet's architecture: `NNNN-slug.md`, numbered by scanning for the highest
 existing number and incrementing.
 
-## ADRs vs plan files
+## ADRs vs commit messages
 
-They answer different questions and neither replaces the other.
-
-- A **plan file** (`docs/plans/`, see the `plan` skill) tracks *a piece of
-  work*: what is being done, what is still open, what was found along the
-  way. It moves `todo` → `in-progress` → `done` and freezes.
-- An **ADR** records *a decision that outlives the work that produced it*.
-  It stays where a reader looking at the architecture will find it, rather
-  than being buried in a completed plan nobody re-reads.
-
-When a plan produces a durable architectural decision, the ADR states the
-decision and the plan cites it. Do not restate an ADR's content in the
-plan — cite it, the same way plan files are cited by bare filename.
+A **commit message** (and its PR) records why *a change* was made. An
+**ADR** records *a decision that outlives the work that produced it*, where
+a reader looking at the architecture will find it rather than having to
+dig through history. When a PR makes a durable architectural decision,
+write the ADR in the same PR.
 
 ## When to write one
 

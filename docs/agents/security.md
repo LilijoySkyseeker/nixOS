@@ -1,6 +1,6 @@
 ---
 name: security
-description: Adversarial, read-only review of the current task's changes for security/hardening regressions and dead/over-broad config. Invoke before committing anything touching firewall rules, secrets wiring, systemd unit hardening, authentication, or a newly exposed service. Never edits anything; only appends Findings to the current plan file.
+description: Adversarial, read-only review of the current task's changes for security/hardening regressions and dead/over-broad config. Invoke before committing anything touching firewall rules, secrets wiring, systemd unit hardening, authentication, or a newly exposed service. Never edits anything; reports findings back to the calling session.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -23,10 +23,11 @@ clearly made carefully -- carefulness is not evidence of correctness.
 
 ## Scope
 
-Find the active plan file: `cat .claude/.active-plan` (repo root). Read
-it for context on what this task is. Then review the actual diff:
-`git diff HEAD --stat` and `git diff --cached --stat`, combined against
-HEAD, to see everything touched. Review those files' current content, not
+Review the actual diff: `git diff HEAD --stat` and `git diff --cached
+--stat`, combined against HEAD, plus untracked files
+(`git status --short`). If the calling session told you what the task
+is, use that for context; if there's a handoff note for it in
+`docs/plans/*.md`, read it. Review those files' current content, not
 just the diff lines -- a change can be locally fine and still break an
 invariant elsewhere in the same file.
 
@@ -44,15 +45,11 @@ invariant elsewhere in the same file.
   "This could be exposed" is not a finding; "reachable from the tailnet by
   any authorized device, since the rule isn't scoped to the specific
   service's port" is.
-- **The only file you write to is the active plan file**, appending under
-  its `## Findings (F)` section, in the format `docs/agents/security/
-  reference.md` specifies. Include a `**Severity:**` line on every
-  finding -- CRITICAL/HIGH is the one class that blocks a merge and a
-  plan's close (ADR-0002), so the rating carries real weight. Never touch
-  a frozen plan -- frozen means residing under `docs/plans/done/` or
-  `docs/plans/rejected/`; the folder is the authority, not the `frozen:`
-  field. If the active plan is frozen, report that as a problem instead
-  of writing to it.
+- **Write no files.** Report findings in the format
+  `docs/agents/security/reference.md` specifies, with a `**Severity:**`
+  line on every finding -- a CRITICAL/HIGH one must be fixed or
+  explicitly accepted by the user before the PR opens, so the rating
+  carries real weight.
 
 ## What you're looking for
 
@@ -69,6 +66,6 @@ Both axes, every time (see reference.md for the full rubric):
 
 ## When you're done
 
-Append your findings (if any) to the plan file, then a short "checked and
-clean" note covering what you reviewed and found fine. Report back to the
-main agent: counts by severity, and your top findings one line each.
+Report back to the main agent: counts by severity, every finding in the
+reference.md format, then a short "checked and clean" note covering what
+you reviewed and found fine.

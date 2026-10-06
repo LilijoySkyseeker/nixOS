@@ -22,7 +22,7 @@ Update docs in the same commit as the code change, not as a follow-up:
 - **Changed a host's services, packages, containers, storage, firewall,
   timers, users, or secrets** — re-run `scripts/doc-host.sh <host>` to
   refresh that README's machine-generated "Host Inventory" block. Outside
-  the `workflow` skill's gate (e.g. a manual edit), this is still on
+  the `workflow` skill (e.g. a manual edit), this is still on
   discipline; inside it, the `docs-updater` subagent checks and refreshes
   this block itself as part of its normal pass — see
   `docs/agents/docs-updater.md`. Decided in
@@ -40,8 +40,8 @@ Update docs in the same commit as the code change, not as a follow-up:
   if different pieces of the change need different rationale.
 - **Discovered a stale reference** (a folder, file, or command that no
   longer exists but is still described somewhere) — fix it immediately if
-  it's a one-line change; if it's bigger, log it with `plan-new` rather than
-  leaving it.
+  it's a one-line change; if it's bigger, write a handoff note for it
+  (`docs/plans/<slug>.md`) rather than leaving it.
 
 If a change doesn't fall into any of the above, it probably doesn't need a
 doc update. Don't pad a doc to have something to show.
@@ -71,9 +71,10 @@ them.
 
 Whenever a documentation issue is *noticed* but isn't being fixed right
 now — spotted mid-task, out of scope for the current change, or too large
-to fix inline — run `plan-new` immediately, the same session it was found
-in (see `docs/skills/plan/SKILL.md`). Don't rely on memory or a mental
-note. Include:
+to fix inline — write a handoff note at `docs/plans/<slug>.md`
+immediately, the same session it was found in (format:
+`docs/skills/workflow/reference.md`, "Handoff notes"). Don't rely on
+memory or a mental note. Include:
 
 - What's stale or wrong, and where (file + what it currently says).
 - What triggered noticing it (what you were actually doing when you found
@@ -97,9 +98,9 @@ no fixed schedule; do this opportunistically when:
 
 The check itself: re-read the doc against the current
 `modules/flake/hosts.nix`/`hosts/*/configuration.nix`/`modules/profiles/*.nix`,
-and fix whatever's drifted. Log what was found and fixed with `plan-new` if
-it was non-trivial, so there's a record of when the last audit happened and
-what it caught.
+and fix whatever's drifted. Say what was found and fixed in the commit
+message, so `git log` records when the last audit happened and what it
+caught.
 
 ## After a big refactor
 
@@ -130,6 +131,6 @@ properly:
    renamed by the refactor.
 5. **Update the root `README.md`'s Hosts table and Layout section** if the
    refactor changed either.
-6. **Log the rewrite with `plan-new`** so there's a dated record of when the
-   docs were last brought back in sync with a structural change, for the
-   next person (or the next refactor) to check against.
+6. **Describe the rewrite in the commit message** so there's a dated record
+   of when the docs were last brought back in sync with a structural
+   change, for the next person (or the next refactor) to check against.

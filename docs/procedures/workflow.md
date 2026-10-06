@@ -36,12 +36,11 @@ least to most trusted: **documentation → source code → local build → VM
 testing → an actual switch on a real host.**
 
 Canonical statement — the full ladder, its "not declarative and
-reproducible is no fix at all" corollary, and how it gates a plan's
-close-out — lives in `docs/skills/workflow/reference.md`'s Trust hierarchy
-section, since that's what the `workflow` skill's step sequence applies
-directly when deciding a plan is actually done. The rationale for why it's
-ordered this way is in `docs/agents.md`; the concrete commands behind each
-rung are in `docs/procedures/testing-changes.md`.
+reproducible is no fix at all" corollary — lives in
+`docs/skills/workflow/reference.md`'s Trust hierarchy section. The
+rationale for why it's ordered this way is in `docs/agents.md`; the
+concrete commands behind each rung are in
+`docs/procedures/testing-changes.md`.
 
 ## Hard-confirm actions — don't do these unprompted
 
@@ -107,7 +106,8 @@ about destructive commands.
 ## Documentation hygiene
 
 Noticed a documentation issue you're not fixing right now (spotted
-mid-task, out of scope, or too big to fix inline)? Run `plan-new`
-immediately, in the same session — don't leave it to memory. See
+mid-task, out of scope, or too big to fix inline)? Write a handoff note
+(`docs/plans/<slug>.md`) immediately, in the same session — don't leave
+it to memory. See
 `docs/procedures/updating-documentation.md`'s "Flag issues immediately"
 section for what to include.
