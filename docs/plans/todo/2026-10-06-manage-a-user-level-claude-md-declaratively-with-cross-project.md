@@ -102,6 +102,25 @@ a working lesson (it lives in `~/Projects/agenticsandbox`).
 > 5. **Automate last.** Automating a process that shouldn't exist is the most
 >    common mistake.
 
+~~"Draft content, revised" above.~~ 2026-10-06: superseded after two
+cold-read tests. A fresh agent was given only the two lessons and five
+scenarios (an explicit small edit, a process-heavy request, an annoying
+existing repo rule, a design task, reviewing someone else's design).
+- **Round 1:** "mostly". It might delete or skip repo rules unprompted,
+  second-guess explicit requests, and read "automate last" as "make backups
+  manual".
+- **Round 2,** after scope and limits were added (deleting means proposing;
+  repo rules and explicit requests still bind; automating process vs. the
+  deliverable): every scenario was handled correctly. The last one-line gaps
+  were then fixed ("once per task"; untraced requirements are still followed;
+  "hard boundary" isn't a reason to add a control; others' projects use their
+  own goal).
+
+**The content is now the bodies of the two memory files**
+(`feedback_five_step_algorithm.md`, `feedback_doghouse_dog_owner.md`), without
+frontmatter and `[[links]]`. Copy them at implementation time; don't maintain a
+second draft here. Re-run the cold-read check if they change.
+
 Source of the reasoning: `~/Projects/agenticsandbox/` (`README.md`,
 `ENGINEERING-RULES.md`, `DECISIONS.md` D16–D21).
 
