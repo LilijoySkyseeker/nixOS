@@ -1,8 +1,8 @@
 ---
 slug: build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable
 created: 2026-10-06
-status: todo
-frozen: false
+status: done
+frozen: true
 kind: task
 priority: normal
 blocked_by:
@@ -12,23 +12,34 @@ blocked_by:
 
 ## State
 
-Tasks 1–5 are built on branch `agent-place`, and everything passes: one VM
-test with 6 subtests, a build of both hosts, and `nix flake check`.
-- **Review fix pass done.** The security review found F1–F8; the whole-branch
-  review confirmed F1 and F2 in a VM and added F9 and F10.
-  - **Fixed**, each with a test that failed first: F1, F2, F3, F4, F5, F8, F9
-    and F10.
-  - **Open, low:** F6 (bindfs symlinks and modes) and F7 (snapdirs, routed to
-    the existing snapdir plan).
-- **Docs pass done.** Comment rationale moved here (F11). The new principal
-  is now in `docs/hardening.md`, `docs/architecture.md`,
-  `docs/threat-model.md` and `hosts/torrent/README.md` (F12).
-- **Not built yet:** Task 6, the user's part. Switch, then the one-time steps,
-  starting with creating `Vault/Research`.
-- **Not verified:** whether the sandboxed service runs the real `claude` on
-  torrent. The VM can't log in. If the unit fails after the first-run step,
-  check `journalctl -u claude-remote-control` for an `EROFS` caused by
-  `ProtectSystem=strict`.
+Verified to rung 5 (a real switch, observed) on torrent, 2026-10-06. The user
+switched to #96, #98, #99 and #100 and ran Task 6 end to end.
+- **The service runs under the sandbox:** task and memory limits in force,
+  sessions spawned with `bypassPermissions`.
+- **A phone session:**
+  - runs as `agent`, in group `agent` only;
+  - sees only `~/research`, and a note written there showed up in Obsidian;
+  - is refused on the LAN router.
+- **The dotfiles PR came from the bot (#97):** a direct push to `master` was
+  refused, and so was the bot merging its own PR.
+- **A side-project push worked.**
+- **No MCP servers:** connectors are off, and `claude-code-remote` is blocked
+  (F13).
+- **`RemoteTrigger` and `SendMessage` are unavailable.**
+- **Trusted Devices is on.**
+
+**Open, LOW:** F6 (bindfs symlinks and modes; trigger: a vault consumer that
+executes or follows files) and F7 (snapdirs, belongs to the existing snapdir
+plan).
+
+**Accepted, unchanged:** the agent can read its own full-scope token (T4).
+The done-check found no use of it outside the harness; the `schedule` skill's
+environment list was filled in by Claude Code itself. Add-back trigger for
+credential protection: evidence of the agent using the token by hand, or the
+token gaining more reach.
+
+**Next:** make the setup reproducible. The `agent-setup` script is in
+`~/Projects/agenticsandbox/notes/stage-1-agents-place.md`.
 
 ## Original plan
 
@@ -298,7 +309,7 @@ them in this order:
 - [x] Task 3 -- egress chain
 - [x] Task 4 -- the Remote Control service
 - [x] Task 5 -- wire into torrent, build, docs, security, PR
-- [ ] Task 6 -- the user switches and does the one-time steps
+- [x] Task 6 -- the user switches and does the one-time steps
 - [x] D2 -- add back a minimal agent `CLAUDE.md`, and drop the unused `~/repos`
 
 ## Decisions (D)
@@ -634,3 +645,5 @@ door:
 
 Both are now denied through `permissions.deny` in the same merged settings.
 Deny rules apply in `bypassPermissions` too.
+
+**FIXED 2026-10-06:** denied claude-code-remote (#99) and the built-in RemoteTrigger/SendMessage (#100); verified on torrent
