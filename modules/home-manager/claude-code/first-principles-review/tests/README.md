@@ -3,8 +3,13 @@
 Re-run this whenever SKILL.md changes. It follows superpowers:writing-skills:
 a baseline without the skill, then a run with it.
 
-**How.** Dispatch fresh subagents that read only `scenario.md` (an over-built
-agent-sandbox design, v1 of a real one) and are asked: "Review this design from
+**How.** Dispatch fresh subagents that read only one scenario. There are three, so the
+skill is tested across domains and sizes:
+- `scenario.md`: an over-built agent-sandbox design, v1 of a real one;
+- `scenario-process.md`: an over-built personal planning system;
+- `scenario-small.md`: a one-line question, where the right answer is short.
+
+The subagents are and are asked: "Review this design from
 first principles." Run at least 2 without the skill and 2 with it, where the
 skill is read first. Score each run against the rubric.
 
@@ -43,3 +48,17 @@ days, not weeks.
   Restored points: "even if the requirement came from me", "remove in-process
   testing once diagnosed", "additions beget additions", "refocus during work",
   and the user's framing that "the real goal wasn't solid".
+- **2026-10-06, spirit-first rewrite** (user: "the spirit of it is more
+  important than an exact process. the goal is for this to generalize").
+  - **Probes of the old six-part version:** the process case had excellent
+    substance but heavy form (six sections, three tables). The small question
+    got a full six-part essay with a table, where a few sentences were right.
+  - **The rewrite:** the doghouse rule applied to the skill itself. The *moves*
+    are kept as "what a good review does", scaled to the thing; the mandated
+    order and table are gone. It is roughly 20% shorter.
+  - **After the rewrite (1 run per scenario):**
+    - **Design:** no regression. It questioned the central part and landed on
+      the known-good destination.
+    - **Process:** prose plus one table, 11 parts → 3, and it reached the
+      dog-owner level ("take on less, not plan better").
+    - **Small:** about 200 words of prose, "build nothing", one question.

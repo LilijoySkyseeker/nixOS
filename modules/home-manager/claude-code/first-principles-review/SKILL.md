@@ -1,83 +1,64 @@
 ---
 name: first-principles-review
-description: Use when reviewing, designing or questioning a plan, architecture, process, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns. Also use when the user asks to go back to first principles, simplify, or question why something exists.
+description: Use when reviewing, designing or questioning a plan, architecture, process, system, habit, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns. Also use when the user asks to go back to first principles, simplify, or question why something exists.
 ---
 
 # First-principles review
 
-## Overview
+## The spirit
 
-This review asks whether each part should exist *before* improving it. Two
-rules drive it:
+Before improving anything, ask what it's really *for* and whether each part
+should exist at all. Two rules carry this:
 
-- **The doghouse check.** Projects grow from a doghouse into a moonbase when
-  **the real goal isn't solid**: the doghouse forgot that the fundamental goal
-  was to be a good dog owner. So make the goal solid first, then judge every
-  part by whether it serves that goal or only the thing being built.
-- **The five steps** (SpaceX):
-  1. make the requirements less dumb by tracing each one to a named source;
-  2. delete;
-  3. simplify;
-  4. speed up;
-  5. automate last.
+- **The doghouse.** Projects grow from a doghouse into a moonbase when **the
+  real goal isn't solid**. The doghouse builder forgot that the fundamental
+  goal was to be a good dog owner. Each addition is locally defensible, and
+  additions beget additions: the light needs power, power needs a generator,
+  the generator needs fuel. Meanwhile the dog is still waiting outside. So
+  make the goal solid first, and judge every part by whether it serves that
+  goal or only the thing being built. Sometimes the answer is to build nothing.
+- **The five steps** (SpaceX), in order:
+  1. Make the requirements less dumb.
+  2. Delete the part or process.
+  3. Simplify what survived.
+  4. Speed up the cycle.
+  5. Automate last.
 
-## The review: produce these parts, in this order
+  Every design is wrong; the only question is how wrong. Every requirement has
+  a named source (a person or a real constraint, never "best practice"), and it
+  gets questioned however smart that source is, the person's own requirements
+  and yours included.
 
-1. **The real goal, traced upward.** What is this *for*? Not "a secure X",
-   but what the person is trying to get done that X serves. Keep going up a
-   level at a time (the doghouse → the dog comfortable outdoors → being a good
-   dog owner) until you reach what they actually care about. If they haven't said,
-   state your best guess, label it as an assumption, and make confirming it
-   your question.
-2. **The facts that decide it.**
-   - Say what the person actually does and has, kept separate from
-     assumptions.
-   - Check real data before judging: read the files, count, measure, survey.
-   - Name the facts that, if they were different, would flip your verdict.
-3. **Every part, biggest first.** One row per part:
-   `part | source | real problem it serves | verdict`.
-   - **Source** is a named person or a concrete external constraint.
-     "Security", "best practice", a doc, an audit finding or "borrowed from
-     tool X" counts as *unknown* until traced. Question the person's own
-     requirements too, and mark the parts you (Claude) introduced.
-   - **Additions beget additions** (the light needs power, power needs a
-     generator). A part whose only source is another part stands or falls
-     with it.
-   - **Start with the central part** (the platform, the VM, the framework
-     itself), not the edges.
-   - **Verdict** is one of: **keep**; **delete**, with an add-back trigger (the
-     concrete pain that would bring it back); or **simplify**.
-4. **Risks, rated.** If the design guards against something, rate each threat
-   or failure by likelihood × impact *for this person*, with evidence, before
-   keeping its control. Ordinary mistakes count as threats.
-5. **What's left.**
-   - Give the smallest design that serves the goal, and its size (days or
-     weeks).
-   - The net part count must go down: add a part only if it replaces more than
-     it adds.
-   - Polish (hardening details, tuning) and automation come last, after
-     deletion. Once a problem is diagnosed and the output is reliably good,
-     drop the in-process checks that were added for it.
-6. **The one question** whose answer would change the design most. Ask one.
+## What a good review does
 
-Then offer another pass on what's left, and stop when a pass deletes nothing.
+Scale it to the thing. A quick question gets a few sentences that do this
+thinking. A big design gets a parts table. The form serves the review.
 
-## Limits
+- **It makes the goal solid.** Trace the goal upward, a level at a time, until
+  you reach what the person actually cares about. If they haven't said, give
+  your guess and ask.
+- **It grounds itself in facts.** Find out what they actually do and have.
+  Check real data where you can. Say which facts would change your mind.
+- **It questions every part, central part first.** For each part: who asked
+  for it, and what real problem it solves. A part that exists only to serve
+  another part falls with it. Being cheap or harmless isn't a reason to keep
+  something.
+- **It rates real risks.** For anything the design guards against, weigh
+  likelihood × impact *for this person*. Ordinary mistakes count.
+- **It deletes boldly.**
+  - Propose deletions, each with the concrete pain that would bring the part
+    back. The net part count goes down.
+  - Polish and automation come last.
+  - Drop checks once the problem they guarded is solved.
+- **It ends with the one question** that would change the answer most, and
+  offers another pass until nothing more comes out.
 
-- **Deleting means proposing.** Never remove code, rules or protections
-  yourself. Existing rules and explicit requests still bind.
-- **Small explicit edits don't need this.**
-- **For someone else's design,** ask what *their* goal is, and give your
-  verdicts as questions.
+## Signs you've lost the spirit
 
-## Common mistakes
-
-| Mistake | Instead |
-|---|---|
-| Treating the stated thing ("a secure sandbox") as the goal | Go one level up |
-| Questioning only peripheral parts | Start with the central part |
-| Hardening details before deletions | Delete first, polish last |
-| Adding about as many parts as you cut | Net reduction |
-| Keeping a part because it's cheap or harmless | Cheap isn't a source. Delete it unless it serves the goal |
-| Several open questions | One deciding question |
-| "Add it back when needed" | Name the concrete pain |
+- You treated the stated thing ("a secure X") as the goal.
+- You trimmed the edges but never questioned the central part.
+- You added about as much as you cut.
+- You asked five questions instead of one.
+- You ran this as a checklist where one sentence would have done.
+- You deleted something yourself. Deletions are proposals; existing rules and
+  explicit requests still bind.
