@@ -92,3 +92,15 @@ and human, the reasoning stays in the plan.
 - If two machines diverge (forgot to pull before committing elsewhere), rebase
   on pull is already the default — resolve any `flake.lock` conflict by
   regenerating it (`nix flake lock`) rather than hand-editing.
+- Landing a branch that predates current `master`, when force-push and
+  `--no-verify` are blocked:
+  - **Already rebased and on origin:** push the rebased state as a sibling
+    branch (`<name>-rebased`), open the PR from it, and leave the original
+    branch for deletion (PR #76).
+  - **The frozen-plan pre-commit hook blocks a merge of `master` into the old
+    branch:** it diffs staged against HEAD, so master's own frozen-plan edits
+    look like violations. Merge the other way instead. Cut a landing branch
+    from `origin/master` and merge the old branch into it (PR #78).
+
+  Both patterns only exist because of the frozen-plan hook. Delete them
+  along with it.

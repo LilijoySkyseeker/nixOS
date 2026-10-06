@@ -140,6 +140,23 @@ memories it duplicates (`feedback_doghouse_dog_owner.md`,
 `feedback_friction_kills_work.md`), keeping one pointer. This follows "docs
 over memory": a fact lives in one place.
 
+2026-10-06 (user: "apply the two most important rules to everything in the
+memories … repo specific stuff should live in the repo"): done ahead of the
+file landing. Memory went from 25 files to 11.
+- **Deleted as repo-specific and already codified:** build-before-commit
+  (`docs/GIT_WORKFLOW.md`), test-don't-switch (`AGENTS.md`), pull-before-branching
+  (the `fresh-branch-guard` hook), secrets, debug-tools, plan tracking, verifying
+  against pinned nixpkgs (`docs/architecture.md`, `docs/procedures/testing-changes.md`),
+  ZFS snapshot recovery (`docs/procedures/workflow.md`).
+- **Moved into the repo:** statix organization → `docs/style-guide.md`; landing
+  stale branches → `docs/GIT_WORKFLOW.md` (marked to die with the frozen-plan
+  hook); findings blocked on agent separation stay open → `docs/accepted-risks.md`.
+- **Folded into the two core lessons:** "friction kills work" and "problem
+  before solution".
+
+The 11 remaining memories are cross-project. They are this plan's content
+once it lands.
+
 ## Gotchas (G)
 
 ### G1 -- an empty unmanaged `~/.claude/CLAUDE.md` already exists
