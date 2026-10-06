@@ -142,3 +142,13 @@ over to this item and conclude it is contained.
 
 ## Findings (F)
 *(populated by security/docs-updater when invoked)*
+
+2026-10-06: torrent now has an untrusted local uid, `agent`, which runs
+prompt-less Claude sessions. Its security review found the `.zfs/snapshot`
+dirs under `/` and `/home` at 0777, so the agent can walk all snapshots. Spot
+checks were clean: lilijoy's home is 0700 in every snapshot, and the sops key
+and host key are 0600. But this undercuts the "PCs are lower risk" premise
+here.
+
+See `2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F7`.
+The finding stays open there and belongs to this plan's fix.
