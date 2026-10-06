@@ -249,7 +249,7 @@ let
   '';
 
   deployerNode =
-    { config, lib, ... }:
+    { ... }:
     {
       imports = [ pushDeployModule ];
       virtualisation.memorySize = 3072;
@@ -284,7 +284,7 @@ let
     };
 
   targetNode =
-    { pkgs, ... }:
+    { ... }:
     {
       imports = [ targetAccessConfig ];
       environment.etc."push-deploy-test-marker".text = "before";

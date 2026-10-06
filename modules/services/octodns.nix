@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.nixos.octodns =
     {
       config,
@@ -15,7 +14,7 @@
       # of checked-in YAML — the zone data and octoDNS's own config file are
       # both build-time-rendered Nix. `domain` is the single source of truth
       # (also consumed by hosts/vps/configuration.nix) — see flake vars.
-      domain = vars.domain;
+      inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
       # Same droplet's public IPv6 — already in use as the WireGuard peer
       # endpoint in hosts/homelab/configuration.nix.

@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # Shared shell fragment for the auto-update/pull-deploy/push-deploy
   # modules' safe-switch checks: dirty/branch guard, fetch+ff-only-merge,
   # min-time-since-last-switch (via /nix/var/nix/profiles/system's mtime,

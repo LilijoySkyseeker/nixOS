@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.homeManager."audio-switch" =
     { pkgs-unstable, inputs, ... }:
     let

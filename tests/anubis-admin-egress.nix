@@ -29,74 +29,72 @@
 pkgs.testers.runNixOSTest {
   name = "anubis-admin-egress";
 
-  nodes.machine =
-    { ... }:
-    {
-      # Stand-in for the wg0 tunnel address jellyfin's real TARGET lives
-      # at, so IPAddressAllow is exercised against a real routable,
-      # non-loopback address rather than 127.0.0.1.
-      systemd.network.netdevs."10-backend0" = {
-        netdevConfig = {
-          Name = "backend0";
-          Kind = "dummy";
-        };
-      };
-      systemd.network.networks."10-backend0" = {
-        matchConfig.Name = "backend0";
-        address = [ "10.100.0.2/32" ];
-      };
-      networking.useNetworkd = true;
-
-      systemd.tmpfiles.rules = [
-        "d /srv/backend-stub 0755 root root -"
-        "f /srv/backend-stub/index.html 0644 root root - backend-reached"
-      ];
-      systemd.services.jellyfin-stub = {
-        description = "stand-in for jellyfin, answering on anubis's TARGET address";
-        after = [ "network-online.target" ];
-        wants = [ "network-online.target" ];
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig.ExecStart = "${pkgs.busybox}/bin/busybox httpd -f -v -p 10.100.0.2:8096 -h /srv/backend-stub";
-      };
-
-      # Same shape as the production fix (hosts/vps/configuration.nix):
-      # anubis in front of a target, IPAddressDeny/Allow pinned to it.
-      services.anubis.instances.jellyfin = {
-        enable = true;
-        settings.TARGET = "http://10.100.0.2:8096";
-        # The test client is curl, not a browser -- bypass anubis's
-        # proof-of-work challenge so a successful proxy is observable.
-        # This test is about network reachability, not the challenge.
-        policy = {
-          useDefaultBotRules = false;
-          extraBots = [
-            {
-              name = "allow-everything";
-              user_agent_regex = ".*";
-              action = "ALLOW";
-            }
-          ];
-        };
-      };
-      systemd.services.anubis-jellyfin.serviceConfig = {
-        IPAddressDeny = "any";
-        IPAddressAllow = [ "10.100.0.2/32" ];
-      };
-
-      users.users.caddy.extraGroups = [ "anubis" ];
-      systemd.services.caddy.after = [ "anubis-jellyfin.service" ];
-      systemd.services.caddy.wants = [ "anubis-jellyfin.service" ];
-      services.caddy = {
-        enable = true;
-        virtualHosts.":8080" = {
-          extraConfig = ''
-            reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
-              header_up X-Real-Ip {remote_host}
-            }
-          '';
-        };
+  nodes.machine = _: {
+    # Stand-in for the wg0 tunnel address jellyfin's real TARGET lives
+    # at, so IPAddressAllow is exercised against a real routable,
+    # non-loopback address rather than 127.0.0.1.
+    systemd.network.netdevs."10-backend0" = {
+      netdevConfig = {
+        Name = "backend0";
+        Kind = "dummy";
       };
     };
+    systemd.network.networks."10-backend0" = {
+      matchConfig.Name = "backend0";
+      address = [ "10.100.0.2/32" ];
+    };
+    networking.useNetworkd = true;
+
+    systemd.tmpfiles.rules = [
+      "d /srv/backend-stub 0755 root root -"
+      "f /srv/backend-stub/index.html 0644 root root - backend-reached"
+    ];
+    systemd.services.jellyfin-stub = {
+      description = "stand-in for jellyfin, answering on anubis's TARGET address";
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig.ExecStart = "${pkgs.busybox}/bin/busybox httpd -f -v -p 10.100.0.2:8096 -h /srv/backend-stub";
+    };
+
+    # Same shape as the production fix (hosts/vps/configuration.nix):
+    # anubis in front of a target, IPAddressDeny/Allow pinned to it.
+    services.anubis.instances.jellyfin = {
+      enable = true;
+      settings.TARGET = "http://10.100.0.2:8096";
+      # The test client is curl, not a browser -- bypass anubis's
+      # proof-of-work challenge so a successful proxy is observable.
+      # This test is about network reachability, not the challenge.
+      policy = {
+        useDefaultBotRules = false;
+        extraBots = [
+          {
+            name = "allow-everything";
+            user_agent_regex = ".*";
+            action = "ALLOW";
+          }
+        ];
+      };
+    };
+    systemd.services.anubis-jellyfin.serviceConfig = {
+      IPAddressDeny = "any";
+      IPAddressAllow = [ "10.100.0.2/32" ];
+    };
+
+    users.users.caddy.extraGroups = [ "anubis" ];
+    systemd.services.caddy.after = [ "anubis-jellyfin.service" ];
+    systemd.services.caddy.wants = [ "anubis-jellyfin.service" ];
+    services.caddy = {
+      enable = true;
+      virtualHosts.":8080" = {
+        extraConfig = ''
+          reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
+            header_up X-Real-Ip {remote_host}
+          }
+        '';
+      };
+    };
+  };
 
   testScript = ''
     start_all()

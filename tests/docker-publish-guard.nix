@@ -38,11 +38,9 @@ in
 pkgs.testers.runNixOSTest {
   name = "docker-publish-guard";
 
-  nodes.client =
-    { ... }:
-    {
-      environment.systemPackages = [ pkgs.netcat ];
-    };
+  nodes.client = _: {
+    environment.systemPackages = [ pkgs.netcat ];
+  };
 
   nodes.machine =
     { ... }:

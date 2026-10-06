@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.nixos."zfs-dataset-properties" =
     {
       config,
@@ -68,8 +67,7 @@
               dataset: props:
               lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (
-                  prop: value:
-                  "zfs set ${lib.escapeShellArg "${prop}=${value}"} ${lib.escapeShellArg dataset}"
+                  prop: value: "zfs set ${lib.escapeShellArg "${prop}=${value}"} ${lib.escapeShellArg dataset}"
                 ) props
               )
             ) cfg

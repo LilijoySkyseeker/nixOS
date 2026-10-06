@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # Single source of truth for interactive debugging tooling, consumed by
   # BOTH the devshell and every host (via profiles/default.nix, which
   # profile-pc also imports). Add a tool here once and it appears in the

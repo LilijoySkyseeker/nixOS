@@ -6,7 +6,6 @@ in
   flake.modules.nixos."profile-server" =
     {
       pkgs,
-      lib,
       config,
       ...
     }:

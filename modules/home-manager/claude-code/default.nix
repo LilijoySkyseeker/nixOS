@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # Claude Code's own config lives in ~/.claude. The CLI writes settings.json
   # itself (that's how /model and /effort persist), so a store symlink over it
   # would make those writes fail. Instead the keys this repo cares about are

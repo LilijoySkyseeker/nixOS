@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.vars = {
     # root access ssh keys
     publicSshKeys = [

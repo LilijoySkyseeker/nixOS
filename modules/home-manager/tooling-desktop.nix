@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   flake.modules.homeManager."tooling-desktop" =
     {
       pkgs-stable,
