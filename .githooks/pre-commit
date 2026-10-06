@@ -1,44 +1,23 @@
 #!/usr/bin/env bash
-# Block obviously-plaintext secrets from being committed, and catch a
-# docs/skills or docs/agents entry missing its .claude/ symlink -- both
-# git-level, so they apply to any tool or human, not just a Claude Code
-# session.
+# Block obviously-plaintext secrets, and lint staged .nix files. Git-level,
+# so it applies to any tool or human. Bypass a false positive with
+# `git commit --no-verify`.
 set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel)"
-
-# The binary probe below needs the blob on disk rather than in a variable,
-# and needs git's own exit status rather than a pipeline's.
+# the binary probe needs the blob on disk, and git's own exit status
 blob="$(mktemp)" || { echo "BLOCKED: cannot create a temporary file." >&2; exit 1; }
 trap 'rm -f "$blob"' EXIT
 
-# Every docs/skills/<name>/ and docs/agents/<name>.md must have a correct
-# symlink under .claude/ -- otherwise it silently vanishes from Claude Code
-# with no visible error (confirmed real pitfall, not speculative).
-if [[ -x "$repo_root/scripts/claude-links-check" ]]; then
-  if ! "$repo_root/scripts/claude-links-check"; then
-    echo "" >&2
-    echo "Run 'scripts/claude-links-check --fix' to repair, or 'git commit --no-verify' if intentional." >&2
-    exit 1
-  fi
-fi
-
 # core.quotePath=false: git otherwise C-quotes a non-ASCII path, which
-# `git show :<path>` below then cannot read
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F42
-# ACMRT excludes deletions and nothing else; ACM also dropped renames
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
+# `git show :<path>` then cannot read. ACMRT: everything but deletions.
 staged_files="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT)"
 [[ -z "$staged_files" ]] && exit 0
 
 fail=0
+staged_nix=()
 
 while IFS= read -r file; do
-  # no working-tree test: every scan below reads the index, and ACMRT
-  # already excludes deletions
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F41
-
-  # secrets.yaml files must be sops-encrypted (contain sops metadata block).
+  # secrets.yaml files must be sops-encrypted
   if [[ "$(basename "$file")" == "secrets.yaml" ]]; then
     if ! git show ":$file" | grep -q '^sops:'; then
       echo "BLOCKED: $file looks unencrypted (no 'sops:' metadata block)." >&2
@@ -47,45 +26,25 @@ while IFS= read -r file; do
     continue
   fi
 
-  # a gitlink is a commit id, not content: there is no blob to scan and
-  # no secret it could carry, so skip it deliberately rather than fail
-  # closed on it -- blocking would make `git submodule add` unfixable
-  # except by --no-verify, which switches off every check in this hook
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F57
-  # Read the mode fail-closed, like the content read below and for the same
-  # reason: an unreadable mode makes this exemption inconclusive, and an
-  # inconclusive answer must not silently take the `continue` branch that
-  # skips every scan for this file.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  # unreadable means undecided, which must not skip the scan
   if ! mode="$(git ls-files -s -- "$file")"; then
     echo "BLOCKED: cannot read the staged mode of $file; refusing to decide whether to scan it." >&2
     fail=1
     continue
   fi
+  # a gitlink (submodule) is a commit id, not content
   if [[ "$(cut -d' ' -f1 <<<"$mode")" == "160000" ]]; then
     continue
   fi
 
-  # anything else that cannot be read is still fail-closed
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F45
   if ! content="$(git show ":$file" 2>/dev/null)"; then
     echo "BLOCKED: cannot read the staged content of $file; refusing to scan it." >&2
     fail=1
     continue
   fi
 
-  # binary detected from the blob's own bytes, never from
-  # `git diff --numstat`, whose "-" answer comes from the `diff`
-  # gitattribute: staging a .gitattributes saying `*.pem -diff` beside a
-  # .pem holding a private key switched this scan off entirely, verified
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F52
-  # A second read, not `<<<"$content"`: command substitution strips NUL
-  # bytes, so probing $content could never find one. Written to a file
-  # rather than piped, so git's own status is checkable -- through a pipe
-  # it is not, because `pipefail` reports the rightmost non-zero status and
-  # grep's "no match" is also 1, making a failed read indistinguishable
-  # from a text file.
-  # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F48
+  # binary from the blob's own bytes, never from the `diff` gitattribute,
+  # which a staged `.gitattributes` could use to switch this scan off
   if ! git show ":$file" > "$blob"; then
     echo "BLOCKED: cannot re-read the staged content of $file to tell text from binary." >&2
     fail=1
@@ -99,22 +58,44 @@ while IFS= read -r file; do
     echo "BLOCKED: $file contains a private key block." >&2
     fail=1
   fi
-
   if grep -qE 'AGE-SECRET-KEY-1[A-Z0-9]+' <<<"$content"; then
     echo "BLOCKED: $file contains an age secret key." >&2
     fail=1
   fi
-
   if grep -qE '(AKIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{10,}|ghp_[0-9A-Za-z]{36})' <<<"$content"; then
     echo "BLOCKED: $file contains what looks like a live API/access token." >&2
     fail=1
   fi
+
+  if [[ "$file" == *.nix ]]; then staged_nix+=("$file"); fi
 done <<<"$staged_files"
+
+if [[ "${#staged_nix[@]}" -gt 0 ]]; then
+  for tool in nixfmt statix deadnix; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      echo "BLOCKED: $tool not on PATH. Commit from the dev shell (direnv, or 'direnv exec . git commit ...')." >&2
+      exit 1
+    fi
+  done
+  if ! nixfmt --check "${staged_nix[@]}"; then
+    echo "BLOCKED: run 'nixfmt' on the file(s) above." >&2
+    fail=1
+  fi
+  for f in "${staged_nix[@]}"; do
+    if ! statix check "$f"; then
+      echo "BLOCKED: statix finding in $f ('statix fix $f' handles most)." >&2
+      fail=1
+    fi
+  done
+  if ! deadnix --fail "${staged_nix[@]}"; then
+    echo "BLOCKED: unused code above ('deadnix --edit <file>' removes it)." >&2
+    fail=1
+  fi
+fi
 
 if [[ "$fail" -eq 1 ]]; then
   echo "" >&2
   echo "If this is a false positive, commit with 'git commit --no-verify'." >&2
   exit 1
 fi
-
 exit 0

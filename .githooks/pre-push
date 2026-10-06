@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Build (don't switch) every NixOS host whose config changed in the commits
-# being pushed, so breakage is caught before it lands on another machine.
+# Evaluate the flake and build (never switch) every NixOS host whose config
+# changed in the commits being pushed, so breakage is caught before it
+# reaches another machine. Bypass with `git push --no-verify`.
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -13,13 +14,9 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
   [[ "$local_sha" == "$zero" ]] && continue # deleting a ref, nothing to build
 
   if [[ "$remote_sha" == "$zero" ]]; then
-    # New branch: diff against master, or against the empty tree if there is
-    # no common ancestor. Checked, not swallowed: `|| true` collapsed the
-    # range to a bare sha, which makes the diff below a *working-tree* diff
-    # -- empty on a clean checkout, exit 0 -- so no host was built, on
-    # exactly the new-branch push this arm exists for. merge-base answers 1
-    # for "no common ancestor" and 128 when git itself fails.
-    # plan: 2026-09-07-revise-the-plan-file-schema-state-first-four-frontmatter-fields.md#F73
+    # new branch: diff against its merge base with master, or the empty tree
+    # if there is none. A failed merge-base must refuse, not collapse the
+    # range to an empty working-tree diff that builds nothing.
     mb_rc=0
     base="$(git merge-base origin/master "$local_sha" 2>/dev/null)" || mb_rc=$?
     case "$mb_rc" in
@@ -35,61 +32,41 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
-  # core.quotePath=false so a non-ASCII hosts/ path is not C-quoted: the
-  # quoted form fails the ^hosts/ selection below and would needlessly
-  # build every host
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F34
-  # status checked, not swallowed: an unresolvable range read as "no host
-  # config changed" and pushed unbuilt -- the fail-open this branch closed
-  # at every other diff call site
-  # plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F56
   if ! files="$(git -c core.quotePath=false diff --name-only "$range" -- hosts/ modules/ files/ flake.nix flake.lock)"; then
     echo "BLOCKED: cannot diff $range; refusing to decide the build set from a failed diff." >&2
     exit 1
   fi
   changed_files+=$'\n'"$files"
-
 done
 
 changed_files="$(echo "$changed_files" | sed '/^$/d' | sort -u)"
+[[ -z "$changed_files" ]] && exit 0
 
-if [[ -z "$changed_files" ]]; then
-  exit 0
-fi
-
+# anything outside hosts/ (modules/, files/, flake.*) affects every host
 hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
+global=0
+if echo "$changed_files" | grep -qv '^hosts/'; then global=1; fi
 to_build=""
-
-# The diff's pathspec above is the only spelling of the trigger set: every
-# listed path is a trigger, and any line outside hosts/ (modules/, files/,
-# flake.*) affects all hosts. Same logic as verify-ladder's targeted
-# build, deliberately -- the two build gates must not diverge
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F48
-# plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#F62
-if echo "$changed_files" | grep -qv '^hosts/'; then
-  global=1
-else
-  global=0
-fi
 for host in $hosts; do
   if [[ "$global" -eq 1 ]] || echo "$changed_files" | grep -q "^hosts/${host}/"; then
     to_build+=" $host"
   fi
 done
 
-if [[ -z "$to_build" ]]; then
-  exit 0
+echo "pre-push: nix flake check --no-build"
+if ! nix flake check --no-build; then
+  echo "BLOCKED: nix flake check failed. Fix it, or push with --no-verify." >&2
+  exit 1
 fi
 
+[[ -z "$to_build" ]] && exit 0
 echo "pre-push: building affected hosts:${to_build}"
-
 for host in $to_build; do
   echo "--- nixos-rebuild build --flake .#${host} ---"
   if ! nixos-rebuild build --flake ".#${host}"; then
     echo "" >&2
-    echo "BLOCKED: build failed for host '${host}'. Fix it, or push with --no-verify to skip this check." >&2
+    echo "BLOCKED: build failed for host '${host}'. Fix it, or push with --no-verify." >&2
     exit 1
   fi
 done
-
 exit 0
