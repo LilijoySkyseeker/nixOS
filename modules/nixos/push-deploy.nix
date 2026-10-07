@@ -45,15 +45,11 @@ in
           default = "sudo";
           description = ''
             Whether to pass nixos-rebuild's --sudo flag for the target's remote
-            activation steps. nixos-rebuild-ng has no separate "elevate backend"
-            flag (an earlier assumption here was wrong) — it only wraps
-            remote commands in the literal `sudo` binary. That's still
-            polkit/run0-based here rather than real sudo, since the target
-            aliases `sudo` to run0 (security.run0.enableSudoAlias, set
-            globally in profiles/default.nix) instead of enabling real sudo.
-            Default "sudo" since the target user (vps-deploy) is unprivileged
-            and needs it for both the profile-set and switch-to-configuration
-            steps.
+            activation steps. nixos-rebuild-ng only wraps remote commands in
+            the literal `sudo` binary, which on the target is the run0 alias
+            (security.run0.enableSudoAlias). Default "sudo" since the target
+            user (vps-deploy) is unprivileged and needs it for both the
+            profile-set and switch-to-configuration steps.
           '';
         };
 
@@ -136,14 +132,9 @@ in
               ${lib.optionalString (cfg.elevate == "sudo") "--sudo"}
 
             ${lib.optionalString cfg.rebootIfKernelChanged ''
-              # The target's own /run/booted-system vs /run/current-system
-              # check (used by pull-deploy for local switches)
-              # doesn't apply here since we're not running on the target —
-              # check remotely instead. Reboot itself has to go through the
-              # same sudo/run0 alias elevation as the switch above, since
-              # the target's deploy user has no other privilege (see
-              # hosts/vps/configuration.nix's vps-deploy dispatcher, which
-              # matches this exact string).
+              # reboot goes through the same sudo/run0 alias as the switch;
+              # hosts/vps/configuration.nix's vps-deploy dispatcher matches
+              # this exact string
               booted=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/booted-system/kernel)
               current=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
               if [ "$booted" != "$current" ]; then
@@ -155,39 +146,9 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
-            # F-P7-06. VM-tested with a real remote target
-            # (tests/push-deploy-sandbox.nix) rather than guessed --
-            # nixos-rebuild-ng's own source settles the two hazards this
-            # comment used to only speculate about:
-            #
-            # - It runs its SSH ControlMaster through a tempdir made by
-            #   Python's `tempfile.TemporaryDirectory()`, which resolves
-            #   against `$TMPDIR`/`/tmp` (nixos_rebuild/tmpdir.py) --
-            #   created once at import time, before anything else runs.
-            #   `ProtectSystem=strict` alone makes `/tmp` read-only and
-            #   this fails immediately; `PrivateTmp=true` fixes it, since
-            #   the socket only ever needs to be reachable from this
-            #   unit's own process tree, which shares one mount namespace
-            #   throughout a single oneshot run.
-            # - The initial local flake build/eval (before anything ever
-            #   reaches the network) needs `/root/.cache` writable for
-            #   nix's own eval/build scratch -- covered by ReadWritePaths
-            #   below rather than `ProtectHome=false`, so only that one
-            #   path opens up, not all of /root. `nix show-config`
-            #   confirms `use-xdg-base-directories = false` (the pinned
-            #   default), so this genuinely has to be `~/.cache`, not an
-            #   `XDG_CACHE_HOME` redirect to somewhere self-creating.
-            # - `ReadWritePaths` does not create the directory it grants
-            #   access to -- caught by the VM test on a genuinely fresh
-            #   root user with no prior `.cache`: mount-namespace setup
-            #   fails outright with ENOENT before the script even starts.
-            #   A `+`-prefixed ExecStartPre does NOT help here (also
-            #   caught by the same test, on the retry): `+` only bypasses
-            #   privilege-dropping (User=/Group=), not the mount
-            #   namespace, which is established once for the whole unit
-            #   before any ExecStartPre runs. The directory has to exist
-            #   before this unit starts at all -- see the tmpfiles rule
-            #   below instead.
+            # sandbox VM-tested in tests/push-deploy-sandbox.nix. PrivateTmp:
+            # nixos-rebuild-ng's ssh ControlMaster socket; /root/.cache: nix
+            # eval scratch, created by tmpfiles below (ReadWritePaths won't)
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             PrivateTmp = true;
@@ -199,13 +160,8 @@ in
           };
         };
 
-        # Both ReadWritePaths targets above have to exist before the unit
-        # ever starts -- the mount namespace is set up once for the whole
-        # unit, before any ExecStartPre runs, so nothing inside the unit
-        # itself can create them first (see the serviceConfig comment).
-        # `.ssh` is very likely already there on a real host, but this
-        # doesn't assume it -- both are declared unconditionally rather
-        # than trusting incidental prior state.
+        # ReadWritePaths targets must exist before the unit's mount namespace
+        # is set up
         systemd.tmpfiles.rules = [
           "d /root/.cache 0700 root root -"
           "d /root/.ssh 0700 root root -"

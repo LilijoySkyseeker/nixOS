@@ -143,9 +143,8 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
-            # this unit runs `nixos-rebuild switch`/`boot` itself — real
-            # system activation — so it can't be filesystem/kernel-sandboxed
-            # the way a plain build-only job can.
+            # runs real activation (nixos-rebuild switch/boot), so no
+            # filesystem/kernel sandboxing
             NoNewPrivileges = true;
             ExecStartPost = lib.optionals cfg.autoReboot [
               (pkgs.writeShellScript "reboot-if-kernel-changed" ''

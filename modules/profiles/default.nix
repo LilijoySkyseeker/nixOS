@@ -1,11 +1,7 @@
-# `inputs` is deliberately not taken here: the outer one was unused even
-# before this file grew a `let` (deadnix flagged it at HEAD), and the
-# inner module gets its own via specialArgs.
+# no `inputs` here: the inner module gets its own via specialArgs
 { config, ... }:
 let
-  # Captured out here, before the inner module's own `config` shadows the
-  # flake-parts one — see docs/architecture.md's "config shadowing"
-  # gotcha, and modules/flake/deploy-guards.nix for the same pattern.
+  # captured before the inner module's `config` shadows the flake-parts one
   debugTools = config.flake.debugTools;
 in
 {
@@ -57,20 +53,13 @@ in
           zfs-prune-snapshots # TEMP, zfs needs module
 
         ]
-        # Shared with the devshell — one list, in modules/flake/debug-tools.nix,
-        # so a tool added for local use also lands on the hosts.
-        #
-        # Always `pkgs-unstable`, deliberately, including on homelab, which
-        # is otherwise pinned to nixpkgs-stable. Debug tooling should be
-        # the same version everywhere: a command learned on one host then
-        # behaves identically on the next, and you are never debugging a
-        # live problem against a year-old set of flags. It also matches the
-        # rest of this list, which is already unstable.
+        # shared with the devshell (modules/flake/debug-tools.nix); always unstable,
+        # even on stable-pinned homelab, so debug tools match fleet-wide
         ++ debugTools pkgs-unstable;
 
       security = lib.mkMerge [
-        # sudo for run0 alias (only present on nixpkgs versions that ship the run0 module;
-        # newer run0 modules dropped the `enable` toggle since run0 itself is always available)
+        # run0 sudo alias, only where nixpkgs ships the run0 module;
+        # newer run0 modules dropped `enable`
         (lib.optionalAttrs (options.security ? run0) {
           run0 = {
             enableSudoAlias = true;
@@ -90,72 +79,25 @@ in
       boot.zfs.forceImportRoot = false;
 
       # tailscale
-      # declarative login: authKeyFile logs the host into the tailnet on boot,
-      # no manual `tailscale up` needed. Each host uses its own non-reusable
-      # pre-authorized key (tailscale_authkey_<hostname>) already tagged with
-      # tag:<hostname> at generation time, so a leaked key only ever grants
-      # that one host's identity/tag rather than a shared credential.
+      # authKeyFile logs in on boot; per-host non-reusable key, pre-tagged tag:<hostname>
       services.tailscale = {
         enable = true;
-        # "client", not "both": `useRoutingFeatures = "both"` makes the
-        # tailscale module force net.ipv{4,6}.conf.all.forwarding on, and only
-        # homelab is actually an exit node / subnet router. Defaulting to
-        # "both" therefore turned on IP forwarding across the whole fleet for
-        # the benefit of one host -- including on two laptops that never route
-        # anything, one of which roams onto untrusted networks. This inverts
-        # the default to fail safe; homelab opts back in with mkForce.
-        #
-        # docs/hardening.md's "Tailscale forwarding sysctls" rule already said
-        # to narrow this per host, but it had only ever been applied to vps.
-        #
-        # Note the module sets those sysctls at mkOverride 97, so a plain
-        # boot.kernel.sysctl assignment loses to it silently -- changing this
-        # option is the only thing that actually moves them.
+        # "client", not "both": "both" forces ip forwarding on; only homelab routes
+        # (it opts back in with mkForce). the module sets those sysctls at
+        # mkOverride 97, so a plain boot.kernel.sysctl loses -- change this instead
         useRoutingFeatures = "client";
         authKeyFile = config.sops.secrets."tailscale_authkey_${config.networking.hostName}".path;
-        # --ssh (Tailscale's own SSH server/auth implementation) is
-        # deliberately NOT enabled: once on, it intercepts ALL SSH
-        # connections to that host and gates them via the tailnet ACL's
-        # "ssh" block, entirely bypassing real sshd — including any
-        # authorized_keys ForceCommand restriction (confirmed live: this
-        # broke vps's dedicated push-deploy user's command allowlist, and
-        # when no ACL "ssh" rule matched, connections were hard-rejected
-        # rather than falling through to real sshd — no partial/fallback
-        # mode exists). SSH still only ever travels over the tailnet either
-        # way (trustedInterfaces=tailscale0 + closed public port 22 on
-        # every host that matters); this only decides whether real sshd or
-        # tailscale's own proxy handles the authentication, and every host
-        # here relies on real sshd being the one in control of that.
+        # no --ssh: tailscale ssh intercepts all ssh and bypasses real sshd,
+        # including authorized_keys ForceCommand (vps push-deploy allowlist)
         extraUpFlags = [
           "--advertise-tags=tag:${config.networking.hostName}"
         ];
       };
       sops.secrets."tailscale_authkey_${config.networking.hostName}" = { };
 
-      # Pin github.com's host key fleet-wide.
-      #
-      # Every host that deploys itself fetches origin/master as root --
-      # myPullDeploy on homelab and the PCs -- and
-      # deploy-guards.nix does that with StrictHostKeyChecking=accept-new.
-      # That is TOFU, and on homelab it is TOFU *on every boot*, because
-      # impermanence does not persist /root so root's known_hosts is empty
-      # again each time (F-P7-04, F-P3-05, F-P0-07). Since a commit fetched
-      # from that remote becomes root on four hosts, the remote's identity is
-      # worth pinning rather than accepting.
-      #
-      # This key was verified against the fingerprint GitHub publishes
-      # (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU) rather than
-      # simply ssh-keyscan'ed and trusted, which would have reproduced the
-      # TOFU it is meant to remove. Public key, not a secret.
-      #
-      # If GitHub ever rotates this, unattended deploys fail closed until it
-      # is updated here -- which is the intended trade, but it is why it
-      # matters that a failed deploy is actually noticed (see F-P7-09).
-      #
-      # vps is deliberately NOT pinned here: its host key churned three times
-      # during the 2026-08-25 reinstall, so a pin would be a standing
-      # breakage risk, and homelab already has root on vps by design
-      # (F-P0-02) so host-key TOFU is not the weak link on that path.
+      # pin github.com: root fetches deploys from it, and /root isn't persisted so
+      # accept-new would be TOFU every boot. key checked against github's published
+      # fingerprint; on rotation, unattended deploys fail closed until updated here
       programs.ssh.knownHosts."github.com" = {
         hostNames = [
           "github.com"
@@ -278,7 +220,6 @@ in
       };
       boot.loader.efi.canTouchEfiVariables = true;
 
-      # plan: 2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md#D1
       boot.tmp.useTmpfs = true;
 
       # Enable networking

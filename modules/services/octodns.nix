@@ -10,15 +10,12 @@ _: {
     let
       enable = true;
 
-      # Everything octoDNS needs is generated from these two values instead
-      # of checked-in YAML — the zone data and octoDNS's own config file are
-      # both build-time-rendered Nix. `domain` comes from flake vars.
+      # zone data and octoDNS config are both rendered from these, no checked-in YAML
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # Only minecraft and factorio are meant to be publicly
-      # reachable (see hosts/vps/README.md); the mail records below point at
-      # Google Workspace, not at the vps.
+      # only minecraft and factorio are meant to be public (hosts/vps/README.md);
+      # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [
           {
@@ -27,7 +24,6 @@ _: {
             value = vpsPublicIp;
           }
           # Google Workspace mail, single-MX form
-          # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F3
           {
             type = "MX";
             ttl = 300;
@@ -37,7 +33,6 @@ _: {
             };
           }
           # SPF and the site-verification token as one TXT with two values
-          # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G2
           {
             type = "TXT";
             ttl = 300;
@@ -47,12 +42,8 @@ _: {
             ];
           }
         ];
-        # DKIM public key, issued by the Workspace admin console (Gmail >
-        # Authenticate email); `\;` escaping, chunking, and why the key is in
-        # a public repo:
-        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G1
-        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#G3
-        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F4
+        # DKIM public key from the Workspace admin console (Gmail > Authenticate
+        # email); `\;` escaping is required by octoDNS
         "google._domainkey" = [
           {
             type = "TXT";
@@ -60,10 +51,7 @@ _: {
             value = "v=DKIM1\\;k=rsa\\;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsonrfzXTCC2+UEvz952v6fJgq6V/dUzIzORTEogwWdoBQHotImyklUGvhGhimwx49P4jDd+IezTeA7spO+EZpepXPidYPrDyzOnqtYyjgCM6z4SrD4RFGIcmtAIcVxYw8uy0LQ/L1L4JHxNf83LGQSRQpGo5HFwbwvAPsVCsE+t4CjFCIbWOlZuvHIuOLApKjrmYT2OBiu6jScKZvAiFTB98c9zJe7Arsws7SrSC41O0S5P/4v6bLCMq524TGiuVWPAJnvrJYJqXzj8nWfkqkZ5tVe/KeJi32pCGevfh1eGXU+IThT27Wcgl6QferAtYs10U/KiVMNRUV/Zeu+4IXwIDAQAB";
           }
         ];
-        # DMARC, monitor-only (`p=none`) to start; policy level and the rua
-        # mailbox:
-        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#D1
-        # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#D2
+        # DMARC, monitor-only (`p=none`)
         "_dmarc" = [
           {
             type = "TXT";
@@ -71,16 +59,8 @@ _: {
             value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
-        # minecraft/factorio clients connect via ip:port, not domain, but a
-        # record still makes it easier to hand out a hostname instead of a
-        # raw IP. IPv4-only, deliberately: these ports are only DNAT'd
-        # through to homelab over IPv4 (net.ipv6.conf.all.forwarding is
-        # explicitly off on the vps, see hosts/vps/configuration.nix, and
-        # there are no ip6tables DNAT rules for them either) — an AAAA
-        # record here would advertise reachability that doesn't exist and
-        # silently break any client that prefers IPv6 when a hostname
-        # resolves to both (confirmed live: a Bedrock client could connect
-        # to the raw IPv4 address fine but not to the hostname).
+        # IPv4-only on purpose: game ports are only DNAT'd over IPv4 on the vps,
+        # so an AAAA would break IPv6-preferring clients
         minecraft = [
           {
             type = "A";
@@ -88,12 +68,6 @@ _: {
             value = vpsPublicIp;
           }
         ];
-        # factorio: one server, one name. The old/new split (`old.factorio`
-        # and `new.factorio`, plus their SRV records) was removed
-        # 2026-08-27 when the second server was retired — these records
-        # are declarative, so octodns-sync retires the stale names from
-        # Cloudflare on its next run rather than leaving them dangling at
-        # the vps.
         factorio = [
           {
             type = "A";
@@ -101,9 +75,7 @@ _: {
             value = vpsPublicIp;
           }
         ];
-        # SRV record so players can connect with just the hostname (no
-        # ":port" suffix) — Factorio has supported DNS SRV lookup for this
-        # since 1.1.67.
+        # SRV so players connect by hostname without ":port" (factorio >= 1.1.67)
         "_factorio._udp.factorio" = [
           {
             type = "SRV";
@@ -122,8 +94,7 @@ _: {
       domainNoDot = lib.removeSuffix "." domain;
       zoneFileName = "${domainNoDot}.yaml";
       zoneFile = yamlFormat.generate zoneFileName zoneRecords;
-      # octoDNS's YamlProvider wants a directory containing a file named
-      # exactly `<zone-without-trailing-dot>.yaml`.
+      # octoDNS's YamlProvider wants a directory with `<zone-without-trailing-dot>.yaml`
       zoneDir = pkgs-unstable.linkFarm "octodns-zones" [
         {
           name = zoneFileName;
@@ -142,11 +113,8 @@ _: {
           cloudflare = {
             class = "octodns_cloudflare.CloudflareProvider";
             token = "env/CLOUDFLARE_TOKEN";
-            # We don't use Cloudflare page rules, and the scoped DNS-edit
-            # token doesn't have Page Rules permission — without this,
-            # octodns-cloudflare's default pagerules=true makes an extra
-            # GET /zones/{id}/pagerules call that 403s and gets
-            # misreported as a DNS auth failure.
+            # the scoped DNS-edit token lacks Page Rules permission; the default
+            # pagerules call 403s and is misreported as a DNS auth failure
             pagerules = false;
           };
         };
@@ -196,10 +164,7 @@ _: {
             ProtectControlGroups = true;
             RestrictNamespaces = true;
             PrivateTmp = true;
-            # matches the baseline beets.nix already runs, likewise a
-            # python workload on this host; this unit holds the token
-            # that controls the whole zone, mail records included
-            # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F16
+            # this unit holds the token controlling the whole zone
             PrivateDevices = true;
             CapabilityBoundingSet = "";
             RestrictRealtime = true;

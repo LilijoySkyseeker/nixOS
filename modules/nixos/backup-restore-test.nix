@@ -8,14 +8,11 @@ _: {
     }:
     let
       cfg = config.myBackupRestoreTest;
-      # The shared convention modules/nixos/backup-canary.nix seeds at --
-      # read from there rather than duplicating it as a second hardcoded
-      # copy the two modules have to agree on by comment.
+      # shared canary path convention from modules/nixos/backup-canary.nix
       canaryRelPath = config.myBackupCanary.relPath;
       canaryBaseName = builtins.baseNameOf canaryRelPath;
 
-      # Shared by both zbackup.targets and restic.targets -- both are just
-      # "dataset name -> the content its canary must contain".
+      # shared by zbackup.targets and restic.targets: dataset -> canary content
       canaryTargetType = lib.types.attrsOf (
         lib.types.submodule {
           options.expectedContent = lib.mkOption {
@@ -25,10 +22,8 @@ _: {
         }
       );
 
-      # Shared epilogue: touch a per-check success marker (picked up by
-      # myHealthAlerts.staleMarkerFiles) iff every target in this run
-      # passed, then propagate failure to systemd (picked up by the
-      # existing failed-units check) either way.
+      # touch a success marker (myHealthAlerts.staleMarkerFiles) iff every
+      # target passed, then propagate failure to systemd
       successEpilogue = markerName: ''
         if [ "$fail" -eq 0 ]; then
           touch "$STATE_DIRECTORY/${markerName}-last-success"
@@ -37,11 +32,8 @@ _: {
       '';
 
       hardeningBase = {
-        # Root stays root here (docs/hardening.md's zfs-space-guard/
-        # health-alerts precedent): `zfs clone`/`mount`/`destroy` and
-        # reading restic's root-owned password file are not delegable to a
-        # service user. Deliberately no PrivateDevices -- the zbackup path
-        # needs /dev/zfs.
+        # root: zfs clone/mount/destroy and restic's root-owned password file
+        # aren't delegable. no PrivateDevices: zbackup needs /dev/zfs
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = true;
@@ -146,17 +138,12 @@ _: {
               mkdir -p "$mnt"
               fail=0
 
-              # Self-heal any leftover mount/clone from a run that crashed
-              # mid-way, rather than every subsequent run failing on "clone
-              # already exists".
+              # self-heal leftovers from a crashed run
               mountpoint -q "$mnt" && umount "$mnt"
               zfs destroy "$scratch" >/dev/null 2>&1 || true
 
-              # Alternate newest/oldest still-retained snapshot by day of
-              # year, computed once for the whole run (%-j is GNU date's
-              # no-leading-zero form, so no base-10-forcing needed on it) --
-              # always testing the newest would hide a retention/prune
-              # regression that only shows up at the tail of the grid.
+              # alternate newest/oldest snapshot by day of year, so a
+              # retention/prune regression at the tail of the grid shows up
               day=$(date +%-j)
 
               ${lib.concatStringsSep "\n" (
@@ -174,12 +161,9 @@ _: {
                   if [ -z "$snap" ]; then
                     echo "backup-restore-test: no zrepl snapshot found for $dataset"
                     fail=1
-                  # Force mountpoint/canmount on the clone rather than trust
-                  # whatever the received dataset's properties happen to be
-                  # -- cheap defense against a hostile mountpoint/canmount
-                  # arriving in a compromised source's send stream (still
-                  # F-P6-03's fix to make on the receive side itself; this
-                  # is a second, independent layer, not a substitute for it).
+                  # security: force mountpoint/canmount on the clone rather than
+                  # trust a possibly hostile received stream (second layer to
+                  # the receive-side fix, F-P6-03)
                   elif ! zfs clone -o mountpoint=legacy -o canmount=on "$snap" "$scratch"; then
                     echo "backup-restore-test: zfs clone failed for $snap"
                     fail=1
@@ -229,13 +213,8 @@ _: {
               trap 'rm -rf "$scratch"' EXIT
               fail=0
 
-              # One restic invocation covering every target rather than one
-              # per dataset -- each restic call separately authenticates to
-              # B2 and loads/decrypts the repo index, a real cost worth
-              # paying once, not N times, for an offsite-bound job. Each
-              # target's file lands under its own dataset@snapshot path
-              # inside $scratch, so a single `--path`-scoped find still
-              # disambiguates them below.
+              # one restic invocation for all targets: each call re-authenticates
+              # to B2 and decrypts the index. per-target paths stay distinct
               if ! ${cfg.restic.wrapperCommand} restore latest --target "$scratch" \
                 ${
                   lib.concatMapStringsSep " " (
@@ -270,12 +249,8 @@ _: {
             '';
           };
 
-          # Hooked off the backup unit's own success, not chained into its
-          # ExecStartPost -- see plan: 2026-09-04-automated-canary-based-backup-restore-and-verify-tier-1.md#G4.
-          # This overrides a unit generated by services.restic.backups,
-          # which is a normal NixOS module-merge, not a redefinition.
+          # merges into the unit generated by services.restic.backups;
           # removeSuffix: systemd.services.<name> already appends ".service"
-          # (see triggerUnit's option doc)
           systemd.services.${lib.removeSuffix ".service" cfg.restic.triggerUnit}.unitConfig.OnSuccess = [
             "backup-restore-test-restic.service"
           ];

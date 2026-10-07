@@ -1,34 +1,8 @@
-# Integration test for modules/nixos/zfs-dataset-properties.nix.
-#
-# The module exists to close a real, live-verified exposure:
-# `/nix/state/.zfs` was world-traversable (0777) on homelab, letting any
-# local uid read old snapshot contents at whatever permissions they had at
-# snapshot time -- proven live and how the factorio credentials leaked
-# (2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md).
-# `snapdir=disabled` closes it, but only if the property actually reaches
-# the dataset and actually blocks access -- `nixos-rebuild build` can't
-# prove either, since there's no real pool at build time. This builds a
-# throwaway VM with a real zpool and checks:
-#
-#   * the systemd sandbox is applied to the unit (matches
-#     zfs-space-guard's precedent, docs/hardening.md's baseline)
-#   * the property is actually applied to the dataset after boot, not just
-#     rendered into a script nobody ran
-#   * an unprivileged uid can read a snapshot file by explicit path under
-#     the default (snapdir=hidden) -- the baseline this is fixing
-#   * the same read is fully blocked (ENOENT, not just EACCES) once the
-#     module applies snapdir=disabled to a dataset whose .zfs was never
-#     touched beforehand
-#   * a second dataset with no myZfsDatasetProperties entry is untouched
-#     -- this is an opt-in mechanism, not a blanket policy
-#   * re-running the service is a no-op (idempotent), matching the
-#     module's own "zfs set is idempotent" claim
-#   * the documented caveat is real, not just claimed: if .zfs was already
-#     accessed before the property flips to disabled, that specific
-#     already-mounted snapshot view stays reachable until the dataset is
-#     unmounted+remounted -- proven live on homelab during this fix's own
-#     research, and asserted here so nobody "fixes" this test by making it
-#     pass without the property module or deploy story accounting for it
+# VM test: modules/nixos/zfs-dataset-properties.nix on a real zpool
+# snapdir=disabled must block explicit-path .zfs snapshot reads (ENOENT) by
+# an unprivileged uid, only on opted-in datasets, idempotently
+# the caveat subtest is real ZFS behavior (a .zfs automount cached before
+# the flip survives until remount); don't "fix" the test to drop it
 #
 # Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
 {
@@ -142,12 +116,8 @@ pkgs.testers.runNixOSTest {
         )
 
     with subtest("caveat: an already-cached automount survives the property changing"):
-        # This is not the module's job to fix -- it is a real ZFS
-        # behavior, verified live on homelab during this fix's research.
-        # Documented in the module's own option description; this
-        # subtest exists so a future change that silently "fixes" it
-        # either updates that claim with real evidence or gets caught
-        # here first.
+        # real ZFS behavior, documented in the module's option description;
+        # a change that "fixes" it must update that claim too
         guard.succeed("zfs set snapdir=hidden guardpool/untouched")
         assert can_read_as_nobody("/guardpool/untouched/.zfs/snapshot/s1/secret.txt"), (
             "sanity check: untouched should still be readable before this subtest's own toggle"

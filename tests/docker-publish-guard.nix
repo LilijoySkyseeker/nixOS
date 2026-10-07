@@ -1,24 +1,10 @@
-# Does the DOCKER-USER allowlist actually constrain a published port?
-#
-# This exists because the thing it replaces *looked* like it worked. The
-# game ports carried `networking.firewall.interfaces.<iface>.allowed*Ports`
-# rules for tailscale0 and wg0 for their whole life; those rules render,
-# they read correctly, and they constrain nothing for a docker-published
-# port, because a `-p` publish DNATs in nat/PREROUTING before the routing
-# decision and the packet is forwarded rather than delivered locally, so
-# it never traverses INPUT where those rules live (F-P4-02). A build
-# proves nothing here for the same reason. So this boots a real VM with a
-# real container and asserts on real netfilter state.
-#
-# The subtest that matters most is the docker-restart one: docker
-# recreates the FORWARD -> DOCKER-USER jump on every start, and a guard
-# that silently vanished on `systemctl restart docker` would leave the
-# ports open with nothing to report it.
+# VM test: the DOCKER-USER allowlist constrains a docker-published port
+# a `-p` publish is DNAT'd and forwarded, never hitting INPUT, so
+# `firewall.interfaces.<iface>.allowed*Ports` look right and do nothing;
+# only real netfilter state and real packets prove the guard
 { pkgs, dockerPublishGuardModule }:
 let
-  # Built locally rather than pulled, so the test needs no network. It
-  # listens on 8080 and answers one line, which is enough to tell
-  # "reached the container" from "dropped on the way".
+  # built locally so the test needs no network; answers one line on 8080
   listenerImage = pkgs.dockerTools.buildImage {
     name = "guard-test-listener";
     tag = "latest";
@@ -50,8 +36,7 @@ pkgs.testers.runNixOSTest {
       virtualisation.docker.enable = true;
       virtualisation.docker.daemon.settings.userland-proxy = false;
 
-      # Preload the locally-built image so the container can start with
-      # no registry and no network.
+      # preload the local image: no registry, no network
       virtualisation.oci-containers.backend = "docker";
       virtualisation.oci-containers.containers.listener = {
         image = "guard-test-listener:latest";
@@ -59,8 +44,7 @@ pkgs.testers.runNixOSTest {
         ports = [ "8080:8080" ];
       };
 
-      # Two dummy interfaces standing in for wg0 and tailscale0, so the
-      # rules can be asserted by name without needing a real tunnel.
+      # dummy stand-ins for wg0 and tailscale0, so rules assert by name
       systemd.network.netdevs = {
         "10-wg0" = {
           netdevConfig = {
@@ -126,10 +110,8 @@ pkgs.testers.runNixOSTest {
         rules = machine.succeed(f"iptables -S {chain}")
         for proto, port in [("tcp", 25565), ("udp", 19132),
                             ("udp", 34197)]:
-            # Matched on components rather than one exact string: the rule
-            # text legitimately grows (it gained `-o docker0`), and an
-            # exact-match assertion fails on a correct change while still
-            # not proving the parts that matter are present.
+            # matched on components, not one exact string: the rule text
+            # legitimately grows
             for iface in ["wg0", "tailscale0"]:
                 accept = [
                     r for r in rules.splitlines()
@@ -165,9 +147,7 @@ pkgs.testers.runNixOSTest {
             "guard chain matched a port it was never given"
 
     # ---- the actual claim: a real packet, to a real container --------
-    # Everything above asserts that rules exist. That is exactly the kind
-    # of evidence that was already true of the INPUT rules this replaces,
-    # which existed and did nothing. So prove behaviour, both directions.
+    # rules existing proves nothing; prove behaviour, both directions
 
     with subtest("a client off an unlisted interface cannot reach the container"):
         # The client is on the test LAN (eth1), which is not in
@@ -188,12 +168,8 @@ pkgs.testers.runNixOSTest {
         client.fail("nc -w 5 -z machine 8080")
 
     with subtest("guard rules only apply to traffic entering the bridge"):
-        # Regression: the rules originally matched on --dport alone, which
-        # also matches traffic a container *sends* when the protocol uses
-        # the same port at both ends. Factorio's server heartbeat does
-        # (SPT=34197 DPT=34197), so the guard silently de-listed the live
-        # server from the public server list while inbound play still
-        # worked. Every rule must be pinned to the bridge with -o.
+        # --dport alone also matches a container's outbound same-port traffic
+        # (factorio heartbeat, 34197 -> 34197); every rule needs -o docker0
         rules = machine.succeed(f"iptables -S {chain}").splitlines()
         for r in rules:
             if "--dport" not in r:
@@ -203,7 +179,7 @@ pkgs.testers.runNixOSTest {
 
     with subtest("a container's own outbound same-port traffic is not dropped"):
         # Send from inside the container to an outside address using the
-        # guarded port as *source* and destination, the shape that broke.
+        # guarded port as *source* and destination
         before = machine.succeed(
             f"iptables -vnL {chain} | grep 'dpt:34197' | tail -1"
         ).split()[0]

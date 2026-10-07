@@ -19,22 +19,13 @@ in
         dataDir = "/srv/jellyfin/data";
         logDir = "/srv/jellyfin/log";
 
-        # encoding.xml had drifted to HardwareAccelerationType=none and the
-        # module silently stops applying config once the file exists (only
-        # writes it if absent by default) -- force it so NixOS stays the
-        # source of truth and this can't drift again unnoticed. Backs up the
-        # prior file with a timestamp on every change. Loses a few fields
-        # the module doesn't model (DownMixAudioBoost, MaxMuxingQueueSize,
-        # EncoderPreset, DeinterlaceMethod, tonemapping algorithm/mode/
-        # range, ...), which revert to Jellyfin's own defaults -- accepted.
-        # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md#D1
+        # the module only writes encoding.xml if absent; force it so NixOS stays
+        # the source of truth. unmodelled fields (EncoderPreset, tonemapping,
+        # ...) revert to Jellyfin's defaults
         forceEncodingConfig = true;
 
-        # Nvidia GTX 1050 Mobile as primary transcoder: dedicated NVENC/NVDEC
-        # blocks free the CPU entirely, and it's the stronger of this host's two
-        # GPUs. The Intel iGPU's render node is also granted to the sandbox
-        # below so QSV/VAAPI can be picked from the dashboard as a fallback
-        # without touching this config.
+        # GTX 1050 Mobile (NVENC/NVDEC) as primary transcoder; the Intel iGPU's
+        # render node is granted below as a dashboard-selectable QSV/VAAPI fallback
         hardwareAcceleration = {
           enable = true;
           type = "nvenc";
@@ -63,25 +54,15 @@ in
       ];
       users.users.jellyfin.extraGroups = [ "render" ];
 
-      # pinned explicitly (rather than left to dynamic allocation) so its gid
-      # stays stable across rebuilds — NFS clients (see
-      # modules/nixos/nfs-homelab-mounts.nix) authorize purely by numeric
-      # gid, so drift here would silently break their access to /storage and
-      # /storage-bulk.
+      # pinned gid: NFS clients (modules/nixos/nfs-homelab-mounts.nix) authorize
+      # by numeric gid, so drift silently breaks /storage access
       users.groups.multimedia = {
         gid = vars.gids.multimedia;
         members = [ "jellyfin" ];
       };
-      # No tmpfiles rules for jellyfin's own directories, on purpose. The
-      # pinned nixpkgs jellyfin module already creates all four through the
-      # typed systemd.tmpfiles.settings API (rendered as jellyfinDirs.conf)
-      # at 0700 jellyfin:multimedia -- tighter than what this repo used to
-      # declare. The four raw rules that were here duplicated that in
-      # 00-nixos.conf at 0770, and since systemd-tmpfiles takes the first
-      # line it sees per path and 00-nixos.conf sorts first, their only
-      # effect was to *loosen* upstream from 0700 to 0770. Removed
-      # 2026-08-28 -- see
-      # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
+      # no tmpfiles rules for jellyfin's dirs: upstream creates them at 0700
+      # (jellyfinDirs.conf); raw rules here land in 00-nixos.conf, sort first
+      # and would loosen that
 
       # tailnet only: homelab's LAN NIC has a public IPv6 address, so no host-wide rule
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];

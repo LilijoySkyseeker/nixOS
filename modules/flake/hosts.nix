@@ -51,16 +51,10 @@ in
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"
-        # audio-switch's dedicated hotkeys hardcode this desk's three output
-        # devices, so it's wired in here (torrent only), not profile-pc,
-        # which thinkpad also uses.
+        # torrent only, not profile-pc: hotkeys hardcode this desk's outputs
         { home-manager.users.lilijoy.imports = [ homeManagerModules."audio-switch" ]; }
-        # The Brother printer/scanner is wired in here (torrent only), not
-        # profile-pc: its static-IP print queue and static-IP scanner
-        # entry are network-supplied-identity risks on thinkpad, a roaming
-        # laptop, and scanning pulls in an unfree vendor blob confined to
-        # this one host (ADR-0003) -- see
-        # modules/nixos/brother-mfc-l2740dw.nix.
+        # torrent only, not profile-pc: static-IP printer/scanner entries are
+        # spoofable on roaming thinkpad; unfree scan blob confined here (ADR-0003)
         nixosModules."brother-mfc-l2740dw"
       ];
     };

@@ -20,9 +20,7 @@
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
-    # root has no home-manager profile (and thus no SSH identity of its
-    # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
-    # already trusts and authenticates to the origin remote day-to-day.
+    # root has no SSH identity here; reuse lilijoy's, already trusted by origin
     sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
@@ -87,27 +85,12 @@
   fileSystems."/nix".neededForBoot = true;
   fileSystems."/nix/state".neededForBoot = true;
 
-  # zroot root dataset's own properties, self-healed live too now, not
-  # just at disko install. plan:
-  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
+  # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
 
-  # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
-  # sanoid + the syncoid-based myBackupPush). Passive side -- see the
-  # equivalent block in hosts/torrent/configuration.nix for the reasoning.
-  #
-  # Being a laptop, this host spends the most time unreachable, so the
-  # module's snap job matters most here: snapshotting and a local prune
-  # ceiling run on-box and do not wait for homelab. A month away costs
-  # nothing -- the replication cursor bookmark survives, so the next pull
-  # resumes incrementally rather than resending.
-  #
-  # That removes what would otherwise be the strongest argument for
-  # flipping this host to push (myZrepl.push.targets): under pull the
-  # puller owns retention, so without a snap job an unreachable homelab
-  # would mean no pruning at all here. Pull is kept because this is also
-  # the host most likely to be compromised, and pull is what denies a
-  # compromised source the ability to destroy its own backup history.
+  # zfs snapshots served to homelab's zrepl puller (passive side, as torrent).
+  # pull, not push: the most exposed host can't destroy its own backup
+  # history; the local snap job keeps pruning while homelab is unreachable
   myZrepl = {
     enable = true;
     preserveLegacySnapshots = false;
@@ -121,17 +104,13 @@
     };
   };
 
-  # sshd exists on this host solely to carry zrepl's stdinserver
-  # transport: tailnet-only, root login forced-commands-only, and no other
-  # root keys present. See hosts/torrent/configuration.nix for detail.
+  # sshd only carries zrepl's stdinserver transport: tailnet-only, root is
+  # forced-commands-only, and there must be no other root keys
   services.openssh = {
     enable = true;
     openFirewall = false;
-    # docs/hardening.md's full SSH baseline (F-P5-07). See
-    # hosts/torrent/configuration.nix for why these are `settings` rather
-    # than `extraConfig`, and for the OpenSSH 10.4p1 default each one
-    # replaces -- both hosts rendered the identical sshd.conf-final, down
-    # to the same store path, so the gap and the fix are identical too.
+    # docs/hardening.md's SSH baseline; see hosts/torrent/configuration.nix
+    # for why these are `settings`, not `extraConfig`
     allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
@@ -157,24 +136,15 @@
     ];
   };
 
-  # Backup restore-test canaries -- content must match homelab's
-  # myBackupRestoreTest.zbackup.targets byte for byte. See
-  # 2026-09-04-automated-canary-based-backup-restore-and-verify-tier-1.md.
+  # backup restore-test canaries: content must match homelab's
+  # myBackupRestoreTest.zbackup.targets byte for byte
   myBackupCanary.paths = {
     "/home/.backup-canary/canary.txt" = "backup-canary thinkpad zroot/local/home v1";
     "/.backup-canary/canary.txt" = "backup-canary thinkpad zroot/local/root v1";
   };
 
-  # failed-unit / stuck-switch alerts to Discord (F-P7-09). See
-  # hosts/torrent/configuration.nix for the full reasoning: why homelab's
-  # webhook is reused rather than a per-host key minted, why checkSmart
-  # is off on a host that has a session, and why a *skipped* deploy is
-  # still not caught by this.
-  #
-  # It matters more here than on torrent. This host is a laptop that is
-  # legitimately offline for long stretches, so "no news" has always been
-  # indistinguishable from "deploying fine" -- and it is the host the
-  # audit could not verify live at all, precisely because it was dark.
+  # failed-unit / stuck-switch alerts to Discord; see
+  # hosts/torrent/configuration.nix for the shared webhook and checkSmart
   sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
@@ -184,22 +154,12 @@
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkSmart = false;
-    # A laptop that wakes after weeks off will fire one batch of alerts
-    # for anything that failed while it was down. That is the intended
-    # behaviour -- the timer is Persistent, so the catch-up run is what
-    # surfaces a deploy that broke a month ago -- and cooldownHours (6)
-    # keeps it to a single batch rather than a repeat every 15 minutes.
+    # after weeks off, the Persistent timer fires one catch-up batch;
+    # cooldownHours keeps it to one
     #
-    # Same reasoning as torrent: the failed-units check cannot see a
-    # pull-deploy that *skips*, because every guard exits 0. Watching the
-    # profile symlink's mtime catches the outcome regardless of cause.
-    #
-    # 720h = 30 days rather than torrent's 504. This host is a laptop that
-    # legitimately goes dark for long stretches, and it additionally sets
-    # requireACPower, so a Thursday spent on battery is a skip that is
-    # entirely correct. The threshold only has to be tight enough to catch
-    # "stopped deploying for good", and it clears itself on the next
-    # successful deploy after a wake-up.
+    # profile mtime catches a pull-deploy that skips (guards exit 0). 720h,
+    # not torrent's 504: a laptop goes dark for weeks and requireACPower
+    # legitimately skips battery Thursdays
     staleMarkerFiles = {
       "/nix/var/nix/profiles/system" = 720;
     };

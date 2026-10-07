@@ -6,10 +6,8 @@ _: {
       "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # yubikey
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6pG0Y9QdCBRJZKpCD62U3uXl5Lz/bE0ifWLbhZ4q9o lilijoy@torrent" # torrent
     ];
-    # Public half of homelab's zrepl pull key (private half is the
-    # homelab_zrepl_key sops secret). Both source hosts pin this same key
-    # to a forced `zrepl stdinserver` command in root's authorized_keys, so
-    # it lives here rather than being repeated per host.
+    # public half of homelab's zrepl pull key (private: homelab_zrepl_key
+    # sops secret); both source hosts pin it to a forced `zrepl stdinserver`
     zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
     username = "lilijoy";
     # public domain fronted by hosts/vps (minecraft, factorio subdomains,
@@ -25,11 +23,7 @@ _: {
     # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
 
-    # disko.nix's zpool rootFsOptions -- byte-identical across every zpool
-    # on every host (torrent's zroot, thinkpad's zroot, homelab's
-    # zroot/zdata/zbackup) before this was consolidated. One copy here
-    # instead of five, so a change doesn't have to be made five times and
-    # can't quietly drift between them.
+    # disko.nix's zpool rootFsOptions, shared by every zpool on every host
     zfsRootFsOptions = {
       acltype = "posixacl";
       xattr = "sa";
@@ -42,21 +36,16 @@ _: {
       "com.sun:auto-snapshot" = "false";
     };
 
-    # Shared lookup for a ZFS host's disko.nix: reads a dataset's properties
-    # from that host's own myZfsDatasetProperties instead of a second
-    # hand-written literal. Call as `(vars.zfsProps config) "<pool>"
-    # "<dataset>"`; fails loudly at eval time on a host that doesn't import
-    # zfs-dataset-properties (deliberate coupling). plan:
-    # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
+    # reads a dataset's properties from the host's own
+    # myZfsDatasetProperties for disko.nix: `(vars.zfsProps config) "<pool>"
+    # "<dataset>"`; fails at eval on a host without zfs-dataset-properties
     zfsProps =
       config: pool: dataset:
       config.myZfsDatasetProperties."${pool}/${dataset}" or { };
 
-    # disko.nix's root-SSD disk layout (ESP + swap + a zroot-pool
-    # partition) -- identical shape on homelab/torrent/thinkpad, differing
-    # only in swap size. `idx` picks the boot mountpoint (`/boot` for 1,
-    # `/boot-<idx>` otherwise, for hosts with more than one ESP) and feeds
-    # disko's partition-label uniqueness requirement.
+    # disko.nix's root-SSD layout (ESP + swap + zroot), shared by
+    # homelab/torrent/thinkpad. `idx` picks the boot mountpoint (`/boot`
+    # for 1, else `/boot-<idx>`) and keeps disko partition labels unique
     mkZfsRootSsd = idx: id: swapSize: {
       type = "disk";
       device = "/dev/disk/by-id/${id}";

@@ -2,13 +2,9 @@
 #
 # design: docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md
 #
-# One entry, keyed by full dataset name, generates every consumer: the
-# disko entry, the ZFS properties (via myZfsDatasetProperties, which
-# vars.zfsProps already reads for disko's own options), and -- for a
-# dataset nothing else already persists -- the environment.persistence
-# entry. `tier` has no default: a dataset declared without one is an
-# evaluation error, which is the point (ADR-0001, "safe by default,
-# twice over").
+# one entry, keyed by full dataset name, generates the disko entry, the ZFS
+# properties (via myZfsDatasetProperties) and, unless already persisted, the
+# environment.persistence entry. `tier` has no default on purpose (ADR-0001)
 _: {
   flake.modules.nixos."datasets" =
     {
@@ -20,10 +16,8 @@ _: {
     let
       cfg = config.myDatasets;
 
-      # com.sun:auto-snapshot follows from the tier alone (ADR-0001's
-      # table); every other zfs-dataset-properties key a specific dataset
-      # needs stays a plain myZfsDatasetProperties entry outside this
-      # registry, same as today.
+      # com.sun:auto-snapshot follows from the tier alone (ADR-0001's table);
+      # other per-dataset properties stay plain myZfsDatasetProperties entries
       tierAutoSnapshot = {
         offsite = "true";
         onsite = "true";
@@ -34,13 +28,8 @@ _: {
       poolOf = name: builtins.head (lib.splitString "/" name);
       relOf = name: lib.concatStringsSep "/" (lib.tail (lib.splitString "/" name));
 
-      # A dataset already mounted under persistRoot (the new, flat
-      # `/nix/state/<service>` convention) needs no impermanence
-      # indirection -- it is real, non-volatile storage already. Anything
-      # else (an existing service's own directory elsewhere, e.g.
-      # jellyfin's `/srv/jellyfin/cache`) is bind-mounted from
-      # persistRoot+mountpoint by impermanence, same as every other
-      # persisted directory.
+      # a mountpoint under persistRoot is mounted directly; anything else is
+      # mounted at persistRoot+mountpoint for impermanence to bind-mount
       diskoMountpoint =
         ds:
         if lib.hasPrefix "${vars.persistRoot}/" ds.mountpoint then

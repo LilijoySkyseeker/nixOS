@@ -1,23 +1,8 @@
 _: {
-  # Single shared zrepl module covering every role this repo needs:
-  # snapshotting, local replication, and both ends of remote replication.
-  # zrepl is one daemon per host driven by one YAML file, so unlike the
-  # sanoid+syncoid pair it replaces there is no separate "snapshot tool"
-  # and "replication tool" to keep in sync -- retention lives in the same
-  # job that does the sending.
-  #
-  # Topology: pull is the default and push is opt-in per host. In a pull
-  # setup the backup server dials out and the source hosts are passive,
-  # which means a compromised source host has no RPC handle on the backup
-  # server at all. That matters because zrepl's receiving endpoint
-  # exposes DestroySnapshots (internal/endpoint/endpoint.go:1058), bounded
-  # only to the client's own subtree -- so in a *push* setup a compromised
-  # source can delete its own backup history. Pull removes that entirely:
-  # the puller owns retention (keep_sender prunes the source), and the
-  # source can only answer questions it is asked.
-  #
-  # Use push only where pull genuinely loses coverage -- e.g. a laptop
-  # that is online in short unpredictable windows the puller may miss.
+  # zrepl: snapshotting, local replication and both ends of remote replication
+  # pull is the default: a push client can DestroySnapshots on its own backup
+  # subtree, so a compromised source could wipe its history; push only where
+  # a puller would miss the host (e.g. a laptop online in short windows)
   flake.modules.nixos."zrepl" =
     {
       config,
@@ -30,25 +15,12 @@ _: {
 
       yamlFormat = pkgs.formats.yaml { };
 
-      # zrepl names the two ends of one transport asymmetrically: the
-      # dialing side is connect.type = "ssh+stdinserver" while the
-      # listening side is serve.type = "stdinserver" (verified against
-      # v0.7.0 internal/config/config.go's ConnectEnum/ServeEnum
-      # unmarshallers). Callers name a transport once, using the
-      # connect-side spelling, and these renderers absorb the split.
-      # zrepl's own default dial_timeout for every network connect type
-      # (ssh+stdinserver, tcp, tls) is 10s (v0.7.0
-      # internal/config/config.go's Connect structs). That's tight enough
-      # that a few seconds of path renegotiation -- e.g. Tailscale's
-      # magicsock flapping between candidate endpoints, seen causing
-      # exactly this on thinkpad's LAN -- trips a hard failure the job
-      # only recovers from on its next scheduled interval. Bumped
-      # universally here (not per-host) so every current and future
-      # remote gets the same slack against transient network flakiness,
-      # since that's inherent to whatever LAN/link a host is on and not
-      # something this repo controls.
+      # zrepl's 10s default dial_timeout fails a whole job interval on a few
+      # seconds of path renegotiation (e.g. tailscale endpoint flapping)
       remoteDialTimeout = "60s";
 
+      # zrepl spells the two ends asymmetrically: connect "ssh+stdinserver",
+      # serve "stdinserver"; callers use the connect spelling, these map it
       mkConnect =
         t:
         {
@@ -108,9 +80,7 @@ _: {
         }
         .${s.type};
 
-      # zrepl's filesystem filter is a pattern -> bool map. A trailing "<"
-      # on a pattern means "this dataset and its children", so callers can
-      # express recursion in the dataset string itself.
+      # pattern -> bool map; a trailing "<" means the dataset and its children
       mkFilesystems = datasets: lib.genAttrs datasets (_: true);
 
       mkSnapshotting = {
@@ -118,49 +88,24 @@ _: {
         inherit (cfg.snapshot) interval prefix;
       };
 
-      # Grid rules are regex-scoped to zrepl's own snapshot prefix.
-      #
-      # Careful with what that scoping means: it does NOT spare
-      # non-matching snapshots. KeepGrid puts every snapshot that fails
-      # the regex straight onto its destroy list
-      # (internal/pruning/keep_grid.go), and PruneSnapshots destroys a
-      # snapshot once *every* rule lists it
-      # (internal/pruning/pruning.go:39). So a lone grid rule condemns
-      # foreign snapshots rather than ignoring them. The regex only stops
-      # foreign snapshots from being counted as grid occupants and
-      # displacing zrepl's own. See protectRule for the actual guard.
+      # the prefix regex does NOT spare foreign snapshots: keep_grid condemns
+      # every non-match, it only stops them occupying grid slots; protectRule
+      # is the actual guard
       gridRule = grid: {
         type = "grid";
         inherit grid;
         regex = "^${cfg.snapshot.prefix}";
       };
 
-      # Never prune a snapshot the receiver hasn't got yet. Without this a
-      # slow or long-offline replication target can have its incremental
-      # base pruned out from under it -- the exact failure that stranded
-      # the syncoid push this module replaces.
+      # never prune a snapshot the receiver hasn't got, or a slow/offline
+      # target loses its incremental base
       notReplicatedRule = {
         type = "not_replicated";
       };
 
-      # Guard for snapshots zrepl must never destroy.
-      #
-      # This is not optional decoration -- without it zrepl deletes any
-      # snapshot it did not create. The pruner treats everything older
-      # than the replication cursor as replicated ("all snapshots older
-      # than cursor are interpreted as replicated",
-      # internal/daemon/pruner/pruner.go:441), so not_replicated condemns
-      # it; and a grid rule condemns every snapshot failing its prefix
-      # regex rather than ignoring it (internal/pruning/keep_grid.go).
-      # Both agreeing means destruction, since PruneSnapshots only spares
-      # a snapshot some rule actively keeps
-      # (internal/pruning/pruning.go:39).
-      #
-      # A `regex` keep rule inverts that: it keeps what it matches and
-      # only lists non-matches for destruction
-      # (internal/pruning/keep_regex.go), so one matching rule is enough
-      # to hold a snapshot indefinitely. Matching is against the bare
-      # snapshot name, not pool/dataset@name (pruner.go:356).
+      # required: without it zrepl destroys every snapshot it didn't create
+      # (not_replicated and the grid both condemn it); a regex keep rule holds
+      # whatever it matches, against the bare snapshot name
       protectRule = regex: {
         type = "regex";
         inherit regex;
@@ -178,54 +123,12 @@ _: {
         keep_receiver = keepReceiver;
       };
 
-      # Every receiving job needs this, and leaving it off is a runtime
-      # failure rather than a config error.
-      #
-      # root_fs is extended with the *full* source dataset path
-      # (subroot.MapToLocal), so receiving zroot/local/home into
-      # zbackup/backup/torrent means zrepl must first create the
-      # intermediate datasets zroot and zroot/local on the receiver as
-      # "placeholders". Creating one requires knowing what to do with the
-      # encryption property, and the config default is "unspecified"
-      # (PlaceholderRecvOptions, internal/config/config.go:145), which
-      # fails the receive with "placeholder filesystem encryption handling
-      # is unspecified in receiver config" (internal/endpoint/endpoint.go).
-      # configcheck accepts the file either way -- the failure only shows
-      # up when a real receive tries to create a placeholder.
-      #
-      # Valid values are "inherit" and "off"
-      # (placeholdercreationencryptionproperty_enumer.go). zbackup is not
-      # encrypted, so "off" is right here; "inherit" is for receiving into
-      # an encrypted root.
-      # The properties below pin what an incoming stream may set (F-P6-03).
-      #
-      # The module's headline argument -- "a compromised source host has no
-      # RPC handle on this machine at all" -- is true about *RPC* and
-      # incomplete about *data*. Under pull, this host still feeds an
-      # entirely source-controlled `zfs send` stream into a root `zfs recv`,
-      # and three facts combined badly:
-      #
-      #   1. The *sender* decides whether properties travel at all:
-      #      Sender.sendMakeArgs reads the source host's own
-      #      `send.properties`, so a source whose root is compromised turns
-      #      it on and the puller has no say and no way to detect it.
-      #   2. The receiver applied whatever arrived. mkRecv set only
-      #      placeholder.encryption, so buildRecvFlags emitted no -x and
-      #      no -o.
-      #   3. Nothing stopped a mount: ZFSRecv never passes -u, and a
-      #      *received* property outranks the inherited mountpoint=none the
-      #      zbackup containers get from the pool root.
-      #
-      # So a hostile `mountpoint=/etc` (or /root/.ssh) plus canmount=on in
-      # the stream could land as a root-owned mount over a live path on the
-      # backup server; sharenfs/sharesmb are the same shape with a
-      # different payoff. Pinning them here costs nothing and does not
-      # depend on that full escalation reproducing.
-      #
-      # -o and -x for the same property are mutually exclusive, so each
-      # property appears in exactly one of these two lists: override for
-      # the two that must take a specific value, inherit for the ones that
-      # simply must not come from the wire.
+      # placeholder.encryption is required: zrepl's "unspecified" default
+      # fails every receive that creates a placeholder, and configcheck
+      # doesn't catch it
+      # security (F-P6-03): the source controls the send stream, so pin props
+      # a hostile stream could set (e.g. mountpoint=/etc, canmount=on, shares);
+      # -o and -x are exclusive per property, so each is in one list only
       mkRecv = {
         placeholder.encryption = cfg.placeholderEncryption;
         properties = {
@@ -233,8 +136,7 @@ _: {
             mountpoint = "none";
             canmount = "off";
           };
-          # quoted: `inherit` is a Nix keyword, so it cannot be a bare
-          # attribute name here even though it is zrepl's own key name.
+          # quoted: `inherit` is a nix keyword
           "inherit" = [
             "sharenfs"
             "sharesmb"
@@ -247,9 +149,7 @@ _: {
 
       # ---- job builders, one per role ------------------------------
 
-      # Every dataset this host owns, however it is replicated. Used to
-      # default the snap job's coverage so a host declares its datasets
-      # once and cannot accidentally leave one unsnapshotted.
+      # every dataset this host owns, however replicated; snap job default
       ownedDatasets = lib.unique (
         cfg.serve.datasets
         ++ cfg.local.datasets
@@ -258,30 +158,13 @@ _: {
 
       snapEnabled = cfg.snap.enable && cfg.snap.datasets != [ ];
 
-      # When a snap job owns snapshotting, every other job that would
-      # otherwise snapshot the same datasets must stand down, or the
-      # datasets get two independent snapshot streams.
+      # other jobs stand down when a snap job owns snapshotting, or the
+      # datasets get two snapshot streams
       ownedSnapshotting = if snapEnabled then { type = "manual"; } else mkSnapshotting;
 
-      # Local snapshotting and local pruning, beholden to no peer.
-      #
-      # This is what keeps a host self-sufficient while whatever it
-      # replicates to is unreachable. Under pull the puller owns
-      # retention (keep_sender lives in the puller's config), so a source
-      # host whose puller is down does not prune at all -- at a 5m
-      # cadence that is ~8.6k snapshots per dataset per month. This job
-      # bounds that locally.
-      #
-      # It is a ceiling, not the primary policy: retention.ceiling is
-      # deliberately more generous than retention.source, so in normal
-      # operation the puller's stricter rules decide and this never bites.
-      # That ordering matters because a snap job has no replication
-      # cursor -- zrepl substitutes alwaysUpToDateReplicationCursorHistory
-      # (internal/daemon/job/snapjob.go), which makes a not_replicated
-      # rule inert here -- so this pruner *can* destroy snapshots that
-      # were never replicated. Keeping it slack means it only does so
-      # after an outage long enough that the alternative was unbounded
-      # growth.
+      # local snapshotting and a prune ceiling, beholden to no peer (under
+      # pull a source with its puller down never prunes); keep the ceiling
+      # slacker than retention.source: snap jobs ignore not_replicated
       snapJob = lib.optional snapEnabled {
         type = "snap";
         name = "snapshots";
@@ -302,23 +185,15 @@ _: {
         type = "pull";
         inherit name;
         connect = mkConnect r;
-        # Pull jobs do NOT append the client identity to root_fs
-        # (PullJob.GetAppendClientIdentity() returns false, unlike
-        # SinkJob's true), so each remote needs its own explicit root_fs.
+        # pull jobs don't append the client identity, unlike sink jobs
         root_fs = r.rootFs;
         inherit (r) interval;
         recv = mkRecv;
         pruning = mkPruning r.keepSender r.keepReceiver;
       }) cfg.pull.remotes;
 
-      # NOTE: push jobs deliberately keep their own snapshotting even when
-      # a snap job exists. A push job's replication is driven *solely* by
-      # its snapshotter -- modePush.RunPeriodic is just snapper.Run
-      # (internal/daemon/job/active.go:135) and PushJob has no interval
-      # field -- so handing snapshotting to a snap job would leave the
-      # push job replicating only on a manual `zrepl signal wakeup`.
-      # Pull jobs have no such coupling (modePull.RunPeriodic has its own
-      # interval loop), which is why pull is the default topology.
+      # push jobs keep their own snapshotting even with a snap job: push
+      # replicates only after its own snapshots (no interval field)
       pushJobs = lib.mapAttrsToList (name: t: {
         type = "push";
         name = "push-${name}";
@@ -336,15 +211,8 @@ _: {
         recv = mkRecv;
       };
 
-      # Same-host replication over zrepl's "local" transport -- a matching
-      # source/pull pair joined by a listener name, no ssh or tcp.
-      #
-      # Deliberately source+pull rather than push+sink. A push job's
-      # replication cadence is welded to its snapshot cadence (see the
-      # note on pushJobs above), which would mean replicating to the
-      # backup pool every 5m purely because that is how often we snapshot.
-      # Pull carries its own interval, so snapshot frequency and how hard
-      # this leans on the (I/O-starved) target pool are separate knobs.
+      # same-host replication: a source/pull pair joined by a listener name;
+      # source+pull, not push+sink, so replication has its own interval
       localJobs = lib.optionals cfg.local.enable [
         {
           type = "source";
@@ -365,9 +233,7 @@ _: {
             client_identity = cfg.local.clientIdentity;
             dial_timeout = "10s";
           };
-          # Spelled out in full: pull jobs don't append a client identity
-          # the way a sink would, so this carries the per-host component
-          # itself.
+          # pull jobs don't append the client identity, so add it here
           root_fs = "${cfg.local.rootFs}/${cfg.local.clientIdentity}";
           interval = cfg.local.interval;
           recv = mkRecv;
@@ -388,11 +254,7 @@ _: {
 
       configFile = yamlFormat.generate "zrepl.yml" settings;
 
-      # zrepl parses its config with UnmarshalStrict, so a stray or
-      # misspelled key is a hard startup failure rather than a warning.
-      # Running configcheck at build time turns that into a build error,
-      # which keeps it inside the repo's build-before-commit convention
-      # instead of surfacing on the target host at activation.
+      # zrepl parses strictly: a bad key fails startup; catch it at build time
       configCheck =
         pkgs.runCommand "zrepl-config-check-${config.networking.hostName}"
           { nativeBuildInputs = [ config.services.zrepl.package ]; }
@@ -419,9 +281,7 @@ _: {
           description = "zrepl keep rules applied to the receiving side's snapshots.";
         };
 
-      # Every dialing role shares one transport shape so the transport
-      # stays pluggable: swapping ssh+stdinserver for tls is a type change
-      # plus the fields that type needs, with no other config churn.
+      # one transport shape for every dialing role
       connectOptions = {
         type = lib.mkOption {
           type = lib.types.enum [
@@ -593,8 +453,7 @@ _: {
           default = true;
           description = ''
             Keep pre-zrepl snapshots (see legacySnapshotPrefix) instead of
-            letting the first prune destroy them. On by default so the
-            sanoid cutover doesn't take local snapshot history with it.
+            letting the first prune destroy them.
 
             Turn off once zrepl has built up enough history of its own,
             then destroy the leftovers by hand -- nothing ages them out
@@ -622,14 +481,6 @@ _: {
               exempt: they run on their own interval and simply collect
               whatever snapshots accumulated, so a source host's cadence
               does not drive network traffic.
-
-              This is 3x the snapshot rate of the sanoid setup it replaces
-              (which ran minutely) and so a net reduction in metadata churn
-              on homelab's USB-attached zbackup pool, where sanoid was
-              enumerating every snapshot every 60s. That pool's link was
-              USB 2.0 when this was chosen; it is USB 3.0 since the
-              2026-08-23 cable change, so the pressure this relieves is
-              real but no longer acute.
             '';
           };
 
@@ -639,7 +490,7 @@ _: {
             description = ''
               Prefix for snapshots zrepl creates. Also scopes every grid
               keep rule -- though note that scoping condemns foreign
-              snapshots rather than sparing them; see legacyRule.
+              snapshots rather than sparing them; see protectRegexes.
             '';
           };
         };
@@ -1075,70 +926,18 @@ _: {
           inherit settings;
         };
 
-        # Upstream's module (nixos/modules/services/backup/zrepl.nix)
-        # hard-`Requires=local-fs.target`. Found the hard way: on a real
-        # homelab reboot, `storage.mount` (/storage, on zdata) failed its
-        # first attempt (status=2/INVALIDARGUMENT, a known ZFS
-        # mount-before-ready race unrelated to zrepl or the zbackup-import
-        # fix), which failed local-fs.target, which aborted zrepl's start
-        # job with "Dependency failed". The mount self-healed a second
-        # later, but systemd does not retry a unit whose start job failed
-        # for a dependency reason -- zrepl sat inactive (dead) until
-        # someone ran `systemctl start zrepl` by hand. That is a silent
-        # backup outage, the exact class of bug this migration exists to
-        # fix (see 2026-08-24-zbackup-was-never-imported-at-boot-backups-had-bee.md
-        # for the first instance).
-        #
-        # `mkForce [ ]` drops that Requires; Wants+After keeps the
-        # normal-case ordering (zrepl still starts after local-fs.target's
-        # start job finishes, mounts attempted either way) without letting
-        # a transient dependency failure permanently down the daemon. If a
-        # dataset genuinely isn't mounted yet when zrepl starts, that job's
-        # own next cycle (source/pull jobs run on their own interval)
-        # simply fails and retries -- worst case a few minutes of gap
-        # instead of an indefinite one, and no longer something a human
-        # has to notice and fix by hand. This trades away the guarantee
-        # that zrepl never starts before its filesystems are ready in
-        # exchange for it never staying down over a transient mount
-        # hiccup. 2026-08-26: the underlying storage.mount race itself is
-        # now fixed too (storage/storage and storage/storage-bulk moved to
-        # options.mountpoint = "legacy" in disko.nix, so zfs-mount.service
-        # no longer races the fstab-generated mount units for them --
-        # reboot-verified, see
-        # 2026-08-26-storage-storage-bulk-failed-their-first-mount-atte.md),
-        # but this Wants=/After=
-        # override is kept regardless as defense in depth against any
-        # other local mount having a bad boot.
+        # upstream Requires=local-fs.target: one transient mount failure at
+        # boot leaves zrepl dead with no retry (silent backup outage); keep
+        # the ordering, a not-yet-mounted dataset just fails one job cycle
         systemd.services.zrepl = {
           requires = lib.mkForce [ ];
           wants = [ "local-fs.target" ];
           after = [ "local-fs.target" ];
         };
 
-        # A sender-side backstop the puller cannot override (F-P6-04).
-        #
-        # Under pull, the puller holds destroy authority over this host's
-        # snapshots and there is no veto on this side: zrepl's
-        # Sender.DestroySnapshots runs `zfs destroy` for every snapshot the
-        # client names and evaluates no keep rules, and config.SourceJob has
-        # no Pruning field at all in 0.7.0. This host's own protectRegexes
-        # and its snap job's ceiling are *local pruning policy*; they do not
-        # gate an incoming destroy. So a compromised homelab -- or simply a
-        # `protectRegexes` typo on homelab -- can destroy every snapshot
-        # here, including @blank, which is the impermanence rollback point
-        # and is not regenerable without reinstalling.
-        #
-        # A plain `zfs hold` fixes that asymmetry locally. zrepl only
-        # recognises and releases holds tagged zrepl_STEP_J_* /
-        # zrepl_last_received_J_*, so a foreign tag is invisible to it and
-        # cannot be released over any RPC, while doDestroySnapshots
-        # tolerates the resulting failure rather than aborting the run
-        # (already covered by tests/zfs-space-guard.nix's "a zrepl-style
-        # hold is tolerated" subtest).
-        #
-        # Only ever @blank. Holding a zrepl_-prefixed snapshot would pin the
-        # pool, since those are exactly the ones retention must be free to
-        # destroy.
+        # security (F-P6-04): the puller destroys whatever snapshots it names,
+        # ignoring local keep rules; a non-zrepl hold tag can't be released
+        # over RPC; only ever @blank, holding zrepl_ snapshots pins the pool
         systemd.services.zrepl-protect-blank = lib.mkIf (cfg.serve.enable && cfg.serve.datasets != [ ]) {
           description = "Hold @blank on served datasets so a puller cannot destroy it";
           wantedBy = [ "multi-user.target" ];
@@ -1149,8 +948,7 @@ _: {
             ${lib.concatMapStringsSep "\n" (dataset: ''
               snap=${lib.escapeShellArg dataset}@blank
               if ! zfs list -t snapshot -H -o name "$snap" >/dev/null 2>&1; then
-                # No @blank: a host not yet on impermanence, or a test
-                # pool. Nothing to protect, and not an error.
+                # no @blank (not on impermanence, or a test pool): not an error
                 echo "zrepl-protect-blank: $snap does not exist, skipping"
               elif zfs holds -H "$snap" | cut -f2 | grep -qx protect; then
                 echo "zrepl-protect-blank: $snap already held"
@@ -1163,8 +961,7 @@ _: {
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
-            # Same stack as zfs-emergency-prune, and NOT PrivateDevices
-            # for the same reason: this needs /dev/zfs.
+            # no PrivateDevices: needs /dev/zfs
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;
@@ -1177,10 +974,8 @@ _: {
           };
         };
 
-        # Forced-command keys for every ssh+stdinserver peer. The command
-        # is fixed here rather than chosen by the client, so a key can only
-        # ever proxy to the one identity it was issued for -- it cannot ask
-        # for a shell, and it cannot claim to be a different host.
+        # forced-command keys: each key only proxies to its own identity, no
+        # shell, no claiming another host
         users.users.root.openssh.authorizedKeys.keys =
           let
             forcedCommand =
