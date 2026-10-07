@@ -35,7 +35,6 @@ in
             # Take owner and mode from the enclosing config/ directory,
             # which the remap migration keeps correct, so this holds with
             # or without userns-remap and hardcodes no uid offset.
-            # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#G13
             chown --reference="${directory}/config" "$settings.tmp"
             chmod --reference="$settings" "$settings.tmp"
             mv "$settings.tmp" "$settings"
@@ -222,7 +221,7 @@ in
       # factorio server
       virtualisation.oci-containers.containers = {
         factorio-main = {
-          autoStart = true;
+          autoStart = false; # disabled 2026-10-06: nobody playing; set true to bring it back (data persists)
           # Pinned to the exact version the current save is already in
           # (2.1.14, factoriotools' newer/experimental line) rather than
           # `stable` (2.0.77) — the live save can't be loaded by an older

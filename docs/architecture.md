@@ -46,10 +46,10 @@ key:
 
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
-| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `backup-canary` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `alloy`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
-| `homelab` | stable | `profile-default`, `profile-server`, `auto-update`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba`, `loki`, `grafana`, `alloy` |
-| `vps` | unstable | `profile-default`, `profile-server`, `health-alerts`, `alloy` |
+| `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary` |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
+| `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
+| `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
 | `isoimage` | unstable | `copyparty-iso` |
 
 ### Which nixpkgs a host tracks
@@ -63,18 +63,8 @@ when something breaks.
 
 **Known deviation: `vps` is on unstable and should be on stable.** It is
 a server and the only host with a public interface, so it belongs on
-the stable branch with `homelab`. It is not there, and moving it is an
-open item, tracked in `2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md` — check it before assuming the table above reflects
-the intent.
-
-This rule was written down on 2026-08-27 because it existed nowhere:
-it had to be inferred from the table above, and inferring it from the
-code gives the *wrong* answer, since `vps` contradicts it. That is
-likely how `vps` drifted in the first place. It also has a second-order
-effect worth knowing — `flake-update-test`'s auto-merge gate builds only
-`homelab`, so it only ever exercises `nixpkgs-stable`; the more hosts
-that legitimately sit on stable, the more of the fleet that gate covers
-(see `docs/audits/2026-08-26/D11-analysis.md` §2).
+the stable branch with `homelab`. Moving it is an open item; until then
+the table above is the fact and this rule is the intent.
 
 `homelab`'s stable pin still means the same thing it always did: a module
 option that exists in unstable may not exist yet in the pinned stable
@@ -135,7 +125,7 @@ not the boundary itself:
   `modules/flake/hosts.nix` (or a profile it composes) actually lists its
   key — being present in the directory, or even being syntactically valid
   and picked up by `import-tree`, doesn't mean any host uses it. Many of
-  these (`alloy.nix`, `auto-update.nix`, `health-alerts.nix`,
+  these (`health-alerts.nix`,
   `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`, `datasets.nix`,
   among others) define a real `options`/`config` surface with an enable
   flag — see `.claude/rules/nix.md`'s `my<Name>` convention. Others (`kde.nix`, `wooting.nix`, most of
@@ -143,12 +133,9 @@ not the boundary itself:
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
-  beets, copyparty, factorio, minecraft, octodns, nfs, samba, loki,
-  grafana), each registering as
-  `flake.modules.nixos.<name>` and listed per-host in
-  `modules/flake/hosts.nix`. No options surface (one exception:
-  `loki.nix` exposes a single `myLoki.alertWebhookFile` option as a VM-test
-  seam — see the comment there). Reach for
+  beets, copyparty, factorio, minecraft, octodns, nfs, samba), each
+  registering as `flake.modules.nixos.<name>` and listed per-host in
+  `modules/flake/hosts.nix`. No options surface. Reach for
   `modules/services/` over an inline host-config block once the config is
   substantial enough to warrant its own file, or could plausibly move to
   another host later.
@@ -166,8 +153,8 @@ not the boundary itself:
 
 Two hosts are still structurally unusual, same as before the migration:
 
-- **`vps`** pulls in no `modules/services/*` modules. It's a tunnel/proxy
-  endpoint (caddy, crowdsec, wireguard, NAT/DNAT forwarding), and that
+- **`vps`** pulls in no `modules/services/*` modules. It's a tunnel
+  endpoint (wireguard, NAT/DNAT forwarding of the game ports), and that
   config is written directly inline in `hosts/vps/configuration.nix` rather
   than factored into `modules/services/`, since none of it is reused by
   another host.
@@ -188,7 +175,7 @@ Derive it from source:
 1. Start at `modules/flake/hosts.nix` — find the host's `modules = [ ... ]`
    list. That's the authoritative list of shared modules it pulls in.
 2. Cross-reference `hosts/<name>/configuration.nix` for host-local settings
-   (hostname, filesystems, host-specific `myPullDeploy`/`myAutoUpdate` option
+   (hostname, filesystems, host-specific `myPullDeploy` option
    settings, etc.) not covered by any shared module.
 3. For each module name in step 1, find its file — mostly
    `modules/{nixos,home-manager,profiles,services}/<name>.nix`, matched by the
@@ -353,65 +340,49 @@ Two things worth knowing before touching anything nearby:
   the impermanence rollback snapshots alive. See `docs/backups.md`'s
   Gotchas before changing any retention rule.
 
-## Auto-update & deploy
+## Updates & deploy
 
-Three `modules/nixos/` options-surface modules, one shared safe-switch
-guard, no manual "did anyone build this" step for any of the four real
-hosts:
+Inputs change only through a PR: someone runs `nix flake update` on a
+branch, every host builds (pre-push) and the VM tests run, and the user
+merges. No host updates inputs itself. A 30-day staleness alert on
+homelab's `/etc/nixos/flake.lock` pages when no lock update has landed.
 
-| Host | Module | What it does |
-|---|---|---|
-| `homelab` | `myAutoUpdate` | `flake-update-test` (branch, bump `flake.lock`, build-test, merge to master if it builds) + `auto-switch` (fetch+switch on a schedule) as two separate jobs |
-| `thinkpad`, `torrent` | `myPullDeploy` | fetch+build+switch/boot on a schedule, from each host's own local checkout |
-| `vps` | `myPushDeploy` | homelab builds vps's config and pushes+activates it over SSH — vps never builds locally (too resource-constrained) |
+Hosts then adopt `master` on their own weekly schedule, servers first so
+a bad update reaches them before the PCs used to fix them:
 
-All three share one safe-switch core (`modules/flake/deploy-guards.nix`,
-a plain shell fragment, not a derivation, so it's usable regardless of
-which pkgs variant a host is pinned to) before any of them will
-build/switch:
+| Host | Module | When | What it does |
+|---|---|---|---|
+| `homelab` | `myPullDeploy` | Tue 03:00 | fetch master, build, `switch`; reboots only if the kernel changed |
+| `vps` | `myPushDeploy` (on homelab) | Wed 03:00 | homelab builds vps's config and pushes+activates it over SSH; vps is too small to build |
+| `torrent`, `thinkpad` | `myPullDeploy` | Thu 03:00 | fetch master, build, `boot` (applies at next reboot) |
 
-- **dirty/branch check + fetch+ff-only-merge** — always builds from
-  verified-fresh `origin/master`, never trusts whatever's already
-  checked out. This is what a 2026-08-21 incident was missing: a
-  scheduled switch built from a stale/dirty local checkout and silently
-  reverted a manual deploy (see
-  `2026-08-18-verify-android-smb-share-end-to-end.md`).
-- **`minSwitchInterval`** (default 7 days) — skips if
-  `/nix/var/nix/profiles/system`'s own mtime (not dereferenced — the
-  symlink itself is recreated fresh on every switch/boot, so its mtime
-  *is* the last-activation time, no new state needed) is more recent
-  than the threshold. A manual or push-deployed switch counts too, so
-  it defers the next scheduled one.
-- **`protectedUnits`** — skips (retries next cycle) rather than
-  build/switch while any listed unit is active, so a scheduled switch
-  can't kill a long-running job mid-run (homelab:
-  `restic-backups-backblazeWeekly.service`, whose runs can take days).
+By hand on homelab: `cd /etc/nixos && git pull && nh os switch`; for vps,
+`systemctl start push-deploy-vps` on homelab.
 
-homelab's `flake-update-test`/`auto-switch` timers (and its
-`restic-backups-backblazeWeekly` timer, outside this shared guard core)
-deliberately run with `Persistent = false`, unlike `myPullDeploy`'s.
-After a long outage, a `Persistent = true` timer fires its missed run
-immediately at boot — for these three specifically that would pile
-I/O/CPU load onto zrepl's own post-boot catch-up replication, which
-also runs on homelab (see the Backups section above). None of the three
-need immediate catch-up (a week's delay is a non-issue given
-`minSwitchInterval` already treats weekly cadence as normal for the
-first two, and restic has its own staleness alert as a backstop), so
-skipping straight to the next scheduled run is preferred over
-contending with zrepl at boot.
+All of them share one safe-switch core (`modules/flake/deploy-guards.nix`,
+a plain shell fragment usable from either nixpkgs pin):
 
-homelab additionally exposes `auto-switch-now` — same build/switch
-logic, manual-trigger only (`systemctl start --wait
-auto-switch-now.service`), deliberately skipping the interval/protected-
-unit guards since those exist to protect an *unattended* run, not to
-silently no-op a human asking for a deploy right now.
+- **clean-checkout check + fetch + fast-forward-only merge**, so a
+  scheduled run always builds fresh `origin/master`, never a stale or
+  dirty local checkout. On the PCs the checkout is the user's own
+  `~/dotfiles`: if it's dirty or on a branch, the run skips.
+- **`minSwitchInterval`** (default 6 days): skips if
+  `/nix/var/nix/profiles/system` (the symlink's own mtime, the last
+  activation by any route) is more recent, so a manual deploy this week
+  defers the scheduled one.
+- **`protectedUnits`**: skips rather than switch while a listed unit is
+  active (homelab: the multi-day restic upload).
 
-A service running as root against a *user*-owned `flakeDir` (both PC
-hosts: root has no home-manager profile there at all, unlike server
-hosts) needs two things a root-owned `/etc/nixos` checkout gets for
-free, both handled inside the shared guard/module: `git config --global
---add safe.directory`, and (via `myPullDeploy.sshKeyPath`) an SSH
-identity to fetch with, since root has none of its own.
+Skips exit 0, so they never page; a 21-day staleness alert on each
+host's system profile catches a host that keeps skipping. A failed run
+pages through the failed-units check. homelab's two deploy timers are
+not `Persistent`, so an outage doesn't trigger a catch-up deploy at boot
+on top of zrepl's own catch-up replication.
+
+A service running as root against a *user*-owned `flakeDir` (the PCs)
+needs `safe.directory` (set per invocation by the guard) and an SSH
+identity to fetch with (`myPullDeploy.sshKeyPath`), since root has none
+of its own there.
 
 ## Secrets
 

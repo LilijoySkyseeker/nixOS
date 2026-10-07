@@ -19,8 +19,8 @@
 # (push-deploy-vps) — one cycle each, ~10 overnight hours, not two days.
 # And they *were* watched: both entered systemctl --failed, which
 # myHealthAlerts checks every 15 minutes. What is genuinely unwatched is a
-# deploy that SKIPS, since every guard below ends in exit 0 — see
-# tests/deploy-chain.nix.
+# deploy that SKIPS, since every guard below ends in exit 0; the
+# profile-staleness alert in myHealthAlerts watches for that.
 #
 # The first subtest deliberately proves the *environment* still
 # reproduces the original failure, so this test cannot quietly stop

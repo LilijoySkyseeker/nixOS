@@ -22,11 +22,8 @@ let
     ) || store_path=""
 
     reject() {
-      # the stderr line only reaches the ssh *client*; the logger line is
-      # what lands in this host's own journal, where the log pipeline's
-      # alert rule reads it -- without it a probe with a stolen key is
-      # invisible server-side
-      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+      # the stderr line only reaches the ssh *client*; the logger line
+      # lands in this host's own journal
       ${pkgs.util-linux}/bin/logger -t vps-deploy -p auth.warning "rejected command: $cmd" || true
       echo "vps-deploy: rejected command: $cmd" >&2
       exit 1
@@ -258,25 +255,6 @@ in
       "/var/log"
       "/var/lib/nixos" # avoids uid/gid complaints on reboot
       "/var/lib/tailscale" # node identity/state; authKeyFile is single-use
-      "/var/lib/caddy" # ACME certs — avoids re-requesting from Let's Encrypt every reboot
-      {
-        directory = "/var/lib/crowdsec";
-        user = "crowdsec";
-        group = "crowdsec";
-        mode = "0750";
-      }
-      "/etc/crowdsec" # hub state (installed collections/parsers)
-      {
-        # crowdsec-firewall-bouncer-register's api-key.cred lives here. Without
-        # persisting it, every reboot wipes this dir while /var/lib/crowdsec's
-        # bouncer-registration DB above survives, so the register service finds
-        # the bouncer already registered but has no key file for it and fails
-        # ("Bouncer registered but API key is not present").
-        directory = "/var/lib/crowdsec-firewall-bouncer-register";
-        user = "crowdsec";
-        group = "crowdsec";
-        mode = "0750";
-      }
     ];
     files = [
       "/etc/machine-id"
@@ -311,9 +289,7 @@ in
     polkit.addRule(function(action, subject) {
       if (action.id == "org.freedesktop.systemd1.manage-units" &&
           subject.user == "vps-deploy") {
-        // silent auto-grants leave no journal line at all; this one is
-        // what the log pipeline's alert rule matches
-        // plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+        // silent auto-grants leave no journal line otherwise
         polkit.log("vps-deploy manage-units grant: " + action.id);
         return polkit.Result.YES;
       }
@@ -351,17 +327,7 @@ in
   # tailscale allow
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  # log refused TCP connection attempts (closed-port scans) to the kernel log —
-  # off by default, so these were previously invisible everywhere, including to CrowdSec.
-  #
-  # Left false here deliberately: the module's own version of this LOG rule
-  # (nixpkgs firewall-iptables.nix's `-p tcp --syn -j LOG --log-prefix "refused
-  # connection: "`) has no -m limit, so under a real scan it can outrun
-  # journald's own rate limit (10000/30s) and start silently dropping the very
-  # messages the detector reads — flagged in the 2026-08-26 audit (F-P2-03's
-  # amplifier) and still open. A rate-limited replacement is added via
-  # extraCommands below instead. See:
-  # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md#D1
+  # the module's LOG rule has no rate limit and can outrun journald under a scan
   networking.firewall.logRefusedConnections = false;
 
   # wireguard tunnel
@@ -413,55 +379,13 @@ in
 
   # SNAT forwarded traffic to our wg0 IP so source IP's are preserved
   networking.firewall.extraCommands = ''
-    # Rate-limited replacement for logRefusedConnections above: same log-prefix
-    # (so CrowdSec's iptables-scan-multi_ports scenario and anything else reading
-    # this still matches), but capped so a scan burst can't overrun journald's
-    # own rate limit. nixos-fw-log-refuse is flushed and rebuilt from scratch on
-    # every firewall (re)start before extraCommands runs (see firewall-iptables.nix's
-    # startScript), so inserting fresh here is idempotent across restarts — no
-    # duplicate rules pile up. 50/sec, burst 100: still ~6.5x headroom under
-    # journald's 10000/30s (~333/sec) limit -- CrowdSec's iptables-scan-multi_ports
-    # only needs ~3/sec (15 distinct ports/5s) to detect a scan, so the cap was
-    # never actually protecting detection; it was only trading away live-tail
-    # visibility during an incident for headroom nobody was spending. Raised from
-    # an initial 10/sec, burst 30 after that analysis (see D4 addendum:
-    # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md).
-    #
-    # Must be -I (insert at position 1), not -A: the module's own build of this
-    # chain already ends in an unconditional `-j nixos-fw-refuse` (a terminal
-    # REJECT/DROP) by the time extraCommands runs -- an appended rule would sit
-    # after that jump and never see a packet. Confirmed by inspecting the built
-    # firewall-start script directly, not just that it builds. See G4:
-    # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
-    iptables -I nixos-fw-log-refuse 1 -p tcp --syn \
-      -m limit --limit 50/sec --limit-burst 100 \
-      -j LOG --log-level info --log-prefix "refused connection: "
-    ip6tables -I nixos-fw-log-refuse 1 -p tcp --syn \
-      -m limit --limit 50/sec --limit-burst 100 \
-      -j LOG --log-level info --log-prefix "refused connection: "
-
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
 
-    # NOTE: the two `ipset create` calls that used to live here have moved
-    # to systemd.services.crowdsec-ipset-precreate below (F-P2-02). They
-    # must not run in this script — see that unit's comment for why an
-    # `ipset` failure here took the whole packet filter down, fail-open.
-
-    # per-source-IP rate limiting on forwarded game ports (DNAT bypasses anubis/crowdsec)
+    # per-source-IP rate limiting on forwarded game ports
     iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
     iptables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
       || iptables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
-
-    # apply CrowdSec's existing ban list (built from sshd/caddy scenarios) to DNAT'd game
-    # traffic too — it never reaches INPUT/CROWDSEC_CHAIN, so this reuses the bouncer's own
-    # ipset instead of duplicating ban logic. Must come first in the chain: banned IPs get
-    # dropped before spending any hashlimit budget below.
-    # `|| true` is load-bearing: this rule fails with "Set ... doesn't exist"
-    # if the pre-create unit did not run or failed, and an unguarded failure
-    # here aborts the firewall script before it arms the filter (F-P2-02).
-    # Degrading the ban layer is survivable; losing the firewall is not.
-    iptables -t raw -A vps-ratelimit -m set --match-set crowdsec-blacklists-0 src -j DROP || true
 
     # minecraft: cap new-connection attempts per source IP
     iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
@@ -477,33 +401,6 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
-
-    # base rate limit for caddy's public HTTP(S) entry (80/443)
-    iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
-      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
-      --hashlimit-mode srcip --hashlimit-name http-new -j DROP
-
-    # IPv6 counterpart of the above: caddy already accepts real IPv6 traffic
-    # today (apex + jellyfin CNAME both carry AAAA records, native on this
-    # box — no forwarding involved), but until now that traffic skipped this
-    # whole raw-table rate-limit layer entirely since it was iptables-only.
-    # CrowdSec's own INPUT-chain bans are already dual-stack (confirmed live:
-    # ip6tables' CROWDSEC_CHAIN matches against a separate crowdsec6-blacklists
-    # ipset the bouncer maintains automatically), this just closes the gap for
-    # the pre-CrowdSec burst/flood layer. Game ports are deliberately not
-    # mirrored here — they're still IPv4-only (see
-    # 2026-08-18-add-ipv6-support-for-the-vps-s-forwarded-game-port.md).
-    # (crowdsec6-blacklists-0 is pre-created by the same unit as its v4 twin)
-    ip6tables -t raw -N vps-ratelimit 2>/dev/null || ip6tables -t raw -F vps-ratelimit
-    ip6tables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
-      || ip6tables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
-
-    # same reasoning as the v4 rule above: fail soft, never take the filter down
-    ip6tables -t raw -A vps-ratelimit -m set --match-set crowdsec6-blacklists-0 src -j DROP || true
-
-    ip6tables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
-      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
-      --hashlimit-mode srcip --hashlimit-name http-new6 -j DROP
   '';
 
   # Tear down the raw-table chain this host adds in extraCommands above.
@@ -524,89 +421,7 @@ in
     iptables -t raw -D PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null || true
     iptables -t raw -F vps-ratelimit 2>/dev/null || true
     iptables -t raw -X vps-ratelimit 2>/dev/null || true
-    ip6tables -t raw -D PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null || true
-    ip6tables -t raw -F vps-ratelimit 2>/dev/null || true
-    ip6tables -t raw -X vps-ratelimit 2>/dev/null || true
   '';
-
-  # Pre-create CrowdSec's ipsets, out of the firewall's own start script.
-  #
-  # These two `ipset create` calls used to sit in
-  # networking.firewall.extraCommands, which was fail-OPEN on the one
-  # internet-facing host in the fleet (F-P2-02). NixOS renders the firewall
-  # start script with `#! ${runtimeShell} -e` and splices extraCommands in
-  # *immediately before* the `ip46tables -A INPUT -j nixos-fw` that actually
-  # arms the filter. Any non-zero exit in between and that jump is never
-  # installed: no INPUT filtering at all. On a reload it is worse, because
-  # reloadScript falls back to stopScript, which removes the jump and the
-  # rpfilter hook outright. sshd binds 0.0.0.0:22 here and the packet filter
-  # is the *only* thing keeping port 22 off the public internet
-  # (services.openssh.openFirewall = false is not an sshd setting), so the
-  # blast radius of one failed `ipset create` was OpenSSH pre-auth exposed
-  # to the internet, plus the loss of the rate limiter and the DNAT rules.
-  #
-  # `-exist` does not save it. ipset(8) only suppresses the error when the
-  # setname *and the create parameters* are identical, and those parameters
-  # are pinned by nothing: nixpkgs' crowdsec-firewall-bouncer module sets
-  # only the set names, and ipset_type/ipset_size/timeouts/the -N suffix all
-  # come from cs-firewall-bouncer's own defaults. A nixpkgs bump that moves
-  # that package -- or one ipset made by hand while troubleshooting -- turned
-  # the next firewall reload into a total loss of the firewall. (Checked live
-  # 2026-08-27: the running sets do still match these parameters exactly.)
-  #
-  # As its own unit, that failure is contained *and* visible: the firewall
-  # comes up regardless, and this lands in `systemctl --failed`, which
-  # myHealthAlerts already pages on. That visibility is the reason this is a
-  # unit rather than just `|| true` on the original lines -- `|| true` alone
-  # would have made the firewall succeed silently and told nobody the ban
-  # layer had gone missing.
-  #
-  # Deliberately ordered Before= firewall.service but NOT RequiredBy/PartOf
-  # it: the firewall must never be able to fail because of this. Before= only
-  # orders the two when both are already in the same transaction, which they
-  # are at boot via multi-user.target.
-  systemd.services.crowdsec-ipset-precreate = {
-    description = "Pre-create CrowdSec's ipsets before the firewall references them";
-    before = [ "firewall.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = pkgs.writeShellScript "crowdsec-ipset-precreate" ''
-        set -eu
-        ipset=${pkgs.ipset}/bin/ipset
-        "$ipset" create -exist crowdsec-blacklists-0 hash:net family inet \
-          hashsize 1024 maxelem 131072 timeout 300
-        "$ipset" create -exist crowdsec6-blacklists-0 hash:net family inet6 \
-          hashsize 1024 maxelem 131072 timeout 300
-      '';
-      # ipset speaks netlink to netfilter; CAP_NET_ADMIN is the whole need.
-      AmbientCapabilities = [ "CAP_NET_ADMIN" ];
-      CapabilityBoundingSet = [ "CAP_NET_ADMIN" ];
-      NoNewPrivileges = true;
-      ProtectSystem = "strict";
-      ProtectHome = true;
-      # ProtectKernelModules is safe here only because the modules are
-      # declared in boot.kernelModules below. Creating a hash:net set
-      # otherwise relies on the kernel autoloading ip_set_hash_net at
-      # create time, which is exactly the kind of implicit dependency that
-      # should not sit between this host and a working packet filter.
-      ProtectKernelModules = true;
-      ProtectKernelTunables = true;
-      ProtectKernelLogs = true;
-      ProtectControlGroups = true;
-      RestrictNamespaces = true;
-      PrivateTmp = true;
-    };
-  };
-  # Load ipset's modules at boot rather than relying on autoload from inside
-  # the sandboxed unit above. Names confirmed against the live host
-  # (`lsmod`): ip_set is the core, ip_set_hash_net backs the hash:net type
-  # both CrowdSec sets use.
-  boot.kernelModules = [
-    "ip_set"
-    "ip_set_hash_net"
-  ];
 
   # tailscale routing: nothing needed here any more. This box isn't an exit
   # node or a subnet router, and "client" is now the fleet-wide default in
@@ -618,287 +433,10 @@ in
   # this box never needs to forward IPv6
   boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
 
-  # anubis: proof-of-work challenge in front of jellyfin
-  services.anubis.instances.jellyfin = {
-    enable = true;
-    settings = {
-      TARGET = "http://10.100.0.2:8096";
-    };
-  };
-  # anubis's own hardening restricts syscalls and namespaces but nothing
-  # narrows what it can *connect to* -- it sits outermost in the path of
-  # untrusted internet traffic and, with no address restriction, can reach
-  # caddy's admin API on 127.0.0.1:2019 (which can replace caddy's whole
-  # running config, including a file_server rooted where the ACME account
-  # key lives). AF_UNIX is unaffected by IPAddress{Deny,Allow}, so the
-  # caddy<->anubis reverse_proxy socket keeps working
-  # (docs/audits/2026-08-26/findings-tail.md L-01).
-  systemd.services.anubis-jellyfin.serviceConfig = {
-    IPAddressDeny = "any";
-    IPAddressAllow = [ "10.100.0.2/32" ];
-  };
-
-  # caddy: public HTTPS entry point, jellyfin routes through anubis
-  # caddy needs group membership to reverse_proxy into anubis's unix socket
-  users.users.caddy.extraGroups = [ "anubis" ];
-  # anubis's "anubis" group is transient (DynamicUser = true): it only exists
-  # while anubis-jellyfin.service is active. Without this ordering, a boot
-  # where caddy starts first spawns caddy before that group exists, so
-  # caddy's supplementary-group resolution misses it entirely and every
-  # request 502s with "permission denied" on the anubis socket until the
-  # next caddy restart. Seen live 2026-08-18/2026-08-21 right after reboots.
-  systemd.services.caddy.after = [ "anubis-jellyfin.service" ];
-  systemd.services.caddy.wants = [ "anubis-jellyfin.service" ];
-  services.caddy = {
-    enable = true;
-    virtualHosts = {
-      # catch-all for plain-HTTP requests with no matching Host (bots hitting the raw
-      # IP, fake hostnames, etc.) — otherwise these produce zero log output anywhere.
-      ":80" = {
-        logFormat = ''
-          output stdout
-          format json
-        '';
-        extraConfig = ''
-          respond 421
-        '';
-      };
-
-      # no TLS catch-all: a `tls internal` host-less vhost was tried and
-      # live-verified inert — caddy refuses the handshake for unlisted SNI
-      # and logs nothing, so it bought no visibility. HTTPS/SNI probes stay
-      # a known blind spot, re-deferred with the other logging blind spots
-      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#F5
-      "jellyfin.${lib.removeSuffix "." vars.domain}" = {
-        # without this, caddy emits no access logs for crowdsec's parser
-        logFormat = ''
-          output stdout
-          format json
-        '';
-        extraConfig = ''
-          header {
-            Strict-Transport-Security "max-age=31536000"
-            X-Content-Type-Options "nosniff"
-            X-Frame-Options "SAMEORIGIN"
-            Referrer-Policy "strict-origin-when-cross-origin"
-            Permissions-Policy "camera=(), microphone=(), geolocation=()"
-          }
-          reverse_proxy unix//run/anubis/anubis-jellyfin/anubis.sock {
-            # anubis refuses to proxy without an explicit X-Real-Ip
-            header_up X-Real-Ip {remote_host}
-          }
-        '';
-      };
-    };
-  };
-
-  # crowdsec: watches sshd/caddy/kernel logs, bans abusive IPs via the firewall bouncer
-  services.crowdsec = {
-    enable = true;
-    settings = {
-      # needed for the local API crowdsec and the bouncer both talk to
-      general.api.server.enable = true;
-      lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
-      # CAPI registration (community blocklist consumption). Declarative and
-      # idempotent: crowdsec-setup's activation script only calls `cscli capi
-      # register` when this file doesn't already contain a password (see
-      # G3 in 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
-      # for a caveat on that check's own syntax). /var/lib/crowdsec is already
-      # persisted (impermanence, above), so no separate persistence entry needed.
-      capi.credentialsFile = "/var/lib/crowdsec/online_api_credentials.yaml";
-    };
-    hub.collections = [
-      "crowdsecurity/linux"
-      "crowdsecurity/sshd"
-      "crowdsecurity/caddy"
-      # closed-port-scan detection, replacing the fail2ban jail this used to be
-      # fed to: crowdsecurity/iptables-scan-multi_ports requires 15 distinct
-      # destination ports from one source within 5s (CrowdSec's own hub rates
-      # this spoofable: 3, i.e. not spoof-proof but no longer a one-packet
-      # trigger) -- see D2 in
-      # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
-      "crowdsecurity/iptables"
-    ];
-    localConfig.acquisitions = [
-      {
-        source = "journalctl";
-        journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
-        labels.type = "syslog";
-      }
-      {
-        source = "journalctl";
-        journalctl_filter = [ "_SYSTEMD_UNIT=caddy.service" ];
-        # must be "syslog", not "caddy" — strips the journalctl envelope
-        labels.type = "syslog";
-      }
-      {
-        source = "journalctl";
-        journalctl_filter = [ "_TRANSPORT=kernel" ];
-        # same "syslog" label as sshd/caddy above, confirmed against
-        # crowdsecurity/iptables-logs' own parser source: it filters on
-        # evt.Parsed.program == 'kernel', a field only populated by the
-        # syslog-logs (s00-raw) stage, which keys off labels.type == 'syslog'
-        # -- not a dedicated "iptables" label (none exists). See D2/G3 in
-        # 2026-09-03-troubleshoot-fail2ban-vps-closed-port-scan-journal-stall.md
-        labels.type = "syslog";
-      }
-    ];
-    # progressive bans for CrowdSec's own scenario-detected decisions (sshd/caddy/
-    # iptables-scan): each repeat offense (by decision-history count for that
-    # IP/range, all-time, not just currently-active bans) roughly quadruples the
-    # ban duration off the module's stock 4h default — 4h, 16h, ~2.7d, ~10.7d,
-    # ~42.7d, then capped — rather than literal-forever, since a shared/dynamic IP
-    # (residential ISP reassignment, CGNAT, VPN exit) can hand off to an unrelated
-    # user later. This is CrowdSec's own module default profile pair, reproduced
-    # verbatim (services.crowdsec.localConfig.profiles has no merge semantics —
-    # setting it replaces the default, so both scopes must be repeated here) plus
-    # duration_expr.
-    localConfig.profiles = [
-      {
-        name = "default_ip_remediation";
-        filters = [ "Alert.Remediation == true && Alert.GetScope() == 'Ip'" ];
-        decisions = [
-          {
-            type = "ban";
-            duration = "4h"; # fallback if duration_expr fails to evaluate/parse
-          }
-        ];
-        duration_expr = "Sprintf('%dh', int(min(4 ** (GetDecisionsCount(Alert.GetValue()) + 1), 2160)))"; # cap 2160h = 90d
-        on_success = "break";
-      }
-      {
-        name = "default_range_remediation";
-        filters = [ "Alert.Remediation == true && Alert.GetScope() == 'Range'" ];
-        decisions = [
-          {
-            type = "ban";
-            duration = "4h";
-          }
-        ];
-        duration_expr = "Sprintf('%dh', int(min(4 ** (GetDecisionsCount(Alert.GetValue()) + 1), 2160)))";
-        on_success = "break";
-      }
-    ];
-  };
-  services.crowdsec-firewall-bouncer.enable = true;
-  # boot-race fix: this droplet's network intermittently takes longer to actually
-  # pass traffic than network-online.target reports ready — DigitalOcean's
-  # hypervisor vNIC arming lags behind the guest's own DHCP lease acquisition (see
-  # the externalInterface comment above), so anything doing a network call at
-  # startup can lose this race. Confirmed live across two separate reboots: both
-  # crowdsec.service (its ExecStartPre's `cscli hub update`) and
-  # crowdsec-firewall-bouncer.service failed with a DNS resolution error at
-  # ~90s into userspace boot — identically, down to the second, both times — and
-  # neither ever retried for the rest of that boot session. crowdsec.service
-  # already sets RestartSec=60 upstream but never sets Restart=, an incomplete
-  # no-op left in nixpkgs' own crowdsec.nix; crowdsec-firewall-bouncer.service has
-  # no restart policy at all.
-  systemd.services.crowdsec.serviceConfig.Restart = "on-failure";
-  systemd.services.crowdsec-firewall-bouncer.serviceConfig = {
-    Restart = "on-failure";
-    RestartSec = "15s";
-  };
   # tailscaled-autoconnect polls internally until tailscale reports Running, but
   # systemd's default 90s unit-start timeout was killing it before that could
-  # happen on a slow boot — also confirmed live, twice, at the same ~90s mark.
+  # happen on a slow boot — confirmed live, twice, at the same ~90s mark.
   systemd.services.tailscaled-autoconnect.serviceConfig.TimeoutStartSec = "300s";
-  # self-ban prevention: exempt the tailnet (100.64.0.0/10) from every CrowdSec
-  # decision. SSH here is tailscale-only (no public port 22), so anything that
-  # reconnects quickly enough — scripted health checks, this repo's own deploy
-  # tooling, a burst of manual troubleshooting — can trip crowdsecurity/sshd's
-  # ssh-slow-bf scenario against itself and get banned by the same mechanism
-  # meant for internet attackers. Confirmed live 2026-08-26: rapid diagnostic
-  # SSH during this PR's own testing did exactly that to the admin's own IP.
-  # Not a new trust boundary — networking.firewall.trustedInterfaces above
-  # already treats tailscale0 as trusted at the packet-filter level; this
-  # extends the same boundary to CrowdSec's decision engine. The actual access
-  # gate stays tailscale's own device authorization (ACLs/key approval) — only
-  # devices explicitly added to the tailnet can ever present a 100.64.0.0/10
-  # source — and sshd is publickey-only regardless, so there's no password to
-  # brute-force from inside the mesh even if this exemption were ever abused.
-  # `cscli allowlists create` errors (not just warns) if the name already
-  # exists, unlike `add` (which just warns and skips already-present values —
-  # confirmed in crowdsec's own cliallowlists/allowlists.go), hence `|| true`
-  # only on the create step.
-  systemd.services.crowdsec-allowlist-tailnet = {
-    description = "Exempt the tailnet from CrowdSec decisions";
-    after = [ "crowdsec.service" ];
-    requires = [ "crowdsec.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      Restart = "on-failure";
-      RestartSec = "15s";
-
-      # This was the one custom unit in the repo running as unsandboxed
-      # root, on the internet-facing host (F-P2-08). Root is not required:
-      # the script reads /etc/crowdsec/config.yaml (a symlink into the
-      # world-readable store, per the tmpfiles rule below) and talks to
-      # the LAPI using /var/lib/crowdsec/local_api_credentials.yaml, which
-      # is crowdsec-owned. services.crowdsec.user is a real static system
-      # user, not a DynamicUser-only name, so User= can simply be set.
-      User = config.services.crowdsec.user;
-      Group = config.services.crowdsec.group;
-
-      # ReadWritePaths is a deliberate departure from F-P2-08's proposed
-      # fix, which claimed strict needs none because "the allowlist lives
-      # in CrowdSec's own database via the LAPI". Two pieces of evidence
-      # say otherwise, and the cost of being wrong here is that the
-      # tailnet exemption silently stops applying and CrowdSec starts
-      # banning the admin's own IP -- which is exactly what prompted this
-      # unit in the first place:
-      #   - crowdsec-firewall-bouncer-register just below carries the
-      #     comment "cscli needs to write /var/lib/crowdsec", and grants
-      #     precisely that.
-      #   - the live state dir on vps holds a SQLite crowdsec.db
-      #     (/var/lib/crowdsec/state/crowdsec.db, 0640 crowdsec:crowdsec),
-      #     and cscli reaches the database directly for several
-      #     subcommands rather than going through the LAPI.
-      # Granting it is strictly safer than omitting it: if cscli turns out
-      # not to need the write, nothing is lost.
-      ProtectSystem = "strict";
-      ReadWritePaths = [ "/var/lib/crowdsec" ];
-
-      NoNewPrivileges = true;
-      ProtectHome = true;
-      ProtectKernelModules = true;
-      ProtectKernelTunables = true;
-      ProtectKernelLogs = true;
-      ProtectControlGroups = true;
-      RestrictNamespaces = true;
-      PrivateTmp = true;
-      CapabilityBoundingSet = [ "" ];
-
-      ExecStart = pkgs.writeShellScript "crowdsec-allowlist-tailnet" ''
-        set -eu
-        cscli=${config.services.crowdsec.package}/bin/cscli
-        "$cscli" allowlists create trusted-tailnet -d "tailscale mesh, exempt from ban decisions" || true
-        "$cscli" allowlists add trusted-tailnet 100.64.0.0/10 -d "tailnet CGNAT range"
-      '';
-    };
-  };
-  # drop both "crowdsec" and "crowdsec-firewall-bouncer-register" from StateDirectory —
-  # both are real impermanence bind-mounts, and DynamicUser's StateDirectory= migration
-  # (moving the "pre-existing public" dir into /var/lib/private/<name> behind a symlink)
-  # deterministically fails with EBUSY against an active mountpoint. Confirmed live
-  # 2026-08-25: this unit's own directory hit exactly the failure the "crowdsec" drop
-  # below was already written to avoid, just never extended to itself.
-  systemd.services.crowdsec-firewall-bouncer-register.serviceConfig = {
-    StateDirectory = lib.mkForce [ ];
-    # DynamicUser makes these read-only otherwise; cscli needs to write /var/lib/crowdsec,
-    # and this unit needs to write its own state (api-key.cred) under the other path
-    ReadWritePaths = [
-      "/var/lib/crowdsec"
-      "/var/lib/crowdsec-firewall-bouncer-register"
-    ];
-  };
-  # symlink cscli's expected default config path into place
-  systemd.tmpfiles.rules = [
-    "L+ /etc/crowdsec/config.yaml - - - - ${
-      (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec.settings.general
-    }"
-  ];
 
   # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
   sops.secrets.discord_webhook = {
@@ -906,22 +444,8 @@ in
     group = "health-check";
   };
 
-  # ship this host's journal to Loki on homelab
-  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
-  myAlloy = {
-    enable = true;
-    # this host's impermanence root is /persist, not vars.persistRoot
-    persistenceRoot = "/persist";
-    # 1GB-RAM host with a small disk: half the fleet default, still sized
-    # for a 24h burst rather than steady state (G6)
-    journalMaxUse = "1G";
-    # caddy is this host's other security-relevant chatty unit (CrowdSec
-    # reads it); raise its per-unit limit alongside sshd's
-    raisedRateLimitUnits = [
-      "sshd"
-      "caddy"
-    ];
-  };
+  # small disk: half the fleet's journal cap
+  services.journald.settings.Journal.SystemMaxUse = "1G";
 
   myHealthAlerts = {
     enable = true;
@@ -940,9 +464,8 @@ in
     # 2026-08-27 (read-only git config); the second entered systemctl
     # --failed on homelab, but a run the *guards* skip never would.
     #
-    # 504h = 21 days, matching homelab's own entry — dates is weekly and
-    # minSwitchInterval is 7 days, giving a 14-day normal ceiling plus one
-    # deferral of slack.
+    # 504h = 21 days, matching homelab's own entry: weekly deploys plus
+    # two weeks of slack.
     staleMarkerFiles = {
       "/nix/var/nix/profiles/system" = 504;
     };
@@ -952,10 +475,6 @@ in
   services.smartd.enable = lib.mkForce false;
 
   # firewall
-  networking.firewall.allowedTCPPorts = [
-    80
-    443
-  ];
   networking.firewall.allowedUDPPorts = [
     51820 # wireguard
   ];

@@ -74,7 +74,7 @@ _: {
               description = ''
                 Absolute path the service actually reads/writes.
 
-                A path under persistRoot (e.g. "/nix/state/loki") is
+                A path under persistRoot (e.g. "/nix/state/myservice") is
                 mounted there directly -- no impermanence indirection
                 needed. Any other path (e.g. "/var/lib/docker") gets the
                 dataset mounted at persistRoot+mountpoint instead, exactly
@@ -118,10 +118,10 @@ _: {
         type = lib.types.attrsOf (lib.types.submodule datasetSubmodule);
         default = { };
         example = {
-          "zroot/persist/loki" = {
+          "zroot/persist/myservice" = {
             tier = "persist";
-            mountpoint = "/nix/state/loki";
-            owner = "loki";
+            mountpoint = "/nix/state/myservice";
+            owner = "myservice";
           };
         };
         description = ''

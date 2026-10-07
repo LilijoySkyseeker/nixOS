@@ -171,8 +171,7 @@ in
         ];
       };
 
-      # no wg0 rule here, unlike jellyfin -- this is the whole point:
-      # never reachable through vps's public Caddy+Anubis proxy.
+      # tailnet only, never over wg0 from vps
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
         config.services.immich.port
       ];
