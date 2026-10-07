@@ -24,16 +24,6 @@
     sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
-  # rebuild the recovery iso into ~/Downloads every time pull-deploy
-  # successfully updates this host, for manual copying onto Ventoy
-  myIsoAutobuild = {
-    enable = true;
-    flakeDir = "/home/lilijoy/dotfiles";
-    buildUser = "lilijoy";
-    isoAttr = "isoimage";
-    triggeredBy = [ "pull-deploy.service" ];
-  };
-
   # System installed pkgs
   environment.systemPackages =
     (with pkgs-unstable; [

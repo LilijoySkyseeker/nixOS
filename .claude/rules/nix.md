@@ -142,7 +142,7 @@ ones.
 ## Naming
 
 - Host names are the literal hostname (`thinkpad`, `torrent`, `homelab`,
-  `vps`, `isoimage`), matching `flake.nixosConfigurations.<name>` in
+  `vps`), matching `flake.nixosConfigurations.<name>` in
   `modules/flake/hosts.nix`.
 - `modules/services/*.nix` files are named after the service they
   configure (`jellyfin.nix`, `factorio.nix`), not the host that runs

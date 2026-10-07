@@ -242,7 +242,10 @@ ceilings.
 
 ---
 
-### AR-8 — The recovery ISO serves the whole filesystem, unauthenticated
+### AR-8 — ~~The recovery ISO serves the whole filesystem, unauthenticated~~
+
+**Superseded 2026-10-06 — the recovery ISO was removed from the repo.**
+Recreate it from git history for a reinstall; this entry applies again if it returns.
 
 **Sits on:** [threat model](threat-model.md) §8, open question 6 ·
 **Evidence:** `findings.md` H6, `F-P4-01`, `F-P5-10` · **Decides D8**
@@ -362,7 +365,7 @@ it leaves this file entirely.
 | D5 | That neither laptop has FDE, and thinkpad hibernates RAM to unencrypted swap | H7 |
 | D6 | That any tailnet device reaches nearly everything | ACL cluster |
 | ~~D7~~ | **Answered 2026-09-03 — not accepted, implementing.** Tracked as `2026-09-03-design-and-implement-intrusion-detection-for-homelab.md`. | H8 |
-| ~~D8~~ | **Answered 2026-09-03 — accepted, see AR-8.** Intended: not meant to be secure, meant to make recovery (of these hosts, or a third party's) as easy as possible. | H6 |
+| ~~D8~~ | **Moot 2026-10-06.** The recovery ISO was removed (AR-8). | H6 |
 | ~~D9~~ | **Answered 2026-08-27 — nothing accepted, all three fixed.** KDE Connect scoped to `tailscale0`; Steam remote play and avahi/mDNS removed outright. | `F-P1-04`, `F-P5-06` |
 | ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
 | ~~D11~~ | **Moot 2026-10-06.** `flake-update-test` was deleted; inputs change only through a PR the user merges, and the `master` ruleset requires one. | `F-P7-10` |

@@ -1,7 +1,7 @@
 # Lilijoy's NixOS Machines
 
-A flake-based NixOS/home-manager configuration for five machines
-(`thinkpad`, `torrent`, `homelab`, `vps`, `isoimage`), managed from one
+A flake-based NixOS/home-manager configuration for four machines
+(`thinkpad`, `torrent`, `homelab`, `vps`), managed from one
 repo. Covers disko partitioning, sops-nix secrets, impermanence,
 home-manager, and a distributed multi-host flake setup. `docs/` has
 the reasoning behind how it's put together.
@@ -18,7 +18,7 @@ the registry.
 
 ```
 flake.nix                          # thin entry point: flake-parts + import-tree ./modules
-modules/flake/                     # vars, pkgs, systems, and hosts.nix (composes all 5 hosts)
+modules/flake/                     # vars, pkgs, systems, and hosts.nix (composes all 4 hosts)
 hosts/<name>/configuration.nix     # host-local config only (hardware, hostname, disko)
 modules/profiles/{default,PC,server}.nix # shared config, layered by machine role
 modules/{nixos,home-manager,services}/   # reusable modules, one file = one flake.modules.* entry
@@ -51,7 +51,6 @@ Conventions for changes and PRs are in [`AGENTS.md`](./AGENTS.md).
 | `torrent` | Desktop | Primary desktop. |
 | `homelab` | Server | Home server: media (Jellyfin), photo/video backup (Immich, tailnet-only), game servers, NFS, DNS automation, backups. |
 | `vps` | Server | Public-facing edge: forwards the game ports to homelab over WireGuard, rate-limited per source IP. |
-| `isoimage` | Standalone | Bootable recovery/install ISO, outside the normal profile hierarchy. |
 
 Known issues and incident history per host live in each host's own
 `hosts/<name>/README.md`.
