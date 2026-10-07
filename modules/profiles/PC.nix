@@ -39,14 +39,11 @@ in
         caligula # cli burning tool
         scrcpy
         isd
-        kdePackages.krfb # kde remote desktop tool
-        kdePackages.krdc # kde remote desktop tool
         vipsdisp # big image viewer
         yt-dlp
         android-tools
 
         yubikey-manager
-        distrobox
         bitwarden-desktop
         thunderbird
         vscode-fhs
@@ -55,19 +52,13 @@ in
         libreoffice
         vlc
         r2modman
-        yubioath-flutter
         nicotine-plus
         vial
-        element-desktop
         ungoogled-chromium
-        python313Packages.nomadnet
-        rns
         signal-desktop
         picard # music metadata tool
         calibre
         quodlibet
-
-        texliveFull
 
         # closed source
         spotify
@@ -82,7 +73,6 @@ in
         wl-clipboard # for waydroid
         quickemu
         qbittorrent
-        texliveSmall
 
       ];
 
@@ -129,14 +119,12 @@ in
         enable = true;
         uninstallUnmanaged = false;
         packages = [
-          "app.grayjay.Grayjay"
           "info.beyondallreason.bar"
         ];
       };
 
       # udev rules
       services.udev.packages = [
-        pkgs-unstable.via
         pkgs-unstable.vial
       ];
       # No services.udev.extraRules here any more. It held two 8bitdo Pro 3

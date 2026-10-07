@@ -46,7 +46,6 @@ in
           rsync
           sops # secrets management
           smartmontools
-          helix
           trippy # ping+traceroute tool
           psmisc # fuser, killall, pstree
           ffmpeg
