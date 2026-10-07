@@ -62,11 +62,6 @@ _: {
                 annotations:
                   summary: firewall unit trouble on {{ $labels.host }} — SSH may be exposed (G5)
 
-              - alert: CrowdSecDown
-                expr: 'sum(count_over_time({host="vps", identifier="systemd"} |~ `crowdsec.*(Failed|failure|Scheduled restart)` [10m])) > 2'
-                annotations:
-                  summary: CrowdSec (or its bouncer) failing or restart-looping on vps
-
               - alert: SopsDecryptFailure
                 expr: 'sum by (host) (count_over_time({host!=""} |~ `sops-(nix|install-secrets)` |~ `(?i)(error|fail)` [10m])) > 0'
                 annotations:
@@ -76,16 +71,6 @@ _: {
                 expr: 'sum by (host) (count_over_time({unit="tailscaled.service"} |~ `(?i)(reauth required|auth.*(fail|expir)|invalid.*key|logged out)` [10m])) > 0'
                 annotations:
                   summary: tailscale auth trouble on {{ $labels.host }} — tailnet loss loses all SSH
-
-              - alert: CaddyUpstreamErrors
-                expr: 'sum(count_over_time({host="vps", unit="caddy.service"} |= `"status":502` | json | status == 502 [10m])) > 5'
-                annotations:
-                  summary: Caddy 502s on vps — anubis/wireguard path to jellyfin failing
-
-              - alert: AnubisDown
-                expr: 'sum(count_over_time({host="vps", identifier="systemd"} |= "anubis-jellyfin.service" |~ `(?i)failed` [10m])) > 0'
-                annotations:
-                  summary: anubis (the only gate in front of personal media) failing on vps
       '';
     in
     {

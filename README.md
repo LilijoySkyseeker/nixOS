@@ -50,7 +50,7 @@ Conventions for changes and PRs are in [`AGENTS.md`](./AGENTS.md).
 | `thinkpad` | Desktop | Secondary laptop. |
 | `torrent` | Desktop | Primary desktop. |
 | `homelab` | Server | Home server: media (Jellyfin), photo/video backup (Immich, tailnet-only), game servers, NFS, DNS automation, backups. |
-| `vps` | Server | Public-facing edge: reverse proxy, WireGuard tunnel back to homelab, DDoS/bot mitigation. |
+| `vps` | Server | Public-facing edge: forwards the game ports to homelab over WireGuard, rate-limited per source IP. |
 | `isoimage` | Standalone | Bootable recovery/install ISO, outside the normal profile hierarchy. |
 
 Known issues and incident history per host live in each host's own
@@ -61,8 +61,8 @@ Known issues and incident history per host live in each host's own
 - Root on `homelab` is wiped on every boot. Every piece of state that
   survives is explicitly declared, not just whatever happened to be
   lying around.
-- `vps` fronts everything public (Caddy, crowdsec, Anubis proof-of-work
-  against bots) and tunnels back to `homelab` over WireGuard, which is
+- `vps` fronts everything public (just the game ports, rate-limited per
+  source IP) and tunnels back to `homelab` over WireGuard, which is
   never directly reachable from the internet itself.
 - `homelab` builds and pushes `vps`'s closure over the tailnet. The
   VPS never compiles its own config, so a small droplet never has to

@@ -12,15 +12,11 @@ _: {
 
       # Everything octoDNS needs is generated from these two values instead
       # of checked-in YAML — the zone data and octoDNS's own config file are
-      # both build-time-rendered Nix. `domain` is the single source of truth
-      # (also consumed by hosts/vps/configuration.nix) — see flake vars.
+      # both build-time-rendered Nix. `domain` comes from flake vars.
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
-      # Same droplet's public IPv6 — already in use as the WireGuard peer
-      # endpoint in hosts/homelab/configuration.nix.
-      vpsPublicIp6 = "2604:a880:4:1d0:0:3:5045:8000";
 
-      # Only jellyfin, minecraft, and factorio are meant to be publicly
+      # Only minecraft and factorio are meant to be publicly
       # reachable (see hosts/vps/README.md); the mail records below point at
       # Google Workspace, not at the vps.
       zoneRecords = {
@@ -29,11 +25,6 @@ _: {
             type = "A";
             ttl = 300;
             value = vpsPublicIp;
-          }
-          {
-            type = "AAAA";
-            ttl = 300;
-            value = vpsPublicIp6;
           }
           # Google Workspace mail, single-MX form
           # plan: 2026-09-15-re-add-google-workspace-mail-dns-records-to-octodns.md#F3
@@ -80,13 +71,6 @@ _: {
             value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
-        jellyfin = [
-          {
-            type = "CNAME";
-            ttl = 300;
-            value = domain;
-          }
-        ];
         # minecraft/factorio clients connect via ip:port, not domain, but a
         # record still makes it easier to hand out a hostname instead of a
         # raw IP. IPv4-only, deliberately: these ports are only DNAT'd
@@ -96,9 +80,7 @@ _: {
         # record here would advertise reachability that doesn't exist and
         # silently break any client that prefers IPv6 when a hostname
         # resolves to both (confirmed live: a Bedrock client could connect
-        # to the raw IPv4 address fine but not to the hostname). The apex
-        # keeps its AAAA record since that's Caddy running directly on the
-        # vps — native IPv6, no forwarding involved.
+        # to the raw IPv4 address fine but not to the hostname).
         minecraft = [
           {
             type = "A";

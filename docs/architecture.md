@@ -156,8 +156,8 @@ not the boundary itself:
 
 Two hosts are still structurally unusual, same as before the migration:
 
-- **`vps`** pulls in no `modules/services/*` modules. It's a tunnel/proxy
-  endpoint (caddy, crowdsec, wireguard, NAT/DNAT forwarding), and that
+- **`vps`** pulls in no `modules/services/*` modules. It's a tunnel
+  endpoint (wireguard, NAT/DNAT forwarding of the game ports), and that
   config is written directly inline in `hosts/vps/configuration.nix` rather
   than factored into `modules/services/`, since none of it is reused by
   another host.

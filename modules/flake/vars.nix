@@ -12,8 +12,8 @@ _: {
     # it lives here rather than being repeated per host.
     zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
     username = "lilijoy";
-    # public domain fronted by hosts/vps (jellyfin, minecraft, factorio
-    # subdomains — see services/octodns.nix and hosts/vps/configuration.nix)
+    # public domain fronted by hosts/vps (minecraft, factorio subdomains,
+    # see services/octodns.nix)
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files
     # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, profiles/PC.nix)
