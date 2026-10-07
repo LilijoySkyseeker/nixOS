@@ -517,10 +517,6 @@
   # own post-boot catch-up replication; next week's run is soon enough
   systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
   systemd.timers.push-deploy-vps.timerConfig.Persistent = lib.mkForce false;
-  # ship this host's own journal into its local Loki, same shipper as the
-  # rest of the fleet
-  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
-  myAlloy.enable = true;
 
   # email alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
@@ -748,18 +744,6 @@
   # none of these exist on the live host yet -- zfs create each manually
   # (docs/procedures/new-service.md) before the next deploy
   myDatasets = {
-    # Fleet log-monitoring's Loki store: persistent but deliberately never
-    # snapshotted or backed up (plan:
-    # 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md).
-    "zroot/persist/loki" = {
-      tier = "persist";
-      mountpoint = "/nix/state/loki";
-      # No owner/group here: this mountpoint already sits under
-      # persistRoot, so no persistence entry is generated (they'd have
-      # no effect) -- ownership is the log-monitoring plan's problem
-      # once it exists.
-    };
-
     # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D5
     # jellyfin cacheDir + /var/lib/docker reclassified persist (#D7)
     # managePersistence = false: entries already exist elsewhere

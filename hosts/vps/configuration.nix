@@ -22,11 +22,8 @@ let
     ) || store_path=""
 
     reject() {
-      # the stderr line only reaches the ssh *client*; the logger line is
-      # what lands in this host's own journal, where the log pipeline's
-      # alert rule reads it -- without it a probe with a stolen key is
-      # invisible server-side
-      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+      # the stderr line only reaches the ssh *client*; the logger line
+      # lands in this host's own journal
       ${pkgs.util-linux}/bin/logger -t vps-deploy -p auth.warning "rejected command: $cmd" || true
       echo "vps-deploy: rejected command: $cmd" >&2
       exit 1
@@ -292,9 +289,7 @@ in
     polkit.addRule(function(action, subject) {
       if (action.id == "org.freedesktop.systemd1.manage-units" &&
           subject.user == "vps-deploy") {
-        // silent auto-grants leave no journal line at all; this one is
-        // what the log pipeline's alert rule matches
-        // plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D13
+        // silent auto-grants leave no journal line otherwise
         polkit.log("vps-deploy manage-units grant: " + action.id);
         return polkit.Result.YES;
       }
@@ -449,16 +444,8 @@ in
     group = "health-check";
   };
 
-  # ship this host's journal to Loki on homelab
-  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
-  myAlloy = {
-    enable = true;
-    # this host's impermanence root is /persist, not vars.persistRoot
-    persistenceRoot = "/persist";
-    # 1GB-RAM host with a small disk: half the fleet default, still sized
-    # for a 24h burst rather than steady state (G6)
-    journalMaxUse = "1G";
-  };
+  # small disk: half the fleet's journal cap
+  services.journald.settings.Journal.SystemMaxUse = "1G";
 
   myHealthAlerts = {
     enable = true;

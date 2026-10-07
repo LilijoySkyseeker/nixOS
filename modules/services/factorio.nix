@@ -35,7 +35,6 @@ in
             # Take owner and mode from the enclosing config/ directory,
             # which the remap migration keeps correct, so this holds with
             # or without userns-remap and hardcodes no uid offset.
-            # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#G13
             chown --reference="${directory}/config" "$settings.tmp"
             chmod --reference="$settings" "$settings.tmp"
             mv "$settings.tmp" "$settings"

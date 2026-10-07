@@ -180,10 +180,6 @@
     group = "health-check";
   };
 
-  # ship this host's journal to Loki on homelab
-  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
-  myAlloy.enable = true;
-
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;

@@ -165,6 +165,19 @@ in
         publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
       };
 
+      # journald: persistent, size-capped; 26.05 only has `extraConfig`,
+      # 26.11 only `settings.Journal`, and 26.11 no longer pins Storage
+      services.journald =
+        if options.services.journald ? settings then
+          {
+            settings.Journal = {
+              Storage = "persistent";
+              SystemMaxUse = lib.mkDefault "2G";
+            };
+          }
+        else
+          { extraConfig = "SystemMaxUse=2G"; };
+
       # firmware updates
       services.fwupd.enable = true;
 

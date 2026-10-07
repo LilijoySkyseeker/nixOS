@@ -41,7 +41,7 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    `<mountpoint>` is the entry's own
    `mountpoint` field verbatim if that path is already under
    `persistRoot` (the flat `/nix/state/<service>` convention new
-   services use, e.g. Loki); otherwise it's `persistRoot` + that field
+   services use); otherwise it's `persistRoot` + that field
    (`modules/nixos/datasets.nix`'s `diskoMountpoint`), e.g.
    `/var/lib/docker` becomes `/nix/state/var/lib/docker`.
    `myZfsDatasetProperties` reapplies the rest

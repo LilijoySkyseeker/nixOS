@@ -2,20 +2,10 @@
 # all at once with `nix flake check`. These are the rung above
 # `nixos-rebuild build`: they boot real VMs, so they can catch what only
 # breaks at runtime. See .claude/skills/verify-a-change/SKILL.md.
-{ config, inputs, ... }:
+{ config, ... }:
 {
   perSystem = _: {
     checks = {
-      # pkgsStable, not pkgsUnstable: homelab (the aggregator) is a
-      # stable host and the fleet's Alloy is pinned stable
-      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D18
-      loki-pipeline = import ../../tests/loki-pipeline.nix {
-        pkgs = config.flake.pkgsStable;
-        lokiModule = config.flake.modules.nixos.loki;
-        alloyModule = config.flake.modules.nixos."alloy";
-        impermanenceModule = inputs.impermanence.nixosModules.impermanence;
-      };
-
       zrepl-replication = import ../../tests/zrepl-replication.nix {
         pkgs = config.flake.pkgsUnstable;
         zreplModule = config.flake.modules.nixos."zrepl";
