@@ -6,7 +6,6 @@ in
   flake.modules.nixos.jellyfin =
     {
       config,
-      pkgs,
       lib,
       ...
     }:
@@ -20,22 +19,13 @@ in
         dataDir = "/srv/jellyfin/data";
         logDir = "/srv/jellyfin/log";
 
-        # encoding.xml had drifted to HardwareAccelerationType=none and the
-        # module silently stops applying config once the file exists (only
-        # writes it if absent by default) -- force it so NixOS stays the
-        # source of truth and this can't drift again unnoticed. Backs up the
-        # prior file with a timestamp on every change. Loses a few fields
-        # the module doesn't model (DownMixAudioBoost, MaxMuxingQueueSize,
-        # EncoderPreset, DeinterlaceMethod, tonemapping algorithm/mode/
-        # range, ...), which revert to Jellyfin's own defaults -- accepted.
-        # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md#D1
+        # the module only writes encoding.xml if absent; force it so NixOS stays
+        # the source of truth. unmodelled fields (EncoderPreset, tonemapping,
+        # ...) revert to Jellyfin's defaults
         forceEncodingConfig = true;
 
-        # Nvidia GTX 1050 Mobile as primary transcoder: dedicated NVENC/NVDEC
-        # blocks free the CPU entirely, and it's the stronger of this host's two
-        # GPUs. The Intel iGPU's render node is also granted to the sandbox
-        # below so QSV/VAAPI can be picked from the dashboard as a fallback
-        # without touching this config.
+        # GTX 1050 Mobile (NVENC/NVDEC) as primary transcoder; the Intel iGPU's
+        # render node is granted below as a dashboard-selectable QSV/VAAPI fallback
         hardwareAcceleration = {
           enable = true;
           type = "nvenc";
@@ -64,65 +54,18 @@ in
       ];
       users.users.jellyfin.extraGroups = [ "render" ];
 
-      # The NixOS jellyfin module has no option for network.xml (only
-      # encoding.xml, via services.jellyfin.transcoding/hardwareAcceleration)
-      # — KnownProxies has to be patched into the XML ourselves. Without this,
-      # every request through the vps -> Anubis -> Caddy -> wireguard chain
-      # arrives at Jellyfin looking like it came from the tunnel IP rather
-      # than the real client, which breaks Jellyfin's own per-IP failed-login
-      # lockout (one bad actor could lock out every real user, since they'd
-      # all look like the same source IP). Runs on every start so it's
-      # idempotent and self-heals if the dashboard ever clears it; only
-      # touches the KnownProxies element, leaving any other network.xml
-      # settings made through the dashboard untouched.
-      systemd.services.jellyfin.preStart = lib.mkAfter ''
-        networkXml=${lib.escapeShellArg "${config.services.jellyfin.configDir}/network.xml"}
-        if [ -f "$networkXml" ]; then
-          ${lib.getExe' pkgs.xmlstarlet "xmlstarlet"} ed -L \
-            -d '/NetworkConfiguration/KnownProxies/*' \
-            -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.1' \
-            -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.2' \
-            "$networkXml"
-        fi
-      '';
-      # pinned explicitly (rather than left to dynamic allocation) so its gid
-      # stays stable across rebuilds — NFS clients (see
-      # modules/nixos/nfs-homelab-mounts.nix) authorize purely by numeric
-      # gid, so drift here would silently break their access to /storage and
-      # /storage-bulk.
+      # pinned gid: NFS clients (modules/nixos/nfs-homelab-mounts.nix) authorize
+      # by numeric gid, so drift silently breaks /storage access
       users.groups.multimedia = {
         gid = vars.gids.multimedia;
         members = [ "jellyfin" ];
       };
-      # No tmpfiles rules for jellyfin's own directories, on purpose. The
-      # pinned nixpkgs jellyfin module already creates all four through the
-      # typed systemd.tmpfiles.settings API (rendered as jellyfinDirs.conf)
-      # at 0700 jellyfin:multimedia -- tighter than what this repo used to
-      # declare. The four raw rules that were here duplicated that in
-      # 00-nixos.conf at 0770, and since systemd-tmpfiles takes the first
-      # line it sees per path and 00-nixos.conf sorts first, their only
-      # effect was to *loosen* upstream from 0700 to 0770. Removed
-      # 2026-08-28 -- see
-      # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
+      # no tmpfiles rules for jellyfin's dirs: upstream creates them at 0700
+      # (jellyfinDirs.conf); raw rules here land in 00-nixos.conf, sort first
+      # and would loosen that
 
-      # networking: dropped host-wide openFirewall/allowedTCPPorts (2026-08-26)
-      # — homelab's LAN NIC carries a real public IPv6 address (ISP
-      # RA-delegated), which turns any host-wide firewall rule into direct
-      # internet exposure. jellyfin is meant to be reached either directly
-      # over the tailnet, or via vps's Caddy+Anubis proxy (which connects
-      # in over the wg0 tunnel to 10.100.0.2, see hosts/vps/
-      # configuration.nix's anubis.instances.jellyfin.settings.TARGET) — so
-      # scope to just those two interfaces instead. This also drops
-      # openFirewall's LAN auto-discovery ports (SSDP 1900/udp, jellyfin's
-      # own 7359/udp) and 8920/tcp (HTTPS, unused here) — confirmed nothing
-      # on the LAN depends on direct/discovered access, so no client-side
-      # fallout. The old allowedUDPPorts = [ 8096 ] is also dropped here,
-      # not just re-scoped — jellyfin's own docs
-      # (https://jellyfin.org/docs/general/networking/#port-bindings) only
-      # list TCP 8096/8920 and discovery UDP 1900/7359 as real ports; UDP
-      # 8096 was never one of them.
+      # tailnet only: homelab's LAN NIC has a public IPv6 address, so no host-wide rule
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
-      networking.firewall.interfaces.wg0.allowedTCPPorts = [ 8096 ];
 
       # persistence
       environment.persistence.${vars.persistRoot}.directories = with config.services.jellyfin; [

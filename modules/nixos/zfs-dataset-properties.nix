@@ -48,10 +48,8 @@ _: {
           serviceConfig = {
             Type = "oneshot";
 
-            # Same baseline as zfs-space-guard.nix's unit -- root stays
-            # root (zfs set is not delegable to a service user here), but
-            # everything else this repo's other zfs-touching units apply
-            # is free.
+            # runs as root (zfs set isn't delegable here); otherwise the same
+            # sandbox as zfs-space-guard.nix
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;

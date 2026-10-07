@@ -9,28 +9,13 @@ _: {
     let
       cfg = config.myDockerPublishGuard;
 
-      # One `-p` publish is one DNAT rule in nat/PREROUTING, applied
-      # *before* the routing decision, so the packet is forwarded and
-      # never reaches INPUT where nixos-fw lives. Filtering it therefore
-      # has to happen in FORWARD, and DOCKER-USER is the one chain in
-      # FORWARD that docker guarantees it will not rewrite: it creates
-      # the chain and the jump to it, then leaves the contents alone.
+      # published ports are DNAT'd before routing and never reach INPUT
+      # (nixos-fw); DOCKER-USER is the FORWARD chain docker won't rewrite
       chain = "docker-publish-guard";
 
-      # `-o <bridge>` is load-bearing, not tidiness. Without it the rules
-      # match on --dport alone and so also match traffic a container
-      # *sends*, whenever the protocol uses the same port at both ends.
-      # Factorio does exactly that: the server heartbeats to the public
-      # matching servers with SPT=34197 DPT=34197, so a dport-only DROP
-      # silently de-lists the server while inbound play still works.
-      # Observed live on homelab, 2026-08-27, within half an hour of
-      # first deploying this guard.
-      #
-      # Direction is unambiguous once you look at the interfaces:
-      #   inbound to a container   IN=wg0|tailscale0  OUT=docker0
-      #   outbound from container  IN=docker0         OUT=enp3s0
-      # so pinning OUT to the bridge keeps this to traffic entering the
-      # container network, which is the only thing it is meant to police.
+      # `-o <bridge>` is load-bearing: dport alone also matches container
+      # *outbound* traffic on same-port protocols (factorio's heartbeat,
+      # SPT=DPT=34197), silently de-listing the server
       match = p: "-o ${cfg.bridgeInterface} -p ${p.protocol} --dport ${toString p.port}";
 
       portRules = lib.concatMapStringsSep "\n" (p: ''
@@ -46,14 +31,10 @@ _: {
           a DOCKER-USER allowlist restricting docker-published ports to a
           set of interfaces.
 
-          This exists because a published port has no firewall in front of
-          it. `virtualisation.oci-containers`' own option documentation
-          says so ("Publishing a port bypasses the NixOS firewall"), and
-          `networking.firewall.interfaces.<name>.allowed*Ports` cannot fix
-          it: those render INPUT rules, and a DNAT'd packet is forwarded
-          rather than delivered locally, so it never traverses INPUT at
-          all. Such rules look like they scope a published port and
-          constrain nothing (F-P4-02)
+          A published port bypasses the NixOS firewall, and
+          `networking.firewall.interfaces.<name>.allowed*Ports` can't scope
+          it: those are INPUT rules, and a DNAT'd packet is forwarded, never
+          traversing INPUT
         '';
 
         allowedInterfaces = lib.mkOption {
@@ -67,12 +48,9 @@ _: {
             Interfaces a published port may legitimately be reached on.
             Everything else is dropped.
 
-            Matched on the *input* interface rather than on a destination
-            address, deliberately: the tailnet address is assigned by
-            tailscale rather than declared here, so an address-based rule
-            would need a hardcoded 100.64.0.0/10 address that this repo
-            otherwise never hardcodes, and that would break silently if
-            the node were ever re-registered.
+            Matched on the input interface, not a destination address:
+            the tailnet address is assigned by tailscale and would break
+            silently if the node were re-registered.
           '';
         };
 
@@ -142,12 +120,8 @@ _: {
         systemd.services.docker-publish-guard = {
           description = "Restrict docker-published ports to specific interfaces (DOCKER-USER)";
 
-          # Must run after dockerd, because dockerd owns the creation of
-          # DOCKER-USER and of the FORWARD jump into it. Re-run on docker
-          # restart via PartOf: docker recreates the jump on every start,
-          # and while it does not flush DOCKER-USER's contents, our own
-          # chain is ours to keep correct rather than something to assume
-          # about.
+          # after dockerd, which creates DOCKER-USER and its FORWARD jump;
+          # PartOf re-runs this on docker restart
           after = [
             "docker.service"
             "firewall.service"
@@ -163,26 +137,19 @@ _: {
 
           path = [ pkgs.iptables ];
 
-          # Deliberately NOT sandboxed beyond NoNewPrivileges: this
-          # manipulates the host's netfilter tables, which needs
-          # CAP_NET_ADMIN in the host network namespace. See
-          # docs/hardening.md on not sandboxing around a functional need.
+          # not sandboxed: needs CAP_NET_ADMIN in the host netns
+          # (docs/hardening.md)
           script = ''
             set -euo pipefail
 
-            # Idempotent: own a private chain, rebuild it from scratch
-            # every run, and jump into it from DOCKER-USER exactly once.
-            # Rebuilding rather than appending is what makes a re-run after
-            # a config change converge instead of accumulating.
+            # idempotent: rebuild the private chain each run, jump to it once
             iptables -N ${chain} 2>/dev/null || true
             iptables -F ${chain}
 
             ${portRules}
 
-            # DOCKER-USER is created by dockerd. It exists by the time this
-            # runs (After=docker.service), but create it defensively so a
-            # docker that has not yet touched iptables cannot make this
-            # unit fail and leave the ports unguarded.
+            # create defensively: a missing DOCKER-USER must not fail this
+            # unit and leave the ports unguarded
             iptables -N DOCKER-USER 2>/dev/null || true
             while iptables -D DOCKER-USER -j ${chain} 2>/dev/null; do :; done
             iptables -I DOCKER-USER 1 -j ${chain}

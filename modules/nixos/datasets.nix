@@ -1,15 +1,10 @@
 # myDatasets: the per-service ZFS dataset registry.
 #
-# plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md
 # design: docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md
 #
-# One entry, keyed by full dataset name, generates every consumer: the
-# disko entry, the ZFS properties (via myZfsDatasetProperties, which
-# vars.zfsProps already reads for disko's own options), and -- for a
-# dataset nothing else already persists -- the environment.persistence
-# entry. `tier` has no default: a dataset declared without one is an
-# evaluation error, which is the point (ADR-0001, "safe by default,
-# twice over").
+# one entry, keyed by full dataset name, generates the disko entry, the ZFS
+# properties (via myZfsDatasetProperties) and, unless already persisted, the
+# environment.persistence entry. `tier` has no default on purpose (ADR-0001)
 _: {
   flake.modules.nixos."datasets" =
     {
@@ -21,10 +16,8 @@ _: {
     let
       cfg = config.myDatasets;
 
-      # com.sun:auto-snapshot follows from the tier alone (ADR-0001's
-      # table); every other zfs-dataset-properties key a specific dataset
-      # needs stays a plain myZfsDatasetProperties entry outside this
-      # registry, same as today.
+      # com.sun:auto-snapshot follows from the tier alone (ADR-0001's table);
+      # other per-dataset properties stay plain myZfsDatasetProperties entries
       tierAutoSnapshot = {
         offsite = "true";
         onsite = "true";
@@ -35,13 +28,8 @@ _: {
       poolOf = name: builtins.head (lib.splitString "/" name);
       relOf = name: lib.concatStringsSep "/" (lib.tail (lib.splitString "/" name));
 
-      # A dataset already mounted under persistRoot (the new, flat
-      # `/nix/state/<service>` convention) needs no impermanence
-      # indirection -- it is real, non-volatile storage already. Anything
-      # else (an existing service's own directory elsewhere, e.g.
-      # jellyfin's `/srv/jellyfin/cache`) is bind-mounted from
-      # persistRoot+mountpoint by impermanence, same as every other
-      # persisted directory.
+      # a mountpoint under persistRoot is mounted directly; anything else is
+      # mounted at persistRoot+mountpoint for impermanence to bind-mount
       diskoMountpoint =
         ds:
         if lib.hasPrefix "${vars.persistRoot}/" ds.mountpoint then
@@ -74,7 +62,7 @@ _: {
               description = ''
                 Absolute path the service actually reads/writes.
 
-                A path under persistRoot (e.g. "/nix/state/loki") is
+                A path under persistRoot (e.g. "/nix/state/myservice") is
                 mounted there directly -- no impermanence indirection
                 needed. Any other path (e.g. "/var/lib/docker") gets the
                 dataset mounted at persistRoot+mountpoint instead, exactly
@@ -105,9 +93,8 @@ _: {
                 declares its own entry for this exact path -- e.g.
                 modules/services/jellyfin.nix's cacheDir -- so the
                 registry doesn't add a second, conflicting one. Service
-                modules stay tier-unaware either way -- plan:
-                2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D9;
-                this only controls who owns the persistence declaration.
+                modules stay tier-unaware either way; this only controls
+                who owns the persistence declaration.
               '';
             };
           };
@@ -118,10 +105,10 @@ _: {
         type = lib.types.attrsOf (lib.types.submodule datasetSubmodule);
         default = { };
         example = {
-          "zroot/persist/loki" = {
+          "zroot/persist/myservice" = {
             tier = "persist";
-            mountpoint = "/nix/state/loki";
-            owner = "loki";
+            mountpoint = "/nix/state/myservice";
+            owner = "myservice";
           };
         };
         description = ''
@@ -130,10 +117,8 @@ _: {
         '';
       };
 
-      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G4
       # every onsite/offsite myDatasets entry, "<"-suffixed for zrepl
-      # recursion -- not wired into myZrepl directly, see
-      # 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F2
+      # recursion; each host feeds it into its own zrepl role
       options.myDatasetsReplicated = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = map (name: "${name}<") (
@@ -150,8 +135,7 @@ _: {
 
       # NB: this attrset's top-level shape (disko/myZfsDatasetProperties/
       # environment) must stay static regardless of `cfg` -- only the
-      # *values* depend on it, lazily. plan:
-      # 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F1
+      # *values* depend on it, lazily, or evaluation hits infinite recursion
       config = lib.mkIf (cfg != { }) {
         myZfsDatasetProperties = lib.mapAttrs (_: ds: {
           "com.sun:auto-snapshot" = tierAutoSnapshot.${ds.tier};

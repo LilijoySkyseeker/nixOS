@@ -45,9 +45,6 @@ in
             The timer is removed rather than merely un-wanted, so a
             `switch` actually stops a running timer instead of leaving it
             armed until the next reboot.
-
-            Currently false fleet-wide — see
-            2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md.
           '';
         };
 
@@ -74,7 +71,7 @@ in
 
         minSwitchInterval = lib.mkOption {
           type = lib.types.ints.positive;
-          default = 7 * 24 * 60 * 60;
+          default = 6 * 24 * 60 * 60;
           description = ''
             Minimum seconds since /nix/var/nix/profiles/system's last
             activation before this scheduled job will build/switch. Manual
@@ -146,10 +143,8 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
-            # this unit runs `nixos-rebuild switch`/`boot` itself — real
-            # system activation — so it can't be filesystem/kernel-sandboxed
-            # the way a plain build-only job can (see myAutoUpdate's
-            # flake-update-test vs auto-switch for the same distinction).
+            # runs real activation (nixos-rebuild switch/boot), so no
+            # filesystem/kernel sandboxing
             NoNewPrivileges = true;
             ExecStartPost = lib.optionals cfg.autoReboot [
               (pkgs.writeShellScript "reboot-if-kernel-changed" ''
