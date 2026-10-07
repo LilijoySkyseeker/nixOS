@@ -18,25 +18,10 @@
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
-    # Disabled 2026-08-27 with the rest of the fleet's schedules — see
-    # hosts/homelab/configuration.nix's myAutoUpdate for the reasoning,
-    # and 2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md.
-    # The service stays: `systemctl start pull-deploy` still works.
-    scheduleEnable = false;
     # root has no home-manager profile (and thus no SSH identity of its
     # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
     # already trusts and authenticates to the origin remote day-to-day.
     sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
-  };
-
-  # rebuild the recovery iso into ~/Downloads every time pull-deploy
-  # successfully updates this host, for manual copying onto Ventoy
-  myIsoAutobuild = {
-    enable = true;
-    flakeDir = "/home/lilijoy/dotfiles";
-    buildUser = "lilijoy";
-    isoAttr = "isoimage";
-    triggeredBy = [ "pull-deploy.service" ];
   };
 
   # System installed pkgs
@@ -207,10 +192,6 @@
     group = "health-check";
   };
 
-  # ship this host's journal to Loki on homelab
-  # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
-  myAlloy.enable = true;
-
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
@@ -240,8 +221,7 @@
     # silently stops this host updating with no failed unit anywhere.
     # Watching the profile symlink measures the outcome instead.
     #
-    # 504h = 21 days: dates is weekly and minSwitchInterval is 7 days, so
-    # 14 days is the normal ceiling, plus a week of slack. This is a
+    # 504h = 21 days: weekly deploys plus two weeks of slack. This is a
     # desktop that is usually powered on, so it needs no laptop-style
     # allowance for long absences.
     staleMarkerFiles = {

@@ -1,7 +1,7 @@
 _: {
   flake.modules.nixos.nfs = _: {
-    # nfs server — tailnet-only file share for /storage and /storage-bulk
-    # (the same datasets previously served by copyparty). NFSv4 covers Linux
+    # nfs server — tailnet-only file share for /storage and /storage-bulk.
+    # NFSv4 covers Linux
     # clients; Android has no usable native NFS client, so it's served the
     # same datasets separately over Samba (see samba.nix).
     services.nfs.server = {

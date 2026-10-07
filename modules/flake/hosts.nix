@@ -26,7 +26,6 @@ in
         nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
-        nixosModules."alloy"
         nixosModules."backup-canary"
       ];
     };
@@ -47,12 +46,10 @@ in
         # torrent only, not profile-pc
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
         nixosModules."agent-user"
-        nixosModules."iso-autobuild"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
-        nixosModules."alloy"
         nixosModules."backup-canary"
         # audio-switch's dedicated hotkeys hardcode this desk's three output
         # devices, so it's wired in here (torrent only), not profile-pc,
@@ -82,7 +79,7 @@ in
         ../../hosts/homelab/configuration.nix
         nixosModules."profile-default"
         nixosModules."profile-server"
-        nixosModules."auto-update"
+        nixosModules."pull-deploy"
         nixosModules."health-alerts"
         nixosModules."push-deploy"
         nixosModules."zrepl"
@@ -100,9 +97,6 @@ in
         nixosModules.octodns
         nixosModules.nfs
         nixosModules.samba
-        nixosModules.loki
-        nixosModules.grafana
-        nixosModules."alloy"
       ];
     };
     #==================================================
@@ -118,19 +112,6 @@ in
         nixosModules."profile-default"
         nixosModules."profile-server"
         nixosModules."health-alerts"
-        nixosModules."alloy"
-      ];
-    };
-    #==================================================
-    isoimage = inputs.nixpkgs-unstable.lib.nixosSystem {
-      specialArgs = {
-        inherit inputs;
-        pkgs-unstable = pkgsUnstable;
-        inherit vars;
-      };
-      modules = [
-        ../../hosts/isoimage/configuration.nix
-        nixosModules."copyparty-iso"
       ];
     };
   };

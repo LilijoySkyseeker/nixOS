@@ -38,10 +38,6 @@
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
-    # provides the services.copyparty NixOS module used on hosts/isoimage
-    copyparty.url = "github:9001/copyparty";
-    copyparty.inputs.nixpkgs.follows = "nixpkgs-unstable";
-
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";
   };

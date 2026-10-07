@@ -6,7 +6,6 @@ in
   flake.modules.nixos.jellyfin =
     {
       config,
-      pkgs,
       lib,
       ...
     }:
@@ -64,27 +63,6 @@ in
       ];
       users.users.jellyfin.extraGroups = [ "render" ];
 
-      # The NixOS jellyfin module has no option for network.xml (only
-      # encoding.xml, via services.jellyfin.transcoding/hardwareAcceleration)
-      # — KnownProxies has to be patched into the XML ourselves. Without this,
-      # every request through the vps -> Anubis -> Caddy -> wireguard chain
-      # arrives at Jellyfin looking like it came from the tunnel IP rather
-      # than the real client, which breaks Jellyfin's own per-IP failed-login
-      # lockout (one bad actor could lock out every real user, since they'd
-      # all look like the same source IP). Runs on every start so it's
-      # idempotent and self-heals if the dashboard ever clears it; only
-      # touches the KnownProxies element, leaving any other network.xml
-      # settings made through the dashboard untouched.
-      systemd.services.jellyfin.preStart = lib.mkAfter ''
-        networkXml=${lib.escapeShellArg "${config.services.jellyfin.configDir}/network.xml"}
-        if [ -f "$networkXml" ]; then
-          ${lib.getExe' pkgs.xmlstarlet "xmlstarlet"} ed -L \
-            -d '/NetworkConfiguration/KnownProxies/*' \
-            -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.1' \
-            -s '/NetworkConfiguration/KnownProxies' -t elem -n string -v '10.100.0.2' \
-            "$networkXml"
-        fi
-      '';
       # pinned explicitly (rather than left to dynamic allocation) so its gid
       # stays stable across rebuilds — NFS clients (see
       # modules/nixos/nfs-homelab-mounts.nix) authorize purely by numeric
@@ -105,24 +83,8 @@ in
       # 2026-08-28 -- see
       # 2026-08-28-fix-srv-permissions-stop-three-systems-fighting-ov.md.
 
-      # networking: dropped host-wide openFirewall/allowedTCPPorts (2026-08-26)
-      # — homelab's LAN NIC carries a real public IPv6 address (ISP
-      # RA-delegated), which turns any host-wide firewall rule into direct
-      # internet exposure. jellyfin is meant to be reached either directly
-      # over the tailnet, or via vps's Caddy+Anubis proxy (which connects
-      # in over the wg0 tunnel to 10.100.0.2, see hosts/vps/
-      # configuration.nix's anubis.instances.jellyfin.settings.TARGET) — so
-      # scope to just those two interfaces instead. This also drops
-      # openFirewall's LAN auto-discovery ports (SSDP 1900/udp, jellyfin's
-      # own 7359/udp) and 8920/tcp (HTTPS, unused here) — confirmed nothing
-      # on the LAN depends on direct/discovered access, so no client-side
-      # fallout. The old allowedUDPPorts = [ 8096 ] is also dropped here,
-      # not just re-scoped — jellyfin's own docs
-      # (https://jellyfin.org/docs/general/networking/#port-bindings) only
-      # list TCP 8096/8920 and discovery UDP 1900/7359 as real ports; UDP
-      # 8096 was never one of them.
+      # tailnet only: homelab's LAN NIC has a public IPv6 address, so no host-wide rule
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
-      networking.firewall.interfaces.wg0.allowedTCPPorts = [ 8096 ];
 
       # persistence
       environment.persistence.${vars.persistRoot}.directories = with config.services.jellyfin; [
