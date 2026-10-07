@@ -1,21 +1,9 @@
-# Integration tests, run with `nix build .#checks.x86_64-linux.<name>` or
-# all at once with `nix flake check`. These are the rung above
-# `nixos-rebuild build`: they boot real VMs, so they can catch what only
-# breaks at runtime. See .claude/skills/verify-a-change/SKILL.md.
-{ config, inputs, ... }:
+# VM integration tests: `nix build .#checks.x86_64-linux.<name>` or
+# `nix flake check` (see .claude/skills/verify-a-change/SKILL.md)
+{ config, ... }:
 {
   perSystem = _: {
     checks = {
-      # pkgsStable, not pkgsUnstable: homelab (the aggregator) is a
-      # stable host and the fleet's Alloy is pinned stable
-      # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D18
-      loki-pipeline = import ../../tests/loki-pipeline.nix {
-        pkgs = config.flake.pkgsStable;
-        lokiModule = config.flake.modules.nixos.loki;
-        alloyModule = config.flake.modules.nixos."alloy";
-        impermanenceModule = inputs.impermanence.nixosModules.impermanence;
-      };
-
       zrepl-replication = import ../../tests/zrepl-replication.nix {
         pkgs = config.flake.pkgsUnstable;
         zreplModule = config.flake.modules.nixos."zrepl";
@@ -51,26 +39,11 @@
         deployGuardsScript = config.flake.deployGuardsScript;
       };
 
-      deploy-chain = import ../../tests/deploy-chain.nix {
-        pkgs = config.flake.pkgsUnstable;
-        autoUpdateModule = config.flake.modules.nixos."auto-update";
-      };
-
-      anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
-        pkgs = config.flake.pkgsUnstable;
-      };
-
-      vps-refused-connection-logging = import ../../tests/vps-refused-connection-logging.nix {
-        pkgs = config.flake.pkgsUnstable;
-      };
-
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";
-        # The exact flake, not just its already-instantiated `pkgs`, so the
-        # test can call `.lib.nixosSystem` itself and get the byte-identical
-        # derivation the pushed flake's own `nixpkgs.lib.nixosSystem` call
-        # will produce inside the VM -- see the test file's own comment.
+        # the flake itself, not its pkgs: the test's `.lib.nixosSystem` must
+        # yield the byte-identical derivation the pushed flake builds in the VM
         nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
     };

@@ -33,14 +33,8 @@
 
           gh
         ]
-        # Shared with every host, from modules/flake/debug-tools.nix, so the
-        # two lists cannot drift — a tool added because it was missing on a
-        # host shows up here too, and vice versa. `jq` used to be listed
-        # above and now comes from there.
-        #
-        # Only *inspect a running system* tooling belongs in the shared
-        # list; everything above stays here because it is dev-machine-only
-        # (formatting, linting, gh, sops, nixos-anywhere).
+        # shared with every host (modules/flake/debug-tools.nix); dev-only
+        # tools stay in the list above
         ++ config.flake.debugTools config.flake.pkgsUnstable;
 
       shellHook = ''

@@ -11,9 +11,8 @@ tiers -- see
 [`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`](adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md).
 restic's dataset list below is the union of the pre-registry hardcoded
 list and a recursive walk of every `offsite`-tier root the registry
-declares; the hardcoded half is a migration remnant that shrinks as
-`2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md`
-moves datasets into the tiered tree.
+declares. Existing services stay on the hardcoded list; only new
+datasets go in the tiered tree.
 
 ## Three independent paths
 

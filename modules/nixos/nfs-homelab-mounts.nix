@@ -4,19 +4,15 @@ let
 in
 {
   flake.modules.nixos."nfs-homelab-mounts" = _: {
-    # matches homelab's "multimedia" group (services/jellyfin.nix), which
-    # owns /storage and /storage-bulk — NFS with sec=sys authorizes purely
-    # by numeric uid/gid, so lilijoy needs this exact gid locally to get
-    # group read/write on the mounts below.
+    # must match homelab's "multimedia" gid (services/jellyfin.nix): NFS
+    # sec=sys authorizes by numeric uid/gid
     users.groups.multimedia = {
       gid = vars.gids.multimedia;
       members = [ "lilijoy" ];
     };
 
-    # nfs client mounts for homelab's tailnet-only file share (see
-    # services/nfs.nix). Automounted on first access rather than at boot —
-    # laptops/desktops aren't always on the tailnet or near homelab, so
-    # boot must never block on this.
+    # nfs client mounts for homelab's tailnet-only share (services/nfs.nix),
+    # automounted so boot never blocks when homelab is unreachable
     fileSystems =
       let
         mountOpts = [
@@ -29,16 +25,8 @@ in
           "timeo=30"
           "retry=0"
 
-          # These two are about trust, not availability (F-P6-05). NFS
-          # here is sec=sys, so the client takes homelab's word for
-          # every uid, gid and mode on the share. The server's
-          # root_squash stops a compromised *client* writing root-owned
-          # files; it does nothing about files the *server* already
-          # owns. Without these, root on homelab can drop a setuid-root
-          # binary or a mknod'd device node under /storage and it
-          # becomes a privilege path on both laptops -- and the
-          # multimedia gid mapping above gives lilijoy group rw over
-          # the whole share, so nothing else is in the way.
+          # security: sec=sys trusts homelab's uids/modes, so without these
+          # root on homelab could plant setuid binaries/device nodes here
           "nosuid" # no setuid/setgid on execution from the share
           "nodev" # no device nodes honoured from the share
           "noexec" # plan: 2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md#D1

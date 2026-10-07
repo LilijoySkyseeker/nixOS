@@ -68,14 +68,12 @@ _: {
             covered by the failed-units check — this instead measures whether the
             backup data itself is actually advancing.
 
-            This matters more under zrepl than it did under syncoid: zrepl is a
-            single long-running daemon, so an individual job erroring does not
-            put a systemd unit into the "failed" state the way a per-job oneshot
-            unit did. Snapshot age is the reliable signal that replication has
-            stopped advancing.
+            zrepl is a single long-running daemon, so an individual job erroring
+            does not put a systemd unit into the "failed" state. Snapshot age is
+            the reliable signal that replication has stopped advancing.
 
             Note zrepl receives into <root_fs>/<full source dataset path>, so
-            these are deep paths, not the short target names syncoid used.
+            these are deep paths.
           '';
         };
 
@@ -105,26 +103,20 @@ _: {
               Pointing this at `/nix/var/nix/profiles/system` measures the
               outcome instead of the attempt: that symlink's mtime is the
               last time the host was *actually* activated, by any route —
-              scheduled, push-deployed or manual. That is F-P7-09's
-              skipped-deploy half.
+              scheduled, push-deployed or manual.
 
             Note the check below uses a non-dereferencing `stat`, which
             matters for the profile symlink specifically: it points into the
             nix store, and store paths all have mtime 1 (1970), so a
             dereferencing `stat -L` here would report every host as
-            permanently stale. Verified live on homelab.
+            permanently stale.
           '';
         };
       };
 
       config = lib.mkIf cfg.enable {
-        # The per-alert cooldown/clear state is keyed on each marker's
-        # *basename*, so two markers whose paths differ only in their
-        # directory would silently share one alert slot: the second would
-        # clear the first's stamp and one of the two failures would stop
-        # being reported. That is invisible at runtime, so catch it at eval.
-        # Not hypothetical — "last-success" is the obvious name for exactly
-        # this kind of file, and this host already has one.
+        # alert state is keyed on each marker's basename, so markers differing
+        # only by directory would silently share one alert slot
         assertions = [
           {
             assertion =
@@ -210,12 +202,8 @@ _: {
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
                   stale_key="backup-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"
-                  # `|| true`: under `set -e -o pipefail`, `zfs list` on a
-                  # dataset that doesn't exist yet at all (not just empty of
-                  # snapshots — e.g. a push-backup target before its first
-                  # ever sync) exits non-zero and would abort this whole
-                  # script instead of falling through to the "$newest" empty
-                  # check below, which already handles that case correctly.
+                  # `|| true`: zfs list fails on a not-yet-created dataset;
+                  # the empty "$newest" check below handles that case
                   newest=$(zfs list -t snapshot -H -p -o creation -s creation ${lib.escapeShellArg dataset} 2>/dev/null | tail -1) || true
                   if [ -z "$newest" ]; then
                     notify "$stale_key" "Backup staleness check failed" "${dataset}: no snapshots found (dataset missing or empty)"
@@ -232,14 +220,9 @@ _: {
             ''}
 
             ${lib.optionalString (cfg.staleMarkerFiles != { }) ''
-              # marker-file staleness: catches both a run that hangs/retries
-              # forever and one that never happens at all (a skipped deploy),
-              # neither of which ever reaches systemd's "failed" state.
-              #
-              # `stat` without -L is load-bearing here, not incidental: the
-              # /nix/var/nix/profiles/system marker is a symlink into the
-              # store, every store path has mtime 1, so dereferencing would
-              # make every host permanently "stale". Keep it non-dereferencing.
+              # marker-file staleness: hung runs and skipped deploys
+              # stat without -L: the profiles/system marker is a symlink into
+              # the store (mtime 1), so dereferencing makes every host stale
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (path: maxHours: ''
                   stale_key="marker-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg path} | tr -c 'a-zA-Z0-9_-' '-')"
@@ -291,20 +274,9 @@ _: {
             User = "health-check";
             Group = "health-check";
             StateDirectory = "health-alerts";
-            # smartctl needs both the "disk" group and CAP_SYS_RAWIO for its
-            # SG_IO ioctls. Both are granted here, on the unit, rather than on
-            # users.users.health-check -- a group on the *user* applies to
-            # everything that user ever runs, whereas SupplementaryGroups is
-            # scoped to this one invocation. That matters more than it looks:
-            # /dev/sd* is root:disk 0660, i.e. read *and write* on every raw
-            # block device, which is root-equivalent (and on homelab is a
-            # direct read of the age key that decrypts the whole secrets
-            # file). The previous comment here claimed "read access"; the
-            # grant was never read-only.
-            #
-            # Both are also gated on checkSmart, since nothing else in this
-            # unit touches a block device -- vps runs with checkSmart = false
-            # and was carrying the capability and the group for no reason.
+            # smartctl's SG_IO needs "disk" + CAP_SYS_RAWIO. security: disk is
+            # read-write on raw block devices (root-equivalent), so grant it on
+            # the unit, not the user, and only when checkSmart
             SupplementaryGroups = lib.optionals cfg.checkSmart [ "disk" ];
             AmbientCapabilities = lib.optionals cfg.checkSmart [ "CAP_SYS_RAWIO" ];
             CapabilityBoundingSet = lib.optionals cfg.checkSmart [ "CAP_SYS_RAWIO" ];
@@ -328,11 +300,8 @@ _: {
           };
         };
 
-        # dedicated non-root user. It deliberately holds no supplementary
-        # groups: the "disk" membership smartctl needs is granted on the unit
-        # instead (serviceConfig.SupplementaryGroups above), so it applies to
-        # that one invocation rather than to anything running as this user.
-        # zpool status/systemctl status queries are unprivileged on their own.
+        # dedicated non-root user; deliberately no supplementary groups
+        # ("disk" is granted on the unit above)
         users.users.health-check = {
           isSystemUser = true;
           group = "health-check";

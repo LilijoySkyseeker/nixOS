@@ -1,29 +1,13 @@
-# Does userns-remap actually put a real, non-zero host uid under a
-# container's uid 0, and does the ownership migration for pre-existing
-# bind-mount data (myDockerUserns.migrations) actually let the container
-# read/write the data it already had before the remap was enabled?
-#
-# F-P4-07 / RESUME.md item 4: container uid 0 was host uid 0 on every
-# bind mount. A build cannot prove any of this -- the security property
-# under test is what the *host kernel* thinks a running container
-# process's uid is, and whether pre-existing bind-mount files are still
-# readable/writable after the remap, neither of which a Nix eval touches.
-#
-# Two otherwise-identical nodes, not a live toggle: Docker's own docs
-# confirm userns-remap is not live-reloadable (changing it needs a full
-# dockerd restart), so there's no "clear it and watch the same probe
-# succeed" causation proof available the way anubis-admin-egress.nix
-# does it -- the two-node comparison (matching push-deploy-sandbox.nix's
-# deployer/deployer-broken shape) is the equivalent here.
+# VM test: userns-remap puts a non-zero host uid under container uid 0, and
+# myDockerUserns.migrations keeps pre-existing bind-mount data usable
+# two nodes rather than a live toggle: userns-remap isn't live-reloadable
 {
   pkgs,
   dockerUsernsModule,
 }:
 let
-  # Built locally, no network required -- see the plan's G6: enabling
-  # userns-remap changes dockerd's storage path per remap user, which
-  # would force a real re-pull of any registry image anyway, and the
-  # sandboxed test VM has no network to do that with.
+  # built locally: userns-remap changes dockerd's storage path, forcing a
+  # re-pull the network-less VM can't do
   probeImage = pkgs.dockerTools.buildImage {
     name = "userns-remap-probe";
     tag = "test";
@@ -43,10 +27,7 @@ let
     ];
   };
 
-  # Shared by both nodes: a bind-mount directory with data already on it,
-  # standing in for /srv/factorio/main's real 845:845 -- simulates a
-  # host that already ran the container before userns-remap ever entered
-  # the picture, which is the exact situation this migration exists for.
+  # bind-mount data owned by the pre-remap uid (like /srv/factorio/main's 845:845)
   preSeed = [
     "d /srv/test-app 0755 845 845 -"
     "f /srv/test-app/pre-existing 0644 845 845 - already-here"
@@ -85,11 +66,7 @@ pkgs.testers.runNixOSTest {
       };
     };
 
-    # Negative control: same container, same pre-seeded data, no remap
-    # at all -- this is the vulnerability F-P4-07 describes, kept live
-    # in the test so a regression that silently stops applying the
-    # remap shows up as "the two nodes look the same" rather than
-    # nothing.
+    # negative control: no remap, so container root is host root
     plain = _: {
       virtualisation = {
         docker.enable = true;
@@ -101,10 +78,7 @@ pkgs.testers.runNixOSTest {
       systemd.tmpfiles.rules = preSeed;
     };
 
-    # Proves the fail-closed wiring (requiredBy, not wantedBy) actually
-    # holds: a real failure in the migration unit, not just a config
-    # assertion, should refuse to let docker.service start at all
-    # rather than silently proceeding against unmigrated data.
+    # fail-closed: a failed migration must keep docker.service from starting
     brokenMigration =
       { lib, ... }:
       {
@@ -139,12 +113,8 @@ pkgs.testers.runNixOSTest {
     with subtest("remapped: dockremap's subuid range actually rendered"):
         subuid = remapped.succeed("cat /etc/subuid")
         assert "dockremap:10000000:65536" in subuid, f"subuid not set: {subuid!r}"
-        # NixOS passes the rendered daemon.json to dockerd via
-        # --config-file=<store path> on the unit's own ExecStart, not
-        # /etc/docker/daemon.json -- confirmed by reading docker.nix
-        # itself (settingsFormat.generate, no /etc/docker anywhere).
-        # `docker info` is dockerd's own live-effective-config view, more
-        # robust than chasing the store path.
+        # NixOS passes daemon.json as --config-file=<store path>, not
+        # /etc/docker; `docker info` shows the live effective config
         security_opts = remapped.succeed("docker info --format '{{.SecurityOptions}}'")
         assert "name=userns" in security_opts, \
             f"userns-remap not active per dockerd itself: {security_opts!r}"

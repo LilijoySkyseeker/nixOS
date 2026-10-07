@@ -6,7 +6,6 @@ in
   flake.modules.nixos."profile-server" =
     {
       pkgs,
-      config,
       ...
     }:
     {
@@ -19,9 +18,8 @@ in
       # disable sudo
       security.sudo.enable = false;
 
-      # audit log of every executed command — /var/log/audit/audit.log,
-      # which lives under /var/log, already in each host's persistence
-      # directories list (impermanence would otherwise wipe it every boot).
+      # audit log of every executed command; /var/log is in each host's
+      # persistence list, else impermanence wipes it
       security.auditd.enable = true;
       security.audit.enable = true;
       security.audit.rules = [ "-a exit,always -F arch=b64 -S execve" ];
@@ -29,24 +27,6 @@ in
       # nh, nix helper
       programs.nh = {
         flake = "/etc/nixos";
-      };
-
-      # git identity for root, rendered to avoid storing name/email in the
-      # nix store — mirrors profiles/PC.nix's lilijoy identity, same shared
-      # sops secret, just rendered to root's home instead. Needed for
-      # myAutoUpdate's flake-update-test commit step (was previously unset,
-      # failing every run — see
-      # 2026-08-19-flake-update-test-service-failing-on-homelab-root-.md).
-      sops.secrets.git_username = { };
-      sops.secrets.git_email = { };
-      sops.templates."git-identity" = {
-        path = "/root/.config/git/identity";
-        owner = "root";
-        content = ''
-          [user]
-              name = ${config.sops.placeholder.git_username}
-              email = ${config.sops.placeholder.git_email}
-        '';
       };
 
       # home-manager
