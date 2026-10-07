@@ -1,6 +1,5 @@
 # myDatasets: the per-service ZFS dataset registry.
 #
-# plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md
 # design: docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md
 #
 # One entry, keyed by full dataset name, generates every consumer: the
@@ -105,9 +104,8 @@ _: {
                 declares its own entry for this exact path -- e.g.
                 modules/services/jellyfin.nix's cacheDir -- so the
                 registry doesn't add a second, conflicting one. Service
-                modules stay tier-unaware either way -- plan:
-                2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D9;
-                this only controls who owns the persistence declaration.
+                modules stay tier-unaware either way; this only controls
+                who owns the persistence declaration.
               '';
             };
           };
@@ -130,10 +128,8 @@ _: {
         '';
       };
 
-      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G4
       # every onsite/offsite myDatasets entry, "<"-suffixed for zrepl
-      # recursion -- not wired into myZrepl directly, see
-      # 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F2
+      # recursion; each host feeds it into its own zrepl role
       options.myDatasetsReplicated = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = map (name: "${name}<") (
@@ -150,8 +146,7 @@ _: {
 
       # NB: this attrset's top-level shape (disko/myZfsDatasetProperties/
       # environment) must stay static regardless of `cfg` -- only the
-      # *values* depend on it, lazily. plan:
-      # 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F1
+      # *values* depend on it, lazily, or evaluation hits infinite recursion
       config = lib.mkIf (cfg != { }) {
         myZfsDatasetProperties = lib.mapAttrs (_: ds: {
           "com.sun:auto-snapshot" = tierAutoSnapshot.${ds.tier};
