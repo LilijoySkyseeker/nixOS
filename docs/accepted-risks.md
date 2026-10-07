@@ -365,7 +365,7 @@ it leaves this file entirely.
 | ~~D8~~ | **Answered 2026-09-03 — accepted, see AR-8.** Intended: not meant to be secure, meant to make recovery (of these hosts, or a third party's) as easy as possible. | H6 |
 | ~~D9~~ | **Answered 2026-08-27 — nothing accepted, all three fixed.** KDE Connect scoped to `tailscale0`; Steam remote play and avahi/mDNS removed outright. | `F-P1-04`, `F-P5-06` |
 | ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
-| D11 | That `flake-update-test` auto-merges upstream updates to fleet root on build success alone | `F-P7-10` |
+| ~~D11~~ | **Moot 2026-10-06.** `flake-update-test` was deleted; inputs change only through a PR the user merges, and the `master` ruleset requires one. | `F-P7-10` |
 | ~~D12~~ | **Answered 2026-09-03 — not accepted, and fixed.** `noexec` added to `nfs-homelab-mounts.nix`, closing the last execution path from a homelab-controlled filesystem onto both laptops. AR-6 marked superseded. | `F-P6-05` |
 | ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
 | ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |

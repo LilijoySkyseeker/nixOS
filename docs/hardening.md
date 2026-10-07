@@ -91,7 +91,7 @@ here; it is already applied in the SSH bullet below.
    option set in an `extraConfig`-shaped escape hatch can render, look
    right in a diff, and do nothing. Prefer the module's structured
    `settings`, and confirm with the daemon's own dump (`sshd -T`,
-   `caddy adapt`, `zrepl configcheck`) or with
+   `zrepl configcheck`) or with
    `nix eval .#nixosConfigurations.<host>.config....` — not by reading
    the file you just wrote. This is why `PermitRootLogin` sat inert in
    `extraConfig` on two hosts. ([threat model](threat-model.md) §7.2, `F-P3-18`)
@@ -188,47 +188,19 @@ here; it is already applied in the SSH bullet below.
   symlink`). If a `DynamicUser` service's state needs to survive
   reboots, drop the directory from that service's `StateDirectory=`
   (`lib.mkForce` an override without it) and grant write access via
-  `ReadWritePaths` instead, so impermanence owns the path outright —
-  see `hosts/vps/configuration.nix`'s
-  `crowdsec-firewall-bouncer-register` override for both directories it
-  needs this for. Missing this can produce a subtler failure than an
-  outright mount error: if a service's on-disk state (e.g. CrowdSec's
-  own bouncer-registration DB) persists via one mechanism while a
-  *different* directory the same subsystem depends on (e.g. the
-  bouncer's API key file) isn't persisted at all, the two can silently
-  diverge across a reboot into a split-brain state that only surfaces
-  as an application-level error, not a systemd/mount failure.
+  `ReadWritePaths` instead, so impermanence owns the path outright.
+  Persist every directory the subsystem depends on: if one piece of its
+  state persists while another (e.g. an API key file) does not, the two
+  can silently diverge across a reboot into a split-brain state that only
+  surfaces as an application-level error, not a systemd/mount failure.
 - **No real `sudo`.** All hosts alias `sudo` to `run0`
   (`security.run0.enableSudoAlias` in `modules/profiles/default.nix`);
   `server.nix`'s `security.sudo.enable = false` confirms the real
   package is intentionally absent. Never install or invoke the real
   `sudo` binary. When a command needs root and the target user's shell
   won't cooperate with `sudo -u <user>` (e.g. a `nologin`-shelled
-  system user like `crowdsec`, where run0-aliased sudo silently no-ops
+  system user, where run0-aliased sudo silently no-ops
   with exit 200), use `runuser -u <user> --` instead.
-  - **`security.sudo.enable = false` also changes third-party tools'
-    own wrapper behavior, not just this repo's code.** CrowdSec's own
-    `cscli` binary on `PATH` isn't the raw one — the NixOS module wraps
-    it (`pkgs.writeShellScriptBin "cscli"`, `environment.systemPackages`)
-    with a check that re-execs via `sudo -u <cfg.user>` when invoked as
-    the wrong user, but **hard-aborts** (`Aborting, cscli must be run as
-    user \`crowdsec\`!`) instead when `security.sudo.enable` is false —
-    which it always is here. Confirmed live on vps's own VM test: bare
-    `cscli` as root aborts every time, with no privilege-drop fallback.
-    A caller that needs `cscli` from a *different* unit's context (e.g.
-    `hosts/vps/configuration.nix`'s fail2ban `cscli.conf` ban action)
-    should call the package's raw binary by absolute store path
-    (`${config.services.crowdsec.package}/bin/cscli`) instead of the
-    wrapped name on `PATH`, bypassing this check entirely — and should
-    generally run as root rather than `runuser -u crowdsec --`-ing into
-    it, unless the calling unit's own `CapabilityBoundingSet` actually
-    includes `CAP_SETUID`/`CAP_SETGID` (`runuser` needs them to switch
-    UID, and `CapabilityBoundingSet` restricts every child process
-    regardless of nominal UID 0 — fail2ban's own systemd unit doesn't
-    grant these, so `runuser` from its action would fail; root already
-    has the file access this needs via `CAP_DAC_READ_SEARCH`, and
-    CrowdSec's local API only cares about the credentials file's
-    contents, not OS-level caller identity).
 - **SSH**: deny everything not explicitly needed —
   `passwordAuthentication no`, `PermitRootLogin prohibit-password`,
   `AuthenticationMethods publickey`, `X11Forwarding no`,
@@ -315,8 +287,7 @@ here; it is already applied in the SSH bullet below.
   override when `useRoutingFeatures = "both"`. Narrow it to `"client"`
   (`lib.mkForce`) on hosts that aren't actually an exit node/subnet
   router.
-- **Forwarded/DNAT'd ports get zero protection** from CrowdSec/
-  Anubis/Caddy (those only see traffic that reaches userspace
-  HTTP/SSH) — add per-source-IP rate limiting (iptables `raw` table
+- **Forwarded/DNAT'd ports never reach INPUT or any userspace control** on
+  the forwarding host — add per-source-IP rate limiting (iptables `raw` table
   PREROUTING + `hashlimit`, evaluated before conntrack/NAT) as the
   floor for anything forwarded straight through to another host.
