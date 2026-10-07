@@ -38,7 +38,6 @@ in
         distrobox
         caligula # cli burning tool
         scrcpy
-        isd
         vipsdisp # big image viewer
         yt-dlp
         android-tools
@@ -58,7 +57,6 @@ in
         signal-desktop
         picard # music metadata tool
         calibre
-        quodlibet
 
         # closed source
         spotify
@@ -283,12 +281,6 @@ in
           ];
         };
       };
-
-      # LD fix
-      programs.nix-ld.enable = true;
-      programs.nix-ld.libraries = with pkgs-unstable; [
-        # add any missing dynamic libraries for unpackaged programs here
-      ];
 
       # Enable bluetooth
       hardware.bluetooth.enable = true;
