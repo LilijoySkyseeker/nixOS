@@ -2,7 +2,7 @@
 
 No scaffolding or generator exists for this — it's a plain file
 following the pattern already in `modules/services/` (`jellyfin.nix`,
-`immich.nix`, `copyparty-iso.nix`, `factorio.nix`, `minecraft.nix`,
+`immich.nix`, `factorio.nix`, `minecraft.nix`,
 `octodns.nix`, `nfs.nix`, `samba.nix`).
 
 1. Create `modules/services/<name>.nix`, registering as
@@ -36,12 +36,13 @@ following the pattern already in `modules/services/` (`jellyfin.nix`,
    `zfs create -o mountpoint=<mountpoint> <dataset>` on the live host
    before the next deploy, or the path stays an ordinary directory
    inside its parent dataset instead of its own — silently defeating
-   the whole point (plan:
-   2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G2).
+   the whole point. If the tier's parent (e.g. `zroot/offsite`) doesn't
+   exist yet, create it first: `zfs create -o mountpoint=none <parent>`
+   (disko creates intermediates on a fresh install; a live host doesn't).
    `<mountpoint>` is the entry's own
    `mountpoint` field verbatim if that path is already under
    `persistRoot` (the flat `/nix/state/<service>` convention new
-   services use, e.g. Loki); otherwise it's `persistRoot` + that field
+   services use); otherwise it's `persistRoot` + that field
    (`modules/nixos/datasets.nix`'s `diskoMountpoint`), e.g.
    `/var/lib/docker` becomes `/nix/state/var/lib/docker`.
    `myZfsDatasetProperties` reapplies the rest

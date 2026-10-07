@@ -16,8 +16,7 @@ properties, zrepl's filesystem map, restic's dataset list, and
 Decided while planning the fleet log-monitoring stack
 (`2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md`),
 which needed a persistent-but-never-backed-up dataset and had no existing
-convention to follow. Execution lives in
-`2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md`.
+convention to follow.
 
 ## The problem this solves
 
@@ -161,11 +160,9 @@ registry. Both layers have to fail before data goes silently unbacked.
   is the point, but it means a `persist` dataset must never get a
   `myHealthAlerts.backupStaleness` key, or it will alert forever about a
   backup that intentionally never runs.
-- **The legacy and tiered trees coexist** until the migration plan
-  (`2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md`)
-  completes, so restic must cover the union of both. The legacy list is
-  marked as a migration remnant in the code so it reads as removable
-  rather than as design.
+- **The legacy and tiered trees coexist**, so restic covers the union of
+  both. As of 2026-10-06 existing services are not being migrated; only
+  new datasets use the tiered tree.
 - **D3 in `2026-08-28-restructure-zfs-so-ordinary-temp-and-cache-data-is.md`
   becomes expressible**: `~/.cache` and Trash are `persist`, and
   `~/Downloads` turns into a tier choice rather than an open-ended

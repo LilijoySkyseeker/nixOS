@@ -30,7 +30,7 @@ live inside that one registration pattern:
 
 ### Custom options modules: the `my<Name>` convention
 
-Many `modules/nixos/` files (`alloy.nix`, `auto-update.nix`,
+Many `modules/nixos/` files (`datasets.nix`,
 `health-alerts.nix`, `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`,
 among others) define a real NixOS options surface, not just plain
 config. These follow one consistent shape:
@@ -56,7 +56,7 @@ config. These follow one consistent shape:
 ```
 
 - Option namespace is `my<CamelCaseModuleName>` (e.g. `myPushDeploy`,
-  `myAutoUpdate`) — deliberately prefixed so it can't collide with an
+  `myPullDeploy`) — deliberately prefixed so it can't collide with an
   upstream NixOS/home-manager option of the same shape. This is
   unrelated to the `flake.modules.nixos.<name>` registration key —
   the registration key is how the module gets pulled into a host; the
@@ -130,21 +130,19 @@ ones.
 - A single-line comment can act as a section banner introducing a
   block of related settings, often `# tool: purpose` when the
   tool/subsystem isn't already obvious from the surrounding attribute
-  names: `# crowdsec: watches sshd/caddy logs, bans abusive IPs via
-  the firewall bouncer`.
+  names: `# minecraft: cap new-connection attempts per source IP`.
 - Multi-line embedded shell scripts get one comment per branch,
   phrased as what triggers it and naming the calling tool:
   `# nixos-rebuild's pre-activation sanity check`.
 - Inline `# TODO:` marks known-incomplete config on the same line as
-  the affected declaration: `sops.secrets.vps_caddy_env = { }; # TODO:
-  populate with DNS provider API token if using DNS-01 challenges`.
+  the affected declaration.
 - See `hosts/vps/configuration.nix` for a dense example of all of the
   above in one file.
 
 ## Naming
 
 - Host names are the literal hostname (`thinkpad`, `torrent`, `homelab`,
-  `vps`, `isoimage`), matching `flake.nixosConfigurations.<name>` in
+  `vps`), matching `flake.nixosConfigurations.<name>` in
   `modules/flake/hosts.nix`.
 - `modules/services/*.nix` files are named after the service they
   configure (`jellyfin.nix`, `factorio.nix`), not the host that runs
