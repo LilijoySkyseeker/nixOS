@@ -51,11 +51,6 @@
         deployGuardsScript = config.flake.deployGuardsScript;
       };
 
-      deploy-chain = import ../../tests/deploy-chain.nix {
-        pkgs = config.flake.pkgsUnstable;
-        autoUpdateModule = config.flake.modules.nixos."auto-update";
-      };
-
       anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
         pkgs = config.flake.pkgsUnstable;
       };

@@ -485,56 +485,25 @@
   # Define your hostname.
   networking.hostName = "homelab";
 
-  # automated flake.lock updates: bump inputs on a branch, build-test, merge
-  # to master only if it builds, then switch (rebooting only if the kernel
-  # actually changed)
-  myAutoUpdate = {
+  # weekly deploy of master, servers first: homelab Tue, vps Wed, PCs Thu,
+  # so an update that breaks the servers hasn't yet reached the PCs used
+  # to fix them. homelab is slow to build, hence a day each.
+  # by hand: cd /etc/nixos && git pull && nh os switch
+  myPullDeploy = {
     enable = true;
+    flakeDir = "/etc/nixos";
     hostAttr = "homelab";
-    updateDates = "Wed 03:00";
-    switchDates = "Thu 03:00";
-    # the weekly restic->Backblaze run can take multiple days (~2.9TiB) —
-    # switch-to-configuration restarts any unit whose definition changed, so
-    # a same-cycle switch would kill it mid-run. Defer instead (see
-    # 2026-08-18-homelab-s-weekly-restic-to-backblaze-backup-has-no.md).
+    dates = "Tue 03:00";
+    operation = "switch";
+    autoReboot = true;
+    # the weekly restic->Backblaze run can take days (~2.9TiB), and a switch
+    # restarts any changed unit, so defer rather than kill it
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
-    # DISABLED 2026-08-27, deliberately and temporarily. Removes both the
-    # flake-update-test and auto-switch timers; the services stay, so
-    # `systemctl start auto-switch-now` is still the manual deploy path.
-    #
-    # Two reasons. There is active development, so these hosts are being
-    # deployed by hand anyway — the scheduled path buys nothing right now
-    # while carrying every risk in the D11 analysis. And the pipeline is
-    # being rebuilt rather than patched (see
-    # 2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md),
-    # so leaving the old shape
-    # armed would mean maintaining something already known to be wrong.
-    #
-    # This also stops D11 firing on its own: flake-update-test can no
-    # longer auto-merge to master unattended. It does NOT answer D11 —
-    # the decision is deferred into the project, not made.
-    #
-    # RE-ENABLE with the new pipeline, not before. The safety net for
-    # being disabled is myHealthAlerts' staleness check on
-    # /nix/var/nix/profiles/system: if the fleet stops being deployed,
-    # it says so within three weeks rather than never.
-    scheduleEnable = false;
-    # Replaces `systemd.services.auto-switch.onSuccess`, which fired this
-    # on a *skipped* switch too — observed live 2026-08-25T13:18:15, where
-    # the min-interval guard deferred the switch and systemd started the
-    # vps closure build 0 seconds later anyway. This only fires after a
-    # real activation (F-P7-09).
-    onDeployUnits = [ "push-deploy-vps.service" ];
   };
 
-  # vps builds nothing itself anymore (myPullDeploy removed there — a
-  # from-scratch local build peaked at ~1.7GB RAM + 424MB swap out of
-  # its ~2GB total, measured live 2026-08-18, too tight to keep
-  # building on-box). homelab builds vps's config here instead and
-  # pushes+activates the finished closure over SSH, as the unprivileged
-  # vps-deploy user (see hosts/vps/configuration.nix — real activation
-  # happens via nixos-rebuild's polkit-based run0 elevator, not root
-  # login, not sudo).
+  # vps can't build its own closure (~2GB RAM), so homelab builds it and
+  # pushes it over SSH as the unprivileged vps-deploy user (activation via
+  # nixos-rebuild's run0 elevator; see hosts/vps/configuration.nix)
   sops.secrets.homelab_vps_deploy_key = { };
   myPushDeploy = {
     enable = true;
@@ -542,21 +511,12 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
-    # Disabled with the rest of the fleet's schedules, 2026-08-27 — see
-    # myAutoUpdate above. The unit remains, so `systemctl start
-    # push-deploy-vps` is still how vps gets deployed by hand.
-    #
-    # Belt and braces: onDeployUnits below would only fire this after a
-    # real auto-switch activation, and auto-switch no longer has a timer,
-    # so the chain is already dead. Disabling the periodic fallback too
-    # means there is exactly one way vps gets deployed right now, and it
-    # is a human.
-    scheduleEnable = false;
-    # dates left at its default (Thu 03:15) as a periodic fallback —
-    # the onSuccess wiring below is the primary trigger, right after
-    # homelab's own myAutoUpdate switch, so this reuses the same
-    # already-vetted master checkout instead of racing/duplicating it.
+    dates = "Wed 03:00";
   };
+  # no catch-up run at boot after an outage: it would contend with zrepl's
+  # own post-boot catch-up replication; next week's run is soon enough
+  systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
+  systemd.timers.push-deploy-vps.timerConfig.Persistent = lib.mkForce false;
   # ship this host's own journal into its local Loki, same shipper as the
   # rest of the fleet
   # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md
@@ -620,22 +580,16 @@
     # but raise the *schedule* too, or the coincidence comes back.
     staleMarkerFiles = {
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
-      # F-P7-09's skipped-deploy half. A *failed* auto-switch already pages
-      # via the failed-units check (confirmed working: the 2026-08-27 03:00
-      # read-only-git-config failure did enter systemctl --failed). A
-      # *skipped* one does not — the guards exit 0 — so a host that defers
-      # every week, or whose timer stops firing, drifts silently forever.
-      # This watches the outcome instead: the profile symlink's mtime is the
-      # last real activation by any route, scheduled or manual.
-      #
-      # 504h = 21 days. The normal ceiling is 14: switchDates is weekly and
-      # minSwitchInterval is 7 days, so a deploy on day 0 defers the day-7
-      # run and lands on day 14. 21 allows one further deferral for the
-      # protectedUnits restic run (weekly, and able to run for days), which
-      # is the realistic third week. Tighten once there is real cadence data
-      # — a threshold this loose still turns "silently stopped deploying"
-      # from never-detected into detected-within-three-weeks.
+      # a failed deploy pages via the failed-units check, but a skipped one
+      # exits 0, so watch the outcome: the profile symlink's mtime is the
+      # last activation by any route. 504h = 21 days: weekly deploys, plus
+      # room for a restic deferral and a week of slack.
       "/nix/var/nix/profiles/system" = 504;
+      # no input update merged in 30 days. Updating by hand has already
+      # stalled once, so when this fires, automate the lock-update PR
+      # rather than just updating by hand again. The file's mtime changes
+      # only when pull-deploy fast-forwards a new lock.
+      "/etc/nixos/flake.lock" = 720;
       # touched by an all-PASS scripts/restore-drill run (the manual Tier 3
       # fire drill; see docs/procedures/backup-restore.md), so "we haven't
       # drilled a restore lately" alerts instead of rotting as a date in a

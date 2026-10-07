@@ -30,7 +30,7 @@ live inside that one registration pattern:
 
 ### Custom options modules: the `my<Name>` convention
 
-Many `modules/nixos/` files (`alloy.nix`, `auto-update.nix`,
+Many `modules/nixos/` files (`alloy.nix`, `datasets.nix`,
 `health-alerts.nix`, `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`,
 among others) define a real NixOS options surface, not just plain
 config. These follow one consistent shape:
@@ -56,7 +56,7 @@ config. These follow one consistent shape:
 ```
 
 - Option namespace is `my<CamelCaseModuleName>` (e.g. `myPushDeploy`,
-  `myAutoUpdate`) — deliberately prefixed so it can't collide with an
+  `myPullDeploy`) — deliberately prefixed so it can't collide with an
   upstream NixOS/home-manager option of the same shape. This is
   unrelated to the `flake.modules.nixos.<name>` registration key —
   the registration key is how the module gets pulled into a host; the
