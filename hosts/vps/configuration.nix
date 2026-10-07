@@ -385,7 +385,8 @@ in
   };
 
   # small disk: half the fleet's journal cap
-  services.journald.settings.Journal.SystemMaxUse = "1G";
+  # stable spelling; replaces the profile's 2G line rather than adding to it
+  services.journald.extraConfig = lib.mkForce "SystemMaxUse=1G";
 
   myHealthAlerts = {
     enable = true;
