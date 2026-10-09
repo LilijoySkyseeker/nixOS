@@ -76,3 +76,15 @@ days, not weeks.
   - **Regression (design + small):** all criteria met. The design run used the
     restored framing directly ("it came from 'how a multi-agent tool does
     it'"). The small question stayed short (~250 words of prose).
+- **2026-10-08, renamed to doghouse-review, doghouse rule marked as the more
+  important** (user: the doghouse rule comes first; the name collided with
+  ordinary talk about first principles). The body changed only in the title
+  and "most important first".
+  - **Small (Sonnet):** short prose, "don't add it", an add-back trigger, one
+    question.
+  - **Design (Sonnet):** missed item 3. It kept a trimmed VM and never
+    questioned the VM itself.
+  - **Design (default model):** all 7 criteria met. It questioned the VM pool
+    first ("very secure" is a department) and landed on the known-good
+    destination, 4 parts, days of work. The Sonnet miss looks like the model,
+    not the change; earlier runs used the default model.
