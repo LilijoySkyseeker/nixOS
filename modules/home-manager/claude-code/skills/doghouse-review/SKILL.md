@@ -1,14 +1,14 @@
 ---
-name: first-principles-review
-description: Use when reviewing, designing or questioning a plan, architecture, process, system, habit, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns. Also use when the user asks to go back to first principles, simplify, or question why something exists.
+name: doghouse-review
+description: Use when reviewing, designing or questioning a plan, architecture, process, system, habit, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns. Also use when the user asks for a doghouse review, to simplify, or why something exists.
 ---
 
-# First-principles review
+# Doghouse review
 
 ## The spirit
 
 Before improving anything, ask what it's really *for* and whether each part
-should exist at all. Two rules carry this:
+should exist at all. Two rules carry this, most important first:
 
 - **The doghouse.** Projects grow from a doghouse into a moonbase when **the
   real goal isn't solid**. The doghouse builder forgot that the fundamental

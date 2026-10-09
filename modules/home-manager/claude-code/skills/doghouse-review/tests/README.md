@@ -1,4 +1,4 @@
-# Testing the first-principles-review skill
+# Testing the doghouse-review skill
 
 Re-run this whenever SKILL.md changes. It follows superpowers:writing-skills:
 a baseline without the skill, then a run with it.
@@ -9,9 +9,9 @@ skill is tested across domains and sizes:
 - `scenario-process.md`: an over-built personal planning system;
 - `scenario-small.md`: a one-line question, where the right answer is short.
 
-The subagents are and are asked: "Review this design from
-first principles." Run at least 2 without the skill and 2 with it, where the
-skill is read first. Score each run against the rubric.
+The subagents are asked: "Review this design." Run at least 2 without the
+skill and 2 with it, where the skill is read first. Score each run against
+the rubric.
 
 **Rubric.** Does the review:
 1. state the real goal one level up, labelled as an assumption?
