@@ -8,7 +8,7 @@ each host.
 There's one shared set of admin public keys —
 `flake.vars.publicSshKeys` in `modules/flake/vars.nix` — installed as
 `users.users.root.openssh.authorizedKeys.keys` on every host that
-accepts interactive admin SSH (`homelab`, `vps`, `isoimage`). Currently
+accepts interactive admin SSH (`homelab`, `vps`). Currently
 three keys: the thinkpad's, torrent's, and a hardware YubIKey
 (`sk-ssh-ed25519@openssh.com`, resident/FIDO2). Adding a new admin
 machine means appending its public key to that one list in
@@ -18,8 +18,8 @@ machine means appending its public key to that one list in
 per-host key list to maintain separately.
 
 Every host disables `PasswordAuthentication` — key-only, no exceptions.
-`PermitRootLogin` differs by host, though: `homelab`, `vps`, and
-`isoimage` set `prohibit-password` (interactive root login with the
+`PermitRootLogin` differs by host, though: `homelab` and `vps` set
+`prohibit-password` (interactive root login with the
 shared admin keys above); `torrent` and `thinkpad` set
 `"forced-commands-only"` instead, so **no interactive root login exists
 on either of those two, from anywhere** — see "Reaching each host"
@@ -53,8 +53,6 @@ account to sudo from.
   public-IP SSH fallback by design; if Tailscale itself is broken, the
   DigitalOcean web console is the recovery path, not a public SSH
   port.
-- **`isoimage`** — not a persistent host; it's a bootable ISO. Same
-  admin key list is baked in for recovery/rescue use when booted.
 
 ## The vps's second SSH identity: `vps-deploy`
 

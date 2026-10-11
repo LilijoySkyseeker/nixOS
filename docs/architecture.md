@@ -47,10 +47,9 @@ key:
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `iso-autobuild`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
 | `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
 | `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
-| `isoimage` | unstable | `copyparty-iso` |
 
 ### Which nixpkgs a host tracks
 
@@ -71,8 +70,7 @@ option that exists in unstable may not exist yet in the pinned stable
 release. `modules/flake/hosts.nix` handles this the same way `flake.nix`
 used to — swapping `home-manager-stable` into `homelab`'s
 `specialArgs.inputs` instead of the unstable `home-manager` every other
-host gets, and giving `isoimage` a narrower `specialArgs` set (no `inputs`)
-than the rest.
+host gets.
 
 Per-host `specialArgs` divergence is written out explicitly per host inside
 `hosts.nix`, not derived automatically — if a new host needs a different arg
@@ -90,9 +88,7 @@ which imports it — see below) also gets `comma`
 (`programs.nix-index-database.comma.enable = true;`, same file): run
 `comma <tool> [args]` (alias `,`) to fetch and run a tool from nixpkgs in a
 throwaway shell without installing it — e.g. `comma lsusb -t` if `lsusb`
-isn't already on the system. Not available on `isoimage` — it doesn't
-import `"profile-default"` at all (its own minimal `hosts.nix` module list
-is just `copyparty-iso`).
+isn't already on the system.
 
 `modules/profiles/PC.nix` (`"profile-pc"`) and `modules/profiles/server.nix`
 (`"profile-server"`) are role bundles:
@@ -133,7 +129,7 @@ not the boundary itself:
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
-  beets, copyparty, factorio, minecraft, octodns, nfs, samba), each
+  beets, factorio, minecraft, octodns, nfs, samba), each
   registering as `flake.modules.nixos.<name>` and listed per-host in
   `modules/flake/hosts.nix`. No options surface. Reach for
   `modules/services/` over an inline host-config block once the config is
@@ -151,16 +147,13 @@ not the boundary itself:
   `devshell.nix` (the dev shell, now a `perSystem` module rather than the
   bare `mkShell` function that used to live at repo root).
 
-Two hosts are still structurally unusual, same as before the migration:
+One host is still structurally unusual, same as before the migration:
 
 - **`vps`** pulls in no `modules/services/*` modules. It's a tunnel
   endpoint (wireguard, NAT/DNAT forwarding of the game ports), and that
   config is written directly inline in `hosts/vps/configuration.nix` rather
   than factored into `modules/services/`, since none of it is reused by
   another host.
-- **`isoimage`** skips the profile hierarchy entirely — it only pulls in
-  `"copyparty-iso"`, not the tailscale/sops/security baseline every other
-  host gets.
 
 `torrent` also carries a second, untrusted principal: `agent-user` adds an
 `agent` Unix user that runs `claude remote-control` with no permission

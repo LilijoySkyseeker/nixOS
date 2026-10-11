@@ -1,7 +1,7 @@
 # AGENTS.md
 
-A flake-based NixOS/home-manager config for five hosts (`thinkpad`,
-`torrent`, `homelab`, `vps`, `isoimage`; see `nixosConfigurations` in
+A flake-based NixOS/home-manager config for four hosts (`thinkpad`,
+`torrent`, `homelab`, `vps`; see `nixosConfigurations` in
 `flake.nix`), organized with the dendritic pattern: every `.nix` file
 under `modules/` self-registers through flake-parts + import-tree. Secrets
 are sops-nix. These are real machines the user relies on, and `vps` is

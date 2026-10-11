@@ -46,7 +46,6 @@ in
         # torrent only, not profile-pc
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
         nixosModules."agent-user"
-        nixosModules."iso-autobuild"
         nixosModules."zrepl"
         nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
@@ -113,18 +112,6 @@ in
         nixosModules."profile-default"
         nixosModules."profile-server"
         nixosModules."health-alerts"
-      ];
-    };
-    #==================================================
-    isoimage = inputs.nixpkgs-unstable.lib.nixosSystem {
-      specialArgs = {
-        inherit inputs;
-        pkgs-unstable = pkgsUnstable;
-        inherit vars;
-      };
-      modules = [
-        ../../hosts/isoimage/configuration.nix
-        nixosModules."copyparty-iso"
       ];
     };
   };

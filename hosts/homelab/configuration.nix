@@ -234,13 +234,11 @@
       # whole multi-day duration, and mkdir -p on a path an unprivileged
       # process pre-planted as a symlink would follow it — systemd's
       # RuntimeDirectory creation refuses that (docs/audits/2026-08-26/findings-tail.md L-02).
-      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D6
       # union of the legacy list and a recursive walk of every offsite-tier
-      # myDatasets root -- shrinks to just the roots once
-      # 2026-09-05-migrate-existing-services-onto-per-service-zfs-datasets.md lands
+      # myDatasets root
       # `zfs list -r` orders parents before children, keeping mount order safe.
       # newline-delimited, not space-delimited -- zfs dataset names may
-      # contain spaces (zfs(8)); plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#F3
+      # contain spaces (zfs(8))
       backupPrepareCommand = ''
         datasets="zroot/local/state"$'\n'"zdata/storage/storage"
 
@@ -457,7 +455,6 @@
         "zdata/storage/storage-bulk"
         "zroot/local/state"
       ]
-      # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G4
       # onsite/offsite myDatasets entries join local replication
       # automatically; homelab is the "local" role for its own datasets.
       ++ config.myDatasetsReplicated;
@@ -740,14 +737,12 @@
   myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;
 
   # myDatasets: per-service ZFS datasets, tiered.
-  # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#G2
-  # none of these exist on the live host yet -- zfs create each manually
-  # (docs/procedures/new-service.md) before the next deploy
+  # a new entry needs a manual zfs create on the live host before deploy
+  # (docs/procedures/new-service.md)
   myDatasets = {
-    # plan: 2026-09-05-adopt-zfs-policy-tiers-and-a-mydatasets-registry.md#D5
-    # jellyfin cacheDir + /var/lib/docker reclassified persist (#D7)
+    # jellyfin cacheDir + /var/lib/docker reclassified persist
     # managePersistence = false: entries already exist elsewhere
-    # (jellyfin.nix's cacheDir, the /var/lib/docker line below) -- #D9
+    # (jellyfin.nix's cacheDir, the /var/lib/docker line below)
     # no owner/group either, they'd have no effect
     "zroot/persist/jellyfin-cache" = {
       tier = "persist";
