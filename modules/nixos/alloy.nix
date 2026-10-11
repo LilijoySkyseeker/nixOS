@@ -87,9 +87,6 @@ in
         };
 
         # sshd fleet-wide; hosts append their own security-relevant units
-        # (vps adds caddy). kernel messages aren't unit-scoped -- vps's
-        # iptables LOG rule is already rate-capped below journald's global
-        # limit, which stays at its default as the safety valve
         # plan: 2026-09-05-build-the-fleet-log-monitoring-stack-on-loki-grafana-alloy.md#D7
         raisedRateLimitUnits = lib.mkOption {
           type = lib.types.listOf lib.types.str;

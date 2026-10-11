@@ -130,14 +130,12 @@ ones.
 - A single-line comment can act as a section banner introducing a
   block of related settings, often `# tool: purpose` when the
   tool/subsystem isn't already obvious from the surrounding attribute
-  names: `# crowdsec: watches sshd/caddy logs, bans abusive IPs via
-  the firewall bouncer`.
+  names: `# minecraft: cap new-connection attempts per source IP`.
 - Multi-line embedded shell scripts get one comment per branch,
   phrased as what triggers it and naming the calling tool:
   `# nixos-rebuild's pre-activation sanity check`.
 - Inline `# TODO:` marks known-incomplete config on the same line as
-  the affected declaration: `sops.secrets.vps_caddy_env = { }; # TODO:
-  populate with DNS provider API token if using DNS-01 challenges`.
+  the affected declaration.
 - See `hosts/vps/configuration.nix` for a dense example of all of the
   above in one file.
 

@@ -12,8 +12,7 @@
 # Two otherwise-identical nodes, not a live toggle: Docker's own docs
 # confirm userns-remap is not live-reloadable (changing it needs a full
 # dockerd restart), so there's no "clear it and watch the same probe
-# succeed" causation proof available the way anubis-admin-egress.nix
-# does it -- the two-node comparison (matching push-deploy-sandbox.nix's
+# succeed" causation proof available -- the two-node comparison (matching push-deploy-sandbox.nix's
 # deployer/deployer-broken shape) is the equivalent here.
 {
   pkgs,

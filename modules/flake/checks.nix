@@ -51,14 +51,6 @@
         deployGuardsScript = config.flake.deployGuardsScript;
       };
 
-      anubis-admin-egress = import ../../tests/anubis-admin-egress.nix {
-        pkgs = config.flake.pkgsUnstable;
-      };
-
-      vps-refused-connection-logging = import ../../tests/vps-refused-connection-logging.nix {
-        pkgs = config.flake.pkgsUnstable;
-      };
-
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";

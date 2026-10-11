@@ -37,6 +37,13 @@ later audit folds them in.
 |---|---|---|---|
 | 2026-10-06 | **`agent`** (torrent): an AI agent running with no permission prompts, so treat it as prompt-injectable | the internet; `~agent`; `Vault/Research` via bindfs; the nix daemon (`allowed-users`) | the Unix user itself, the `agent-egress` chain (no LAN or tailnet, IPv6 loopback only), the `claude-remote-control` unit's sandbox, and sshd `DenyUsers`. See `hardening.md`, "The `agent` user"; design record in `~/Projects/agenticsandbox/` |
 
+## Removed since the current model
+
+Since 2026-10-06 `vps` serves no public HTTP(S) (no Caddy, Anubis or
+public Jellyfin; Jellyfin is tailnet-only) and runs no CrowdSec. Its
+public surface is the DNAT'd game ports and WireGuard, so §2's exposure
+map overstates it.
+
 ## Using it
 
 - **Before exposing anything new**, check §2 and §4: decide which

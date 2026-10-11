@@ -222,7 +222,7 @@ in
       # factorio server
       virtualisation.oci-containers.containers = {
         factorio-main = {
-          autoStart = true;
+          autoStart = false; # disabled 2026-10-06: nobody playing; set true to bring it back (data persists)
           # Pinned to the exact version the current save is already in
           # (2.1.14, factoriotools' newer/experimental line) rather than
           # `stable` (2.0.77) — the live save can't be loaded by an older

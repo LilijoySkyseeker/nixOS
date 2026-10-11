@@ -1,6 +1,10 @@
 # vps
 
 Public-facing tunnel endpoint for CGNAT'd `homelab` on DigitalOcean droplet.
+Its only public ports are the game ports it DNATs to homelab over
+WireGuard (Minecraft 25565/tcp and 19132/udp, Factorio 34197/udp), each
+rate-limited per source IP, plus WireGuard's own 51820/udp. SSH and
+everything else is tailnet-only. Jellyfin is tailnet-only on homelab.
 
 ## Hardware
 
@@ -14,7 +18,7 @@ DigitalOcean droplet (KVM, `vda`/virtio disk):
 
 ## Reinstall
 
-No local state worth preserving: Caddy/CrowdSec/tailscale config is all
+No local state worth preserving: wireguard/NAT/tailscale config is all
 declarative, and secrets re-provision through sops on first boot once
 the new host's key is enrolled. See `docs/procedures/new-host.md` for
 the general shape; this is the vps-specific worked example.
@@ -104,11 +108,9 @@ After install:
   but do this once you're actually done poking at the new box, not the
   moment it boots (a resize is another power-off/on cycle).
 - If the public IP did change, update `modules/services/octodns.nix`'s
-  `vpsPublicIp`(`6`) and `hosts/homelab/configuration.nix`'s wireguard
+  `vpsPublicIp` and `hosts/homelab/configuration.nix`'s wireguard
   peer `endpoint`.
-- Confirm `crowdsec`, `crowdsec-firewall-bouncer`,
-  `tailscaled-autoconnect`, and `caddy` are all active before trusting
-  the box, then exercise a real reboot — the
-  boot-race fixes (retry-on-failure for crowdsec/the bouncer, a longer
-  `tailscaled-autoconnect` timeout) can only be confirmed against
+- Confirm `tailscaled-autoconnect` and `firewall` are active before
+  trusting the box, then exercise a real reboot — the longer
+  `tailscaled-autoconnect` timeout can only be confirmed against
   DigitalOcean's real network-arming delay, not a local VM.
