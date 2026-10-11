@@ -49,7 +49,7 @@ key:
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary` |
 | `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch` (home-manager) |
 | `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `octodns`, `nfs`, `samba` |
-| `vps` | unstable | `profile-default`, `profile-server`, `health-alerts` |
+| `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 
 ### Which nixpkgs a host tracks
 
@@ -60,15 +60,10 @@ a problem in a way it is not on a desktop. The PCs are where new
 packages are actually wanted, and a human is sitting in front of them
 when something breaks.
 
-**Known deviation: `vps` is on unstable and should be on stable.** It is
-a server and the only host with a public interface, so it belongs on
-the stable branch with `homelab`. Moving it is an open item; until then
-the table above is the fact and this rule is the intent.
-
-`homelab`'s stable pin still means the same thing it always did: a module
+The stable pin still means the same thing it always did: a module
 option that exists in unstable may not exist yet in the pinned stable
 release. `modules/flake/hosts.nix` handles this the same way `flake.nix`
-used to — swapping `home-manager-stable` into `homelab`'s
+used to — swapping `home-manager-stable` into each server's
 `specialArgs.inputs` instead of the unstable `home-manager` every other
 host gets.
 

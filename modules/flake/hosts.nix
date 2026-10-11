@@ -94,9 +94,12 @@ in
       ];
     };
     #==================================================
-    vps = inputs.nixpkgs-unstable.lib.nixosSystem {
+    vps = inputs.nixpkgs-stable.lib.nixosSystem {
       specialArgs = {
-        inherit inputs;
+        # home-manager release matching nixpkgs-stable
+        inputs = inputs // {
+          home-manager = inputs.home-manager-stable;
+        };
         pkgs-unstable = pkgsUnstable;
         pkgs-stable = pkgsStable;
         inherit vars;

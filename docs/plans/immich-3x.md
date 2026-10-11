@@ -23,3 +23,6 @@ Migration detail (database steps, what to check):
 When 26.11 is out: move homelab's stable input to it, drop the
 `immich-2.7.5` exemption in `modules/services/immich.nix`, and follow the
 migration plan, watching the database migration on the first switch.
+Also drop the 26.05 journald spellings: the `extraConfig` branch in
+`modules/profiles/default.nix` and vps's `extraConfig` cap in
+`hosts/vps/configuration.nix` (back to `settings.Journal.SystemMaxUse`).

@@ -40,9 +40,9 @@ copy the path back from `<mountpoint>/.zfs/snapshot/<timestamp>/` (see
 
 ## Before changing things
 
-- **Check the nixpkgs channel.** `homelab` is on stable, the rest on
-  unstable, so an option can exist on one host and not another
-  (`docs/architecture.md` has the per-host table).
+- **Check the nixpkgs channel.** The servers (`homelab`, `vps`) are on
+  stable, the PCs on unstable, so an option can exist on one host and not
+  another (`docs/architecture.md` has the per-host table).
 - **Before deleting a file, grep the repo for it.** Files under `files/`
   are often read by external tools (VIA/Vial, Picard, an ICC loader),
   not by Nix.
