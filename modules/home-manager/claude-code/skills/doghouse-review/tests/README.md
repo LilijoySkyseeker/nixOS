@@ -1,4 +1,4 @@
-# Testing the first-principles-review skill
+# Testing the doghouse-review skill
 
 Re-run this whenever SKILL.md changes. It follows superpowers:writing-skills:
 a baseline without the skill, then a run with it.
@@ -9,9 +9,9 @@ skill is tested across domains and sizes:
 - `scenario-process.md`: an over-built personal planning system;
 - `scenario-small.md`: a one-line question, where the right answer is short.
 
-The subagents are and are asked: "Review this design from
-first principles." Run at least 2 without the skill and 2 with it, where the
-skill is read first. Score each run against the rubric.
+The subagents are asked: "Review this design." Run at least 2 without the
+skill and 2 with it, where the skill is read first. Score each run against
+the rubric.
 
 **Rubric.** Does the review:
 1. state the real goal one level up, labelled as an assumption?
@@ -76,3 +76,15 @@ days, not weeks.
   - **Regression (design + small):** all criteria met. The design run used the
     restored framing directly ("it came from 'how a multi-agent tool does
     it'"). The small question stayed short (~250 words of prose).
+- **2026-10-08, renamed to doghouse-review, doghouse rule marked as the more
+  important** (user: the doghouse rule comes first; the name collided with
+  ordinary talk about first principles). The body changed only in the title
+  and "most important first".
+  - **Small (Sonnet):** short prose, "don't add it", an add-back trigger, one
+    question.
+  - **Design (Sonnet):** missed item 3. It kept a trimmed VM and never
+    questioned the VM itself.
+  - **Design (default model):** all 7 criteria met. It questioned the VM pool
+    first ("very secure" is a department) and landed on the known-good
+    destination, 4 parts, days of work. The Sonnet miss looks like the model,
+    not the change; earlier runs used the default model.
