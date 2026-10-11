@@ -136,7 +136,7 @@ in
       # Pin github.com's host key fleet-wide.
       #
       # Every host that deploys itself fetches origin/master as root --
-      # myAutoUpdate on homelab, myPullDeploy on the laptops -- and
+      # myPullDeploy on homelab and the PCs -- and
       # deploy-guards.nix does that with StrictHostKeyChecking=accept-new.
       # That is TOFU, and on homelab it is TOFU *on every boot*, because
       # impermanence does not persist /root so root's known_hosts is empty

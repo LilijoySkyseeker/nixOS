@@ -60,7 +60,7 @@ in
         dates = lib.mkOption {
           type = lib.types.str;
           default = "Thu 03:15";
-          description = "systemd OnCalendar spec for the push/switch job — a periodic fallback independent of any onSuccess wiring the caller may also set up.";
+          description = "systemd OnCalendar spec for the push/switch job.";
         };
 
         scheduleEnable = lib.mkOption {
@@ -73,30 +73,20 @@ in
             the target gets deployed by hand — while stopping it
             happening on a schedule.
 
-            Note this only governs the timer. If the caller also wires
-            this unit into `myAutoUpdate.onDeployUnits`, it still runs
-            after a real activation of the *deploying* host; disabling
-            that host's own schedule is what stops the chain.
-
             The timer is removed rather than merely un-wanted, so a
             `switch` actually stops a running timer instead of leaving it
             armed until the next reboot.
-
-            Currently false fleet-wide — see
-            2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md.
           '';
         };
 
         minSwitchInterval = lib.mkOption {
           type = lib.types.ints.positive;
-          default = 7 * 24 * 60 * 60;
+          default = 6 * 24 * 60 * 60;
           description = ''
             Minimum seconds since the target's /nix/var/nix/profiles/system
             was last activated (checked remotely over SSH) before this
-            scheduled job will build/push. Mainly matters for the periodic
-            `dates` fallback — an onSuccess-triggered run right after this
-            same host's own switch is already gated by that switch's own
-            interval check.
+            scheduled job will build/push, so a manual deploy this week
+            defers next week's scheduled one.
           '';
         };
 
@@ -147,7 +137,7 @@ in
 
             ${lib.optionalString cfg.rebootIfKernelChanged ''
               # The target's own /run/booted-system vs /run/current-system
-              # check (used by pull-deploy/myAutoUpdate for local switches)
+              # check (used by pull-deploy for local switches)
               # doesn't apply here since we're not running on the target —
               # check remotely instead. Reboot itself has to go through the
               # same sudo/run0 alias elevation as the switch above, since

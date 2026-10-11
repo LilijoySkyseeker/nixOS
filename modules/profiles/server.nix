@@ -6,7 +6,6 @@ in
   flake.modules.nixos."profile-server" =
     {
       pkgs,
-      config,
       ...
     }:
     {
@@ -29,24 +28,6 @@ in
       # nh, nix helper
       programs.nh = {
         flake = "/etc/nixos";
-      };
-
-      # git identity for root, rendered to avoid storing name/email in the
-      # nix store — mirrors profiles/PC.nix's lilijoy identity, same shared
-      # sops secret, just rendered to root's home instead. Needed for
-      # myAutoUpdate's flake-update-test commit step (was previously unset,
-      # failing every run — see
-      # 2026-08-19-flake-update-test-service-failing-on-homelab-root-.md).
-      sops.secrets.git_username = { };
-      sops.secrets.git_email = { };
-      sops.templates."git-identity" = {
-        path = "/root/.config/git/identity";
-        owner = "root";
-        content = ''
-          [user]
-              name = ${config.sops.placeholder.git_username}
-              email = ${config.sops.placeholder.git_email}
-        '';
       };
 
       # home-manager

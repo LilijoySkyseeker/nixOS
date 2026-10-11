@@ -20,11 +20,6 @@
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
-    # Disabled 2026-08-27 with the rest of the fleet's schedules — see
-    # hosts/homelab/configuration.nix's myAutoUpdate for the reasoning,
-    # and 2026-08-27-rebuild-the-update-build-deploy-pipeline-properly.md.
-    # The service stays: `systemctl start pull-deploy` still works.
-    scheduleEnable = false;
     # root has no home-manager profile (and thus no SSH identity of its
     # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
     # already trusts and authenticates to the origin remote day-to-day.

@@ -940,9 +940,8 @@ in
     # 2026-08-27 (read-only git config); the second entered systemctl
     # --failed on homelab, but a run the *guards* skip never would.
     #
-    # 504h = 21 days, matching homelab's own entry — dates is weekly and
-    # minSwitchInterval is 7 days, giving a 14-day normal ceiling plus one
-    # deferral of slack.
+    # 504h = 21 days, matching homelab's own entry: weekly deploys plus
+    # two weeks of slack.
     staleMarkerFiles = {
       "/nix/var/nix/profiles/system" = 504;
     };

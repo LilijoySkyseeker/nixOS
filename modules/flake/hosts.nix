@@ -82,7 +82,7 @@ in
         ../../hosts/homelab/configuration.nix
         nixosModules."profile-default"
         nixosModules."profile-server"
-        nixosModules."auto-update"
+        nixosModules."pull-deploy"
         nixosModules."health-alerts"
         nixosModules."push-deploy"
         nixosModules."zrepl"
