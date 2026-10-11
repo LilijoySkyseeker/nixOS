@@ -11,32 +11,22 @@
 #     that same key being unable to get a shell
 #   * `recv.placeholder.encryption` being set, without which the receiver
 #     cannot create the intermediate placeholder datasets the layout
-#     implies -- configcheck passes either way, so this is only ever
-#     visible from a real receive. This test is what caught it missing.
-#   * received data appearing at the deeper `root_fs/<full source path>`
-#     layout that replaced syncoid's flatter names, and still holding the
-#     payload when recovered the way backup-restore.md prescribes
+#     implies -- configcheck passes either way
+#   * received data appearing at `root_fs/<full source path>`, and still
+#     holding the payload when recovered the way backup-restore.md prescribes
 #   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
 #     unguarded grid rule would condemn (see docs/backups.md "Gotchas")
 #   * a `snap` job snapshotting on its own, with no puller involved
 #   * `zrepl-protect-blank` making `@blank` genuinely undestroyable on the
 #     source, which `protectRegexes` cannot do -- that is the puller's
 #     pruning policy, and the source endpoint evaluates no keep rules
-#     (F-P6-04)
 #   * the receiver ignoring properties a *hostile sender* puts in the
 #     stream, simulated by poisoning the dataset and editing the source's
-#     own zrepl.yml the way an attacker with root there would (F-P6-03).
-#     Not covered: a resumed receive, which the finding also asks for --
-#     `-o` on resume has historically been fussy and orchestrating an
-#     interrupted send here is a separate piece of work
+#     own zrepl.yml the way an attacker with root there would
+#     not covered: a resumed receive
 #
-# This is kept as a regression test, not a one-off verification: the
-# module still has planned edits (turning off preserveLegacySnapshots,
-# and the tcp/tls transports that are wired but unexercised), and its
-# failure mode is a backup that silently stops working -- which you find
-# out about when you need a restore. Delete it if zrepl is ever replaced.
-#
-# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
+# delete if zrepl is ever replaced
+# writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md
 {
   pkgs,
   zreplModule,
@@ -45,10 +35,8 @@ let
   # nixpkgs' own throwaway test keys, so no private key lives in this
   # repo. They grant nothing outside the ephemeral VMs below; the real
   # puller key is the homelab_zrepl_key sops secret.
-  # Path concatenation, not "${pkgs.path}/..." interpolation: coercing a
-  # path to a string copies the whole nixpkgs source into the store as a
-  # deriver-less source path, which nothing can rebuild once it is
-  # garbage-collected -- plan: 2026-09-05-route-every-fact-into-one-channel-by-decidability-and-audience.md#G5
+  # path concatenation, not "${pkgs.path}/..." interpolation: the interpolated
+  # copy is deriver-less and nothing can rebuild it once garbage-collected
   inherit (import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs)
     snakeOilEd25519PrivateKey
     snakeOilEd25519PublicKey
@@ -200,8 +188,7 @@ pkgs.testers.runNixOSTest {
     with subtest("the replicated copy holds the real payload"):
         # Received datasets carry no mountpoint, so getting at the data
         # means cloning the snapshot rather than mounting the backup --
-        # the path docs/procedures/backup-restore.md prescribes. Doing it
-        # that way here gives that procedure its first real exercise.
+        # the path docs/procedures/backup-restore.md prescribes
         snap = puller.succeed(
             "zfs list -t snapshot -o name -H -s creation "
             "backup/backup/sourcehost/tank/data | tail -1"
@@ -279,13 +266,8 @@ pkgs.testers.runNixOSTest {
         # module's business and could change.
         last = sourcehost.succeed("tail -1 /run/hostile.yml").strip()
         assert last == "type: source", f"expected the source job last, got {last!r}"
-        # `send_properties`, not `properties`. F-P6-03 writes it as
-        # "send.properties: true"; the actual key in zrepl 0.7.0 is
-        # SendOptions.SendProperties `yaml:"send_properties"`
-        # (internal/config/config.go:95). The wrong spelling is not
-        # silently ignored -- zrepl unmarshals strictly and refuses to
-        # start with "field properties not found in type
-        # config.SendOptions" -- which is how this was caught.
+        # `send_properties`, not `properties` (zrepl 0.7.0
+        # SendOptions.SendProperties); zrepl refuses to start on the wrong key
         sourcehost.succeed("echo '  send: {send_properties: true}' >> /run/hostile.yml")
         sourcehost.succeed("rm -f /etc/zrepl/zrepl.yml")
         sourcehost.succeed("cp /run/hostile.yml /etc/zrepl/zrepl.yml")

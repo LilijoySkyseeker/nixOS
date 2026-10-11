@@ -12,10 +12,7 @@ _: {
       # Git
       programs.git = {
         enable = true;
-        # relative to whichever user's home-manager profile imports this
-        # module — lilijoy on PC hosts, root on server hosts. Each host's
-        # own profile (profiles/PC.nix, profiles/server.nix) is responsible
-        # for actually rendering a sops template at this path.
+        # sops template rendered here by profiles/PC.nix / profiles/server.nix
         includes = [ { path = "${config.home.homeDirectory}/.config/git/identity"; } ];
       };
 

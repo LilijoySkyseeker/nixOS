@@ -1,7 +1,5 @@
-# Integration tests, run with `nix build .#checks.x86_64-linux.<name>` or
-# all at once with `nix flake check`. These are the rung above
-# `nixos-rebuild build`: they boot real VMs, so they can catch what only
-# breaks at runtime. See .claude/skills/verify-a-change/SKILL.md.
+# VM integration tests: `nix build .#checks.x86_64-linux.<name>` or
+# `nix flake check` (see .claude/skills/verify-a-change/SKILL.md)
 { config, ... }:
 {
   perSystem = _: {
@@ -44,10 +42,8 @@
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";
-        # The exact flake, not just its already-instantiated `pkgs`, so the
-        # test can call `.lib.nixosSystem` itself and get the byte-identical
-        # derivation the pushed flake's own `nixpkgs.lib.nixosSystem` call
-        # will produce inside the VM -- see the test file's own comment.
+        # the flake itself, not its pkgs: the test's `.lib.nixosSystem` must
+        # yield the byte-identical derivation the pushed flake builds in the VM
         nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
     };

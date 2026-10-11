@@ -1,41 +1,8 @@
-# Integration test for modules/nixos/zfs-space-guard.nix.
-#
-# This module is a single manual break-glass service now:
-# `zfs-emergency-prune.service` destroys every local snapshot except one
-# named exactly `@blank` (the impermanence rollback point disko creates
-# once at install) on each configured dataset. An earlier version also
-# auto-pruned on a timer down to a keep-newest floor; removed, because that
-# doesn't actually solve the real problem -- see the module's own comment
-# and 2026-08-25-zfs-space-guard-myzfsspaceguard-reviewed-tested-an.md for
-# why. `nixos-rebuild build` only proves the unit parses;
-# it can't prove any of this, because there's no real pool at build time.
-# This builds a throwaway VM with a real zpool and checks:
-#
-#   * deleting a large file does NOT free real pool space while an older
-#     snapshot still references it -- the actual problem this service
-#     exists to solve
-#   * running the service afterward destroys that holding snapshot, keeps
-#     `@blank`, and the space actually comes back
-#   * a dataset with no `@blank` (a host not yet on impermanence) gets
-#     every snapshot destroyed -- the documented fallback, not a surprise
-#   * a zrepl-style hold on a snapshot is tolerated (`|| true`), not fatal
-#     to the run -- other snapshots still get destroyed
-#   * a zrepl-style cursor *bookmark* does NOT pin the space of a destroyed
-#     snapshot's data -- confirming the module's own claim that zrepl's
-#     replication cursor surviving locally destructive pruning doesn't
-#     also mean it silently keeps the space you were trying to reclaim
-#   * the systemd sandbox is applied AND the service still works under it
-#     (F-P6-06). Both halves matter: the unit was missing the whole
-#     hardening stack, and the failure mode of adding it wrongly is "the
-#     break-glass service doesn't work when you need it at 2am". The
-#     subtests below start the unit for real under the sandbox, so a
-#     sandbox that breaks `zfs destroy` fails the run rather than waiting
-#     for an emergency.
-#
-
-# Kept as a regression test: the failure mode (destroying the wrong thing,
-# or not actually reclaiming space) is exactly the kind of thing you'd only
-# discover under real pressure. Delete it if the module is ever replaced.
+# VM test: modules/nixos/zfs-space-guard.nix on a real zpool
+# zfs-emergency-prune (manual break-glass) destroys every snapshot except
+# `@blank` (impermanence rollback point) and the space comes back; holds are
+# tolerated, a leftover zrepl cursor bookmark doesn't pin space, and the
+# unit works under its sandbox (a broken sandbox fails here, not at 2am)
 #
 # Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
 {
@@ -78,10 +45,7 @@ pkgs.testers.runNixOSTest {
         ).strip()
 
     with subtest("the sandbox is actually applied to the unit"):
-        # F-P6-06: this unit had none of docs/hardening.md's sandboxing
-        # stack. Asserting it here means a future edit that drops it fails
-        # loudly rather than silently -- the whole reason the omission
-        # survived this long is that nothing looked.
+        # docs/hardening.md's sandboxing stack; dropping it must fail here
         for prop, want in [
             ("NoNewPrivileges", "yes"),
             ("ProtectSystem", "strict"),

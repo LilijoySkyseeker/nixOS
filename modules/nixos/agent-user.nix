@@ -1,5 +1,4 @@
 # agent-user: unprivileged `agent` user on torrent for prompt-free agent work
-# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
 {
   flake.modules.nixos."agent-user" =
     { lib, pkgs, ... }:
@@ -7,7 +6,6 @@
       bot = "LilijoySkyseeker-agent";
       # orientation + the user's two working lessons (the same file as their own
       # user-level CLAUDE.md, so there's no copy to drift)
-      # plan: 2026-10-06-manage-a-user-level-claude-md-declaratively-with-cross-project.md#D4
       agentClaudeMd = pkgs.writeText "agent-CLAUDE.md" (
         builtins.readFile ./agent-user-CLAUDE.md
         + "\n"
@@ -21,7 +19,6 @@
           email = 338765425+${bot}@users.noreply.github.com
       '';
       # check-and-fix for the parts that can't be declared
-      # plan: 2026-10-06-make-the-agent-s-place-reproducible-with-an-agent-setup-check-and-fix.md
       agentSetup = pkgs.writeShellApplication {
         name = "agent-setup";
         runtimeInputs = with pkgs; [
@@ -39,7 +36,6 @@
         + builtins.readFile ./agent-setup.sh;
       };
       # agent-egress rules per family; IPv6 rejects all but loopback
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F1
       egress = [
         {
           cmd = "iptables";
@@ -78,7 +74,6 @@
       };
 
       # no inbound ssh
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F8
       services.openssh.settings.DenyUsers = [ "agent" ];
 
       # nix daemon access, not trusted-users
@@ -88,7 +83,6 @@
 
       # agent-egress: jumped from OUTPUT for uid agent and gid nixbld (every
       # user's sandboxed builds, lilijoy's included)
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2
       networking.firewall.extraCommands = ''
         ${lib.concatMapStrings (
           { cmd, rules }:
@@ -117,13 +111,10 @@
       '';
 
       # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G1
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
         # claude remote-control server: prompt-free sessions spawned in ~/work
-        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
         # merge the keys this repo owns into the agent's CLI-owned settings.json
-        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F13
         services.claude-agent-settings = {
           description = "Merge repo-owned keys into the agent's Claude settings";
           wantedBy = [ "multi-user.target" ];
@@ -170,7 +161,6 @@
           wantedBy = [ "multi-user.target" ];
           wants = [ "network-online.target" ];
           # stop with the firewall: a stopped or failed firewall drops agent-egress
-          # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F9
           bindsTo = [ "firewall.service" ];
           after = [
             "network-online.target"
@@ -215,7 +205,6 @@
         tmpfiles.rules = [
           "d /home/agent/work 0700 agent agent -"
           # orientation for the agent; a store symlink, so edits go through the repo
-          # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#D2
           "d /home/agent/.claude 0700 agent agent -"
           # ~/.gitconfig stays writable: gh auth setup-git puts its helper there
           "d /home/agent/.config 0700 agent agent -"
@@ -238,7 +227,6 @@
             type = "fuse.bindfs";
             options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
             # no start limit: a missing source must not wedge the automount
-            # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F10
             unitConfig.StartLimitIntervalSec = 0;
           }
         ];

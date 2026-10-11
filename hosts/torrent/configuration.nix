@@ -18,9 +18,7 @@
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
-    # root has no home-manager profile (and thus no SSH identity of its
-    # own) on this PC host -- reuse lilijoy's, whose known_hosts/agent
-    # already trusts and authenticates to the origin remote day-to-day.
+    # root has no SSH identity here; reuse lilijoy's, already trusted by origin
     sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
@@ -56,23 +54,12 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
-  # zroot root dataset's own properties, self-healed live too now, not
-  # just at disko install. plan:
-  # 2026-09-01-unify-myzfsdatasetproperties-and-disko-so-one-declaration-covers-both.md#G3
+  # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
 
-  # zfs snapshots, and serving them to homelab's puller (zrepl; replaced
-  # sanoid + the syncoid-based myBackupPush).
-  #
-  # This host is the passive side of replication: it answers homelab's
-  # pulls but never initiates a connection and holds no credential for
-  # homelab. Backup retention is decided by homelab's pull job
-  # (keep_sender), so a compromise here cannot delete backup history.
-  #
-  # Snapshotting and a local prune ceiling are handled on-box by the
-  # module's snap job, independent of homelab being reachable -- without
-  # that, an extended homelab outage would mean no pruning here at all,
-  # since under pull the puller owns retention.
+  # zfs snapshots served to homelab's zrepl puller; passive side: holds no
+  # homelab credential and homelab owns retention, so a compromise here can't
+  # delete backup history. the local snap job prunes even if homelab is away
   myZrepl = {
     enable = true;
     preserveLegacySnapshots = false;
@@ -86,54 +73,28 @@
     };
   };
 
-  # sshd exists on this host solely to carry zrepl's stdinserver
-  # transport. It is reachable only over the tailnet (no openFirewall), and
-  # root login is forced-commands-only, so the single forced command in
-  # root's authorized_keys -- rendered by the zrepl module -- is the only
-  # thing an SSH connection here can ever do. There are no other root keys
-  # on this host to weaken that.
+  # sshd only carries zrepl's stdinserver transport: tailnet-only, root is
+  # forced-commands-only, and there must be no other root keys
   services.openssh = {
     enable = true;
     openFirewall = false;
-    # Modern OpenSSH implements scp over the SFTP protocol, so this
-    # removes both scp and sftp. Nothing copies files to this host --
-    # zrepl uses ssh+stdinserver, not sftp -- and there is no interactive
-    # login here to use them from: root is forced-commands-only and no
-    # non-root user has an authorized_keys (checked on-box).
+    # also disables scp (sftp-based in modern OpenSSH); zrepl uses neither
     allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
 
-      # The rest of docs/hardening.md's SSH baseline, which this host was
-      # missing entirely (F-P5-07): of the nine directives the rule
-      # lists, only three were rendered, so OpenSSH's own defaults
-      # applied to the other six -- and three of those defaults are the
-      # opposite of what the rule asks for.
-      #
-      # These go in `settings`, not `extraConfig`, deliberately.
-      # sshd_config is first-directive-wins, and the module emits
-      # `settings` into the configFile half that sshd reads *first*
-      # (sshd.nix:82-89, :893), so a directive written here cannot be
-      # silently overridden. The same set written into `extraConfig` on
-      # homelab and vps is inert for exactly that reason -- it works
-      # there only because nothing else emits those keys, i.e. by luck
-      # (threat model §7.2, F-P2-09/F-P3-18).
-      #
-      # Each "was" is the pinned OpenSSH 10.4p1's own documented default,
-      # read out of sshd_config.5 rather than assumed. Note the third
-      # one: docs/hardening.md claimed AllowTcpForwarding already
-      # defaults to `no`. It does not -- it defaults to `yes`, so
-      # forwarding has been on everywhere it was not explicitly set. That
-      # sentence is corrected in the same commit as this change.
-      AuthenticationMethods = "publickey"; # was: any
-      AllowAgentForwarding = false; # was: yes
-      AllowStreamLocalForwarding = false; # was: yes
-      AllowTcpForwarding = false; # was: yes
-      PermitTunnel = "no"; # was: no -- the one already correct, by accident
-      ClientAliveInterval = 60; # was: 0, i.e. no idle timeout at all
-      ClientAliveCountMax = 5; # was: 3
+      # rest of docs/hardening.md's SSH baseline; in `settings`, not
+      # `extraConfig`: sshd_config is first-directive-wins and `settings`
+      # renders first. trailing values are the OpenSSH 10.4p1 defaults
+      AuthenticationMethods = "publickey"; # default: any
+      AllowAgentForwarding = false; # default: yes
+      AllowStreamLocalForwarding = false; # default: yes
+      AllowTcpForwarding = false; # default: yes
+      PermitTunnel = "no"; # default: no
+      ClientAliveInterval = 60; # default: 0, no idle timeout
+      ClientAliveCountMax = 5; # default: 3
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
@@ -147,46 +108,15 @@
     ];
   };
 
-  # Backup restore-test canaries -- content must match homelab's
-  # myBackupRestoreTest.zbackup.targets byte for byte. See
-  # 2026-09-04-automated-canary-based-backup-restore-and-verify-tier-1.md.
+  # backup restore-test canaries: content must match homelab's
+  # myBackupRestoreTest.zbackup.targets byte for byte
   myBackupCanary.paths = {
     "/home/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/home v1";
     "/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/root v1";
   };
 
-  # failed-unit / stuck-switch alerts to Discord (F-P7-09)
-  #
-  # myPullDeploy runs unattended every Thursday, and until now a build
-  # error, a fetch failure or a failed switch on this host was visible
-  # only in the local journal: health-alerts was imported for homelab and
-  # vps only, so nothing anywhere reported that a laptop had quietly
-  # stopped deploying. The failed-units check is the whole point of
-  # enabling it here -- pull-deploy.service entering "failed" is exactly
-  # what it catches.
-  #
-  # It does NOT yet catch a *skipped* deploy. Every guard in
-  # deploy-guards.nix ends in `exit 0`, so a skip is recorded as success
-  # and never enters `systemctl --failed`; closing that needs the
-  # deploy-marker half of F-P7-09, which is not this change.
-  #
-  # One fleet-wide webhook, deliberately, resolving the open question in
-  # the audit's "mint per-host webhook keys -- or decide the shared one
-  # is fine" item: the shared one is fine.
-  #
-  # There used to be two sops keys holding the same URL --
-  # homelab_discord_webhook (read by homelab, torrent AND thinkpad) and
-  # vps_discord_webhook -- so the host prefix described nothing real and
-  # actively misled. Now a single unprefixed `discord_webhook`, matching
-  # how other fleet-shared secrets are named (git_email, open_weather_key).
-  #
-  # What the shared key gives up: after .sops.yaml is split per path
-  # (F-P8-01, F-P8-05), a compromise of any one host leaks the fleet's
-  # only alert sink and it cannot be revoked per host. Accepted -- the
-  # webhook is a write-only sink to one channel, so the worst case is
-  # forged or drowned-out alerts, not access; and all four hosts
-  # legitimately consume it, so a per-path split still has to grant it to
-  # all four. Splitting is cheap to revisit if that trade ever changes.
+  # failed-unit / stuck-switch alerts to Discord; one fleet-wide webhook,
+  # shared on purpose (write-only sink, worst case is forged alerts)
   sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
@@ -195,35 +125,13 @@
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
-    # checkSmart is the one option here that costs something: the module
-    # grants the unit the "disk" group plus CAP_SYS_RAWIO so smartctl can
-    # issue its SG_IO ioctls, and /dev/sd* is root:disk 0660 -- read *and
-    # write* on every raw block device, i.e. root-equivalent. homelab
-    # pays that because it is headless, where smartd's wall/x11 sinks
-    # reach nobody. This host has a graphical session, so the fleet-wide
-    # services.smartd (profiles/default.nix) already reaches a human --
-    # paying a root-equivalent grant for a duplicate alert is a bad
-    # trade.
+    # off: smartctl needs the disk group + CAP_SYS_RAWIO (root-equivalent), and
+    # the fleet-wide smartd already reaches a human via the graphical session
     checkSmart = false;
-    # checkZfs stays on and needs no privilege: /dev/zfs is 0666, and
-    # `zpool status -x` was verified to succeed as the unprivileged
-    # health-check user on homelab.
+    # no backupStaleness: homelab's own myHealthAlerts watches this host's replicas
     #
-    # backupStaleness is deliberately absent. This host is the passive
-    # side of replication, and homelab's own myHealthAlerts already
-    # watches zbackup/backup/torrent/* at a 336h threshold -- measuring
-    # it again here would only report on the puller's behalf.
-    #
-    # The failed-units check above catches a pull-deploy that *fails*. It
-    # cannot catch one that *skips*: every guard exits 0, so a tree left
-    # dirty or parked on a branch (easy here -- flakeDir is this user's own
-    # ~/dotfiles, which is a working checkout, not a deploy-only clone)
-    # silently stops this host updating with no failed unit anywhere.
-    # Watching the profile symlink measures the outcome instead.
-    #
-    # 504h = 21 days: weekly deploys plus two weeks of slack. This is a
-    # desktop that is usually powered on, so it needs no laptop-style
-    # allowance for long absences.
+    # profile mtime catches a pull-deploy that skips (guards exit 0, so no
+    # failed unit); 504h = 21 days, weekly deploys plus two weeks of slack
     staleMarkerFiles = {
       "/nix/var/nix/profiles/system" = 504;
     };

@@ -25,19 +25,10 @@ _: {
             keep rules still own normal retention; this only runs when you
             invoke it.
 
-            An earlier version of this module also auto-pruned on a timer
-            when free space got tight. Removed: capacity-threshold pruning
-            trims the *oldest* snapshots down to a floor, but the actual
-            problem it needs to solve — "I deleted a large file and want
-            that space back right now" — isn't fixed by that. ZFS doesn't
-            free a deleted file's blocks until every snapshot referencing
-            them is gone, and whatever snapshot is newest at delete time
-            was almost always taken *before* the delete (snapshots run on
-            their own schedule), so a floor that keeps N newest snapshots
-            routinely keeps exactly the one holding the space you wanted
-            back. The only thing that reliably reclaims it is destroying
-            every snapshot that could be holding it, immediately, on
-            demand — which is what this does now.
+            Destroys every snapshot that could be holding a deleted file's
+            blocks, immediately, on demand: ZFS only frees them once no
+            snapshot references them, and the newest snapshot usually
+            predates the delete.
 
             Safe to prune aggressively: zrepl's replication cursor
             preserves the incremental base regardless of which snapshots
@@ -58,36 +49,17 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        # Manual escape hatch: `systemctl start zfs-emergency-prune.service`.
-        # Destroys every local snapshot except one named exactly `@blank` on
-        # each configured dataset, immediately. `@blank` is the impermanence
-        # rollback point disko creates once at install time (see
-        # docs/backups.md and zrepl's own protectRegexes) -- every host is
-        # expected to end up on impermanence, so that's the one snapshot
-        # that must never go. On a dataset with no `@blank` (a host not yet
-        # migrated), this destroys everything. For a "game update needs
-        # 40GB right now" situation, not routine use.
+        # manual escape hatch: `systemctl start zfs-emergency-prune.service`.
+        # keeps only `@blank` (impermanence rollback point); a dataset
+        # without one loses every snapshot
         systemd.services.zfs-emergency-prune = {
           description = "Immediately destroy every local snapshot except @blank on ${lib.concatStringsSep ", " cfg.datasets}";
           path = [ pkgs.zfs ];
           serviceConfig = {
             Type = "oneshot";
 
-            # docs/hardening.md's sandboxing baseline, which this unit was
-            # simply missing (F-P6-06) -- every other custom module in
-            # modules/nixos/ applies it, and the deliberately-partial ones
-            # (pull-deploy, push-deploy) say in a comment why. This one was
-            # a plain omission rather than a decision.
-            #
-            # This stays root: `zfs destroy` is not delegable to a service
-            # user here. Root is the blast radius being bounded, not
-            # removed.
-            #
-            # health-alerts.nix is the direct in-repo precedent that the
-            # full stack is compatible with running zfs/zpool commands --
-            # it does exactly that under ProtectSystem = "strict".
-            # Deliberately NOT PrivateDevices: this unit needs /dev/zfs,
-            # and PrivateDevices would hide it.
+            # docs/hardening.md sandboxing baseline; stays root (zfs destroy
+            # isn't delegable). no PrivateDevices: needs /dev/zfs
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;

@@ -1,11 +1,7 @@
 _: {
-  # Claude Code's own config lives in ~/.claude. The CLI writes settings.json
-  # itself (that's how /model and /effort persist), so a store symlink over it
-  # would make those writes fail. Instead the keys this repo cares about are
-  # declared below and merged into the mutable file on activation: declarative
-  # keys win on every rebuild, CLI-owned keys survive untouched.
-  #
-  # The claude-code package itself comes from profile-pc's systemPackages.
+  # the CLI writes ~/.claude/settings.json itself (/model, /effort), so no store
+  # symlink: managed keys are merged into the mutable file on activation
+  # package comes from profile-pc's systemPackages
   flake.modules.homeManager.claude-code =
     {
       config,
@@ -14,13 +10,8 @@ _: {
       ...
     }:
     let
-      # statusLine is invoked as a bare command, inheriting whatever PATH the
-      # terminal happens to have - jq otherwise only exists in this repo's
-      # devshell, so the bar silently emptied out anywhere else. Packaging the
-      # script pins its own deps instead.
-      #
-      # bashOptions is emptied deliberately: the script uses `cond && printf`
-      # idioms for optional segments, whose non-zero exits would trip errexit.
+      # packaged so the statusLine has its own deps, not the terminal's PATH
+      # bashOptions empty: `cond && printf` optional segments would trip errexit
       statusline = pkgs-unstable.writeShellApplication {
         name = "claude-statusline";
         runtimeInputs = with pkgs-unstable; [
@@ -29,12 +20,9 @@ _: {
           coreutils
         ];
         bashOptions = [ ];
-        # Tide-style statusLine, segments separated by plain spaces:
-        # cwd (blue) -> git branch (green/yellow) -> model+effort (magenta)
-        # -> context -> 5h usage -> 7d usage (green/yellow/red) -> time (grey)
-        #
-        # `${...}` bash expansions below are escaped as `''${...}` throughout
-        # so Nix doesn't try to interpolate them itself.
+        # tide-style: cwd (blue) -> git branch (green/yellow) -> model+effort
+        # (magenta) -> context -> 5h -> 7d usage (green/yellow/red) -> time (grey)
+        # bash `${...}` is escaped as `''${...}` so Nix doesn't interpolate it
         text = ''
           input=$(cat)
 
@@ -129,15 +117,14 @@ _: {
 
       claudeDir = "${config.home.homeDirectory}/.claude";
 
-      # Keys this repo owns in ~/.claude/settings.json. Anything absent here
-      # (model, effortLevel, theme, enabledPlugins, ...) stays CLI-owned.
+      # keys this repo owns in settings.json; anything absent stays CLI-owned
       managedSettings = {
         statusLine = {
           type = "command";
           command = "${claudeDir}/statusline.sh";
           padding = 0;
         };
-        # The tips shown next to the spinner.
+        # tips shown next to the spinner
         spinnerTipsEnabled = false;
         # no AI attribution in commits or PRs (docs/GIT_WORKFLOW.md); sub-keys
         # rather than `attribution = false` so older CLI versions read it too
@@ -150,8 +137,7 @@ _: {
 
       jsonFormat = pkgs-unstable.formats.json { };
       managedSettingsFile = jsonFormat.generate "claude-settings-managed.json" managedSettings;
-      # Recorded so that dropping a key from managedSettings actually removes it
-      # from settings.json on the next activation, instead of stranding it there.
+      # recorded so a key dropped from managedSettings is removed on next activation
       managedKeysFile = jsonFormat.generate "claude-settings-managed-keys.json" (
         lib.attrNames managedSettings
       );
@@ -160,9 +146,8 @@ _: {
       home = {
         file = {
           ".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
-          # user-level instructions, loaded in every project: the two core lessons.
-          # read-only by design; the agent user gets the same file appended to its own
-          # plan: 2026-10-06-manage-a-user-level-claude-md-declaratively-with-cross-project.md#D2
+          # user-level instructions, loaded in every project; read-only by design,
+          # the agent user gets the same file appended to its own
           ".claude/CLAUDE.md".source = ./user-claude.md;
         }
         # every skill under ./skills; the agent user links the same directory
@@ -170,9 +155,8 @@ _: {
           name: _: lib.nameValuePair ".claude/skills/${name}" { source = ./skills + "/${name}"; }
         ) (builtins.readDir ./skills);
 
-        # Reads happen unconditionally, but every write goes through `run` so
-        # that `home-manager build`/dry-run stays side-effect free - a bare
-        # `run echo > file` would still truncate the file via the redirect.
+        # every write goes through `run` to keep dry-run side-effect free; a bare
+        # `run echo > file` would still truncate via the redirect
         activation.claudeCodeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="${claudeDir}/settings.json"
           keyrecord="${claudeDir}/.hm-managed-setting-keys.json"
@@ -182,9 +166,8 @@ _: {
           prevKeys='[]'
           [ -e "$keyrecord" ] && prevKeys=$(cat "$keyrecord")
 
-          # Deep-merge (jq `*`) so unmanaged keys survive, with the declared
-          # side winning. Keys we managed on a previous generation but no
-          # longer declare are dropped, so deleting one here removes it.
+          # deep-merge, declared side wins; keys managed last generation but no
+          # longer declared are dropped
           merged=$(${pkgs-unstable.jq}/bin/jq -n \
             --argjson current "$current" \
             --argjson prevKeys "$prevKeys" \

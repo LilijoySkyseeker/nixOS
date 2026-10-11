@@ -1,5 +1,4 @@
 # VM test: agent-user's boundary, asserted from the agent's side
-# plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
 { pkgs, agentUserModule }:
 pkgs.testers.runNixOSTest {
   name = "agent-user";
@@ -60,7 +59,7 @@ pkgs.testers.runNixOSTest {
     def as_agent(cmd):
         return f"su agent -s /bin/sh -c '{cmd}'"
 
-    # review-fix checks report every failure, not just the first
+    # report every failure, not just the first
     failures = []
 
     def check(ok, msg):
@@ -121,7 +120,7 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
 
     with subtest("review fixes: egress, builds, reload, sandbox, sshd"):
-        # IPv6: all but loopback rejected (F1)
+        # IPv6: all but loopback rejected
         machine.succeed("curl -6 --fail --max-time 5 http://lan:8000/marker")
         rc, _ = machine.execute(as_agent("curl -6 --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN over IPv6")
@@ -151,7 +150,7 @@ pkgs.testers.runNixOSTest {
         check(sprop("MemoryMax") not in ("infinity", ""), f"MemoryMax={sprop('MemoryMax')!r}")
         check("firewall.service" in sprop("BindsTo"), f"BindsTo={sprop('BindsTo')!r}")
         check("firewall.service" in sprop("After"), "not ordered after firewall.service")
-        # sshd denies agent (F8)
+        # sshd denies agent
         sshd = machine.succeed("sshd -T -C user=agent,host=x,addr=127.0.0.1 | grep -i '^denyusers' || true")
         check("agent" in sshd, f"sshd denyusers: {sshd!r}")
 
@@ -165,7 +164,7 @@ pkgs.testers.runNixOSTest {
         # plus the user's two working lessons, from the same file their own CLAUDE.md uses
         for phrase in ["## Five steps", "## Doghouse vs dog owner"]:
             assert phrase in md, f"CLAUDE.md lacks the lesson {phrase!r}"
-        # the unused ~/repos is gone; clones live in ~/work/repos
+        # no ~/repos; clones live in ~/work/repos
         machine.fail("test -e /home/agent/repos")
         # account-level tools stay out: remote session/routine tools would run
         # cloud work with the user's GitHub App and connectors

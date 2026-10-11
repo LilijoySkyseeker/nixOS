@@ -2,9 +2,7 @@ _: {
   flake.modules.homeManager.tmux =
     { pkgs-unstable, ... }:
     {
-      # tmux: vi keybinds throughout, sessions persisted/restored across reboots.
-      # Shared by every host (root on servers, lilijoy on PCs) so a tmux session
-      # behaves the same whether it's a local terminal or an SSH session.
+      # tmux: vi keybinds, sessions persisted/restored across reboots
       programs.tmux = {
         enable = true;
         keyMode = "vi";

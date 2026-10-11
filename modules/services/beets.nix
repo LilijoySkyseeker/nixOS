@@ -13,21 +13,16 @@ in
     let
       importDir = "/storage/Music/Import";
       reviewDir = "/storage/Music/NeedsReview";
-      # a fresh folder, deliberately separate from the pre-existing Picard/
-      # tree -- see plan#D3.
+      # deliberately separate from the pre-existing Picard/ tree
       libraryDir = "/storage/Music/Library";
 
-      # shared by every non-default bucket below and by `default` itself --
-      # they differ only in which folder prefix comes before this.
+      # shared by every bucket in `paths`; they differ only in the prefix
       pathSuffix = "$year_bracket $album%if{$albumdisambig, ($albumdisambig)}%aunique{}/$disc_prefix$track_padded $title$feat_bracket";
 
       beetsConfigName = "beets-config";
     in
     {
-      # dedicated, single-purpose account -- only ever runs beets-import.service.
-      # multimedia membership declared from the group side (matching jellyfin.nix's
-      # own users.groups.multimedia.members pattern), since this user's whole
-      # purpose already is exactly this one task.
+      # single-purpose account, only runs beets-import.service
       users.users.beets = {
         isSystemUser = true;
         group = "beets";
@@ -38,15 +33,8 @@ in
 
       sops.secrets.homelab_beets_acoustid_apikey = { };
 
-      # renders atomically to /run/secrets/rendered/<name> with the apikey
-      # spliced in -- never touches the nix store or persistent disk
-      # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G8
-      #
-      # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#D1
-      # ported from files/PicardNamingScript.txt -- see that plan's G2/G3 for the
-      # divergences (dropped Classical bucket, ftintitle instead of Picard's
-      # Additional Artist Variables plugin) and the real on-disk examples this
-      # was checked against; G6 for the extras (art/booklets/etc.) carry-over.
+      # renders to /run/secrets/rendered/<name> with the apikey spliced in,
+      # never the nix store; ported from files/PicardNamingScript.txt
       sops.templates.${beetsConfigName} = {
         owner = "beets";
         group = "beets";
@@ -64,21 +52,12 @@ in
             quiet: yes
             quiet_fallback: skip
             timid: no
-            # crash mid-batch (OOM, kill) leaves some of an entry's tracks
-            # already moved into the library and the rest still in Import --
-            # resuming lets beets pick back up from its own session state
-            # instead of re-matching a now-incomplete remainder from scratch.
+            # a crash mid-batch leaves an entry half-moved; resume from session state
             resume: yes
             incremental: yes
             duplicate_action: skip
 
-          # default (0.04) requires ~96% metadata similarity to auto-accept in
-          # quiet mode -- confirmed via a live test that this rejects even an
-          # AcoustID-fingerprint-confirmed, unambiguously-correct match scored
-          # at 0.12-0.14 distance. Loosened per the user's explicit choice,
-          # above beets' own docs' "loosen it a bit" example (0.10) since that
-          # value wouldn't have caught the observed 0.12-0.14 case either.
-          # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G12
+          # default 0.04 rejects correct AcoustID-confirmed matches at 0.12-0.14
           match:
             strong_rec_thresh: 0.15
 
@@ -104,29 +83,16 @@ in
 
           replaygain:
             auto: yes
-            # gstreamer: already unconditionally linked into every pkgs.beets build
-            # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G1
+            # gstreamer: already linked into every pkgs.beets build
             backend: gstreamer
 
-          # keeps beets from probing torrent-drop clutter (readme.txt, .cue, .log,
-          # sample clips) as bogus candidate tracks during the tagging pass itself.
-          # Orthogonal to the extras carry-over in the import script below -- that
-          # relocates whatever's left in the source folder after import,
-          # regardless of what filefilter let through as a track candidate.
-          # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G6
+          # don't probe torrent-drop clutter (readme.txt, .cue, .log) as tracks;
+          # extras are relocated separately by the import script
           filefilter:
             path: '(?i).*\.(mp3|flac|m4a|m4b|mp4|ogg|opus|wma|wv|ape|mpc|aac|aiff?|dsf|wav)$'
 
-          # NOTE: item_fields/album_fields are deliberately top-level, NOT
-          # nested under an `inline:` key. beetsplug/inline.py imports the
-          # global `beets.config` object directly rather than using the
-          # plugin-scoped `self.config` property every other plugin here
-          # uses -- confirmed by reading the actual bundled plugin source on
-          # the pinned nixpkgs beets derivation after a live test revealed
-          # these fields silently never registered (literal unresolved
-          # `$fieldname` text ended up in real file/folder names on the real
-          # host). `beet fields` is the fast way to check this kind of thing
-          # is actually registered, read-only, without touching the library.
+          # item_fields/album_fields must be top-level, not under `inline:`: the
+          # inline plugin reads the global config (check with `beet fields`)
           album_fields:
             initial: >
               next((c.upper() for c in (albumartist_sort or albumartist or "") if c.isalpha()), '#')
@@ -140,10 +106,8 @@ in
             feat_bracket: >
               "" if (artist or "").strip().lower() == (albumartist or "").strip().lower() else ' [%s]' % artist
 
-          # queries soundtrack/other/single before the `comp` (Various Artists)
-          # catch-all, matching PicardNamingScript.txt's override order
-          # (soundtrack/other/classical checks run after and win over the single
-          # check; VA is only a sub-case of its remaining "Standard" branch).
+          # soundtrack/other/single before the `comp` (Various Artists) catch-all,
+          # matching PicardNamingScript.txt's override order
           paths:
             albumtype:soundtrack: "[Soundtracks]/${pathSuffix}"
             albumtype:other: "[Other]/${pathSuffix}"
@@ -153,9 +117,7 @@ in
         '';
       };
 
-      # human-facing drop/review folders, and the fresh library output root --
-      # all three created the same way (2770, setgid, root:multimedia).
-      # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#D3
+      # drop/review folders and the library root (2770, setgid, root:multimedia)
       systemd.tmpfiles.rules = [
         "d ${importDir} 2770 root multimedia -"
         "d ${reviewDir} 2770 root multimedia -"
@@ -164,37 +126,20 @@ in
 
       systemd.services.beets-import = {
         description = "beets: import+tag new drops from Music/Import, sweep unmatched into Music/NeedsReview";
-        # matches samba.nix's samba-user-provision pattern: without this, nothing
-        # guarantees the rendered config (with the acoustid key spliced in)
-        # exists yet before the timer's first OnBootSec run on a slow boot.
+        # the rendered config must exist before the timer's first run
         after = [ "sops-nix.service" ];
         wants = [ "sops-nix.service" ];
         serviceConfig = {
           Type = "oneshot";
           User = "beets";
-          # runtime (not account) group: a live test found setgid inheritance
-          # from libraryDir's own mode isn't a reliable enough guarantee on
-          # its own (observed a new subdirectory beets created land as
-          # beets:beets instead of beets:multimedia) -- setting the
-          # *process's* own effective gid directly means every new
-          # file/directory it creates gets group:multimedia regardless of
-          # whichever parent directory's mode it happens to land in.
-          # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G13
+          # process gid, not just setgid dirs (unreliable), so every new file is
+          # group multimedia
           Group = "multimedia";
           StateDirectory = "beets";
-          # new files/dirs beets creates default to systemd's usual 022 (world-
-          # readable) otherwise -- this keeps them multimedia-group-only,
-          # matching the rest of /storage's convention rather than the Picard
-          # subtree's looser legacy other::r-x holdover.
+          # multimedia-group-only, not systemd's default 022
           UMask = "0007";
-          # NFS/SMB clients drop files into Import with whatever mode/ownership
-          # their own umask produced -- often unreadable by anyone but the
-          # dropping uid. beets (unprivileged, no group override can fix a
-          # file whose *owner* bits are the only ones set) can't read those at
-          # all. Narrowly-scoped privilege escalation (the "+" prefix, a
-          # systemd mechanism -- see systemd.service(5)) on just this one
-          # claim step, not on the service's own User=, which stays "beets"
-          # for everything else.
+          # "+": root for just this claim step; NFS/SMB drops arrive with the
+          # dropper's umask, often owner-only and unreadable to beets
           ExecStartPre = "+${
             lib.getExe (
               pkgs.writeShellApplication {
@@ -215,21 +160,14 @@ in
               ];
               text = ''
                 config_path=${lib.escapeShellArg config.sops.templates.${beetsConfigName}.path}
-                # beets' own app-dir lookup (state.pickle, plugin caches) falls
-                # back to $HOME/.config/beets independent of -c -- the beets
-                # user's $HOME (/var/empty) is real and read-only, so this
-                # crashes without BEETSDIR pointed somewhere writable.
+                # $HOME (/var/empty) is read-only and beets ignores -c for its app dir
                 export BEETSDIR=/var/lib/beets
 
                 move_to_review() {
                   dest=${lib.escapeShellArg reviewDir}/"$(basename "$1")"
                   if [ -e "$dest" ]; then
-                    # an empty leftover from an earlier failed/interrupted move
-                    # (mv falls back to copy+delete here, since Import and
-                    # NeedsReview are separate ReadWritePaths bind mounts under
-                    # ProtectSystem=strict, so a failed copy can leave an empty
-                    # destination dir behind) isn't a real collision -- reclaim
-                    # the name instead of timestamp-suffixing every retry.
+                    # an empty leftover from an interrupted cross-mount mv isn't a
+                    # real collision: reclaim the name
                     rmdir "$dest" 2>/dev/null || dest="$dest-$(date +%Y%m%d%H%M%S)"
                   fi
                   mv "$1" "$dest"
@@ -240,9 +178,7 @@ in
                 for entry in ${lib.escapeShellArg importDir}/*; do
                   [ -e "$entry" ] || continue
 
-                  # a symlinked top-level entry could point beet import's own
-                  # directory walk at something outside Import entirely --
-                  # route to review instead of ever handing it to beet.
+                  # a symlink could point beet's walk outside Import
                   if [ -L "$entry" ]; then
                     move_to_review "$entry"
                     continue
@@ -254,16 +190,12 @@ in
                   fi
 
                   # O(1) item-level "added since" query, not an O(library) before/after diff
-                  # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G8
                   start_ts="$(date '+%Y-%m-%dT%H:%M:%S')"
                   beet -c "$config_path" import --quiet "$entry" || true
 
-                  # move: yes already relocated matched audio out -- remaining files
-                  # are extras (art/booklets/.cue/.log); only relocated when exactly
-                  # one destination album came out of this entry
-                  # plan: 2026-09-04-homelab-beets-setup-mimicking-picard-tagging-renaming.md#G6
-                  # '$path' below is beets' own format-field syntax, not a shell
-                  # variable -- must stay single-quoted.
+                  # leftovers are extras (art/booklets/.cue/.log); only relocated
+                  # when exactly one destination album came out of this entry.
+                  # '$path' is beets format syntax, must stay single-quoted
                   # shellcheck disable=SC2016
                   new_dirs="$(beet -c "$config_path" list -f '$path' "added:''${start_ts}.." 2>/dev/null | xargs -r -I{} dirname {} | sort -u)"
                   new_dir_count=0
@@ -271,9 +203,7 @@ in
                     new_dir_count="$(printf '%s\n' "$new_dirs" | grep -c .)"
                   fi
                   if [ -e "$entry" ] && [ "$new_dir_count" -eq 1 ]; then
-                    # -n: a genuine name collision with something beets/fetchart
-                    # already wrote is left behind in $entry instead of clobbered,
-                    # so it still surfaces via the review sweep below.
+                    # -n: collisions stay in $entry and surface via the review sweep
                     find "$entry" -type f -exec mv -n -t "$new_dirs" {} +
                     find "$entry" -depth -type d -empty -delete
                   fi
@@ -321,9 +251,7 @@ in
         };
       };
 
-      # /storage/Music/{Import,NeedsReview,Library} are already-persistent ZFS
-      # datasets (see zdata/storage/storage in hosts/homelab/configuration.nix),
-      # not impermanence paths -- only the beets library db itself needs this.
+      # the Music dirs are ZFS datasets; only the library db needs impermanence
       environment.persistence.${vars.persistRoot}.directories = [
         {
           directory = "/var/lib/beets";

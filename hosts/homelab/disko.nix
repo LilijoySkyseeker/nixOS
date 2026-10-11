@@ -75,10 +75,8 @@
             "storage/storage" = {
               type = "zfs_fs";
               mountpoint = "/storage"; # "<path>" just mountpoint
-              # legacy: prevents zfs-mount.service's `zfs mount -a` from also
-              # trying to mount this dataset at boot, racing against the
-              # fstab-generated storage.mount unit (disko's documented
-              # zfs-over-legacy pattern, see example/zfs.nix upstream).
+              # legacy: keeps zfs-mount.service's `zfs mount -a` from racing
+              # the fstab-generated storage.mount unit
               options = {
                 mountpoint = "legacy";
                 "com.sun:auto-snapshot" = "false";
@@ -102,17 +100,9 @@
           rootFsOptions = config.myZfsDatasetProperties."zbackup";
           options.ashift = "12"; # IMPORTANT
           datasets = {
-            # "backup/<host>/..." tree — one convention for everything (no
-            # more backup vs backup-bulk split: restic's offsite job never
-            # reads from zbackup at all regardless, so that split wasn't
-            # doing anything functionally). All pure containers; real data
-            # lives in the children underneath, created by zrepl on first
-            # receive and so not declared here.
-            #
-            # Note zrepl receives into <root_fs>/<full source dataset
-            # path>, so the real children are deeper than the old syncoid
-            # names: e.g. backup/torrent/zroot/local/home, not
-            # backup/torrent/home.
+            # "backup/<host>/..." containers only; zrepl creates the real
+            # children on first receive as <root_fs>/<full source path>,
+            # e.g. backup/torrent/zroot/local/home
             "backup" = {
               type = "zfs_fs";
               options = {

@@ -1,42 +1,16 @@
-# Do the deploy guards survive a read-only global git config?
-#
-# This is a regression test for a live fleet outage: root's
-# ~/.config/git/config is a home-manager symlink into the nix store, and
-# the guards opened with `git config --global --add safe.directory`.
-# Git creates its lockfile beside the config it is writing, the store is
-# read-only, so the guard died on its first line with
-#
-#   error: could not lock config file /root/.config/git/config:
-#   Read-only file system
-#
-# taking auto-switch and push-deploy-vps with it.
-#
-# The original write-up here said this went unnoticed for two days because
-# a failed deploy is not watched. Re-reading homelab's journal shows both
-# halves of that were wrong, so it is corrected rather than repeated: the
-# last good run was 2026-08-25T13:18 and the failures were the next
-# scheduled runs, 2026-08-27T03:00 (auto-switch) and 03:15
-# (push-deploy-vps) — one cycle each, ~10 overnight hours, not two days.
-# And they *were* watched: both entered systemctl --failed, which
-# myHealthAlerts checks every 15 minutes. What is genuinely unwatched is a
-# deploy that SKIPS, since every guard below ends in exit 0; the
-# profile-staleness alert in myHealthAlerts watches for that.
-#
-# The first subtest deliberately proves the *environment* still
-# reproduces the original failure, so this test cannot quietly stop
-# testing anything if the store symlink arrangement ever changes.
+# VM test: deploy guards survive root's global git config being a read-only
+# store symlink (home-manager); the first subtest proves the env still
+# reproduces that, so the test can't silently stop testing it
 { pkgs, deployGuardsScript }:
 let
-  # Stands in for the home-manager-managed config: a store path, hence a
-  # read-only filesystem, exactly as on the real hosts.
+  # stand-in for the home-manager config: a read-only store path
   storeGitconfig = pkgs.writeText "hm-gitconfig" ''
     [user]
       name = root
       email = root@example.invalid
   '';
 
-  # The guards as the real services consume them: interpolated verbatim
-  # into a script that then calls into them.
+  # the guards as the real services consume them: interpolated verbatim
   guardRunner = pkgs.writeShellScript "guard-runner" ''
     set -euo pipefail
     cd "$1"

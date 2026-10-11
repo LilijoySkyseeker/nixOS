@@ -18,9 +18,8 @@ in
       # disable sudo
       security.sudo.enable = false;
 
-      # audit log of every executed command — /var/log/audit/audit.log,
-      # which lives under /var/log, already in each host's persistence
-      # directories list (impermanence would otherwise wipe it every boot).
+      # audit log of every executed command; /var/log is in each host's
+      # persistence list, else impermanence wipes it
       security.auditd.enable = true;
       security.audit.enable = true;
       security.audit.rules = [ "-a exit,always -F arch=b64 -S execve" ];
