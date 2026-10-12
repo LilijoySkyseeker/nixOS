@@ -10,7 +10,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 agent_home=/home/agent
-research=/home/lilijoy/Documents/Vault/Research
+folder=/home/lilijoy/Documents/Vault/Agent
 settings=$agent_home/.claude/settings.json
 state=$agent_home/.claude.json
 
@@ -45,13 +45,13 @@ item() {
 
 chk_module() { id agent >/dev/null 2>&1 && systemctl cat claude-remote-control >/dev/null 2>&1; }
 
-chk_research() { [ -d "$research" ]; }
-fix_research() { as_user mkdir -p "$research"; }
+chk_folder() { [ -d "$folder" ]; }
+fix_folder() { as_user mkdir -p "$folder"; }
 
-chk_mount() { as_agent sh -c 'touch ~/research/.agent-setup-probe && rm ~/research/.agent-setup-probe' 2>/dev/null; }
+chk_mount() { as_agent sh -c 'touch ~/agent/.agent-setup-probe && rm ~/agent/.agent-setup-probe' 2>/dev/null; }
 fix_mount() {
-  systemctl reset-failed home-agent-research.mount home-agent-research.automount 2>/dev/null || true
-  systemctl restart home-agent-research.automount
+  systemctl reset-failed home-agent-agent.mount home-agent-agent.automount 2>/dev/null || true
+  systemctl restart home-agent-agent.automount
 }
 
 chk_settings() {
@@ -118,8 +118,8 @@ if ! chk_module; then
   exit 1
 fi
 ok "agent-user module deployed"
-item "research folder" chk_research "create $research (as lilijoy)" fix_research
-item "research mount" chk_mount "reset and restart the research automount" fix_mount
+item "agent folder" chk_folder "create $folder (as lilijoy)" fix_folder
+item "agent folder mount" chk_mount "reset and restart the agent folder automount" fix_mount
 item "agent settings merged" chk_settings "rerun claude-agent-settings" fix_settings
 item "LAN/tailnet egress blocked" chk_egress "reload the firewall" fix_egress
 item "git identity" chk_git "it's declared by the module: switch" ""

@@ -110,7 +110,7 @@
         ) egress}
       '';
 
-      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
+      # bindfs: Vault/Agent only, agent-owned on its side, lilijoy:users on disk
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
         # claude remote-control server: prompt-free sessions spawned in ~/work
@@ -222,8 +222,8 @@
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
         mounts = [
           {
-            what = "/home/lilijoy/Documents/Vault/Research";
-            where = "/home/agent/research";
+            what = "/home/lilijoy/Documents/Vault/Agent";
+            where = "/home/agent/agent";
             type = "fuse.bindfs";
             options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
             # no start limit: a missing source must not wedge the automount
@@ -232,7 +232,7 @@
         ];
         automounts = [
           {
-            where = "/home/agent/research";
+            where = "/home/agent/agent";
             wantedBy = [ "multi-user.target" ];
           }
         ];

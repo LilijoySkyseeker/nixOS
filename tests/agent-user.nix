@@ -76,30 +76,30 @@ pkgs.testers.runNixOSTest {
             assert got == "700 agent", f"{d}: {got!r}"
         machine.succeed(as_agent("nix-store --query --hash /run/current-system"))
 
-    with subtest("research mount"):
-        src = "/home/lilijoy/Documents/Vault/Research"
+    with subtest("agent folder mount"):
+        src = "/home/lilijoy/Documents/Vault/Agent"
         # before the user creates the folder, access fails visibly but must
         # not hit the start limit and wedge the automount until reboot
         for _ in range(8):
-            machine.execute(as_agent("ls /home/agent/research"))
+            machine.execute(as_agent("ls /home/agent/agent"))
         # the user makes this folder once; the module never writes into their home
         machine.succeed(f"su lilijoy -s /bin/sh -c 'mkdir -p {src}'")
-        rc, out = machine.execute(as_agent("touch /home/agent/research/after-missing.md 2>&1"))
+        rc, out = machine.execute(as_agent("touch /home/agent/agent/after-missing.md 2>&1"))
         check(rc == 0, f"mount wedged after missing source: {out!r}")
         # a sibling vault folder the agent must never reach
         machine.succeed("install -d -o lilijoy -g users /home/lilijoy/Documents/Vault/Library")
         machine.succeed("su lilijoy -s /bin/sh -c 'echo mine > /home/lilijoy/Documents/Vault/Library/x.md'")
         # agent writes land as lilijoy-owned files in the real vault folder
-        machine.succeed(as_agent("echo found > /home/agent/research/note.md"))
+        machine.succeed(as_agent("echo found > /home/agent/agent/note.md"))
         got = machine.succeed(f"stat -c %U:%G {src}/note.md").strip()
         assert got == "lilijoy:users", f"note.md owner: {got!r}"
         # a note lilijoy writes is editable by the agent through the mount
         machine.succeed(f"su lilijoy -s /bin/sh -c 'echo seed > {src}/seed.md'")
-        machine.succeed(as_agent("echo edited >> /home/agent/research/seed.md"))
+        machine.succeed(as_agent("echo edited >> /home/agent/agent/seed.md"))
         machine.succeed(f"grep -q edited {src}/seed.md")
-        # nothing beyond Research is reachable
+        # nothing beyond Agent is reachable
         machine.fail(as_agent("cat /home/lilijoy/Documents/Vault/Library/x.md"))
-        listing = machine.succeed(as_agent("ls -a /home/agent/research/.."))
+        listing = machine.succeed(as_agent("ls -a /home/agent/agent/.."))
         assert "Library" not in listing, f"parent listing: {listing!r}"
 
     with subtest("egress"):
@@ -159,7 +159,7 @@ pkgs.testers.runNixOSTest {
     with subtest("orientation"):
         # the agent reads where it is from a declared CLAUDE.md
         md = machine.succeed(as_agent("cat /home/agent/.claude/CLAUDE.md"))
-        for phrase in ["torrent", "~/research", "~/work/repos", "pull request"]:
+        for phrase in ["torrent", "~/agent", "~/work/repos", "pull request"]:
             assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
         # plus the user's two working lessons, from the same file their own CLAUDE.md uses
         for phrase in ["## Five steps", "## Doghouse vs dog owner"]:
@@ -197,7 +197,7 @@ pkgs.testers.runNixOSTest {
         rc, out = machine.execute("cd /root && agent-setup --check 2>&1")
         # no logins can exist in the VM, so it must report failures, not fix them
         assert rc == 1, f"rc={rc}: {out}"
-        for good in ["✓ agent-user module deployed", "✓ research folder", "✓ research mount",
+        for good in ["✓ agent-user module deployed", "✓ agent folder", "✓ agent folder mount",
                      "✓ agent settings merged", "✓ LAN/tailnet egress blocked", "✓ git identity"]:
             assert good in out, f"missing {good!r} in:\n{out}"
         for missing in ["✗ gh logged in as LilijoySkyseeker-agent", "✗ Claude login and workspace trust"]:

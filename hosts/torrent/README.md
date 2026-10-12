@@ -42,8 +42,8 @@ thinkpad it has no `@blank` snapshots to preserve.
 
 This host (only) runs `agent-user`: an `agent` Unix user whose
 `claude-remote-control` service runs agent sessions with no permission
-prompts. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
-`/home/agent/research`) and can't reach the LAN or tailnet. Its
+prompts. It sees only `~/Documents/Vault/Agent` (bindfs-mounted at
+`/home/agent/agent`) and can't reach the LAN or tailnet. Its
 `agent-egress` chain is also jumped for `gid nixbld`, so **your own**
 fixed-output builds on this host can't fetch from LAN/tailnet addresses or
 over IPv6 either. After a reinstall, or to check it's healthy, run
