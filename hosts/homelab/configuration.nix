@@ -175,7 +175,8 @@
       '';
       backupCleanupCommand = ''
         # unmount only what this run mounted; cut, not awk: no gawk on this unit's path
-        grep " on $RUNTIME_DIRECTORY/" /proc/mounts \
+        # /proc/mounts is "src target fstype ...", no " on " (that's mount(8) output)
+        grep " $RUNTIME_DIRECTORY/" /proc/mounts \
           | cut -d' ' -f2 \
           | tac \
           | xargs -r -I{} umount -t zfs {}
