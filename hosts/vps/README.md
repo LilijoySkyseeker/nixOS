@@ -2,8 +2,9 @@
 
 Public-facing tunnel endpoint for CGNAT'd `homelab` on DigitalOcean droplet.
 Its only public ports are the game ports it DNATs to homelab over
-WireGuard (Minecraft 25565/tcp and 19132/udp, Factorio 34197/udp), each
-rate-limited per source IP, plus WireGuard's own 51820/udp. SSH and
+WireGuard (Minecraft 25565/tcp and 19132/udp, Factorio 34197/udp, Hytale
+5520/udp), each rate-limited per source IP, plus WireGuard's own
+51820/udp. SSH and
 everything else is tailnet-only. Jellyfin is tailnet-only on homelab.
 
 ## Hardware

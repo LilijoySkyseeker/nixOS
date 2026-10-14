@@ -14,7 +14,7 @@ _: {
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # only minecraft and factorio are meant to be public (hosts/vps/README.md);
+      # only the game servers are meant to be public (hosts/vps/README.md);
       # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [
@@ -69,6 +69,15 @@ _: {
           }
         ];
         factorio = [
+          {
+            type = "A";
+            ttl = 300;
+            value = vpsPublicIp;
+          }
+        ];
+        # no SRV: Hytale clients don't look them up (server manual, "Future
+        # Additions"), so the port stays the default 5520
+        hytale = [
           {
             type = "A";
             ttl = 300;

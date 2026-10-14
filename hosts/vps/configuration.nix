@@ -334,6 +334,11 @@ in
         proto = "udp";
         sourcePort = 34197; # factorio
       }
+      {
+        destination = "10.100.0.2:5520";
+        proto = "udp";
+        sourcePort = 5520; # hytale (QUIC)
+      }
     ];
   };
 
@@ -361,6 +366,11 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
+
+    # hytale: cap packet rate per source IP; factorio's figure, not measured
+    iptables -t raw -A vps-ratelimit -p udp --dport 5520 \
+      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
+      --hashlimit-mode srcip --hashlimit-name hytale-flood -j DROP
   '';
 
   # tear down the raw-table chain; the firewall's stop path only flushes
