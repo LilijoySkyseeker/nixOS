@@ -253,7 +253,11 @@ here; it is already applied in the SSH bullet below.
   stopped or failed firewall drops the chain. Interactive `run0 -u agent`
   shells get the chain but not the unit's sandbox. A uid match does not
   cover work the principal hands to a daemon or a setuid helper, so check
-  that whenever the agent gains a new tool.
+  that whenever the agent gains a new tool. The `codex` plugin is fine on
+  that count: `codex app-server` runs as a child of the session, same uid
+  and unit, and reaches OpenAI over public egress. It does mean the agent
+  holds a login to the user's ChatGPT account (`~agent/.codex/auth.json`,
+  written by `agent-setup`), as it already holds their Claude one.
   (`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2`,
   `#F9`; the design record lives outside the repo, in
   `~/Projects/agenticsandbox/`.)

@@ -29,6 +29,9 @@ in
         ripgrep
         gitFull
         gh # GitHub CLI
+        # claude-code's codex@openai-codex plugin: the codex CLI, and node for its scripts
+        codex
+        nodejs
         gjs # for kdeconnect
         restic # backups
         fd

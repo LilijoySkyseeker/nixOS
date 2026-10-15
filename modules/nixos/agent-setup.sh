@@ -91,6 +91,18 @@ fix_consent() {
     claude remote-control --spawn same-dir --name "$NAME" || true
 }
 
+# enabledPlugins only auto-installs in an interactive session
+chk_codex_plugin() {
+  jq -e '.plugins["codex@openai-codex"]' "$agent_home/.claude/plugins/installed_plugins.json" >/dev/null 2>&1
+}
+fix_codex_plugin() { as_agent claude plugin install codex@openai-codex; }
+
+chk_codex_login() { as_agent codex login status >/dev/null 2>&1; }
+fix_codex_login() {
+  note "sign in with your ChatGPT account at the URL shown, using the code it prints"
+  as_agent codex login --device-auth || true
+}
+
 chk_service() { systemctl is-active --quiet claude-remote-control; }
 fix_service() {
   systemctl restart claude-agent-settings claude-remote-control
@@ -126,6 +138,8 @@ item "git identity" chk_git "it's declared by the module: switch" ""
 item "gh logged in as $BOT" chk_gh "log the agent's gh in as the bot" fix_gh
 item "Claude login and workspace trust" chk_claude "run claude once in ~agent/work" fix_claude
 item "Remote Control consent" chk_consent "run claude remote-control once" fix_consent
+item "codex plugin installed" chk_codex_plugin "install codex@openai-codex as the agent" fix_codex_plugin
+item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
 item "remote-control service running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""
