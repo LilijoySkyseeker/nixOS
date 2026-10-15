@@ -194,7 +194,11 @@ container start** — every reboot, and every switch touching the unit —
 at the `alpha` release channel, with
 `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further transitive
 artifacts nobody has listed. Both Factorio servers do the same through
-`UPDATE_MODS_ON_START`. There is no version constraint and no integrity
+`UPDATE_MODS_ON_START`. The Hytale server (2026-10-14) goes further: it
+replaces its own server JAR, assets and `start.sh` from Hytale's update
+service, applied when no one is online. Only the first-install seed JAR
+is hash-pinned. Clients refuse a server whose protocol version differs,
+so a held-back server is unplayable. There is no version constraint and no integrity
 check on any of it.
 
 **Why accepted:** the servers exist to be played on and current. A
