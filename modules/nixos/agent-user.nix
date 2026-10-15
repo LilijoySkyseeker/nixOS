@@ -139,6 +139,12 @@
                     pr = "";
                     sessionUrl = false;
                   };
+                  # OpenAI's codex plugin, as in the user's own settings
+                  extraKnownMarketplaces.openai-codex.source = {
+                    source = "github";
+                    repo = "openai/codex-plugin-cc";
+                  };
+                  enabledPlugins."codex@openai-codex" = true;
                   # the built-in twins: routines and messages into the user's sessions
                   permissions.deny = [
                     "RemoteTrigger"
