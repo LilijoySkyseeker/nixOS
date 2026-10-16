@@ -39,6 +39,10 @@
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
 
+  # arm the board's hardware watchdog (sp5100_tco, /dev/watchdog0): a full
+  # hang resets the machine in ~30s instead of sitting frozen until power-cycled
+  systemd.settings.Manager.RuntimeWatchdogSec = "30s";
+
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
