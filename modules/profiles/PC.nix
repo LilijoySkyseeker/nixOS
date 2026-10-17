@@ -17,6 +17,7 @@ in
       imports = [
         nixosModules."virtual-machines" # (also needs home manager config)
         nixosModules.tooling
+        nixosModules."agent-tools"
         nixosModules."profile-default"
         nixosModules.wooting
         inputs.stylix.nixosModules.stylix
