@@ -88,3 +88,32 @@ days, not weeks.
     first ("very secure" is a department) and landed on the known-good
     destination, 4 parts, days of work. The Sonnet miss looks like the model,
     not the change; earlier runs used the default model.
+- **2026-10-16, merged into "the six steps" and checked against the sources**
+  (user: step back to the sources; combine the two rules into one process
+  with the doghouse as step 0).
+  - **Sources re-read:** the doghouse is from OpenRig's video "I Run an AI
+    Civilization in Herdr" (13:05–19:50). The five steps come from Musk's 2021
+    Starbase tour and Isaacson's "the algorithm".
+  - **Restored:**
+    - "locally defensible", and the light as a fair question;
+    - process growing by checks on checks, "the rules became more important
+      than the things they were supposed to serve";
+    - another agent's approval counted as a department;
+    - stop proving the work is done once it's done;
+    - "only the laws of physics are rules";
+    - "in case" arguments;
+    - "don't dig your grave faster";
+    - Musk doing all five steps backwards.
+  - **Moved:** the steps now exist only in `user-claude.md`, which is always
+    loaded. SKILL.md maps each step to what a review does there.
+  - **Runs (1 per scenario, default model):** the subagents read the new
+    `user-claude.md` and SKILL.md. The old CLAUDE.md was still loaded, with
+    an instruction to ignore its lesson section.
+    - **Design:** all 7 criteria met. It questioned the VM pool first ("very
+      secure" is a department) and landed on the known-good destination: 5
+      parts, about a weekend.
+    - **Process:** all 7 criteria met. 4 apps and 7 routines became a
+      calendar, one list and a 15-minute weekly look, and it reached the
+      dog-owner level ("taking on less, or charging more").
+    - **Small:** about 200 words, "probably not", an add-back trigger and one
+      question.
