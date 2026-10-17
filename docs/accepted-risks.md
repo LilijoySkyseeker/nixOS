@@ -109,16 +109,18 @@ supporting an unprivileged transport. Already the standing example in
 **Sits on:** [threat model](threat-model.md) §4.7 ·
 **Evidence:** `findings-tail.md` §2, `F-P8-17`
 
-`__fish_command_not_found_handler` runs `comma $argv[1]`, so every typo
-becomes a network fetch and execution of a nixpkgs package of that name.
+On the desktops, bash's `command_not_found_handle` runs `comma "$@"` (as
+does the fallback fish shell's `__fish_command_not_found_handler`), so
+every typo becomes a network fetch and execution of a nixpkgs package of
+that name.
 
 **Why accepted:** it is a deliberate ergonomic choice on an
 interactive desktop, made with the trade-off understood. It is
 recorded because "what executes code the lock does not cover" is a
 question that needed an answer, and this is the whole answer.
 
-**Scope limit:** interactive desktop only. It doesn't belong on a host
-that builds or deploys unattended — `F-P8-15` is the same class of
+**Scope limit:** interactive desktop only (`tooling-desktop.nix`). It
+doesn't belong on a host that builds or deploys unattended — `F-P8-15` is the same class of
 problem in `flake-update-test`, and it is *not* accepted.
 
 ### AR-5 — There is no CI, and that is the safer posture

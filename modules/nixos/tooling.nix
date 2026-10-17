@@ -1,6 +1,6 @@
 _: {
   flake.modules.nixos.tooling =
-    { pkgs-stable, lib, ... }:
+    { lib, ... }:
     {
       # Git
       programs.git = {
@@ -10,21 +10,11 @@ _: {
         };
       };
 
-      # fish
+      # fish: fallback shell; bash is the interactive shell (home-manager tooling.nix)
       programs.fish = {
         enable = true;
       };
-      programs.bash = {
-        # switch to fish in interactive shell, otherwise bash
-        interactiveShellInit = ''
-          if [[ $(${pkgs-stable.procps}/bin/ps --no-header --pid=$PPID --format=comm) != "fish" && -z ''${BASH_EXECUTION_STRING} ]]
-          then
-            shopt -q login_shell && LOGIN_OPTION='--login' || LOGIN_OPTION=""
-            exec ${pkgs-stable.fish}/bin/fish $LOGIN_OPTION
-          fi
-        '';
-      };
-      environment.shellAliases = lib.mkForce { }; # clear all shell aliases, using fish functions instead
+      environment.shellAliases = lib.mkForce { }; # clear NixOS's default aliases; ours live in home-manager
 
       # neovim
       programs.neovim = {
