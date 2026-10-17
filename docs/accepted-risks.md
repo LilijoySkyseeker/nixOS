@@ -104,22 +104,20 @@ host.
 supporting an unprivileged transport. Already the standing example in
 `hardening.md`'s dedicated-service-user rule.
 
-### AR-4 — Two interactive shell paths execute code the flake lock does not cover
+### AR-4 — An interactive shell path executes code the flake lock does not cover
 
 **Sits on:** [threat model](threat-model.md) §4.7 ·
 **Evidence:** `findings-tail.md` §2, `F-P8-17`
 
 `__fish_command_not_found_handler` runs `comma $argv[1]`, so every typo
-becomes a network fetch and execution of a nixpkgs package of that name;
-`ns` runs `nix shell 'nixpkgs/nixos-unstable#…' --impure`, deliberately
-outside the lock.
+becomes a network fetch and execution of a nixpkgs package of that name.
 
-**Why accepted:** both are deliberate ergonomic choices on an
-interactive desktop, made with the trade-off understood. They are
+**Why accepted:** it is a deliberate ergonomic choice on an
+interactive desktop, made with the trade-off understood. It is
 recorded because "what executes code the lock does not cover" is a
-question that needed an answer, and these are the whole answer.
+question that needed an answer, and this is the whole answer.
 
-**Scope limit:** interactive desktop only. Neither belongs on a host
+**Scope limit:** interactive desktop only. It doesn't belong on a host
 that builds or deploys unattended — `F-P8-15` is the same class of
 problem in `flake-update-test`, and it is *not* accepted.
 

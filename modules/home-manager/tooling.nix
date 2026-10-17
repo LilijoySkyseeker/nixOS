@@ -64,24 +64,6 @@ _: {
           }
         ];
         functions = {
-          ns.body = ''
-            export NIXPKGS_ALLOW_UNFREE=1 && nix shell 'nixpkgs/nixos-unstable#'{$argv} --impure
-          '';
-          nhu.body = ''
-            git add --all && nix flake update && git add --all
-          '';
-          nht.body = ''
-            git add --all && nh os test
-          '';
-          nhb.body = ''
-            git add --all && nh os boot && git diff --staged | bat --paging always --pager less && git commit -a && git push
-          '';
-          nhs.body = ''
-            git add --all && nh os switch && git diff --staged | bat --paging always --pager less && git commit -a && git push
-          '';
-          gds.body = ''
-            git add --all && git diff --staged | bat --paging always --pager less
-          '';
           __fish_command_not_found_handler.body = ''
             comma $argv[1]
           '';
