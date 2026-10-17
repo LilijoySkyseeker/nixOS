@@ -258,6 +258,12 @@ here; it is already applied in the SSH bullet below.
   and unit, and reaches OpenAI over public egress. It does mean the agent
   holds a login to the user's ChatGPT account (`~agent/.codex/auth.json`,
   written by `agent-setup`), as it already holds their Claude one.
+  `~agent/work` is shared the other way: lilijoy is in group `agent`, the
+  home is `711` and `work` is `2770` with a default ACL. That grants the
+  agent nothing. What it does open is the agent writing files that
+  lilijoy's tools then execute, so lilijoy only reads, edits and drops
+  files there. Git's ownership check refuses agent-owned repos for
+  lilijoy, so never add a `safe.directory` for that path.
   (`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2`,
   `#F9`; the design record lives outside the repo, in
   `~/Projects/agenticsandbox/`.)
