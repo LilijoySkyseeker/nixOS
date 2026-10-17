@@ -7,6 +7,10 @@ or commands (e.g. `phone-paste | wl-copy`).
 
 The page needs the random token in its URL, takes one submission, binds
 only the address of the default route, and gives up after 15 minutes.
+
+It is plain HTTP, not encrypted: over shared Wi-Fi, others on the network
+could read what you send. For passwords and other secrets, use USB
+tethering (a direct link to the phone).
 """
 
 import html
@@ -90,6 +94,7 @@ def main():
     try:
         subprocess.run(["qrencode", "-t", "ansiutf8", url], stdout=sys.stderr, check=False)
         print(f"Scan with your phone, or open: {url}", file=sys.stderr)
+        print("Not encrypted: on shared Wi-Fi others could read it. Use USB tethering for secrets.", file=sys.stderr)
         timer = threading.Timer(TIMEOUT_S, server.shutdown)
         timer.start()
         server.serve_forever()

@@ -44,6 +44,7 @@ in
           sudo nixos-firewall-tool open tcp "$port"
           trap 'sudo nixos-firewall-tool reset' EXIT
           echo "sharing $dir ($mode) on $ip:$port; log in as \"me\". Ctrl+C to stop."
+          echo "Not encrypted (plain HTTP): on shared Wi-Fi others could see the password and files. Prefer USB tethering."
           copyparty -i "$ip" -p "$port" --qr -v "$dir:/:$mode,me" -a "me:$pw"
         '';
       };

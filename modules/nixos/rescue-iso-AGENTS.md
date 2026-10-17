@@ -50,7 +50,8 @@ installed OS, its firmware and hardware.
   `arp-scan`, `iw`, `ethtool`, `tailscale`.
 - Phones: `adb`/`fastboot`, `scrcpy`, `libimobiledevice`.
 - Files: `share [--rw] DIR` (copyparty: serves DIR to a phone or PC behind a
-  per-session password, with a QR code), `rsync`, `rclone`, `sshfs`,
+  per-session password, with a QR code; plain HTTP, so on shared Wi-Fi
+  prefer USB tethering), `rsync`, `rclone`, `sshfs`,
   `smbclient`.
 - Missing something? `nix shell nixpkgs#<pkg>` works with internet.
 
