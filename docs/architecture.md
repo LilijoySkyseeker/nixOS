@@ -140,7 +140,25 @@ not the boundary itself:
   `pkgs.nix` (`flake.pkgsUnstable`/`flake.pkgsStable`, pre-instantiated
   nixpkgs), `systems.nix`, `hosts.nix` (the composition point above), and
   `devshell.nix` (the dev shell, now a `perSystem` module rather than the
-  bare `mkShell` function that used to live at repo root).
+  bare `mkShell` function that used to live at repo root), and
+  `rescue-iso.nix` (the rescue ISO below).
+
+## The rescue ISO (not a host)
+
+`nix build .#rescue-iso` builds a KDE Plasma live ISO for the USB toolbox
+stick (a Ventoy stick; its project lives in `~agent/work/repos/usb-toolbox`).
+It's the user's own rescue and work environment on any machine, and a
+toolbox for Claude Code and Codex working on a broken one. It isn't a host,
+so it's a package (`modules/flake/rescue-iso.nix`), not an entry in
+`hosts.nix` or the table above, and the pre-push hook doesn't build it.
+
+It composes nixpkgs' `installation-cd-graphical-calamares-plasma6.nix`
+(which brings `profiles/base.nix`'s recovery tools and `all-hardware.nix`),
+`"rescue-iso"` (`modules/nixos/rescue-iso.nix`), and `"tooling"` with nvf for
+the user's shell and editor. No `profile-default`: that brings sops-nix and
+home-manager, and the ISO carries no secrets. The properties that matter
+(internal disks read-only until `disk-rw`, sshd closed off the tailnet,
+phone-paste's one-shot token) are checked by `checks.x86_64-linux.rescue-iso`.
 
 One host is still structurally unusual, same as before the migration:
 

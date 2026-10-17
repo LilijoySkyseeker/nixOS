@@ -39,6 +39,11 @@
         deployGuardsScript = config.flake.deployGuardsScript;
       };
 
+      rescue-iso = import ../../tests/rescue-iso.nix {
+        pkgs = config.flake.pkgsUnstable;
+        rescueIsoModule = config.flake.modules.nixos."rescue-iso";
+      };
+
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";
