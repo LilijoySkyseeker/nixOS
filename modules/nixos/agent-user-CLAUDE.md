@@ -16,7 +16,7 @@ container: anything you write is on the owner's machine.
 - You may use the machine's full resources: run builds, tests and jobs
   in parallel and as large as the work needs, without asking first. The
   limits are hard ones, so you can't hurt the desktop by trying. Your
-  sessions are capped at 24 GiB of memory and 4096 tasks, and have a lower
+  sessions are capped at 64 GiB of memory and 4096 tasks, and have a lower
   CPU weight, which only matters when the CPU is contended. Nix builds
   run in the nix daemon, outside that cap, with 16 jobs and `kvm` and
   `nixos-test`, so VM tests do run. Disk is the one shared limit: clean

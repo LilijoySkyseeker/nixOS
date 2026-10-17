@@ -205,7 +205,7 @@
               "-/run/libvirt"
             ];
             # a runaway agent can't take the desktop down with it
-            MemoryMax = "24G";
+            MemoryMax = "64G";
             TasksMax = 4096;
             CPUWeight = 50;
           };
