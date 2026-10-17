@@ -19,6 +19,7 @@ pkgs.testers.runNixOSTest {
       networking.nftables.enable = false;
       environment.systemPackages = [
         pkgs.curl
+        pkgs.git
         pkgs.jq
       ];
       services.openssh.enable = true;
@@ -71,10 +72,33 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("cat /home/lilijoy/secret"))
         groups = machine.succeed("id -nG agent").strip()
         assert groups == "agent", f"agent groups: {groups!r}"
-        for d in ["/home/agent", "/home/agent/work"]:
+        # lilijoy joins agent's group, never the other way round
+        groups = machine.succeed("id -nG lilijoy").strip().split()
+        assert "agent" in groups, f"lilijoy groups: {groups!r}"
+        for d, mode in [("/home/agent", "711"), ("/home/agent/work", "2770")]:
             got = machine.succeed(f"stat -c '%a %U' {d}").strip()
-            assert got == "700 agent", f"{d}: {got!r}"
+            assert got == f"{mode} agent", f"{d}: {got!r}"
         machine.succeed(as_agent("nix-store --query --hash /run/current-system"))
+
+    with subtest("shared work folder"):
+        def as_user(cmd):
+            return f"su lilijoy -s /bin/sh -c '{cmd}'"
+
+        # lilijoy drops a file in ~/work; the agent can edit it
+        machine.succeed(as_user("umask 077 && echo drop > /home/agent/work/drop.md"))
+        machine.succeed(as_agent("echo edited >> /home/agent/work/drop.md"))
+        got = machine.succeed("stat -c %G /home/agent/work/drop.md").strip()
+        assert got == "agent", f"drop.md group: {got!r}"
+        # an agent-made folder stays writable for lilijoy
+        machine.succeed(as_agent("umask 077 && mkdir /home/agent/work/proj && echo a > /home/agent/work/proj/a.md"))
+        machine.succeed(as_user("echo b >> /home/agent/work/proj/a.md && touch /home/agent/work/proj/b.md"))
+        # the rest of the agent's home stays closed to lilijoy
+        machine.fail(as_user("ls /home/agent"))
+        machine.fail(as_user("ls /home/agent/.claude"))
+        # git as lilijoy refuses an agent-owned repo, so its hooks never run as lilijoy
+        machine.succeed(as_agent("git init -q /home/agent/work/proj"))
+        rc, out = machine.execute(as_user("git -C /home/agent/work/proj status 2>&1"))
+        assert rc != 0 and "dubious ownership" in out, f"git ran as lilijoy in an agent repo: {out!r}"
 
     with subtest("research mount"):
         src = "/home/lilijoy/Documents/Vault/Research"

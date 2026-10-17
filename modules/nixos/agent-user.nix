@@ -62,10 +62,13 @@
       # own group, not isNormalUser's default `users`
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G2
       users.groups.agent = { };
+      # lilijoy opens and drops files in ~/work; the agent gains nothing from this
+      users.users.lilijoy.extraGroups = [ "agent" ];
       users.users.agent = {
         isNormalUser = true;
         group = "agent";
-        homeMode = "700";
+        # traverse only: lilijoy reaches ~/work, nothing else here
+        homeMode = "711";
         description = "Claude agent (non-sensitive work)";
         packages = with pkgs; [
           git
@@ -209,7 +212,10 @@
         };
 
         tmpfiles.rules = [
-          "d /home/agent/work 0700 agent agent -"
+          # ~/work is shared with lilijoy (group agent); setgid + default acl keep
+          # files group-writable whoever creates them, whatever their umask
+          "d /home/agent/work 2770 agent agent -"
+          "a+ /home/agent/work - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::---"
           # orientation for the agent; a store symlink, so edits go through the repo
           "d /home/agent/.claude 0700 agent agent -"
           # ~/.gitconfig stays writable: gh auth setup-git puts its helper there

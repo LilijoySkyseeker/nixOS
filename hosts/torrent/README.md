@@ -53,3 +53,11 @@ what's missing. `--check` only reports. The original one-time steps are Task 6 o
 `2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`;
 mechanics in [`docs/hardening.md`](../../docs/hardening.md) ("The `agent`
 user").
+
+Its `~/work` is shared with you at **`~/Agent`** (you're in group `agent`;
+setgid plus a default ACL keep everything group-writable). Open, edit and
+drop files there; put files for the agent in `~/Agent/inbox/`. Don't run
+git, builds, direnv or your own Claude sessions in it as yourself: the
+agent writes those files, and hooks or project settings in them would run
+as you. Git already refuses agent-owned repos ("dubious ownership"); never
+add a `safe.directory` for this path. Review the agent's code through its PRs.
