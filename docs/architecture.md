@@ -154,7 +154,7 @@ so it's a package (`modules/flake/rescue-iso.nix`), not an entry in
 
 It composes nixpkgs' `installation-cd-graphical-calamares-plasma6.nix`
 (which brings `profiles/base.nix`'s recovery tools and `all-hardware.nix`),
-`"rescue-iso"` (`modules/nixos/rescue-iso.nix`), and `"tooling"` with nvf for
+`"rescue-iso"` (`modules/nixos/rescue-iso.nix`), `"agent-tools"`, and `"tooling"` with nvf for
 the user's shell and editor. No `profile-default`: that brings sops-nix and
 home-manager, and the ISO carries no secrets. The properties that matter
 (internal disks read-only until `disk-rw`, sshd closed off the tailnet,

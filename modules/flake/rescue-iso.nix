@@ -25,8 +25,9 @@ let
       )
       # the image-independent part, also used by tests/rescue-iso.nix
       nixosModules."rescue-iso"
-      # the user's own shell and editor, as on the PCs
+      # the user's own shell and editor, and the agents' CLI tools, as on the PCs
       nixosModules.tooling
+      nixosModules."agent-tools"
       inputs.nvf.nixosModules.default
     ];
   };

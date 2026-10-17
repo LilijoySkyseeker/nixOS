@@ -233,10 +233,6 @@ in
         claude-code
         codex
         nodejs # codex plugin scripts
-        python3
-        perl
-        bc
-        binutils # strings, objdump
         tmux
         qrencode
         gh
@@ -336,9 +332,6 @@ in
         kiwix-tools
         p7zip
         zip
-        unzip
-        file
-        xxd
         binwalk
         qalculate-qt
         kdePackages.kate
