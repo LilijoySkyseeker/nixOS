@@ -8,7 +8,7 @@ let
 in
 {
   flake.modules.nixos."rescue-iso" =
-    { pkgs-unstable, ... }:
+    { pkgs-unstable, lib, ... }:
     let
       pkgs = pkgs-unstable;
 
@@ -16,8 +16,38 @@ in
       rescueAgentsMd = pkgs.writeText "rescue-AGENTS.md" (builtins.readFile ./rescue-iso-AGENTS.md);
 
       # nothing listens by default, so no port is open by default: the
-      # servers below open theirs (unscoped, interface names aren't known
-      # ahead on a live ISO) only while they run, and bind one address
+      # servers below open theirs only while they run, on the interface of
+      # the default route (names aren't known ahead on a live ISO), and
+      # close only their own rule
+      rescue-fw = pkgs.writeShellApplication {
+        name = "rescue-fw";
+        runtimeInputs = with pkgs; [
+          iptables
+          iproute2
+          gawk
+          gnugrep
+          coreutils
+        ];
+        text = ''
+          usage() { echo "usage: rescue-fw open|close TCP_PORT" >&2; exit 2; }
+          [[ $# -eq 2 && $2 =~ ^[0-9]+$ ]] || usage
+          tag="rescue-fw:$2"
+          case $1 in
+            open)
+              dev=$(ip -4 route get 1.1.1.1 | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
+              [[ -n $dev ]] || { echo "no default route" >&2; exit 1; }
+              iptables -I nixos-fw -i "$dev" -p tcp --dport "$2" -m comment --comment "$tag" -j nixos-fw-accept
+              ;;
+            close)
+              # iptables -S quotes comments: --comment "rescue-fw:PORT"
+              iptables -S nixos-fw | grep -E -- "--comment \"?$tag\"?( |$)" | sed 's/^-A /-D /' |
+                while read -r rule; do eval "iptables $rule"; done
+              ;;
+            *) usage ;;
+          esac
+        '';
+      };
+
       phone-paste = pkgs.writers.writePython3Bin "phone-paste" {
         flakeIgnore = [ "E501" ];
       } (builtins.readFile ./rescue-iso-phone-paste.py);
@@ -41,8 +71,8 @@ in
           [[ -n $ip ]] || { echo "no network: plug in a phone with USB tethering, or connect with nmtui" >&2; exit 1; }
           read -rsp "Choose a password for this session: " pw
           echo
-          sudo nixos-firewall-tool open tcp "$port"
-          trap 'sudo nixos-firewall-tool reset' EXIT
+          sudo rescue-fw open "$port"
+          trap 'sudo rescue-fw close "$port"' EXIT
           echo "sharing $dir ($mode) on $ip:$port; log in as \"me\". Ctrl+C to stop."
           echo "Not encrypted (plain HTTP): on shared Wi-Fi others could see the password and files. Prefer USB tethering."
           copyparty -i "$ip" -p "$port" --qr -v "$dir:/:$mode,me" -a "me:$pw"
@@ -104,6 +134,8 @@ in
           dev=/dev/mapper/VentoyPart
           [[ -e $dev ]] || dev=/dev/disk/by-label/TOOLBOX
           [[ -e $dev ]] || { echo "toolbox stick partition not found (no /dev/mapper/VentoyPart or label TOOLBOX)" >&2; exit 1; }
+          # the read-only rules leave the stick alone, but say so explicitly
+          [[ $mode == rw ]] && sudo blockdev --setrw "$(realpath "$dev")"
           sudo mkdir -p /run/toolbox
           if mountpoint -q /run/toolbox; then
             sudo mount -o "remount,$mode" /run/toolbox
@@ -136,9 +168,20 @@ in
       # internal disks start read-only, so nothing (agent or human) writes to
       # a disk being rescued by accident; `disk-rw` lifts it per disk. USB
       # disks stay writable: they're the stick and the backup targets.
+      # stacked devices (LVM, LUKS, md) get their own flag: the kernel only
+      # warns, and doesn't refuse, when they write to a read-only disk.
+      # dm's flag is set at table load and its name is only known from then
+      # on, so dm matches once DM_NAME is set; Ventoy's own mappings (the
+      # booted ISO, the stick's data partition) are left alone
       services.udev.extraRules = ''
         ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNEL=="sd*|nvme*|mmcblk*|vd*|hd*|xvd*", ENV{ID_BUS}!="usb", RUN+="${pkgs.util-linux}/bin/blockdev --setro /dev/%k"
+        ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", KERNEL=="md*", RUN+="${pkgs.util-linux}/bin/blockdev --setro /dev/%k"
+        ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="dm-*", ENV{DM_NAME}=="?*", ENV{DM_NAME}!="ventoy|VentoyPart", RUN+="${pkgs.util-linux}/bin/blockdev --setro /dev/%k"
       '';
+      # the installer profile auto-assembles RAID arrays at boot, before any
+      # rule can mark them read-only, and assembly can start a resync that
+      # writes; assemble by hand instead (`mdadm --assemble --readonly`)
+      boot.swraid.enable = lib.mkForce false;
 
       # the user's own keys, so the rescue box can be reached over SSH;
       # sshd itself comes from the installer profile
@@ -170,10 +213,15 @@ in
         "L+ /home/nixos/.claude/CLAUDE.md - - - - ${rescueAgentsMd}"
         "L+ /home/nixos/.codex/AGENTS.md - - - - ${rescueAgentsMd}"
         "d /home/nixos/rescue 0755 nixos users - -"
+        # the installer's desktop icon stays, but it doesn't launch at login
+        "d /home/nixos/.config 0755 nixos users - -"
+        "d /home/nixos/.config/autostart 0755 nixos users - -"
+        "L+ /home/nixos/.config/autostart/calamares.desktop - - - - ${pkgs.writeText "calamares-hidden.desktop" "[Desktop Entry]\nHidden=true\n"}"
       ];
 
       environment.systemPackages = [
         ai-login
+        rescue-fw
         phone-paste
         share
         disk-rw

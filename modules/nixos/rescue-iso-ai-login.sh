@@ -56,7 +56,7 @@ else
   while kill -0 "$pp" 2>/dev/null; do
     if read -r -t 1 typed && [[ -n $typed ]]; then
       echo "$typed" >"$code_file"
-      kill -INT "$pp" 2>/dev/null || true
+      kill -TERM "$pp" 2>/dev/null || true
       break
     fi
   done

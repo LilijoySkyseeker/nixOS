@@ -15,11 +15,12 @@ tethering (a direct link to the phone).
 
 import html
 import secrets
+import signal
 import socket
 import subprocess
 import sys
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
 PORT = 8765
@@ -53,7 +54,15 @@ def default_route_ip():
         return s.getsockname()[0]
 
 
+def stop(*_):
+    # SIGTERM from ai-login, or Ctrl+C even when the parent ignores SIGINT:
+    # raise in the main thread so the firewall cleanup below still runs
+    raise SystemExit(1)
+
+
 def main():
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
     try:
         ip = default_route_ip()
     except OSError:
@@ -62,8 +71,12 @@ def main():
     token = secrets.token_urlsafe(16)
     url = f"http://{ip}:{PORT}/{token}"
     received = []
+    lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
+        # an idle or half-sent request can't hold the server up
+        timeout = 15
+
         def log_message(self, *args):
             pass
 
@@ -81,27 +94,32 @@ def main():
             self._reply(200, PAGE.format(host=html.escape(socket.gethostname())))
 
         def do_POST(self):
-            if self.path != f"/{token}" or received:
+            if self.path != f"/{token}":
                 return self._reply(404, "not found")
             length = min(int(self.headers.get("Content-Length", 0)), 64 * 1024)
             form = parse_qs(self.rfile.read(length).decode(errors="replace"))
-            received.append(form.get("text", [""])[0].strip())
+            with lock:
+                if received:
+                    return self._reply(404, "not found")
+                received.append(form.get("text", [""])[0].strip())
             self._reply(200, DONE)
             threading.Thread(target=self.server.shutdown).start()
 
-    server = HTTPServer((ip, PORT), Handler)
-    subprocess.run(["sudo", "nixos-firewall-tool", "open", "tcp", str(PORT)], check=True)
+    server = ThreadingHTTPServer((ip, PORT), Handler)
+    server.daemon_threads = True
+    subprocess.run(["sudo", "rescue-fw", "open", str(PORT)], check=True)
     try:
         subprocess.run(["qrencode", "-t", "ansiutf8", url], stdout=sys.stderr, check=False)
         print(f"Scan with your phone, or open: {url}", file=sys.stderr)
         print("Not encrypted: on shared Wi-Fi others could read it. Use USB tethering for secrets.", file=sys.stderr)
         timer = threading.Timer(TIMEOUT_S, server.shutdown)
+        timer.daemon = True
         timer.start()
         server.serve_forever()
         timer.cancel()
     finally:
         server.server_close()
-        subprocess.run(["sudo", "nixos-firewall-tool", "reset"], check=False)
+        subprocess.run(["sudo", "rescue-fw", "close", str(PORT)], check=False)
 
     if not received:
         sys.exit("phone-paste: timed out with nothing sent")

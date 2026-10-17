@@ -1,7 +1,8 @@
 # VM test: the rescue ISO's safety properties hold on a booted system
 # internal disks really reject writes until `disk-rw`, a mount of one falls
 # back to read-only, sshd is unreachable off the tailnet, and phone-paste
-# takes exactly one submission behind its token and closes its port after
+# takes exactly one submission behind its token, scopes its firewall rule
+# to one interface and removes it after
 { pkgs, rescueIsoModule }:
 pkgs.testers.runNixOSTest {
   name = "rescue-iso";
@@ -58,11 +59,19 @@ pkgs.testers.runNixOSTest {
         machine.fail("touch /mnt/t/x")
         machine.succeed("umount /mnt/t")
 
-    with subtest("toolbox-mount finds the stick by label, read-only"):
-        machine.succeed("disk-rw /dev/vdb && mkfs.exfat -L TOOLBOX /dev/vdb && blockdev --setro /dev/vdb")
-        machine.succeed("udevadm trigger --settle /dev/vdb")
+    with subtest("device-mapper volumes on internal disks start read-only"):
+        machine.succeed("dmsetup create testlv --table '0 2048 linear /dev/vda 0' && udevadm settle")
+        machine.succeed("test $(blockdev --getro /dev/mapper/testlv) = 1")
+        machine.succeed("dmsetup remove testlv")
+
+    with subtest("toolbox-mount uses Ventoy's VentoyPart mapping, read-only, --rw on request"):
+        # the real stick is USB, hence writable; here vdb plays it
+        machine.succeed("disk-rw /dev/vdb && mkfs.exfat -L TOOLBOX /dev/vdb")
+        machine.succeed("dmsetup create VentoyPart --table \"0 $(blockdev --getsz /dev/vdb) linear /dev/vdb 0\" && udevadm settle")
+        machine.succeed("test $(blockdev --getro /dev/mapper/VentoyPart) = 0")
         machine.succeed("toolbox-mount")
-        machine.succeed("findmnt -no OPTIONS /run/toolbox | grep -qw ro")
+        machine.succeed("findmnt -no SOURCE,OPTIONS /run/toolbox | grep -w ro | grep -q VentoyPart")
+        machine.succeed("toolbox-mount --rw && touch /run/toolbox/written")
 
     with subtest("agent instructions are in place for both CLIs"):
         machine.succeed("grep -q 'Rescue session' /home/nixos/.claude/CLAUDE.md")
@@ -79,11 +88,21 @@ pkgs.testers.runNixOSTest {
         machine.wait_until_succeeds("grep -q 'open: http' /tmp/paste.err")
         url = machine.succeed("grep -o 'http://[^ ]*' /tmp/paste.err").strip()
         base = url.rsplit("/", 1)[0]
-        client.succeed(f"test $(curl -s -o /dev/null -w '%{{http_code}}' {base}/wrong) = 404")
+        machine.succeed("iptables -S nixos-fw | grep -- '-i eth1 ' | grep -q 'rescue-fw:8765'")
+        # an idle connection that never sends a request mustn't block others
+        client.succeed("(sleep 60 | nc machine 8765 >/dev/null &)")
+        client.succeed(f"test $(curl -s --max-time 10 -o /dev/null -w '%{{http_code}}' {base}/wrong) = 404")
         client.succeed(f"curl -sf {url} | grep -q '<form'")
         client.succeed(f"curl -sf --data-urlencode 'text=hello from the phone' {url}")
         machine.wait_until_succeeds("grep -qx 'hello from the phone' /tmp/paste.out")
         client.fail(f"curl -sf --max-time 3 --data-urlencode 'text=second' {url}")
         client.fail("nc -z -w 3 machine 8765")
+        machine.wait_until_fails("iptables -S nixos-fw | grep -q rescue-fw")
+
+    with subtest("phone-paste cleans up its firewall rule when killed"):
+        machine.succeed("phone-paste >/dev/null 2>/tmp/paste2.err & echo $! >/tmp/paste2.pid")
+        machine.wait_until_succeeds("iptables -S nixos-fw | grep -q rescue-fw:8765")
+        machine.succeed("kill -TERM $(cat /tmp/paste2.pid)")
+        machine.wait_until_fails("iptables -S nixos-fw | grep -q rescue-fw")
   '';
 }

@@ -31,6 +31,9 @@ installed OS, its firmware and hardware.
 - **BitLocker:** unlocking needs the recovery key; `dislocker` reads it.
   Don't change firmware settings on a BitLocker machine without the key.
 - **ZFS pools:** import read-only (`zpool import -o readonly=on -N`).
+- **RAID and LVM:** md arrays are not auto-assembled; assemble with
+  `mdadm --assemble --scan --readonly`. Device-mapper devices (LVM volumes,
+  unlocked LUKS) also start read-only, so `disk-rw` the mapped device too.
 - **Someone else's files:** this machine's owner may not be the person
   you're talking to. Look at only what the task needs, and don't upload
   file contents anywhere beyond this conversation.
