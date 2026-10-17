@@ -46,6 +46,10 @@ _: {
       # not declared on the home-manager release tracking nixpkgs-stable
       // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "enableNushellIntegration" ] options) {
         enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
+      }
+      # atuin owns Ctrl-R in bash; fish keeps fzf's
+      // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "historyWidget" "bash" ] options) {
+        historyWidget.bash.command = "";
       };
 
       # zoxide
@@ -300,6 +304,22 @@ _: {
             error_symbol = "[❯](bold bright-red)";
           };
         };
+      };
+
+      # atuin: searchable shell history on Ctrl-R, local only (no account, no sync)
+      programs.atuin = {
+        enable = true;
+        enableFishIntegration = false;
+        # up arrow stays ble.sh's history search
+        flags = [ "--disable-up-arrow" ];
+        settings.update_check = false;
+      };
+
+      # direnv: load a repo's .envrc dev shell on cd
+      programs.direnv = {
+        enable = true;
+        nix-direnv.enable = true;
+        config.global.hide_env_diff = true;
       };
 
       # fish: kept as a fallback shell until it's removed
