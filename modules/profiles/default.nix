@@ -192,7 +192,7 @@ in
       # file system trim for ssd
       services.fstrim.enable = true;
 
-      # fix for buggy fish command not found
+      # comma handles unknown commands instead (home-manager tooling.nix)
       programs.command-not-found.enable = false;
 
       # remove all defualt packages

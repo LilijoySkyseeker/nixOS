@@ -7,6 +7,11 @@ _: {
       ...
     }:
     {
+      # bash: unknown command fetches and runs it from nixpkgs; desktop only (docs/accepted-risks.md AR-4)
+      programs.bash.initExtra = ''
+        command_not_found_handle() { comma "$@"; }
+      '';
+
       # KDE Connect
       services.kdeconnect = {
         enable = true;

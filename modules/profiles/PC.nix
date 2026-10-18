@@ -142,7 +142,7 @@ in
           username = "lilijoy";
           homeDirectory = "/home/lilijoy";
 
-          # fish environment variables
+          # session environment variables
           sessionVariables = {
             SSH_AUTH_SOCK = "/home/<user>/.bitwarden-ssh-agent.sock"; # bitwarden ssh-agent
           };
