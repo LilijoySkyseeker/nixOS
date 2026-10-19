@@ -148,6 +148,8 @@
                     repo = "openai/codex-plugin-cc";
                   };
                   enabledPlugins."codex@openai-codex" = true;
+                  # keep session transcripts ~forever (default deletes after 30 days; 0 is rejected)
+                  cleanupPeriodDays = 36500;
                   # the built-in twins: routines and messages into the user's sessions
                   permissions.deny = [
                     "RemoteTrigger"
