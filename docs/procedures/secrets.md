@@ -69,6 +69,33 @@ No dedicated rotation script or automation exists beyond what's below
    command needed — it doesn't touch the plaintext values, just who
    can decrypt them.
 
+### Decrypting with a YubiKey (every host lost)
+
+Both YubiKeys (keychain 5C NFC, torrent's 5C Nano) are recipients, each
+through its own PIV identity, so either one alone opens the secrets from
+any computer with `nix`:
+
+```
+nix shell nixpkgs#sops nixpkgs#age-plugin-yubikey
+SOPS_AGE_KEY="$(age-plugin-yubikey --identity | grep '^AGE-PLUGIN')" \
+  sops -d secrets/secrets.yaml
+```
+
+It asks for the PIV PIN and a touch. The plugin talks to the key through
+the smart-card daemon `pcscd`, which the PCs run
+(`services.pcscd.enable`) but a live or borrowed system may not. If
+`--identity` finds no YubiKey, start one by hand in a second terminal:
+
+```
+sudo env PCSCLITE_HP_DROPDIR="$(nix build --no-link --print-out-paths nixpkgs#ccid)/pcsc/drivers" \
+  "$(nix build --no-link --print-out-paths nixpkgs#pcsclite.out)/bin/pcscd" --foreground
+```
+
+From there, add a new host's key
+and `sops updatekeys` as above. `age-plugin-yubikey` 0.5.1 needs a TDES
+PIV management key (`ykman piv access change-management-key -a TDES
+--generate --protect`); firmware 5.7 defaults to AES.
+
 ### Removing a recipient (decommissioning a host, revoking access)
 
 Same shape in reverse: remove the key/anchor from `.sops.yaml`, then

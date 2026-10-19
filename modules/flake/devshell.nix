@@ -20,6 +20,7 @@
           # secrets
           sops
           age
+          age-plugin-yubikey # the YubiKey recipients in .sops.yaml
           ssh-to-age
 
           # git hooks (.githooks/*, all bash)

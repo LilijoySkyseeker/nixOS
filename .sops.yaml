@@ -11,6 +11,11 @@ keys:
   # on first boot — see hosts/vps/README.md step 1. Rotated 2026-08-25
   # for the post-brick reinstall (old key's droplet was destroyed).
   - &vps age13y33z6n68r0f96p3ts4mqr4zvvlfxsxp8wtu025zqacmgc42l9kq7qegc8
+  # YubiKey PIV identities (age-plugin-yubikey): a way back in that doesn't
+  # depend on any host. `age-plugin-yubikey --identity` rebuilds the
+  # identity from a plugged-in key on any machine.
+  - &yubikey-keychain age1yubikey1qgty804u2cw2l5hr5at8rwrtdesj2lcegxeak96yn07drqmsnsez736qquk # 5C NFC, serial 27674308
+  - &yubikey-torrent age1yubikey1qfcfvhue5lu3gtklnw2arf5htecj27zc20suqqv324hugvh94jss577qayj # 5C Nano, serial 29680883
 creation_rules:
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
@@ -22,3 +27,5 @@ creation_rules:
         - *homelab3
         - *torrent-age
         - *vps
+        - *yubikey-keychain
+        - *yubikey-torrent
