@@ -82,5 +82,7 @@ Facts checked 2026-10-19:
 2. Runbook, then at the machine: final zrepl snapshot + `zfs hold` on homelab, rescue
    stick, format, `zfs recv` root and home, `nixos-install`, Secure
    Boot keys (with Microsoft's), `bcdboot`, BitLocker TPM+PIN,
-   supervisor password, TPM+PIN enroll last. Merge the PR the same day,
+   supervisor password, TPM+PIN enroll last, then both YubiKeys as
+   FIDO2 unlock slots (`systemd-cryptenroll --fido2-device`; the owner
+   wants either key alone to be a way back in, 2026-10-19). Merge the PR the same day,
    before Thursday's pull-deploy.
