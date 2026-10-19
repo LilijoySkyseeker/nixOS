@@ -82,8 +82,9 @@ SOPS_AGE_KEY="$(age-plugin-yubikey --identity | grep '^AGE-PLUGIN')" \
 ```
 
 It asks for the PIV PIN and a touch. The plugin talks to the key through
-the smart-card daemon `pcscd`, which the PCs run
-(`services.pcscd.enable`) but a live or borrowed system may not. If
+the smart-card daemon `pcscd`. The PCs (`services.pcscd.enable`) and the
+TOOLBOX stick's Rescue System run it, with `sops` and
+`age-plugin-yubikey` installed; a borrowed system may not. If
 `--identity` finds no YubiKey, start one by hand in a second terminal:
 
 ```
