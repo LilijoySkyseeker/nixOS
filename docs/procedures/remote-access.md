@@ -9,8 +9,10 @@ There's one shared set of admin public keys —
 `flake.vars.publicSshKeys` in `modules/flake/vars.nix` — installed as
 `users.users.root.openssh.authorizedKeys.keys` on every host that
 accepts interactive admin SSH (`homelab`, `vps`). Currently
-three keys: the thinkpad's, torrent's, and a hardware YubIKey
-(`sk-ssh-ed25519@openssh.com`, resident/FIDO2). Adding a new admin
+four keys: the thinkpad's, torrent's, and two hardware YubiKeys
+(`sk-ssh-ed25519@openssh.com`, resident/FIDO2): one on the keychain, one
+kept plugged into torrent. Each YubiKey's key is enrolled separately, so
+either one alone gets in. Adding a new admin
 machine means appending its public key to that one list in
 `modules/flake/vars.nix` — it propagates to every host on next deploy
 (each host reads it via `config.flake.vars`, passed through as the
