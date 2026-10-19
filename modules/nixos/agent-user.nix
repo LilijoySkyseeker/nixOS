@@ -4,7 +4,7 @@
     { lib, pkgs, ... }:
     let
       bot = "LilijoySkyseeker-agent";
-      # orientation + the user's two working lessons (the same file as their own
+      # orientation + the user's working rule (the same file as their own
       # user-level CLAUDE.md, so there's no copy to drift)
       agentClaudeMd = pkgs.writeText "agent-CLAUDE.md" (
         builtins.readFile ./agent-user-CLAUDE.md
