@@ -19,6 +19,11 @@
         zfsDatasetPropertiesModule = config.flake.modules.nixos."zfs-dataset-properties";
       };
 
+      hibernate-zfs-luks = import ../../tests/hibernate-zfs-luks.nix {
+        pkgs = config.flake.pkgsUnstable;
+        hibernateModule = config.flake.modules.nixos."hibernate";
+      };
+
       docker-publish-guard = import ../../tests/docker-publish-guard.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
