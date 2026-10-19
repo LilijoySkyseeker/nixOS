@@ -44,7 +44,12 @@ sops age key (accepted-risks D5).
 
 ## State
 
-Branch `thinkpad-fde`. Nothing built yet. The stale branch
+Branch `thinkpad-fde`. `myHibernate` (modules/nixos/hibernate.nix) and
+its VM test `hibernate-zfs-luks` pass: ZFS in LVM in LUKS, hibernate and
+resume, resume through a newer kernel (6.18 to 7.2), pool healthy and
+scrub clean each time. The import-after-resume ordering also makes the
+pool import wait for however long the PIN takes. Not wired into thinkpad
+yet. The stale branch
 `origin/worktree-fde-secureboot-plan` is direction only; its scripts,
 runbooks, rollout flag and shared modules are not being carried over.
 
@@ -63,8 +68,9 @@ Facts checked 2026-10-19:
 - Thunderbolt DMA protection is on (`iommu_dma_protection` = 1).
 - The stick's AI Help and Rescue System share a per-machine folder
   (`_toolbox/collected/sessions/<maker-model-serial>/notes/NOTES.md`,
-  read first, kept across reboots), so the runbook needs no stick
-  changes: it lives in this repo and the stick agent clones it.
+  read first, kept across reboots). Per docs/procedures/toolbox-stick.md
+  the runbook lives in this repo, with a short `_toolbox/runbooks/
+  thinkpad.md` on the stick that the owner copies there.
 - Resuming through a newer kernel works on x86; systemd accepts the
   mismatch on purpose (`hibernate-resume-config.c`).
 
@@ -73,8 +79,7 @@ Facts checked 2026-10-19:
 1. Modules: encrypted root disk layout (`vars`), TPM+PIN unlock,
    lanzaboote, hibernate-only power handling, reboot notice. Windows
    settings as a script under `files/windows/`.
-2. VM test: ZFS on LUKS, hibernate, resume through a newer kernel.
-3. At the machine: final zrepl snapshot + `zfs hold` on homelab, rescue
+2. Runbook, then at the machine: final zrepl snapshot + `zfs hold` on homelab, rescue
    stick, format, `zfs recv` root and home, `nixos-install`, Secure
    Boot keys (with Microsoft's), `bcdboot`, BitLocker TPM+PIN,
    supervisor password, TPM+PIN enroll last. Merge the PR the same day,
