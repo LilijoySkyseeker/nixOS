@@ -23,16 +23,18 @@ Not started. Facts as of 2026-10-19:
   enabled. Keychain key: YubiKey 5C NFC, serial 27674308, firmware
   5.7.1, PIV enabled over USB and NFC. Both work with
   `age-plugin-yubikey` (nixpkgs 0.5.1).
-- One YubiKey's resident FIDO2 SSH key is already in
-  `vars.publicSshKeys` (root on homelab and vps); which of the two is
-  unknown.
+- The keychain key holds the resident FIDO2 SSH key already in
+  `vars.publicSshKeys` (root on homelab and vps); torrent's key has none.
+- Both keys already log in to Bitwarden on their own, without the
+  master password (owner, 2026-10-19).
 - sops supports age plugins since 3.10 (nixpkgs has 3.13.3), so
   `age1yubikey…` recipients work in `.sops.yaml`.
 
 ## Next
 
 1. Each key: FIDO2 PIN and PIV PIN/PUK set (PIV ships with `123456`).
-2. Resident SSH key on the second YubiKey; add it to
+2. Resident SSH key on torrent's YubiKey
+   (`ssh-keygen -t ed25519-sk -O resident -O verify-required`); add it to
    `vars.publicSshKeys`.
 3. A PIV age identity on each key; add both as recipients in
    `.sops.yaml` and `sops updatekeys` every file. `/security-review`
