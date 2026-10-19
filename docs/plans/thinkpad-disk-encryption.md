@@ -26,6 +26,8 @@ sops age key (accepted-risks D5).
   be there and work.
 - 2026-10-19: idle does nothing until 60 minutes, on AC or battery, then
   hibernates; the same on both systems.
+- 2026-10-19: no automatic screen lock before the 60-minute hibernate
+  either; screen stays on (hands-busy work). Lock by hand when leaving.
 - 2026-10-19: a GUI toggle on KDE and on Windows pauses the idle
   hibernate for long-running tasks (screen locked by hand, trusted
   places only).
@@ -35,6 +37,8 @@ sops age key (accepted-risks D5).
   laptop) can reuse them.
 - 2026-10-19: clean up the leftover impermanence config (`/nix/state`)
   now.
+- 2026-10-19: do the at-machine steps with Claude Code from the TOOLBOX
+  stick, following a runbook written for it.
 - 2026-10-19: fix the lid setting properly (`hybrid-sleep` can't work:
   ZFS adds `nohibernate`; KDE was handling the lid).
 
@@ -56,6 +60,11 @@ Facts checked 2026-10-19:
 - NixOS's systemd-initrd `zfs-import-<pool>` has no ordering against
   `systemd-hibernate-resume.service`; importing before resume corrupts
   the pool (openzfs#12842). Needs an explicit `after`.
+- Thunderbolt DMA protection is on (`iommu_dma_protection` = 1).
+- The stick's AI Help and Rescue System share a per-machine folder
+  (`_toolbox/collected/sessions/<maker-model-serial>/notes/NOTES.md`,
+  read first, kept across reboots), so the runbook needs no stick
+  changes: it lives in this repo and the stick agent clones it.
 - Resuming through a newer kernel works on x86; systemd accepts the
   mismatch on purpose (`hibernate-resume-config.c`).
 
