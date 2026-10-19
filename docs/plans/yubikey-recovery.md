@@ -20,8 +20,9 @@ instance, getting back into the sops secretes."
 Not started. Facts as of 2026-10-19:
 
 - torrent's key: YubiKey 5C Nano, serial 29680883, firmware 5.7.1, PIV
-  enabled, so `age-plugin-yubikey` (nixpkgs 0.5.1) works. Keychain
-  key's model not yet known.
+  enabled. Keychain key: YubiKey 5C NFC, serial 27674308, firmware
+  5.7.1, PIV enabled over USB and NFC. Both work with
+  `age-plugin-yubikey` (nixpkgs 0.5.1).
 - One YubiKey's resident FIDO2 SSH key is already in
   `vars.publicSshKeys` (root on homelab and vps); which of the two is
   unknown.
