@@ -81,7 +81,17 @@ SOPS_AGE_KEY="$(age-plugin-yubikey --identity | grep '^AGE-PLUGIN')" \
   sops -d secrets/secrets.yaml
 ```
 
-It asks for the PIV PIN and a touch. From there, add a new host's key
+It asks for the PIV PIN and a touch. The plugin talks to the key through
+the smart-card daemon `pcscd`, which the PCs run
+(`services.pcscd.enable`) but a live or borrowed system may not. If
+`--identity` finds no YubiKey, start one by hand in a second terminal:
+
+```
+sudo env PCSCLITE_HP_DROPDIR="$(nix build --no-link --print-out-paths nixpkgs#ccid)/pcsc/drivers" \
+  "$(nix build --no-link --print-out-paths nixpkgs#pcsclite.out)/bin/pcscd" --foreground
+```
+
+From there, add a new host's key
 and `sops updatekeys` as above. `age-plugin-yubikey` 0.5.1 needs a TDES
 PIV management key (`ykman piv access change-management-key -a TDES
 --generate --protect`); firmware 5.7 defaults to AES.
