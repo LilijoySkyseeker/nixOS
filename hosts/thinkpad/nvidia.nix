@@ -11,7 +11,8 @@
     services.xserver.videoDrivers = [ "nvidia" ]; # Load nvidia driver for Xorg and Wayland
     hardware.nvidia = {
       modesetting.enable = true;
-      powerManagement.enable = false;
+      # saves VRAM across hibernation; without it the display breaks on resume
+      powerManagement.enable = true;
       powerManagement.finegrained = false;
       open = true;
       nvidiaSettings = true;

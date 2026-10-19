@@ -366,7 +366,7 @@ it leaves this file entirely.
 | D2 | That `origin/master` is unsigned and unattended fleet root | H1 |
 | ~~D3~~ | **Answered 2026-08-27.** `master` had no protection and no rulesets at all; a ruleset now blocks force pushes and deletions with no bypass actors. Signed commits deliberately not enabled yet — that is D2. | H1, AR-5 |
 | D4 | That no backup copy is out of reach of a single root | C3 |
-| D5 | That neither laptop has FDE, and thinkpad hibernates RAM to unencrypted swap | H7 |
+| D5 | That torrent has no FDE. **thinkpad fixed:** LUKS2 with TPM2 + PIN, Secure Boot, and its swap inside the LUKS container (it never did hibernate before: ZFS adds `nohibernate`). | H7 |
 | D6 | That any tailnet device reaches nearly everything | ACL cluster |
 | ~~D7~~ | **Dropped 2026-10-06.** homelab isn't public; its public surface is being cut to a Minecraft port forward. | H8 |
 | ~~D8~~ | **Moot 2026-10-06.** The recovery ISO was removed (AR-8). | H6 |
