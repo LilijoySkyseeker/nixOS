@@ -121,3 +121,4 @@ exactly as they bind you.
 | A new host or service | `docs/procedures/new-host.md`, `new-service.md` |
 | Secrets | `docs/procedures/secrets.md` |
 | How modules and hosts compose | `docs/architecture.md`, `docs/adr/` |
+| A job at the machine (reinstall, disks, firmware, anything across reboots) | `docs/procedures/toolbox-stick.md` |
