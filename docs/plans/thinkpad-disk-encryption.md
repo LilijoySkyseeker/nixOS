@@ -44,14 +44,15 @@ sops age key (accepted-risks D5).
 
 ## State
 
-Branch `thinkpad-fde`. `myHibernate` (modules/nixos/hibernate.nix) and
-its VM test `hibernate-zfs-luks` pass: ZFS in LVM in LUKS, hibernate and
-resume, resume through a newer kernel (6.18 to 7.2), pool healthy and
-scrub clean each time. The import-after-resume ordering also makes the
-pool import wait for however long the PIN takes. Not wired into thinkpad
-yet. The stale branch
-`origin/worktree-fde-secureboot-plan` is direction only; its scripts,
-runbooks, rollout flag and shared modules are not being carried over.
+Branch `thinkpad-fde`, built for thinkpad, not merged (it changes the disk
+layout, so it merges on reinstall day). Done: `vars.mkEncryptedRootSsd`,
+`myEncryptedRoot`, `mySecureBoot` (lanzaboote v1.2.0), `myHibernate` (VM
+tested), `myHibernateOnly`, `myRebootNotice`, `files/windows/dual-boot.ps1`,
+thinkpad wiring, README, runbook `docs/procedures/thinkpad-reinstall.md`.
+Stick stub for `_toolbox/runbooks/`: `~/Agent/projects/thinkpad-reinstall/thinkpad.md`.
+usb-toolbox (local commits, ship with the next ISO build and sync): pcscd
+and YubiKey tools (`4919842`); dm volumes follow their disk's writability
+(`e135e26`), without which disko fails in the Rescue System.
 
 Facts checked 2026-10-19:
 
@@ -76,13 +77,7 @@ Facts checked 2026-10-19:
 
 ## Next
 
-1. Modules: encrypted root disk layout (`vars`), TPM+PIN unlock,
-   lanzaboote, hibernate-only power handling, reboot notice. Windows
-   settings as a script under `files/windows/`.
-2. Runbook, then at the machine: final zrepl snapshot + `zfs hold` on homelab, rescue
-   stick, format, `zfs recv` root and home, `nixos-install`, Secure
-   Boot keys (with Microsoft's), `bcdboot`, BitLocker TPM+PIN,
-   supervisor password, TPM+PIN enroll last, then both YubiKeys as
-   FIDO2 unlock slots (`systemd-cryptenroll --fido2-device`; the owner
-   wants either key alone to be a way back in, 2026-10-19). Merge the PR the same day,
-   before Thursday's pull-deploy.
+1. VM test of the real layout with TPM2 + PIN (running).
+2. `/security-review` and Codex review, then the PR.
+3. Owner: Windows upgrade and BIOS update; build the toolbox ISO and sync
+   the stick, copy the stub; then the runbook at the machine.
