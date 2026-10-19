@@ -32,6 +32,7 @@ container: anything you write is on the owner's machine.
     here can be deleted; move what turns out to matter into a project.
   - `inbox/`: files the owner drops for you. Move each into a project
     when you use it.
+  - `ENVIRONMENT.md`: the log of environment failures (see below).
   Finished research goes to `~/research`, not `~/work`.
 - Auto-memory is off in `~/work`. Keep notes about a project in that
   project's folder, in `CLAUDE.local.md` (excluded from git). Save
@@ -56,3 +57,11 @@ container: anything you write is on the owner's machine.
   can't push to `master` of the `nixOS` repo; the owner reviews and merges.
 - If a task needs root, a secret or a LAN host, say exactly what to run and
   why. The owner does it.
+- When the environment gets in your way (a missing tool, a sandbox or
+  permission denial, a blocked network call, a hook or CLI misbehaving,
+  this file being wrong or missing a fact), say so in one line in your
+  reply and append an entry to `~/work/ENVIRONMENT.md`: the date, what
+  failed (command and error), what you did instead, and the fix you'd
+  suggest. Log it even when the workaround was easy; quiet workarounds
+  are how these stayed invisible. Mistakes in your own work don't go
+  there. Delete an entry once its fix lands.
