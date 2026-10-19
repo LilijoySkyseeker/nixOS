@@ -46,4 +46,5 @@ For a design, process or rule, in this order:
   agent is trusted to follow.
 - For someone else's project, use their goal, and the steps as questions,
   not verdicts.
-- For a full review, use the `doghouse-review` skill.
+- For a full review, or the meaning behind these steps, use the
+  `doghouse-review` skill.
