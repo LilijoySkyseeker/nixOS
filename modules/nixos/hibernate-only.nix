@@ -1,0 +1,81 @@
+{ inputs, ... }:
+{
+  flake.modules.nixos."hibernate-only" =
+    {
+      config,
+      lib,
+      vars,
+      ...
+    }:
+    let
+      cfg = config.myHibernateOnly;
+
+      # one KDE power profile (AC, battery, low battery)
+      profile = {
+        autoSuspend = {
+          action = "hibernate";
+          idleTimeout = cfg.idleMinutes * 60;
+        };
+        whenLaptopLidClosed = "hibernate";
+        inhibitLidActionWhenExternalMonitorConnected = false;
+        turnOffDisplay.idleTimeout = "never";
+        dimDisplay.enable = false;
+      };
+    in
+    {
+      options.myHibernateOnly = {
+        enable = lib.mkEnableOption "hibernate in place of sleep: lid closed, idle and critical battery all hibernate, sleep is unavailable, and nothing happens on idle before the hibernate";
+
+        idleMinutes = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 60;
+          description = "Minutes idle, on AC or battery, before hibernating. KDE's \"Manually block sleep and screen locking\" switch pauses it.";
+        };
+
+        user = lib.mkOption {
+          type = lib.types.str;
+          default = vars.username;
+          description = "The KDE user whose power settings are managed.";
+        };
+      };
+
+      config = lib.mkIf cfg.enable {
+        assertions = [
+          {
+            assertion = config.myHibernate.enable or false;
+            message = "myHibernateOnly needs a working hibernation (myHibernate on a ZFS root)";
+          }
+        ];
+
+        # no sleep at all: KDE hides the Sleep button once systemd refuses it
+        systemd.sleep.settings.Sleep = {
+          AllowSuspend = false;
+          AllowHybridSleep = false;
+          AllowSuspendThenHibernate = false;
+        };
+
+        # logind acts only when no session holds the lid (the SDDM greeter)
+        services.logind.settings.Login = {
+          HandleLidSwitch = "hibernate";
+          HandleLidSwitchExternalPower = "hibernate";
+          HandleLidSwitchDocked = "hibernate";
+          HandleSuspendKey = "hibernate";
+        };
+
+        # in a session, KDE's powerdevil handles lid, idle and battery
+        home-manager.users.${cfg.user} = {
+          imports = [ inputs.plasma-manager.homeModules.plasma-manager ];
+          programs.plasma = {
+            enable = true;
+            powerdevil = {
+              AC = profile;
+              battery = profile;
+              lowBattery = profile;
+              batteryLevels.criticalAction = "hibernate";
+            };
+            kscreenlocker.autoLock = false;
+          };
+        };
+      };
+    };
+}
