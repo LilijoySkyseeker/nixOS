@@ -17,8 +17,8 @@ in this repo); its handbook is `START HERE.html` at the stick's root.
   passwordless sudo. The internal disks are read-only until `disk-rw`
   unlocks one. The user signs in from their phone (**AI Login**) and
   drives the agent through Claude Remote Control.
-- **AI Help**, on the running install: `_toolbox/ai/ai-help.sh` from the
-  mounted stick (or `AI Help.cmd` on Windows). The agent runs as the
+- **AI Help**, on the running install: `sh Tools/ai-help.sh` from the
+  mounted stick (or `Tools\AI Help.cmd` on Windows). The agent runs as the
   logged-in user, and its login is deleted when it exits.
 
 Both need the internet (USB tethering from the phone works). The stick
@@ -27,22 +27,23 @@ one boot. A step that needs a secret needs the user there.
 
 ## Notes that survive reboots
 
-Each machine gets a folder on the stick,
-`_toolbox/collected/sessions/<maker>-<model>-<serial>/`, holding the
-agent's `NOTES.md` (read first, at every start) and both agents' chat
-history. The Rescue System and AI Help use the same folder, so a job can
-run across reboots and between the two.
+Each machine gets a folder at the stick's top level,
+`Machines/<maker>-<model>-<serial>/`, holding the agent's `NOTES.md` (read
+first, at every start) and its output in `files/`, the Health Reports in
+`reports/`, saved drivers in `drivers/`, and both agents' chat history in
+`chat/`. The Rescue System, AI Help and the stick's tools use the same
+folder, so a job can run across reboots and between the two.
 
 ## Handing over a job: runbooks
 
-The agents on the stick read `_toolbox/runbooks/` when they start and
+The agents on the stick read `Runbooks/` when they start and
 follow the runbook meant for their machine. The stick's
-`_toolbox/runbooks/README.md` has the format: name the machine first, by
+`Runbooks/README.md` has the format: name the machine first, by
 hostname (`thinkpad`) or by maker, model and serial, then the goal, the
 steps, and how to check each one.
 
 - You can't reach the stick from here: write the runbook and ask the user
-  to copy it into `_toolbox/runbooks/`.
+  to copy it into the stick's `Runbooks/`.
 - This repo is public, so the runbook can live here (in
   `docs/plans/<slug>.md`, say), with a short file on the stick that names
   the machine and says to clone
