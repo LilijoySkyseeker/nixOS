@@ -3,6 +3,8 @@
 #   - the hardware clock is UTC, as Linux keeps it
 #   - hibernate in place of sleep: lid closed, sleep button, critical
 #     battery and idle all hibernate; Sleep is hidden from the power menu
+#   - the power button shuts down, as on NixOS (its default is sleep, which
+#     keeps the BitLocker key in RAM and skips the PIN on wake)
 #   - nothing happens on idle (no screen off, no sleep) until the hibernate
 #   - PowerToys Awake, a tray toggle that pauses the idle hibernate
 #   - with -NoSignInOnResume: no Windows sign-in after resuming, for a PC
@@ -26,6 +28,7 @@ powercfg /hibernate on
 
 # action values: 0 nothing, 1 sleep, 2 hibernate, 3 shut down
 foreach ($mode in '/setacvalueindex', '/setdcvalueindex') {
+    powercfg $mode SCHEME_CURRENT SUB_BUTTONS PBUTTONACTION 3
     powercfg $mode SCHEME_CURRENT SUB_BUTTONS LIDACTION 2
     powercfg $mode SCHEME_CURRENT SUB_BUTTONS SBUTTONACTION 2
     powercfg $mode SCHEME_CURRENT SUB_BATTERY BATACTIONCRIT 2

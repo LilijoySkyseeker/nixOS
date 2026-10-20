@@ -66,8 +66,14 @@ Boot the stick's Rescue System on the thinkpad.
    `sudo tailscale up --qr` (the owner scans the QR code and approves).
    Clone: `git clone -b thinkpad-fde https://github.com/LilijoySkyseeker/nixOS /tmp/nixOS`.
 2. SSH to homelab with the keychain YubiKey (owner plugs it in, enters its
-   FIDO2 PIN): `cd /tmp && ssh-keygen -K` writes `id_ed25519_sk_rk*`; then
-   `ssh -i /tmp/id_ed25519_sk_rk* root@homelab true` (owner touches the key).
+   FIDO2 PIN): `mkdir /tmp/sk && cd /tmp/sk && ssh-keygen -K` writes the
+   key and its `.pub` (`ls` shows the name, usually `id_ed25519_sk_rk`).
+   Pick the private file, the one without `.pub`, and use it in every SSH
+   command below:
+   ```
+   key=/tmp/sk/id_ed25519_sk_rk
+   ssh -i "$key" -o IdentitiesOnly=yes root@homelab true   # owner touches the key
+   ```
    Check: it returns without error.
 3. Find the disks: `lsblk -o NAME,SIZE,MODEL,SERIAL`. Show the owner the
    Samsung's model and serial, compare with the table above.
@@ -84,9 +90,9 @@ Boot the stick's Rescue System on the thinkpad.
    ```
    sudo zfs destroy zroot/local/root
    sudo zfs destroy zroot/local/home
-   ssh -i /tmp/id_ed25519_sk_rk* root@homelab zfs send -c zbackup/backup/thinkpad/zroot/local/root@<snapshot> \
+   ssh -i "$key" -o IdentitiesOnly=yes root@homelab zfs send -c zbackup/backup/thinkpad/zroot/local/root@<snapshot> \
      | sudo zfs recv -u -o mountpoint=/ zroot/local/root
-   ssh -i /tmp/id_ed25519_sk_rk* root@homelab zfs send -c zbackup/backup/thinkpad/zroot/local/home@<snapshot> \
+   ssh -i "$key" -o IdentitiesOnly=yes root@homelab zfs send -c zbackup/backup/thinkpad/zroot/local/home@<snapshot> \
      | sudo zfs recv -u -o mountpoint=/home zroot/local/home
    ```
    About 131 GB in all; run them in `tmux`. Check: the received snapshot's
@@ -146,7 +152,8 @@ Boot the stick's Rescue System on the thinkpad.
    (`https://raw.githubusercontent.com/LilijoySkyseeker/nixOS/thinkpad-fde/files/windows/dual-boot.ps1`):
    `powershell -ExecutionPolicy Bypass -File dual-boot.ps1 -NoSignInOnResume`
    (only once step 4's BitLocker PIN works: that PIN is then the unlock).
-   Check: the power menu shows Hibernate and no Sleep; `powercfg /a` lists
+   Check: the power menu shows Hibernate and no Sleep; the power button
+   shuts down (press it once); `powercfg /a` lists
    Hibernate available; the clock is right in both OSes after a reboot each
    way; closing the lid hibernates, and opening it asks only for the
    BitLocker PIN.
