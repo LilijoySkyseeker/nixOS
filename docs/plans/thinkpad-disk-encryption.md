@@ -39,6 +39,8 @@ sops age key (accepted-risks D5).
   now.
 - 2026-10-19: do the at-machine steps with Claude Code from the TOOLBOX
   stick, following a runbook written for it.
+- 2026-10-19: no impermanence on this reinstall either; if state drift
+  ever becomes a problem, it's its own change on the running system.
 - 2026-10-19: fix the lid setting properly (`hybrid-sleep` can't work:
   ZFS adds `nohibernate`; KDE was handling the lid).
 
