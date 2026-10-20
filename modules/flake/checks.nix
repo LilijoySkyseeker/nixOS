@@ -1,6 +1,6 @@
 # VM integration tests: `nix build .#checks.x86_64-linux.<name>` or
 # `nix flake check` (see .claude/skills/verify-a-change/SKILL.md)
-{ config, ... }:
+{ config, inputs, ... }:
 {
   perSystem = _: {
     checks = {
@@ -19,9 +19,13 @@
         zfsDatasetPropertiesModule = config.flake.modules.nixos."zfs-dataset-properties";
       };
 
-      hibernate-zfs-luks = import ../../tests/hibernate-zfs-luks.nix {
+      thinkpad-disk = import ../../tests/thinkpad-disk.nix {
         pkgs = config.flake.pkgsUnstable;
+        inherit (config.flake) vars;
+        diskoModule = inputs.disko.nixosModules.disko;
+        encryptedRootModule = config.flake.modules.nixos."encrypted-root";
         hibernateModule = config.flake.modules.nixos."hibernate";
+        hibernateOnlyModule = config.flake.modules.nixos."hibernate-only";
       };
 
       docker-publish-guard = import ../../tests/docker-publish-guard.nix {
