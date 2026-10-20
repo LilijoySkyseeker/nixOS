@@ -3,10 +3,11 @@
 # zroot) plus a zpool like hosts/thinkpad/disko.nix; the installed system runs
 # myEncryptedRoot, myHibernate and myHibernateOnly on systemd-boot with a TPM.
 # First boot unlocks with the passphrase, then TPM2 + PIN is enrolled with the
-# README's command and every later boot and resume types only the PIN; PCR 15
-# then blocks a second unseal. Hibernate and resume, then hibernate with a
-# newer kernel as the boot default (it resumes, or boots fresh with the pool
-# intact), then wrong PINs fall back to the passphrase
+# README's command and every later boot and resume types only the PIN, which
+# systemd-cryptsetup's token discovery asks for. Hibernate and resume, then hibernate with a
+# newer kernel as the boot default (myHibernate's one-shot entry resumes it
+# through the kernel that hibernated), then wrong PINs fall back to the
+# passphrase and the newer kernel cold boots
 # the store lives on the pool, not a 9p/virtiofs share, which hibernation
 # doesn't survive
 #
@@ -28,7 +29,7 @@ let
   hostId = "8425e349";
   # hosts/thinkpad/README.md's enrollment
   luksDevice = "/dev/disk/by-partlabel/disk-root-luks";
-  pcrs = "7+15:sha256=${lib.strings.replicate 64 "0"}";
+  pcrs = "7";
 
   # qemu gives the target disk serial `root`
   diskoDevices = vars.mkEncryptedRootSsd "virtio-root" "3G" // {
@@ -89,9 +90,6 @@ let
 
         boot.loader.systemd-boot.enable = true;
         boot.loader.timeout = 1;
-        # stands in for lanzaboote's stub, whose StubPcrKernelImage EFI variable
-        # is what lets systemd-cryptsetup measure into PCR 15 at all
-        boot.kernelParams = [ "systemd.tpm2_measured_os=1" ];
         boot.supportedFilesystems = [ "zfs" ];
         fileSystems."/nix".neededForBoot = true;
 
@@ -101,6 +99,10 @@ let
           resumeDevice = "/dev/mapper/vg-swap";
         };
         myHibernateOnly.enable = true;
+
+        # power off after writing the image instead of ACPI S4, which OVMF with
+        # a TPM sometimes never completes (test VM only)
+        systemd.sleep.settings.Sleep.HibernateMode = "shutdown";
 
         # the driver's shell is on hvc0; hand it back over on resume (nixpkgs' hibernate.nix)
         powerManagement.powerDownCommands = "systemctl --no-block stop backdoor.service";
@@ -185,13 +187,14 @@ pkgs.testers.runNixOSTest {
   testScript = ''
     import re
     import time
+    from datetime import timedelta
 
     # kernel and initrd log lines land in the middle of a prompt on the serial
     # console, so a prompt's characters may have whole log lines between them
     def spread(text):
         return r"(?:\[\s*\d+\.\d+\][^\n]*\n)*".join(re.escape(c) for c in text)
 
-    prompt_re = re.compile(f"(?P<pin>{spread('Please enter TPM2 PIN')})|{spread('Please enter passphrase for disk')}")
+    prompt_re = re.compile(f"(?P<pin>{spread('Please enter LUKS2 token PIN')})|{spread('Please enter passphrase for disk')}")
 
     def prompt():
         """wait for this boot's first unlock prompt, return which one it is"""
@@ -214,11 +217,6 @@ pkgs.testers.runNixOSTest {
     def boot_id():
         return target.succeed("cat /proc/sys/kernel/random/boot_id").strip()
 
-    def pcr15():
-        out = target.succeed("systemd-analyze pcrs 15 --no-pager")
-        print(out)
-        return out.split()[-1].lower()
-
     def check_pool(sha):
         out = target.succeed("zpool status -x").strip()
         assert out == "all pools are healthy", out
@@ -239,6 +237,38 @@ pkgs.testers.runNixOSTest {
         assert target.succeed("cat /run/test/marker").strip() == marker
         print(target.succeed("dmesg | grep -iE 'PM: (hibernation|image|restor|resume)' || true"))
         check_pool(sha)
+
+    def hibernate_until_resumed(kernel, sha, tries=6):
+        """hibernate until a resume works; return the attempt it took
+
+        with a TPM, the kernel's EFI stub keeps its copy of the TPM event log
+        in an e820 "ACPI data" region, and OVMF places it differently from
+        boot to boot, so the resuming kernel can refuse the image ("Hibernate
+        inconsistent memory map detected!") and boot fresh. That is this VM's
+        firmware, not the system under test; any other reason fails the test.
+        """
+        for attempt in range(1, tries + 1):
+            target.succeed(
+                "mkdir -p /run/test",
+                "mountpoint -q /run/test || mount -t ramfs ramfs /run/test",
+                "head -c16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > /run/test/marker",
+            )
+            marker = target.succeed("cat /run/test/marker").strip()
+            bid = boot_id()
+            hibernate()
+            target.start()
+            target.wait_for_console_text(f"Linux version {kernel}", timeout=timedelta(minutes=10))
+            unlock("pin", "${pin}")
+            target.succeed("true")  # reconnects to the resumed or freshly booted backdoor
+            if boot_id() == bid:
+                resume_and_check(bid, marker, sha)
+                print(f"resumed on attempt {attempt}")
+                return attempt
+            kmsg = target.succeed("journalctl -k -b --no-pager | grep -E 'memory map|Image mismatch|Failed to load image' || true")
+            assert "inconsistent memory map" in kmsg, "booted fresh, not for the VM's moving e820 region:\n" + kmsg
+            print(f"attempt {attempt}: the e820 map moved under OVMF, hibernating again")
+            target.wait_for_unit("multi-user.target")
+        raise AssertionError(f"no resume in {tries} attempts")
 
     with subtest("install: disko formats vars.mkEncryptedRootSsd + zroot"):
         installer.wait_for_unit("multi-user.target")
@@ -309,7 +339,6 @@ pkgs.testers.runNixOSTest {
         journal = target.succeed("journalctl -b -o short-monotonic --no-pager")
         cryptsetup_lines = [l for l in journal.splitlines() if "systemd-cryptsetup" in l]
         print("\n".join(cryptsetup_lines))
-        assert any("Successfully extended PCR index 15" in l for l in cryptsetup_lines), cryptsetup_lines
         assert target.succeed("findmnt -no SOURCE /").strip() == "zroot/local/root"
 
     with subtest("initrd ran zfs-import-zroot only after systemd-hibernate-resume"):
@@ -330,36 +359,13 @@ pkgs.testers.runNixOSTest {
         importing = first("Starting Import ZFS pool")
         assert unlocked <= resumed <= importing, (unlocked, resumed, importing)
 
-    with subtest("PCR 15 guard: once crypt is open the TPM won't unseal again"):
-        value = pcr15()
-        assert re.fullmatch(r"[0-9a-f]{64}", value) and value != "0" * 64, value
-        # what the initrd ran, with the right PIN, against the same token
-        rc, out = target.execute(
-            "SYSTEMD_LOG_LEVEL=debug PIN=${pin} systemd-cryptsetup attach probe ${luksDevice} -"
-            " tpm2-device=auto,tpm2-measure-pcr=yes,headless=yes 2>&1"
-        )
-        print(out)
-        assert rc != 0, out
-        assert "Current policy digest does not match stored policy digest" in out, out
-        target.fail("test -e /dev/mapper/probe")
-
     with subtest("hibernate and resume on the same kernel, PIN only"):
         target.succeed("dd if=/dev/urandom of=/data.bin bs=1M count=64 status=none", "sync")
         sha = target.succeed("sha256sum /data.bin").split()[0]
-        target.succeed(
-            "mkdir /run/test",
-            "mount -t ramfs ramfs /run/test",
-            "head -c16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > /run/test/marker",
-        )
-        marker = target.succeed("cat /run/test/marker").strip()
-        bid = boot_id()
-        hibernate()
-        target.start()
-        unlock("pin", "${pin}")
-        resume_and_check(bid, marker, sha)
+        hibernate_until_resumed("${oldKernel}", sha)
         assert target.succeed("uname -r").strip() == "${oldKernel}"
 
-    with subtest("hibernate with generation 2 (newer kernel) as the boot default: resumes, or boots fresh with the pool intact"):
+    with subtest("hibernate with generation 2 (newer kernel) as the boot default: resumes through the entry that hibernated"):
         target.succeed(
             "nix-env -p /nix/var/nix/profiles/system --set ${newKernelSystem.toplevel}",
             "/nix/var/nix/profiles/system/bin/switch-to-configuration boot",
@@ -368,50 +374,69 @@ pkgs.testers.runNixOSTest {
         entry_text = target.succeed(f"cat /boot/loader/entries/{entry}")
         print(entry_text)
         assert "Generation 2" in entry_text and "${newKernel}" in entry_text, entry_text
-        target.succeed("echo changed > /run/test/marker2")
-        bid = boot_id()
-        hibernate()
+
+        loader_guid = "4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"
+
+        def efi_string(name):
+            # EFI variable file: 4 attribute bytes, then UTF-16LE (ASCII ids: drop the NULs)
+            return target.succeed(
+                f"tail -c +5 /sys/firmware/efi/efivars/{name}-{loader_guid} | tr -d '\\0'"
+            ).strip()
+
+        # hibernate-prepare's one-shot is the entry that boots the running
+        # system, under its current file name: installing generation 2 renamed
+        # generation 1's entry, so the ID this boot came from (LoaderEntrySelected)
+        # is gone. The one-shot outlives a restart and systemd-boot boots it
+        target.succeed("systemctl start hibernate-prepare.service")
+        selected = efi_string("LoaderEntrySelected")
+        oneshot = efi_string("LoaderEntryOneShot")
+        print(f"selected={selected} oneshot={oneshot}")
+        assert oneshot != entry, (oneshot, entry)
+        target.succeed(
+            f"test -f /boot/loader/entries/{oneshot}",
+            f"grep -q \"init=$(readlink -f /run/booted-system)/init\" /boot/loader/entries/{oneshot}",
+        )
+        target.shutdown()
         target.start()
-        # generation 2's kernel is the one systemd-boot started
-        target.wait_for_console_text("Linux version ${newKernel}")
         unlock("pin", "${pin}")
-        target.succeed("true")  # reconnects to the resumed or freshly booted backdoor
-        if boot_id() == bid:
-            print("resumed through the newer kernel")
-            resume_and_check(bid, marker, sha)
-            # and it handed over to the hibernated older kernel
-            assert target.succeed("uname -r").strip() == "${oldKernel}"
-            assert target.succeed("cat /run/test/marker2").strip() == "changed"
-        else:
-            # with a TPM, OVMF's e820 map differs between the two kernels and
-            # the newer one refuses the image ("inconsistent memory map")
-            kmsg = target.succeed("journalctl -k -b --no-pager | grep -E 'hibernation|memory map' || true")
-            print("booted fresh instead of resuming:\n" + kmsg)
-            assert "Failed to load image" in kmsg, kmsg
-            target.wait_for_unit("multi-user.target")
-            assert target.succeed("uname -r").strip() == "${newKernel}"
-            target.fail("test -e /run/test/marker")
-            check_pool(sha)
+        target.wait_for_unit("multi-user.target")
+        booted = target.succeed("uname -r").strip()
+        print(target.succeed("bootctl status --no-pager 2>&1 | sed -n '/Current Boot Loader/,/^$/p;/Boot Loader Entries/,/^$/p' || true"))
+        print("LoaderEntrySelected now: " + efi_string("LoaderEntrySelected"))
+        rc, _ = target.execute(f"test -e /sys/firmware/efi/efivars/LoaderEntryOneShot-{loader_guid}")
+        print(f"after restart: booted {booted}, one-shot variable {'still set' if rc == 0 else 'gone'}")
+        assert booted == "${oldKernel}", f"the one-shot entry wasn't booted (kernel {booted})"
+        assert rc != 0, "the one-shot variable is still set"
+
+        # hibernate-prepare makes the running entry (generation 1) the
+        # one-shot, so every attempt boots the kernel that hibernated
+        hibernate_until_resumed("${oldKernel}", sha)
+        assert target.succeed("uname -r").strip() == "${oldKernel}"
+        # consumed: the next restart takes generation 2 (the next subtest boots it)
+        target.fail(f"test -e /sys/firmware/efi/efivars/LoaderEntryOneShot-{loader_guid}")
 
     with subtest("wrong PINs fall back to the passphrase; generation 2 cold boots"):
         target.shutdown()
         target.start()
-        # systemd-cryptsetup re-asks a bad PIN up to 5 times, fewer once the TPM's
-        # dictionary-attack lockout starts, then falls back to the passphrase
-        # their log lines come before the next prompt, whose own line may stay
-        # unterminated on the console
-        bad_pin_re = re.compile(spread("Bad PIN."))
-        fallback_re = re.compile(spread("falling back to traditional unlocking"))
+        # token discovery re-asks a wrong PIN; once the TPM's dictionary-attack
+        # lockout starts, the token fails outright and the passphrase is asked
+        # for. The newest prompt's own line may stay unterminated on the console
+        pin_re = re.compile(spread("Please enter LUKS2 token PIN"))
+        # the passphrase prompt's line may stay unterminated, so its query's log
+        # line after the lockout counts too
+        passphrase_re = re.compile(
+            f"{spread('Please enter passphrase for disk')}|{spread('dictionary attack lock-out mode.')}"
+        )
 
-        def after_wrong_pin(wrong):
+        def after_wrong_pin(asked):
             deadline = time.monotonic() + 600
             while True:
                 console = target.get_console_log() + "\n"
-                if fallback_re.search(console):
+                if passphrase_re.search(console):
                     return "passphrase"
-                if wrong < 5 and len(bad_pin_re.findall(console)) >= wrong:
+                if len(pin_re.findall(console)) > asked:
                     return "pin"
-                assert time.monotonic() < deadline, "neither a PIN prompt nor the fallback"
+                assert time.monotonic() < deadline, "neither another PIN prompt nor the passphrase"
                 time.sleep(0.5)
 
         assert prompt() == "pin"
@@ -421,9 +446,9 @@ pkgs.testers.runNixOSTest {
             wrong += 1
             if after_wrong_pin(wrong) == "passphrase":
                 break
+            assert wrong < 12, "still asking for the PIN after 12 wrong ones"
             time.sleep(2)
-        lockout = "dictionary attack lock-out" in target.get_console_log()
-        print(f"passphrase asked for after {wrong} wrong PINs (TPM lockout: {lockout})")
+        print(f"passphrase asked for after {wrong} wrong PINs")
         time.sleep(2)
         target.send_console("${passphrase}\n")
         target.wait_for_unit("multi-user.target")
