@@ -15,11 +15,25 @@ _: {
         };
       };
 
-      config = lib.mkIf cfg.enable {
-        # systemd-cryptsetup tries every enrolled LUKS2 token (TPM2 + PIN, FIDO2)
-        # by itself, then the passphrase; naming a token type in crypttab, or
-        # tpm2-measure-pcr, would limit it to the named ones
-        boot.initrd.systemd.enable = true;
-      };
+      config = lib.mkIf cfg.enable (
+        let
+          device = config.boot.initrd.luks.devices.${cfg.luksName}.device;
+        in
+        {
+          # systemd-cryptsetup tries every enrolled LUKS2 token (TPM2 + PIN, FIDO2)
+          # by itself, then the passphrase; naming a token type in crypttab, or
+          # tpm2-measure-pcr, would limit it to the named ones
+          boot.initrd.systemd.enable = true;
+
+          # refuse to install onto a disk without this root's LUKS container (a
+          # host not yet reinstalled, or the wrong machine): it couldn't boot
+          system.preSwitchChecks.encryptedRoot = ''
+            if [ ! -e ${device} ]; then
+              echo "myEncryptedRoot: ${device} isn't on this machine; refusing to install a system that can't find its root" >&2
+              exit 1
+            fi
+          '';
+        }
+      );
     };
 }
