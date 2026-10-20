@@ -16,14 +16,18 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        # systemd-cryptsetup tries every enrolled LUKS2 token (TPM2 + PIN, FIDO2)
-        # by itself, then falls back to the passphrase
         boot.initrd.systemd.enable = true;
 
-        # measures the volume key into PCR 15 once unlocked; TPM2 enrollment
-        # binds PCR 15 to all-zeros, so the TPM refuses a second unseal after
-        # any volume, real or substituted, has been opened
-        boot.initrd.luks.devices.${cfg.luksName}.crypttabExtraOpts = [ "tpm2-measure-pcr=yes" ];
+        boot.initrd.luks.devices.${cfg.luksName}.crypttabExtraOpts = [
+          # measures the volume key into PCR 15 once unlocked; TPM2 enrollment
+          # binds PCR 15 to all-zeros, so the TPM refuses a second unseal after
+          # any volume, real or substituted, has been opened
+          "tpm2-measure-pcr=yes"
+          # tpm2-measure-pcr turns off systemd-cryptsetup's token auto-discovery,
+          # so the TPM2 token must be asked for; with none enrolled, or a wrong
+          # PIN, it falls back to the passphrase
+          "tpm2-device=auto"
+        ];
       };
     };
 }
