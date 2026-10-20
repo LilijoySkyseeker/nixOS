@@ -32,6 +32,12 @@
           description = "Minutes idle, on AC or battery, before hibernating. KDE's \"Manually block sleep and screen locking\" switch pauses it.";
         };
 
+        lockOnResume = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Lock the session when hibernating. Turn off where the disk's unlock at resume (TPM2 + PIN) already proves who is there.";
+        };
+
         user = lib.mkOption {
           type = lib.types.str;
           default = vars.username;
@@ -73,7 +79,10 @@
               lowBattery = profile;
               batteryLevels.criticalAction = "hibernate";
             };
-            kscreenlocker.autoLock = false;
+            kscreenlocker = {
+              autoLock = false;
+              inherit (cfg) lockOnResume;
+            };
           };
         };
       };

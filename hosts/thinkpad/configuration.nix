@@ -31,9 +31,6 @@
     ++ (with pkgs-stable; [
     ]);
 
-  # fingerprint reader
-  services.fprintd.enable = true;
-
   # state change settings/buttons (lid, idle, sleep key: myHibernateOnly below)
   services.logind.settings.Login.HandlePowerKey = "poweroff";
 
@@ -96,7 +93,11 @@
     enable = true;
     resumeDevice = "/dev/mapper/vg-swap";
   };
-  myHibernateOnly.enable = true;
+  myHibernateOnly = {
+    enable = true;
+    # resuming asks for the disk's TPM2 PIN, which is the unlock
+    lockOnResume = false;
+  };
 
   # tells the desktop when a pull-deploy is waiting for a restart
   myRebootNotice.enable = true;

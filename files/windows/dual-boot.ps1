@@ -5,10 +5,12 @@
 #     battery and idle all hibernate; Sleep is hidden from the power menu
 #   - nothing happens on idle (no screen off, no sleep) until the hibernate
 #   - PowerToys Awake, a tray toggle that pauses the idle hibernate
+#   - with -NoSignInOnResume: no Windows sign-in after resuming, for a PC
+#     whose BitLocker asks for a PIN at boot (that PIN is the unlock)
 #
 # Run once per Windows install, from an administrator PowerShell:
-#   powershell -ExecutionPolicy Bypass -File dual-boot.ps1 [-IdleMinutes 60]
-param([int]$IdleMinutes = 60)
+#   powershell -ExecutionPolicy Bypass -File dual-boot.ps1 [-IdleMinutes 60] [-NoSignInOnResume]
+param([int]$IdleMinutes = 60, [switch]$NoSignInOnResume)
 
 $ErrorActionPreference = 'Stop'
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -35,6 +37,10 @@ foreach ($power in 'ac', 'dc') {
     powercfg /change "standby-timeout-$power" 0
     powercfg /change "hibernate-timeout-$power" $IdleMinutes
 }
+# sign-in after resuming: 1 required, 0 not (BitLocker's PIN already asked)
+$signIn = if ($NoSignInOnResume) { 0 } else { 1 }
+powercfg /setacvalueindex SCHEME_CURRENT SUB_NONE CONSOLELOCK $signIn
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_NONE CONSOLELOCK $signIn
 powercfg /setactive SCHEME_CURRENT
 
 # power menu: Hibernate shown, Sleep hidden

@@ -41,6 +41,12 @@ sops age key (accepted-risks D5).
   stick, following a runbook written for it.
 - 2026-10-19: no impermanence on this reinstall either; if state drift
   ever becomes a problem, it's its own change on the running system.
+- 2026-10-19: TPM + PIN over TPM-only ("A"): the PIN is also the unlock at
+  resume, so no lock screen after resuming (on Windows, no sign-in after
+  the BitLocker PIN); manual locking stays. Either YubiKey unlocks the disk
+  directly, so no PCR 15 guard (it turns off token discovery).
+- 2026-10-19: fingerprint reader off on thinkpad.
+- 2026-10-19: resume through the boot entry that hibernated.
 - 2026-10-19: fix the lid setting properly (`hybrid-sleep` can't work:
   ZFS adds `nohibernate`; KDE was handling the lid).
 

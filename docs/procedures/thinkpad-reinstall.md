@@ -131,13 +131,7 @@ Boot the stick's Rescue System on the thinkpad.
    NixOS (`nix shell nixpkgs#efibootmgr`): `efibootmgr` to see the entries,
    then `sudo efibootmgr -o <Linux Boot Manager>,<Windows Boot Manager>,…`.
    Check: the boot menu lists NixOS and Windows Boot Manager, and Windows boots from it.
-4. ⚠ In Windows, admin PowerShell: download and run
-   `files/windows/dual-boot.ps1` from the branch
-   (`https://raw.githubusercontent.com/LilijoySkyseeker/nixOS/thinkpad-fde/files/windows/dual-boot.ps1`):
-   `powershell -ExecutionPolicy Bypass -File dual-boot.ps1`.
-   Check: the power menu shows Hibernate and no Sleep; `powercfg /a` lists
-   Hibernate available; the clock is right in both OSes after a reboot each way.
-5. ⚠ BitLocker with TPM + PIN (owner types the PIN; the recovery key goes
+4. ⚠ BitLocker with TPM + PIN (owner types the PIN; the recovery key goes
    straight into Bitwarden, never into notes):
    - `gpedit.msc` → Computer Configuration → Administrative Templates →
      Windows Components → BitLocker Drive Encryption → Operating System
@@ -147,23 +141,45 @@ Boot the stick's Rescue System on the thinkpad.
      shown key in Bitwarden), then `manage-bde -on C: -TPMAndPIN`.
    - Reboot into Windows: it asks for the PIN. Check: `manage-bde -status C:`
      shows protectors "TPM And PIN" and "Numerical Password".
+5. ⚠ In Windows, admin PowerShell: download and run
+   `files/windows/dual-boot.ps1` from the branch
+   (`https://raw.githubusercontent.com/LilijoySkyseeker/nixOS/thinkpad-fde/files/windows/dual-boot.ps1`):
+   `powershell -ExecutionPolicy Bypass -File dual-boot.ps1 -NoSignInOnResume`
+   (only once step 4's BitLocker PIN works: that PIN is then the unlock).
+   Check: the power menu shows Hibernate and no Sleep; `powercfg /a` lists
+   Hibernate available; the clock is right in both OSes after a reboot each
+   way; closing the lid hibernates, and opening it asks only for the
+   BitLocker PIN.
 
 ## F. Unlock NixOS with TPM + PIN and the YubiKeys (NixOS, last)
 
 Last, because the Secure Boot state is now final.
 
 1. ⚠ `hosts/thinkpad/README.md` § Disk encryption and boot has the commands:
-   TPM2 + PIN (owner picks the PIN), then FIDO2 for each YubiKey, one
+   TPM2 + PIN (the owner picks the PIN), then FIDO2 for each YubiKey, one
    plugged in at a time. Each asks for the passphrase.
 2. Check: `sudo systemd-cryptenroll /dev/disk/by-partlabel/disk-root-luks`
-   lists password, tpm2 and two fido2 slots. Reboot: the PIN alone unlocks.
-   Reboot again with a YubiKey plugged in and confirm it can unlock too.
+   lists password, tpm2 and two fido2 slots, and each YubiKey's slot opens
+   with the README's `cryptsetup open --test-passphrase --token-only` check.
+   Reboot with no YubiKey plugged in: "Please enter LUKS2 token PIN:", the
+   TPM PIN alone unlocks. A few wrong PINs lock the TPM out for a while (the
+   passphrase still works); don't test that.
 
 ## G. Checks, then finish
 
-1. Hibernate: close the lid; open it; PIN; the session comes back as left.
-   KDE's power menu has Hibernate and no Sleep. In Windows, the lid
-   hibernates too, and its BitLocker PIN comes up on resume.
+1. Hibernate: close the lid; open it; PIN; the session comes back, unlocked,
+   as left. KDE's power menu has Hibernate and no Sleep. Do it three times;
+   if a resume ever boots fresh instead, `journalctl -k -b | grep -E "memory map|Image mismatch"`
+   says whether the firmware's memory map moved (note it for the owner).
+   In Windows, the lid hibernates too, and opening it asks only for the
+   BitLocker PIN.
+   The step before each hibernate names the entry that boots the running
+   system as the next boot's one-time choice; check it finds one under
+   lanzaboote: `sudo systemctl start hibernate-prepare`, then
+   `tail -c +5 /sys/firmware/efi/efivars/LoaderEntryOneShot-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f | tr -d '\0'`
+   prints an ID that `bootctl list` shows for the running generation; clear it
+   with `sudo bootctl set-oneshot ''`. The journal says "no boot entry boots
+   the running system" if it found none.
 2. Backups: on homelab, `zrepl status` shows the `thinkpad` job replicating
    again (it should continue from the restored snapshot). Then release the
    holds: `zfs release reinstall <both snapshots from B3>`.

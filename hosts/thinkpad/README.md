@@ -30,34 +30,43 @@ reconsidering that posture.
 
 The Samsung SSD (`disko.nix`, `vars.mkEncryptedRootSsd`) is an ESP and one
 LUKS2 container, `crypt`, holding LVM: `vg/swap` (64G, the hibernation
-image) and `vg/zfs` (zroot). At boot the systemd initrd unlocks it with
-whichever works first:
+image) and `vg/zfs` (zroot). At boot the systemd initrd asks "Please enter
+LUKS2 token PIN:" and tries every enrolled way in:
 
-- **TPM2 + PIN**, the everyday way. The TPM releases the key only for
-  this machine's Secure Boot state (PCR 7) and before any volume has been
-  opened (PCR 15 = 0).
-- **Either YubiKey** (FIDO2, with its PIN), plugged in at the prompt.
-- **The recovery passphrase**, typed when the disk was formatted. It lives
-  in Bitwarden.
+- **TPM2 + PIN**, the everyday way. The TPM releases the key only for this
+  machine's Secure Boot state (PCR 7), and only for the right PIN; it locks
+  itself out after a few wrong ones.
+- **Either YubiKey** (FIDO2): plug it in and type its FIDO2 PIN at the same
+  prompt. A PIN is tried against every token, so a wrong one also counts
+  against a plugged-in YubiKey's PIN retries; keep the YubiKey out unless
+  you're using it.
+- **The recovery passphrase**, asked for once the tokens fail (a changed
+  Secure Boot state, or the TPM locked out). It lives in Bitwarden.
 
-Enrolling, after Secure Boot is on (each command asks for an existing
-passphrase first):
+The PIN is also the unlock after hibernating: the session resumes unlocked
+(`myHibernateOnly.lockOnResume = false`). Lock by hand (Meta+L) to come back
+to a locked session.
+
+Enrolling, after Secure Boot is on (each command asks for the passphrase
+first):
 
 ```
 dev=/dev/disk/by-partlabel/disk-root-luks
-pcrs=7+15:sha256=0000000000000000000000000000000000000000000000000000000000000000
-systemd-cryptenroll --tpm2-device=auto --tpm2-with-pin=yes --tpm2-pcrs=$pcrs $dev
+systemd-cryptenroll --tpm2-device=auto --tpm2-with-pin=yes --tpm2-pcrs=7 $dev
 systemd-cryptenroll --fido2-device=auto $dev   # once per YubiKey, one plugged in at a time
 systemd-cryptenroll $dev                         # lists the slots
 ```
 
-**When the PIN prompt falls back to the passphrase**, the Secure Boot state
-changed: a firmware update, Secure Boot keys changed, or Windows applying
-a Secure Boot database update. Unlock with a YubiKey or the passphrase,
-then re-seal against the new state:
+To check a YubiKey's slot without rebooting, with it plugged in:
+`cryptsetup open --test-passphrase --token-only --token-id <its token id from cryptsetup luksDump> $dev`.
+
+**When the PIN stops working and the passphrase is asked for**, the Secure
+Boot state changed: a firmware update, Secure Boot keys changed, or Windows
+applying a Secure Boot database update. Unlock with a YubiKey or the
+passphrase, then re-seal against the new state:
 
 ```
-systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-with-pin=yes --tpm2-pcrs=$pcrs $dev
+systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-with-pin=yes --tpm2-pcrs=7 $dev
 ```
 
 **Secure Boot** is lanzaboote (`mySecureBoot`). Its keys are on
