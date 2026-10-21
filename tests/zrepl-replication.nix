@@ -26,7 +26,7 @@
 #     not covered: a resumed receive
 #
 # delete if zrepl is ever replaced
-# writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md
+# writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md
 {
   pkgs,
   zreplModule,

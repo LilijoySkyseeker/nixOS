@@ -18,6 +18,10 @@ sets `core.hooksPath` so the git hooks run.
 - VM and runtime tests: `nix build .#checks.x86_64-linux.<name>`
 - How far to verify, and landing on a live host: the `verify-a-change` skill
 
+Skills live in `.agents/skills/`, which Codex reads. `.claude/skills` is a
+symlink to it for Claude. Claude loads `.claude/rules/` by path on its own,
+and Codex reads the matching rule from the table at the end.
+
 The git hooks enforce the floor: `pre-commit` blocks plaintext secrets and
 runs nixfmt, statix and deadnix on staged `.nix` files; `pre-push` runs
 `nix flake check` and builds every host the push affects.
@@ -129,3 +133,5 @@ exactly as they bind you.
 | Secrets | `docs/procedures/secrets.md` |
 | How modules and hosts compose | `docs/architecture.md`, `docs/adr/` |
 | A job at the machine (reinstall, disks, firmware, anything across reboots) | `docs/procedures/toolbox-stick.md` |
+| Editing any `.nix` file | `.claude/rules/nix.md` |
+| Editing `hosts/`, `modules/` or `.sops.yaml` | `.claude/rules/hardening.md` |
