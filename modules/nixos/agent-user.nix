@@ -43,6 +43,10 @@
           name = ${bot}
           email = 338765425+${bot}@users.noreply.github.com
       '';
+      # git's user-wide ignore file: local notes stay out of every repo
+      gitIgnore = pkgs.writeText "agent-git-ignore" ''
+        AGENTS.local.md
+      '';
       # check-and-fix for the parts that can't be declared
       agentSetup = pkgs.writeShellApplication {
         name = "agent-setup";
@@ -414,6 +418,7 @@
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
+          "L+ /home/agent/.config/git/ignore - - - - ${gitIgnore}"
           "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentInstructions}"
           "d /home/agent/.codex 0700 agent agent -"
           "L+ /home/agent/.codex/AGENTS.md - - - - ${agentInstructions}"

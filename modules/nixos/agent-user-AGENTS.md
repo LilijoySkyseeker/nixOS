@@ -57,7 +57,7 @@ container: anything you write is on the owner's machine.
     agent to pick it up cold, and delete an item once it's done.
   Finished research goes to `~/research`, not `~/work`.
 - Don't rely on either tool's built-in memory. Keep notes about a project
-  in that project's folder, in `AGENTS.local.md` (excluded from git); both
+  in that project's folder, in `AGENTS.local.md` (git ignores it everywhere); both
   of you read and update it when you start work there. Save cross-project
   memory only when the owner asks; facts about this machine belong in this
   file.
