@@ -113,7 +113,8 @@ let
   # generation 2: the same system on a newer kernel, as after an update
   newKernelSystem = pkgs.nixos [
     targetModule
-    { boot.kernelPackages = pkgs.linuxPackages_latest; }
+    # newest kernel zfs supports; TODO: drop when zfs supports linuxPackages_latest (7.3) again
+    { boot.kernelPackages = pkgs.linuxPackages_7_2; }
   ];
 
   # generation 1, carrying generation 2 so the target's own nix can --set it
