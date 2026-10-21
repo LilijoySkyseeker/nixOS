@@ -17,7 +17,8 @@ half-done as the fleet moves on.
    (clone `LilijoySkyseeker/nixOS` there if it is missing) and look at:
    - `~/work/ENVIRONMENT.md`, the agents' friction log. First delete every
      entry whose fix is now on `origin/master`;
-   - `~/work/TODO.md`, the deferred work: delete items that are done;
+   - `~/work/TODO.md`, the deferred work: delete items that are done,
+     and take up items whose own date or condition has come due;
    - every `# TODO: drop when <condition>` in the repo
      (`git grep -n "TODO: drop when"`) whose condition doesn't depend on
      the flake lock (`agent-flake-update` drops those): is it met now?
