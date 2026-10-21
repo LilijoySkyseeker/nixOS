@@ -1,5 +1,6 @@
-# browser-fetch URL: load URL in Chromium through nodriver, wait out a
-# JavaScript challenge, and print the final HTML
+# browser-fetch URL CHROMIUM: load URL in Chromium through nodriver, wait
+# out a JavaScript challenge, and print the final HTML; exits 1 when the
+# page that finally loaded is an HTTP error
 import sys
 import tempfile
 
@@ -20,7 +21,9 @@ async def main(url):
         browser = await uc.start(
             browser_executable_path=sys.argv[2],
             headless=False,
-            sandbox=False,
+            # Chromium's own sandbox: it runs untrusted pages, and the agent's
+            # logins are in its home
+            sandbox=True,
             user_data_dir=profile,
         )
         try:
@@ -40,7 +43,15 @@ async def main(url):
                     and not any(c in title.lower() for c in CHALLENGE)
                 ):
                     break
+            # the status of the document that finally loaded, after any
+            # challenge's redirect
+            status = await tab.evaluate(
+                "(performance.getEntriesByType('navigation')[0] || {}).responseStatus || 0"
+            )
             print(await tab.get_content())
+            if status >= 400:
+                print(f"browser-fetch: HTTP {status}", file=sys.stderr)
+                sys.exit(1)
         finally:
             browser.stop()
 

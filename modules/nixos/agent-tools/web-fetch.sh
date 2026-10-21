@@ -55,7 +55,7 @@ if blocked "$code" || shell_only; then
   tier=browser
 fi
 if blocked "$code"; then
-  echo "web-fetch: still blocked after every tier (last: $tier, $code)" >&2
+  echo "web-fetch: blocked or failed after every tier (last: $tier, $code)" >&2
   exit 1
 fi
 echo "web-fetch: $tier" >&2
