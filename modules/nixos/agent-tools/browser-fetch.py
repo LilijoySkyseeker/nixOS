@@ -1,6 +1,6 @@
 # browser-fetch URL CHROMIUM: load URL in Chromium through nodriver, wait
-# out a JavaScript challenge, and print the final HTML; exits 1 when the
-# page that finally loaded is an HTTP error
+# out a JavaScript challenge, and print the final HTML; exits 1 when no
+# page loaded or the one that did is an HTTP error
 import sys
 import tempfile
 
@@ -48,10 +48,12 @@ async def main(url):
             status = await tab.evaluate(
                 "(performance.getEntriesByType('navigation')[0] || {}).responseStatus || 0"
             )
-            print(await tab.get_content())
-            if status >= 400:
-                print(f"browser-fetch: HTTP {status}", file=sys.stderr)
+            # 0 means no response at all: DNS, connection or TLS failure, and
+            # the HTML is Chromium's own error page
+            if not status or status >= 400:
+                print(f"browser-fetch: HTTP {status or 'none'}", file=sys.stderr)
                 sys.exit(1)
+            print(await tab.get_content())
         finally:
             browser.stop()
 
