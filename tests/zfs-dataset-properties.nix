@@ -4,7 +4,7 @@
 # the caveat subtest is real ZFS behavior (a .zfs automount cached before
 # the flip survives until remount); don't "fix" the test to drop it
 #
-# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
+# Writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   zfsDatasetPropertiesModule,

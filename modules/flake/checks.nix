@@ -1,5 +1,5 @@
 # VM integration tests: `nix build .#checks.x86_64-linux.<name>` or
-# `nix flake check` (see .claude/skills/verify-a-change/SKILL.md)
+# `nix flake check` (see .agents/skills/verify-a-change/SKILL.md)
 { config, inputs, ... }:
 {
   perSystem = _: {

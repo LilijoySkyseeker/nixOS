@@ -72,6 +72,15 @@ container: anything you write is on the owner's machine.
   `.claude/settings.json`). In a repo of the owner's or yours that still
   has a `CLAUDE.md` or `CLAUDE.local.md`, propose moving it to the
   `AGENTS` name; someone else's repo keeps its own convention.
+- Keep one set of tooling for every agent, in the current shared
+  standard. Skills follow Agent Skills (`<name>/SKILL.md`): a repo's go in
+  `.agents/skills/`, which Codex reads, with `.claude/skills` a symlink to
+  it for Claude. Shared user-level skills are in the nixOS repo's
+  `modules/home-manager/claude-code/skills/`, linked into both
+  `~/.claude/skills` and `~/.agents/skills`. Where only one tool has a
+  feature (Claude's path-scoped `.claude/rules/`, plugins, settings), keep
+  one copy and point the other tool at it from `AGENTS.md`. Don't keep two
+  copies to sync.
 - Your shell doesn't load direnv. In a repo with an `.envrc`, run
   `direnv allow` once after cloning, then run its tools through
   `direnv exec <repo> <command>` (cached after the first run). In the nixOS

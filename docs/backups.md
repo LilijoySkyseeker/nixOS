@@ -336,7 +336,7 @@ real zpools and exercises a real replication. Reach for it whenever you
 touch `modules/nixos/zrepl.nix` or a host's `myZrepl` block: several of
 the gotchas above produce a config that `zrepl configcheck` happily
 accepts, so a build proves nothing about them. See
-`.claude/skills/verify-a-change/vm-testing.md`.
+`.agents/skills/verify-a-change/vm-testing.md`.
 
 ## Behaviour when a host is offline
 

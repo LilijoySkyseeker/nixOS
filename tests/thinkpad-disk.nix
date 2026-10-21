@@ -11,7 +11,7 @@
 # the store lives on the pool, not a 9p/virtiofs share, which hibernation
 # doesn't survive
 #
-# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
+# Writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   vars,

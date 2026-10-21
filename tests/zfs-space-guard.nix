@@ -4,7 +4,7 @@
 # tolerated, a leftover zrepl cursor bookmark doesn't pin space, and the
 # unit works under its sandbox (a broken sandbox fails here, not at 2am)
 #
-# Writing or debugging one of these: .claude/skills/verify-a-change/vm-testing.md.
+# Writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md.
 {
   pkgs,
   zfsSpaceGuardModule,

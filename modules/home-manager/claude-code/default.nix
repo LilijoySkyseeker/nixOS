@@ -156,11 +156,15 @@ _: {
           # user-level instructions, loaded in every project; read-only by design,
           # the agent user gets the same file appended to its own
           ".claude/CLAUDE.md".source = ./user-claude.md;
+          # the same file for codex
+          ".codex/AGENTS.md".source = ./user-claude.md;
         }
-        # every skill under ./skills; the agent user links the same directory
-        // lib.mapAttrs' (
-          name: _: lib.nameValuePair ".claude/skills/${name}" { source = ./skills + "/${name}"; }
-        ) (builtins.readDir ./skills);
+        # every skill under ./skills, for claude and for codex (~/.agents/skills);
+        # the agent user links the same directory
+        // lib.concatMapAttrs (name: _: {
+          ".claude/skills/${name}".source = ./skills + "/${name}";
+          ".agents/skills/${name}".source = ./skills + "/${name}";
+        }) (builtins.readDir ./skills);
 
         # every write goes through `run` to keep dry-run side-effect free; a bare
         # `run echo > file` would still truncate via the redirect
