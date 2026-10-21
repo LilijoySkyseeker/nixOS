@@ -91,8 +91,11 @@
           // {
             Type = "oneshot";
             StandardInput = "file:${prompt}";
-            ExecStart = "${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
-            TimeoutStartSec = "6h";
+            # one job at a time: they share the vault reports and the nixOS
+            # checkout, and two timers can fire together after downtime
+            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+            # includes waiting on the lock behind the other jobs
+            TimeoutStartSec = "18h";
           };
       };
       # codex app-server is the remote-control host; the managed daemon

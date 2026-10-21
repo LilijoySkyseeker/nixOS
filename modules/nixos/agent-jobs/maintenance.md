@@ -60,7 +60,11 @@ half-done as the fleet moves on.
    - put a `## Act now` section at the very top that gathers every
      owner action from every section, or "Nothing" if there is none.
    Then rewrite `~/research/Fleet/Status.md` as the fleet's standing
-   picture: updated date and a link to this week's report, "Act now", each
+   picture. Read the existing page and last week's report first: every
+   "Act now" item on them stays, with its original date, until the owner
+   deletes it or you have evidence it's done (say which). Then add this
+   week's. The page has: updated date and a link to this week's report,
+   "Act now", each
    job's last result, open agent PRs and issues, workarounds waiting on
    upstream with their conditions, and what the agents are waiting on
    (`TODO.md`, friction entries that wait). Keep both short enough to read

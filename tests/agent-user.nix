@@ -182,6 +182,8 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
+            if unit.startswith("agent-"):
+                check("flock /home/agent/.agent-jobs.lock" in sprop("ExecStart"), f"{unit}: not under the shared job lock")
         for timer in ["agent-weekly.timer", "agent-security-watch.timer"]:
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
