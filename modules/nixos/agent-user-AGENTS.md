@@ -12,8 +12,17 @@ container: anything you write is on the owner's machine.
   - CPU: AMD Ryzen 7 9800X3D, 8 cores / 16 threads, up to 5.27 GHz, 96 MiB L3
   - RAM: 96 GB, plus a 16 GiB swap partition
   - GPU: AMD Radeon RX 7900 XTX (24 GB VRAM), plus the CPU's iGPU. Your
-    sessions can't reach either: the units' `PrivateDevices` hides
-    `/dev/dri` (and `/dev/kvm`).
+    sessions can use the 7900 XTX for compute: its render node in
+    `/dev/dri` (Vulkan, VA-API) and `/dev/kfd` (ROCm). The display nodes
+    (`card*`) and the iGPU are visible but refused. Get the tools with
+    `nix shell` (for example `nixpkgs#vulkan-tools`, ROCm from
+    `rocmPackages`). Nothing caps VRAM, and the owner's desktop and games
+    use the same card: check
+    `/sys/bus/pci/devices/0000:03:00.0/mem_info_vram_used` before a big
+    job, and free the GPU when you're done.
+  - KVM: `/dev/kvm` works, so QEMU VMs run accelerated. They get user-mode
+    networking only (`-nic user`): there is no `/dev/net/tun`, and their
+    traffic leaves as you, through the same egress firewall.
   - Disk: one 4 TB Samsung 990 PRO NVMe, a single ZFS pool (`zroot`) shared
     with the owner's home and `/nix`, about 80% full
   - Board: Gigabyte X870 AORUS ELITE WIFI7 ICE; Linux 6.18, NixOS unstable

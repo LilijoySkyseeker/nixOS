@@ -243,7 +243,11 @@ here; it is already applied in the SSH bullet below.
   no extra groups, `nix.settings.allowed-users` but never `trusted-users`,
   `DenyUsers agent` in sshd, and sandboxed `claude-remote-control` and
   `codex-remote-control` units (one shared `agent.slice` memory and task
-  cap) that run agent sessions with no permission prompts. Its egress wall is
+  cap) that run agent sessions with no permission prompts. Their private
+  `/dev` carries only the pseudo devices plus, through `DeviceAllow`, the
+  RX 7900 XTX's render node, `/dev/kfd` and `/dev/kvm`: the GPU's display
+  nodes and the iGPU are visible but refused by the device cgroup, and
+  `/dev/net/tun` is absent, so VMs get only user-mode networking. Its egress wall is
   the `agent-egress` iptables/ip6tables chain, jumped from `OUTPUT` for
   `--uid-owner agent` **and** `--gid-owner nixbld`: IPv4 RFC1918, the
   tailnet's `100.64.0.0/10`, link-local, multicast and broadcast are

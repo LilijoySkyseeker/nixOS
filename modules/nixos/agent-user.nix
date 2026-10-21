@@ -36,7 +36,9 @@
         ''
         + builtins.readFile ./agent-setup.sh;
       };
-      # sandbox shared by both agents' remote-control units: every agent
+      # torrent's RX 7900 XTX, by PCI path: DRM numbering follows probe order
+      agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
+      # sandbox shared by both agents' units: every agent
       # session is a child of one of them
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
@@ -48,7 +50,24 @@
         Slice = "agent.slice";
         NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
         PrivateTmp = true;
-        PrivateDevices = true; # no /dev/kvm or /dev/net/tun (F4)
+        # a private /dev with only the pseudo devices, plus the GPU and KVM
+        # bound in; /dev/net/tun stays out (F4), and the device cgroup
+        # refuses the display (card*) and iGPU nodes /dev/dri also carries
+        PrivateDevices = true;
+        BindPaths = [
+          "-/dev/kvm"
+          "-/dev/kfd" # ROCm compute
+          "-/dev/dri"
+        ];
+        DeviceAllow = [
+          "/dev/kvm rw"
+          "/dev/kfd rw"
+          "${agentGpu} rw"
+        ];
+        SupplementaryGroups = [
+          "kvm"
+          "render"
+        ];
         ProtectSystem = "strict";
         ReadWritePaths = [ "/home/agent" ];
         # world-writable daemon sockets: VPN, tailnet and VM control (F5)
