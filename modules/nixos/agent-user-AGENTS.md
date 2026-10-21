@@ -12,8 +12,17 @@ container: anything you write is on the owner's machine.
   - CPU: AMD Ryzen 7 9800X3D, 8 cores / 16 threads, up to 5.27 GHz, 96 MiB L3
   - RAM: 96 GB, plus a 16 GiB swap partition
   - GPU: AMD Radeon RX 7900 XTX (24 GB VRAM), plus the CPU's iGPU. Your
-    sessions can't reach either: the units' `PrivateDevices` hides
-    `/dev/dri` (and `/dev/kvm`).
+    sessions can use the 7900 XTX for compute: its render node in
+    `/dev/dri` (Vulkan, VA-API) and `/dev/kfd` (ROCm). The display nodes
+    (`card*`) and the iGPU are visible but refused. Get the tools with
+    `nix shell` (for example `nixpkgs#vulkan-tools`, ROCm from
+    `rocmPackages`). Nothing caps VRAM, and the owner's desktop and games
+    use the same card: check
+    `/sys/bus/pci/devices/0000:03:00.0/mem_info_vram_used` before a big
+    job, and free the GPU when you're done.
+  - KVM: `/dev/kvm` works, so QEMU VMs run accelerated. They get user-mode
+    networking only (`-nic user`): there is no `/dev/net/tun`, and their
+    traffic leaves as you, through the same egress firewall.
   - Disk: one 4 TB Samsung 990 PRO NVMe, a single ZFS pool (`zroot`) shared
     with the owner's home and `/nix`, about 80% full
   - Board: Gigabyte X870 AORUS ELITE WIFI7 ICE; Linux 6.18, NixOS unstable
@@ -43,6 +52,9 @@ container: anything you write is on the owner's machine.
   - `inbox/`: files the owner drops for you. Move each into a project
     when you use it.
   - `ENVIRONMENT.md`: the log of environment failures (see below).
+  - `TODO.md`: work deferred for a later session. Read it when you start;
+    add anything you put off, with the date and enough context for an
+    agent to pick it up cold, and delete an item once it's done.
   Finished research goes to `~/research`, not `~/work`.
 - Don't rely on either tool's built-in memory. Keep notes about a project
   in that project's folder, in `CLAUDE.local.md` (excluded from git); both
@@ -61,6 +73,20 @@ container: anything you write is on the owner's machine.
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
   Codex has no setting for it, so this line is the control.
+- Claude runs scheduled jobs unattended. Every Monday just past midnight,
+  `agent-weekly.timer` runs `agent-flake-update` (flake inputs, the stable
+  hosts' move to each new NixOS release, and workarounds the update makes
+  unnecessary), then `agent-maintenance` (`ENVIRONMENT.md`, `TODO.md`,
+  workarounds waiting on upstream, forgotten PRs and notes). Every morning,
+  `agent-security-watch` checks the security news against the fleet. They report
+  in `~/research/Fleet/`: `Weekly/YYYY-MM-DD.md` and `Status.md`. Their
+  prompts are in the nixOS repo's `modules/nixos/agent-jobs/`; a new job
+  is a PR there. Anything you need but can't get, such as an account the
+  agents should own or a missing tool, goes in `ENVIRONMENT.md`, and
+  `agent-maintenance` brings it to the owner.
+- A temporary workaround (a patch, an override, a stopgap waiting on an
+  upstream fix) gets a `# TODO: drop when <condition>` comment, with a
+  link, so the weekly jobs remove it when the condition is met.
 - If a task needs root, a secret or a LAN host, say exactly what to run and
   why. The owner does it.
 - When the environment gets in your way (a missing tool, a sandbox or

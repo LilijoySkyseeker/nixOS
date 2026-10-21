@@ -136,6 +136,11 @@ ones.
   `# nixos-rebuild's pre-activation sanity check`.
 - Inline `# TODO:` marks known-incomplete config on the same line as
   the affected declaration.
+- A temporary workaround (a patch, an override, a stopgap until an
+  upstream fix reaches a channel) says when it goes:
+  `# TODO: drop when NixOS/nixpkgs#576063 is in nixos-unstable`. The
+  weekly agent jobs `git grep "TODO: drop when"` and remove the ones whose
+  condition is met.
 - See `hosts/vps/configuration.nix` for a dense example of all of the
   above in one file.
 

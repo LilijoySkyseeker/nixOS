@@ -4,7 +4,7 @@ pkgs.testers.runNixOSTest {
   name = "agent-user";
 
   nodes.machine =
-    { ... }:
+    { lib, ... }:
     {
       imports = [ agentUserModule ];
 
@@ -15,6 +15,11 @@ pkgs.testers.runNixOSTest {
       };
       # mirror profile-pc: only wheel may talk to the nix daemon
       nix.settings.allowed-users = [ "@wheel" ];
+      # fire the weekly jobs' timer often, to see it start them repeatedly
+      systemd.timers.agent-weekly.timerConfig = {
+        OnCalendar = lib.mkForce "*:*:0/20";
+        AccuracySec = "1s";
+      };
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
       environment.systemPackages = [
@@ -163,8 +168,9 @@ pkgs.testers.runNixOSTest {
         rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN after a firewall reload")
 
-        # both agents' remote-control units: same sandbox, one shared cap
-        for unit in ["claude-remote-control", "codex-remote-control"]:
+        # both agents' remote-control units and the scheduled jobs: same
+        # sandbox, one shared cap
+        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-security-watch", "agent-maintenance"]:
             def sprop(p):
                 return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
             for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
@@ -176,6 +182,53 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
+            if unit.startswith("agent-"):
+                check("flock /home/agent/.agent-jobs.lock" in sprop("ExecStart"), f"{unit}: not under the shared job lock")
+        for timer in ["agent-weekly.timer", "agent-security-watch.timer"]:
+            state = machine.succeed(f"systemctl is-active {timer} || true").strip()
+            check(state == "active", f"{timer}: {state!r}")
+        # each activation of the weekly target reaches both jobs, not
+        # just the first (they skip here: no Claude login in the VM)
+        jobs = ["agent-flake-update", "agent-maintenance"]
+        def ran():
+            return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}
+        # the test node fires the timer every 20s (see nodes.machine)
+        seen = []
+        for _ in range(2):
+            before = ran()
+            machine.wait_until_succeeds(
+                "systemctl show agent-maintenance -p ConditionTimestampMonotonic --value | grep -vx '%s'"
+                % before["agent-maintenance"], timeout=90)
+            machine.wait_until_succeeds("! systemctl list-jobs --no-legend | grep -q agent-")
+            seen.append(ran())
+        for j in jobs:
+            check(seen[0][j] not in ("", "0"), f"{j} never ran")
+            check(seen[1][j] != seen[0][j], f"{j} didn't run on the second activation")
+        # GPU and KVM: bound in and allowed; tun and display nodes refused
+        for unit in ["claude-remote-control", "codex-remote-control"]:
+            allow = machine.succeed(f"systemctl show {unit} -p DeviceAllow --value")
+            for dev in ["/dev/kvm", "/dev/kfd", "/dev/dri/by-path/"]:
+                check(dev in allow, f"{unit}: {dev} not allowed: {allow!r}")
+            binds = machine.succeed(f"systemctl show {unit} -p BindPaths --value")
+            check("/dev/dri" in binds and "/dev/kvm" in binds, f"{unit}: BindPaths={binds!r}")
+            check("tun" not in allow + binds, f"{unit}: tun exposed")
+        # the same device rules on a probe process, since the real units
+        # can't start in the VM (no logins)
+        probe = ("systemd-run --wait --pipe --quiet -p User=agent -p PrivateDevices=yes "
+                 "-p BindPaths=-/dev/kvm -p BindPaths=-/dev/dri -p 'DeviceAllow=/dev/kvm rw' "
+                 "-p SupplementaryGroups=kvm -- sh -c ")
+        if machine.execute("test -c /dev/kvm")[0] == 0:
+            rc, out = machine.execute(probe + "'exec 3<>/dev/kvm && echo kvm-ok'")
+            check("kvm-ok" in out, f"probe can't open /dev/kvm: {out!r}")
+        rc, out = machine.execute(probe + "'exec 3<>/dev/net/tun && echo tun-open'")
+        check("tun-open" not in out, "probe opened /dev/net/tun")
+        rc, card = machine.execute("ls /dev/dri/card* 2>/dev/null | head -1")
+        if card.strip():
+            # visible in the bound /dev/dri, refused by the device cgroup:
+            # probe as root, which file permissions wouldn't stop
+            rc, out = machine.execute(probe.replace("User=agent", "User=root") + f"'test -c {card.strip()} && echo card-seen; exec 3<>{card.strip()} && echo card-open'")
+            check("card-seen" in out, f"probe can't see {card.strip()}: {out!r}")
+            check("card-open" not in out, "probe opened a display node")
         mem = machine.succeed("systemctl show agent.slice -p MemoryMax --value").strip()
         check(mem not in ("infinity", ""), f"agent.slice MemoryMax={mem!r}")
         # sshd denies agent

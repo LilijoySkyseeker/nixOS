@@ -43,7 +43,19 @@ thinkpad it has no `@blank` snapshots to preserve.
 This host (only) runs `agent-user`: an `agent` Unix user whose
 `claude-remote-control` and `codex-remote-control` services run Claude
 Code and Codex sessions with no permission prompts, reachable from the
-Claude and ChatGPT apps. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
+Claude and ChatGPT apps. Claude also runs unattended jobs in the same
+sandbox. Every Monday at 00:15, `agent-weekly.timer` runs two of them, one
+after the other: `agent-flake-update` (flake inputs, the stable hosts'
+move to each new NixOS release, and dropping workarounds the update makes
+unnecessary, as a PR), then `agent-maintenance` (the agents' friction log
+and to-dos, workarounds waiting on upstream, and forgotten PRs or notes,
+as a PR or issue). Every day at 06:00, `agent-security-watch` checks the
+security news against the fleet and opens fix PRs. Their results land in `Vault/Research/Fleet/`: one report per
+week in `Weekly/`, and `Status.md`, the standing picture. The prompts are
+in `modules/nixos/agent-jobs/`. Run one now with
+`run0 systemctl start agent-flake-update` (or both weekly jobs in order
+with `run0 systemctl start agent-weekly.target`), and follow it with
+`journalctl -fu agent-flake-update`. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
 `/home/agent/research`) and can't reach the LAN or tailnet. Its
 `agent-egress` chain is also jumped for `gid nixbld`, so **your own**
 fixed-output builds on this host can't fetch from LAN/tailnet addresses or

@@ -36,7 +36,9 @@
         ''
         + builtins.readFile ./agent-setup.sh;
       };
-      # sandbox shared by both agents' remote-control units: every agent
+      # torrent's RX 7900 XTX, by PCI path: DRM numbering follows probe order
+      agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
+      # sandbox shared by both agents' units: every agent
       # session is a child of one of them
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
@@ -48,7 +50,24 @@
         Slice = "agent.slice";
         NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
         PrivateTmp = true;
-        PrivateDevices = true; # no /dev/kvm or /dev/net/tun (F4)
+        # a private /dev with only the pseudo devices, plus the GPU and KVM
+        # bound in; /dev/net/tun stays out (F4), and the device cgroup
+        # refuses the display (card*) and iGPU nodes /dev/dri also carries
+        PrivateDevices = true;
+        BindPaths = [
+          "-/dev/kvm"
+          "-/dev/kfd" # ROCm compute
+          "-/dev/dri"
+        ];
+        DeviceAllow = [
+          "/dev/kvm rw"
+          "/dev/kfd rw"
+          "${agentGpu} rw"
+        ];
+        SupplementaryGroups = [
+          "kvm"
+          "render"
+        ];
         ProtectSystem = "strict";
         ReadWritePaths = [ "/home/agent" ];
         # world-writable daemon sockets: VPN, tailnet and VM control (F5)
@@ -71,6 +90,32 @@
           "network-online.target"
           "firewall.service"
         ];
+      };
+      claudeEnvironment = agentEnvironment // {
+        # keep the account's claude.ai connectors (and their data) out
+        ENABLE_CLAUDEAI_MCP_SERVERS = "false";
+      };
+      # an unattended Claude run in the agent sandbox; the prompt is a file
+      # in ./agent-jobs, so a job changes only through a reviewed PR
+      agentJob = description: prompt: {
+        inherit description;
+        inherit (agentUnitDeps) wants bindsTo after;
+        unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
+        environment = claudeEnvironment;
+        serviceConfig =
+          builtins.removeAttrs agentSandbox [
+            "Restart"
+            "RestartSec"
+          ]
+          // {
+            Type = "oneshot";
+            StandardInput = "file:${prompt}";
+            # one job at a time: they share the vault reports and the nixOS
+            # checkout, and two timers can fire together after downtime
+            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+            # includes waiting on the lock behind the other jobs
+            TimeoutStartSec = "18h";
+          };
       };
       # codex app-server is the remote-control host; the managed daemon
       # (`codex remote-control start`) refuses a nix-packaged CLI
@@ -227,10 +272,7 @@
           description = "Claude Code Remote Control server for the agent user";
           # skipped until the one-time `claude auth login`
           unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
-          environment = agentEnvironment // {
-            # keep the account's claude.ai connectors (and their data) out
-            ENABLE_CLAUDEAI_MCP_SERVERS = "false";
-          };
+          environment = claudeEnvironment;
           serviceConfig = agentSandbox // {
             ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
           };
@@ -284,6 +326,47 @@
             ExecStart = codexRemote;
             # the app-server's JSON-RPC replies and notifications
             StandardOutput = "null";
+          };
+        };
+
+        # scheduled jobs: Claude, by the owner's choice (more Claude usage),
+        # one after another; each can also be started by hand
+        services.agent-flake-update = agentJob "Weekly flake update and stable release move, as a PR" ./agent-jobs/flake-update.md;
+        services.agent-security-watch = agentJob "Daily security research for the fleet, as a report and PRs" ./agent-jobs/security-watch.md;
+        services.agent-maintenance =
+          agentJob "Weekly maintenance: friction, to-dos, workarounds, forgotten work" ./agent-jobs/maintenance.md
+          // {
+            # last: sees the flake update's result and friction, and writes
+            # the fleet status page
+            after = agentUnitDeps.after ++ [ "agent-flake-update.service" ];
+          };
+        targets.agent-weekly = {
+          description = "The agents' weekly scheduled jobs";
+          # a target stays active otherwise, and the timer's next firing
+          # would then start nothing
+          unitConfig.StopWhenUnneeded = true;
+          wants = [
+            "agent-flake-update.service"
+            "agent-maintenance.service"
+          ];
+        };
+        # Monday just past midnight: the owner's weekly Claude usage resets
+        # Sunday at 17:00, so the jobs spend the start of the week's limit;
+        # Persistent catches up on a run missed while torrent was off
+        timers.agent-weekly = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = "Mon 00:15";
+            Persistent = true;
+            Unit = "agent-weekly.target";
+          };
+        };
+        # security incidents move in hours (#140), so this one runs daily
+        timers.agent-security-watch = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = "06:00";
+            Persistent = true;
           };
         };
 
