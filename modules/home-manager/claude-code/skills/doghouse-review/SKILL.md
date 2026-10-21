@@ -5,9 +5,9 @@ description: Use when reviewing or questioning a plan, architecture, process, sy
 
 # Doghouse review
 
-Run the six steps from CLAUDE.md on the thing. Hold to the spirit, not the
-form, and scale the review to the thing: a quick question gets a few
-sentences, a big design gets a parts table.
+Run the six steps from your global instructions on the thing. Hold to the
+spirit, not the form, and scale the review to the thing: a quick question
+gets a few sentences, a big design gets a parts table.
 
 What a review adds to the steps:
 
@@ -33,9 +33,9 @@ What a review adds to the steps:
 
 ## The meaning behind the steps
 
-CLAUDE.md carries the steps in short form, to steer everyday work. This is the
-context behind them, for when a review needs it. It explains; it doesn't add
-rules.
+Your global instructions carry the steps in short form, to steer everyday
+work. This is the context behind them, for when a review needs it. It
+explains; it doesn't add rules.
 
 **Why they exist.** My previous agent-safety process (plan-file gates, review
 stamps, a 40-rule orchestrator) was step 5 done first. My dotfiles repo went

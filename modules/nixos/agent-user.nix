@@ -277,7 +277,7 @@
                   permissions.defaultMode = "bypassPermissions";
                   permissions.disableAutoMode = "disable";
                   skipDangerousModePermissionPrompt = true;
-                  # the machine's full resources, as the agent's CLAUDE.md grants
+                  # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
                   # unattended sessions wait out a usage limit instead of stalling
                   autoContinueAtUsageLimit = true;

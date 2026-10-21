@@ -57,10 +57,21 @@ container: anything you write is on the owner's machine.
     agent to pick it up cold, and delete an item once it's done.
   Finished research goes to `~/research`, not `~/work`.
 - Don't rely on either tool's built-in memory. Keep notes about a project
-  in that project's folder, in `CLAUDE.local.md` (excluded from git); both
+  in that project's folder, in `AGENTS.local.md` (excluded from git); both
   of you read and update it when you start work there. Save cross-project
   memory only when the owner asks; facts about this machine belong in this
   file.
+- This environment is shared by both agents, any future model and the
+  services that run them, so use the tool-neutral names, never Claude's:
+  `AGENTS.md` for a repo's or project's instructions, `AGENTS.local.md`
+  for its untracked notes. Claude Code loads `AGENTS.md` itself where
+  there's no `CLAUDE.md`, so don't create a `CLAUDE.md`, not even an
+  `@AGENTS.md` import, and don't run `/init`, which writes one. Neither
+  tool loads `AGENTS.local.md` on its own, so read it when you start. Keep
+  a Claude-only name only where Claude requires it (`~/.claude/`,
+  `.claude/settings.json`). In a repo of the owner's or yours that still
+  has a `CLAUDE.md` or `CLAUDE.local.md`, propose moving it to the
+  `AGENTS` name; someone else's repo keeps its own convention.
 - Your shell doesn't load direnv. In a repo with an `.envrc`, run
   `direnv allow` once after cloning, then run its tools through
   `direnv exec <repo> <command>` (cached after the first run). In the nixOS
