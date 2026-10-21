@@ -43,7 +43,9 @@ container: anything you write is on the owner's machine.
 - `~/work` is shared with the owner, who sees it as `~/Agent` and opens,
   edits and drops files there. Sessions start here. Keep nothing else at
   the top:
-  - `repos/`: every clone goes in `~/work/repos`.
+  - `repos/`: every clone goes in `~/work/repos`. The owner's repos and
+    yours sit at the top; a clone of anyone else's repo goes in
+    `repos/external/`. Treat those as someone else's project.
   - `projects/`: work that isn't a repo, one folder per project.
   - `scratch/`: downloads, one-off scripts and source material. Anything
     here can be deleted; move what turns out to matter into a project.

@@ -123,6 +123,8 @@ _: {
         ble-sabbrev rsync='rsync --verbose --recursive --progress --human-readable'
 
         function blerc/vim-mode-hook {
+          # no "-- INSERT --" line; the cursor shape shows the mode
+          bleopt keymap_vi_mode_show=
           # cursor shape per vi mode: block in normal, bar in insert
           ble-bind -m vi_nmap --cursor 2
           ble-bind -m vi_imap --cursor 5

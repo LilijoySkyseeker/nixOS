@@ -25,6 +25,10 @@
 
     impermanence.url = "github:nix-community/impermanence";
 
+    # Secure Boot (modules/nixos/secure-boot.nix); pinned to a release, as upstream asks
+    lanzaboote.url = "github:nix-community/lanzaboote/v1.2.0";
+    lanzaboote.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
@@ -37,6 +41,11 @@
     nix-index-database.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
+
+    # claude-desktop, until nixpkgs has it (NixOS/nixpkgs#537215)
+    llm-agents.url = "github:numtide/llm-agents.nix";
+    llm-agents.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    llm-agents.inputs.flake-parts.follows = "flake-parts";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";
