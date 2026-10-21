@@ -302,20 +302,13 @@
         # scheduled jobs: Claude, by the owner's choice (more Claude usage),
         # one after another; each can also be started by hand
         services.agent-flake-update = agentJob "Weekly flake update and stable release move, as a PR" ./agent-jobs/flake-update.md;
-        services.agent-security-watch =
-          agentJob "Weekly security research for the fleet, as a note and PRs" ./agent-jobs/security-watch.md
+        services.agent-security-watch = agentJob "Daily security research for the fleet, as a report and PRs" ./agent-jobs/security-watch.md;
+        services.agent-maintenance =
+          agentJob "Weekly maintenance: friction, to-dos, workarounds, forgotten work" ./agent-jobs/maintenance.md
           // {
-            # sees this week's flake-update PR
+            # last: sees the flake update's result and friction, and writes
+            # the fleet status page
             after = agentUnitDeps.after ++ [ "agent-flake-update.service" ];
-          };
-        services.agent-friction-review =
-          agentJob "Weekly review of ~/work/ENVIRONMENT.md, as a PR" ./agent-jobs/friction-review.md
-          // {
-            # last, so the other jobs' friction is in the log
-            after = agentUnitDeps.after ++ [
-              "agent-flake-update.service"
-              "agent-security-watch.service"
-            ];
           };
         targets.agent-weekly = {
           description = "The agents' weekly scheduled jobs";
@@ -324,19 +317,26 @@
           unitConfig.StopWhenUnneeded = true;
           wants = [
             "agent-flake-update.service"
-            "agent-security-watch.service"
-            "agent-friction-review.service"
+            "agent-maintenance.service"
           ];
         };
-        # late Sunday, just after the owner's weekly Claude usage resets, so
-        # the jobs spend the start of the week's limit; Persistent catches
-        # up on a run missed while torrent was off
+        # Monday just past midnight: the owner's weekly Claude usage resets
+        # Sunday at 17:00, so the jobs spend the start of the week's limit;
+        # Persistent catches up on a run missed while torrent was off
         timers.agent-weekly = {
           wantedBy = [ "timers.target" ];
           timerConfig = {
-            OnCalendar = "Sun 23:30";
+            OnCalendar = "Mon 00:15";
             Persistent = true;
             Unit = "agent-weekly.target";
+          };
+        };
+        # security incidents move in hours (#140), so this one runs daily
+        timers.agent-security-watch = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = "06:00";
+            Persistent = true;
           };
         };
 

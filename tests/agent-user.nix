@@ -170,7 +170,7 @@ pkgs.testers.runNixOSTest {
 
         # both agents' remote-control units and the scheduled jobs: same
         # sandbox, one shared cap
-        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-security-watch", "agent-friction-review"]:
+        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-security-watch", "agent-maintenance"]:
             def sprop(p):
                 return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
             for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
@@ -182,12 +182,12 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
-        for timer in ["agent-weekly.timer"]:
+        for timer in ["agent-weekly.timer", "agent-security-watch.timer"]:
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
-        # each activation of the weekly target reaches all three jobs, not
+        # each activation of the weekly target reaches both jobs, not
         # just the first (they skip here: no Claude login in the VM)
-        jobs = ["agent-flake-update", "agent-security-watch", "agent-friction-review"]
+        jobs = ["agent-flake-update", "agent-maintenance"]
         def ran():
             return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}
         # the test node fires the timer every 20s (see nodes.machine)
@@ -195,8 +195,8 @@ pkgs.testers.runNixOSTest {
         for _ in range(2):
             before = ran()
             machine.wait_until_succeeds(
-                "systemctl show agent-friction-review -p ConditionTimestampMonotonic --value | grep -vx '%s'"
-                % before["agent-friction-review"], timeout=90)
+                "systemctl show agent-maintenance -p ConditionTimestampMonotonic --value | grep -vx '%s'"
+                % before["agent-maintenance"], timeout=90)
             machine.wait_until_succeeds("! systemctl list-jobs --no-legend | grep -q agent-")
             seen.append(ran())
         for j in jobs:

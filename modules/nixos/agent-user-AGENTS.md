@@ -62,15 +62,20 @@ container: anything you write is on the owner's machine.
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
   Codex has no setting for it, so this line is the control.
-- Every Sunday night, `agent-weekly.timer` runs three Claude jobs
-  unattended, in order: `agent-flake-update` (flake inputs, and the stable
-  hosts' move to each new NixOS release), `agent-security-watch` (the
-  week's security news against the fleet, as a research note and fix PRs)
-  and `agent-friction-review` (turns `ENVIRONMENT.md` into a PR). Their prompts are in the nixOS repo's
-  `modules/nixos/agent-jobs/`; a new job is a PR there. Anything you need
-  but can't get, such as an account the agents should own or a missing
-  tool, goes in `ENVIRONMENT.md`, and the weekly review brings it to the
-  owner.
+- Claude runs scheduled jobs unattended. Every Monday just past midnight,
+  `agent-weekly.timer` runs `agent-flake-update` (flake inputs, the stable
+  hosts' move to each new NixOS release, and workarounds the update makes
+  unnecessary), then `agent-maintenance` (`ENVIRONMENT.md`, `TODO.md`,
+  workarounds waiting on upstream, forgotten PRs and notes). Every morning,
+  `agent-security-watch` checks the security news against the fleet. They report
+  in `~/research/Fleet/`: `Weekly/YYYY-MM-DD.md` and `Status.md`. Their
+  prompts are in the nixOS repo's `modules/nixos/agent-jobs/`; a new job
+  is a PR there. Anything you need but can't get, such as an account the
+  agents should own or a missing tool, goes in `ENVIRONMENT.md`, and
+  `agent-maintenance` brings it to the owner.
+- A temporary workaround (a patch, an override, a stopgap waiting on an
+  upstream fix) gets a `# TODO: drop when <condition>` comment, with a
+  link, so the weekly jobs remove it when the condition is met.
 - If a task needs root, a secret or a LAN host, say exactly what to run and
   why. The owner does it.
 - When the environment gets in your way (a missing tool, a sandbox or
