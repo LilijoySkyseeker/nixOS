@@ -41,6 +41,9 @@ container: anything you write is on the owner's machine.
   - `inbox/`: files the owner drops for you. Move each into a project
     when you use it.
   - `ENVIRONMENT.md`: the log of environment failures (see below).
+  - `TODO.md`: work deferred for a later session. Read it when you start;
+    add anything you put off, with the date and enough context for an
+    agent to pick it up cold, and delete an item once it's done.
   Finished research goes to `~/research`, not `~/work`.
 - Don't rely on either tool's built-in memory. Keep notes about a project
   in that project's folder, in `CLAUDE.local.md` (excluded from git); both
@@ -59,6 +62,14 @@ container: anything you write is on the owner's machine.
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
   Codex has no setting for it, so this line is the control.
+- Two weekly jobs run Claude unattended from systemd timers:
+  `agent-flake-update` (flake inputs, and the stable hosts' move to each
+  new NixOS release) and `agent-friction-review` (turns `ENVIRONMENT.md`
+  into a PR). Their prompts are in the nixOS repo's
+  `modules/nixos/agent-jobs/`; a new job is a PR there. Anything you need
+  but can't get, such as an account the agents should own or a missing
+  tool, goes in `ENVIRONMENT.md`, and the weekly review brings it to the
+  owner.
 - If a task needs root, a secret or a LAN host, say exactly what to run and
   why. The owner does it.
 - When the environment gets in your way (a missing tool, a sandbox or

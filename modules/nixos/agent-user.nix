@@ -72,6 +72,38 @@
           "firewall.service"
         ];
       };
+      claudeEnvironment = agentEnvironment // {
+        # keep the account's claude.ai connectors (and their data) out
+        ENABLE_CLAUDEAI_MCP_SERVERS = "false";
+      };
+      # an unattended Claude run in the agent sandbox; the prompt is a file
+      # in ./agent-jobs, so a job changes only through a reviewed PR
+      agentJob = description: prompt: {
+        inherit description;
+        inherit (agentUnitDeps) wants bindsTo after;
+        unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
+        environment = claudeEnvironment;
+        serviceConfig =
+          builtins.removeAttrs agentSandbox [
+            "Restart"
+            "RestartSec"
+          ]
+          // {
+            Type = "oneshot";
+            StandardInput = "file:${prompt}";
+            ExecStart = "${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+            TimeoutStartSec = "6h";
+          };
+      };
+      # weekly; Persistent catches up on a run missed while torrent was off
+      agentTimer = onCalendar: {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = onCalendar;
+          Persistent = true;
+          RandomizedDelaySec = "1h";
+        };
+      };
       # codex app-server is the remote-control host; the managed daemon
       # (`codex remote-control start`) refuses a nix-packaged CLI
       codexRemote = pkgs.writeShellScript "codex-remote-control" ''
@@ -219,10 +251,7 @@
           description = "Claude Code Remote Control server for the agent user";
           # skipped until the one-time `claude auth login`
           unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
-          environment = agentEnvironment // {
-            # keep the account's claude.ai connectors (and their data) out
-            ENABLE_CLAUDEAI_MCP_SERVERS = "false";
-          };
+          environment = claudeEnvironment;
           serviceConfig = agentSandbox // {
             ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
           };
@@ -278,6 +307,12 @@
             StandardOutput = "null";
           };
         };
+
+        # scheduled jobs: Claude, by the owner's choice (more Claude usage)
+        services.agent-flake-update = agentJob "Weekly flake update and stable release move, as a PR" ./agent-jobs/flake-update.md;
+        timers.agent-flake-update = agentTimer "Sat 04:00";
+        services.agent-friction-review = agentJob "Weekly review of ~/work/ENVIRONMENT.md, as a PR" ./agent-jobs/friction-review.md;
+        timers.agent-friction-review = agentTimer "Sun 04:00";
 
         # one cap for both agents' sessions: a runaway agent can't take the
         # desktop down with it

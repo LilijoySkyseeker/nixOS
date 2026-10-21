@@ -163,8 +163,9 @@ pkgs.testers.runNixOSTest {
         rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN after a firewall reload")
 
-        # both agents' remote-control units: same sandbox, one shared cap
-        for unit in ["claude-remote-control", "codex-remote-control"]:
+        # both agents' remote-control units and the scheduled jobs: same
+        # sandbox, one shared cap
+        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-friction-review"]:
             def sprop(p):
                 return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
             for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
@@ -176,6 +177,9 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
+        for timer in ["agent-flake-update.timer", "agent-friction-review.timer"]:
+            state = machine.succeed(f"systemctl is-active {timer} || true").strip()
+            check(state == "active", f"{timer}: {state!r}")
         mem = machine.succeed("systemctl show agent.slice -p MemoryMax --value").strip()
         check(mem not in ("infinity", ""), f"agent.slice MemoryMax={mem!r}")
         # sshd denies agent
