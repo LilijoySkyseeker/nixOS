@@ -250,6 +250,10 @@ pkgs.testers.runNixOSTest {
         assert codex_md == md, "~/.codex/AGENTS.md differs from ~/.claude/CLAUDE.md"
         for d in ["/home/agent/.claude/skills", "/home/agent/.agents/skills"]:
             machine.succeed(as_agent(f"test -f {d}/doghouse-review/SKILL.md"))
+        # bot-wall fetcher on the agent's PATH (no network in the VM to run it)
+        machine.succeed(as_agent("command -v web-fetch"))
+        rc, out = machine.execute(as_agent("web-fetch 2>&1"))
+        assert rc == 2 and "usage: web-fetch" in out, f"web-fetch usage: rc={rc} {out!r}"
         # no ~/repos; clones live in ~/work/repos
         machine.fail("test -e /home/agent/repos")
         # account-level tools stay out: remote session/routine tools would run

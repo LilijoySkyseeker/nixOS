@@ -13,6 +13,30 @@
         + builtins.readFile ../home-manager/claude-code/user-claude.md
       );
       sharedSkills = ../home-manager/claude-code/skills;
+      # web-fetch: pages past bot walls (curl, curl-impersonate, then real
+      # Chromium through nodriver in a virtual display)
+      fetchPython = pkgs.python3.withPackages (ps: [
+        ps.nodriver
+        ps.trafilatura
+        ps.html2text
+      ]);
+      webFetch = pkgs.writeShellApplication {
+        name = "web-fetch";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.gnugrep
+          pkgs.curl
+          pkgs.curl-impersonate
+          pkgs.xvfb-run
+          (pkgs.writeShellScriptBin "browser-fetch" ''
+            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium
+          '')
+          (pkgs.writeShellScriptBin "extract-text" ''
+            exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
+          '')
+        ];
+        text = builtins.readFile ./agent-tools/web-fetch.sh;
+      };
       # git identity: the bot's noreply address (its public GitHub id)
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
@@ -166,6 +190,7 @@
         packages = with pkgs; [
           git
           gh
+          webFetch
         ];
       };
 
