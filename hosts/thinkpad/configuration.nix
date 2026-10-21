@@ -31,14 +31,8 @@
     ++ (with pkgs-stable; [
     ]);
 
-  # fingerprint reader
-  services.fprintd.enable = true;
-
-  # state change settings/buttons
-  services.logind.settings.Login = {
-    HandleLidSwitch = "hybrid-sleep";
-    HandlePowerKey = "poweroff";
-  };
+  # state change settings/buttons (lid, idle, sleep key: myHibernateOnly below)
+  services.logind.settings.Login.HandlePowerKey = "poweroff";
 
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
@@ -83,7 +77,30 @@
   };
   networking.hostId = "5f763495";
   fileSystems."/nix".neededForBoot = true;
-  fileSystems."/nix/state".neededForBoot = true;
+
+  # encrypted root (disko.nix): unlocked by TPM2 + PIN, either YubiKey
+  # (FIDO2) or the recovery passphrase; enrollment is in README.md
+  myEncryptedRoot.enable = true;
+
+  # Secure Boot, keys on zroot/local/secureboot; boot menu also lists Windows
+  # (its boot files copied onto this ESP, see README.md)
+  mySecureBoot.enable = true;
+  boot.loader.timeout = 2;
+
+  # hibernate in place of sleep (lid, 60 min idle, critical battery), to the
+  # swap LV in disko.nix
+  myHibernate = {
+    enable = true;
+    resumeDevice = "/dev/mapper/vg-swap";
+  };
+  myHibernateOnly = {
+    enable = true;
+    # resuming asks for the disk's TPM2 PIN, which is the unlock
+    lockOnResume = false;
+  };
+
+  # tells the desktop when a pull-deploy is waiting for a restart
+  myRebootNotice.enable = true;
 
   # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
