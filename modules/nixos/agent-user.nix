@@ -319,6 +319,9 @@
           };
         targets.agent-weekly = {
           description = "The agents' weekly scheduled jobs";
+          # a target stays active otherwise, and the timer's next firing
+          # would then start nothing
+          unitConfig.StopWhenUnneeded = true;
           wants = [
             "agent-flake-update.service"
             "agent-security-watch.service"

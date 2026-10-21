@@ -4,7 +4,7 @@ pkgs.testers.runNixOSTest {
   name = "agent-user";
 
   nodes.machine =
-    { ... }:
+    { lib, ... }:
     {
       imports = [ agentUserModule ];
 
@@ -15,6 +15,11 @@ pkgs.testers.runNixOSTest {
       };
       # mirror profile-pc: only wheel may talk to the nix daemon
       nix.settings.allowed-users = [ "@wheel" ];
+      # fire the weekly jobs' timer often, to see it start them repeatedly
+      systemd.timers.agent-weekly.timerConfig = {
+        OnCalendar = lib.mkForce "*:*:0/20";
+        AccuracySec = "1s";
+      };
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
       environment.systemPackages = [
@@ -180,6 +185,23 @@ pkgs.testers.runNixOSTest {
         for timer in ["agent-weekly.timer"]:
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
+        # each activation of the weekly target reaches all three jobs, not
+        # just the first (they skip here: no Claude login in the VM)
+        jobs = ["agent-flake-update", "agent-security-watch", "agent-friction-review"]
+        def ran():
+            return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}
+        # the test node fires the timer every 20s (see nodes.machine)
+        seen = []
+        for _ in range(2):
+            before = ran()
+            machine.wait_until_succeeds(
+                "systemctl show agent-friction-review -p ConditionTimestampMonotonic --value | grep -vx '%s'"
+                % before["agent-friction-review"], timeout=90)
+            machine.wait_until_succeeds("! systemctl list-jobs --no-legend | grep -q agent-")
+            seen.append(ran())
+        for j in jobs:
+            check(seen[0][j] not in ("", "0"), f"{j} never ran")
+            check(seen[1][j] != seen[0][j], f"{j} didn't run on the second activation")
         mem = machine.succeed("systemctl show agent.slice -p MemoryMax --value").strip()
         check(mem not in ("infinity", ""), f"agent.slice MemoryMax={mem!r}")
         # sshd denies agent
