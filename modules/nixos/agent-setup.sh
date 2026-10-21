@@ -108,7 +108,8 @@ chk_codex_config() {
 }
 fix_codex_config() { systemctl restart codex-agent-config; }
 
-chk_service() { systemctl is-active --quiet claude-remote-control codex-remote-control; }
+# is-active with several units passes when any one is active
+chk_service() { systemctl is-active --quiet claude-remote-control && systemctl is-active --quiet codex-remote-control; }
 fix_service() {
   systemctl restart claude-agent-settings codex-agent-config claude-remote-control codex-remote-control
   sleep 3
