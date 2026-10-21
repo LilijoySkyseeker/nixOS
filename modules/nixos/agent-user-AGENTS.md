@@ -65,6 +65,19 @@ container: anything you write is on the owner's machine.
   `direnv allow` once after cloning, then run its tools through
   `direnv exec <repo> <command>` (cached after the first run). In the nixOS
   repo that also wires up its git hooks.
+- **Bot walls.** When a site refuses you (a 403 or 429, a "Just a moment"
+  or CAPTCHA page), run `web-fetch URL` in the shell. It prints the main
+  text as markdown (`--html` for the raw page, `-o FILE` to save a PDF or
+  other file), trying curl with browser headers, then curl-impersonate,
+  then real Chromium through nodriver, which waits out Cloudflare-style
+  challenges. Save long pages to a file rather than printing them whole.
+  For papers, the open routes are often quicker: arXiv, Europe PMC, and
+  the Unpaywall, OpenAlex and Crossref APIs.
+  The owner authorizes getting past bot walls whenever you read for their
+  work, with any tool that does it (`nix shell` the ones you need). The
+  line is access control: don't get around paywalls or logins, don't use
+  CAPTCHA-solving services or proxy networks, and keep to the pace of a
+  person reading. A wall `web-fetch` can't pass goes in `ENVIRONMENT.md`.
 - By design you have no root, no secrets, no access to the owner's home, and
   no route to their LAN or tailnet.
 - Your changes reach the owner as pull requests from your GitHub account. You
