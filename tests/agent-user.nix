@@ -163,17 +163,21 @@ pkgs.testers.runNixOSTest {
         rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN after a firewall reload")
 
-        def sprop(p):
-            return machine.succeed(f"systemctl show claude-remote-control -p {p} --value").strip()
-        for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"), ("ProtectSystem", "strict")]:
-            check(sprop(p) == want, f"{p}={sprop(p)!r}")
-        check("/home/agent" in sprop("ReadWritePaths"), f"ReadWritePaths={sprop('ReadWritePaths')!r}")
-        inacc = sprop("InaccessiblePaths")
-        for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
-            check(sock in inacc, f"{sock} not inaccessible: {inacc!r}")
-        check(sprop("MemoryMax") not in ("infinity", ""), f"MemoryMax={sprop('MemoryMax')!r}")
-        check("firewall.service" in sprop("BindsTo"), f"BindsTo={sprop('BindsTo')!r}")
-        check("firewall.service" in sprop("After"), "not ordered after firewall.service")
+        # both agents' remote-control units: same sandbox, one shared cap
+        for unit in ["claude-remote-control", "codex-remote-control"]:
+            def sprop(p):
+                return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
+            for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
+                            ("ProtectSystem", "strict"), ("User", "agent"), ("Slice", "agent.slice")]:
+                check(sprop(p) == want, f"{unit}: {p}={sprop(p)!r}")
+            check("/home/agent" in sprop("ReadWritePaths"), f"{unit}: ReadWritePaths={sprop('ReadWritePaths')!r}")
+            inacc = sprop("InaccessiblePaths")
+            for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
+                check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
+            check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
+            check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
+        mem = machine.succeed("systemctl show agent.slice -p MemoryMax --value").strip()
+        check(mem not in ("infinity", ""), f"agent.slice MemoryMax={mem!r}")
         # sshd denies agent
         sshd = machine.succeed("sshd -T -C user=agent,host=x,addr=127.0.0.1 | grep -i '^denyusers' || true")
         check("agent" in sshd, f"sshd denyusers: {sshd!r}")
@@ -188,6 +192,11 @@ pkgs.testers.runNixOSTest {
         # plus the user's working rule, the same file their own CLAUDE.md uses
         with open("${../modules/home-manager/claude-code/user-claude.md}") as f:
             assert f.read() in md, "CLAUDE.md lacks the user's working rule"
+        # codex reads the same file, and both see the same skills
+        codex_md = machine.succeed(as_agent("cat /home/agent/.codex/AGENTS.md"))
+        assert codex_md == md, "~/.codex/AGENTS.md differs from ~/.claude/CLAUDE.md"
+        for d in ["/home/agent/.claude/skills", "/home/agent/.agents/skills"]:
+            machine.succeed(as_agent(f"test -f {d}/doghouse-review/SKILL.md"))
         # no ~/repos; clones live in ~/work/repos
         machine.fail("test -e /home/agent/repos")
         # account-level tools stay out: remote session/routine tools would run
@@ -207,6 +216,19 @@ pkgs.testers.runNixOSTest {
         machine.succeed("systemctl restart claude-agent-settings")
         cfg = machine.succeed("cat /home/agent/.claude/settings.json")
         assert '"theme": "dark"' in cfg and '"claude-code-remote"' in cfg, f"merge clobbered: {cfg!r}"
+
+    with subtest("codex config"):
+        machine.wait_for_unit("codex-agent-config.service")
+        cfg = machine.succeed("cat /home/agent/.codex/config.toml")
+        for line in ['sandbox_mode = "danger-full-access"', 'approval_policy = "never"']:
+            assert line in cfg, f"missing {line!r}: {cfg!r}"
+        # a CLI-owned key survives the merge
+        machine.succeed("""printf 'model = "m"\\n' >> /home/agent/.codex/config.toml""")
+        machine.succeed("systemctl restart codex-agent-config")
+        cfg = machine.succeed("cat /home/agent/.codex/config.toml")
+        assert 'model = "m"' in cfg and "danger-full-access" in cfg, f"merge clobbered: {cfg!r}"
+        mode = machine.succeed("stat -c %a /home/agent/.codex/config.toml").strip()
+        assert mode == "600", f"config.toml mode {mode}"
 
     with subtest("git identity is declared"):
         name = machine.succeed(as_agent("git config user.name")).strip()
@@ -242,5 +264,13 @@ pkgs.testers.runNixOSTest {
         env = prop("Environment")
         assert "ENABLE_CLAUDEAI_MCP_SERVERS=false" in env, f"Environment: {env!r}"
         assert "HOME=/home/agent" in env, f"Environment: {env!r}"
+        # codex: skipped until its one-time login, same as claude
+        def cprop(p):
+            return machine.succeed(f"systemctl show codex-remote-control -p {p} --value").strip()
+        assert cprop("ConditionResult") == "no", f"codex ConditionResult: {cprop('ConditionResult')!r}"
+        assert cprop("ActiveState") != "failed", f"codex ActiveState: {cprop('ActiveState')!r}"
+        script = machine.succeed("cat " + cprop("ExecStart").split("path=")[1].split(" ")[0])
+        for want in ["app-server", "remoteControl/enable"]:
+            assert want in script, f"missing {want!r} in codex wrapper"
   '';
 }
