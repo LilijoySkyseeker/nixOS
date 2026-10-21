@@ -32,7 +32,29 @@
     ]);
 
   # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
-  boot.extraModulePackages = with config.boot.kernelPackages; [ r8125 ];
+  boot.extraModulePackages = with config.boot.kernelPackages; [
+    # install via modules_install so the .ko.cer exists (NixOS/nixpkgs#575192);
+    # drop the override once NixOS/nixpkgs#576564 reaches nixos-unstable
+    (r8125.overrideAttrs (old: {
+      preBuild = "";
+      postPatch = ''
+        substituteInPlace src/Makefile --replace-fail "BASEDIR :=" "BASEDIR ?="
+      '';
+      makeFlags = old.makeFlags ++ [
+        "INSTALL_MOD_PATH=${placeholder "out"}"
+        "INSTALL_MOD_DIR=kernel/drivers/net/ethernet/realtek"
+        "INSTALL_MOD_STRIP=1"
+        "DEPMOD=true"
+      ];
+      installPhase = null;
+      installTargets = [ "modules_install" ];
+      installFlags = [
+        "-C"
+        "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
+        "M=$(PWD)/src"
+      ];
+    }))
+  ];
   boot.kernelModules = [ "r8125" ];
   nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
 

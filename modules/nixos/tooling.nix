@@ -85,7 +85,7 @@ _: {
             };
             statusline.lualine = {
               enable = true;
-              theme = lib.mkForce "gruvbox_dark"; # TEMP
+              setupOpts.options.theme = lib.mkForce "gruvbox_dark"; # TEMP
             };
             visuals = {
               highlight-undo = {
