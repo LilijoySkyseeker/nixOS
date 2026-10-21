@@ -52,12 +52,24 @@ half-done as the fleet moves on.
      "Maintenance: needs you" with `gh issue` instead. Close it when a
      later run finds nothing that needs the owner.
    - Leave every `ENVIRONMENT.md` entry that isn't fixed on `master`.
-5. **Report.** In this week's fleet report,
+5. **Branches.** In every clone under `~/work/repos`, after
+   `git fetch --prune`:
+   - remove each worktree whose branch is merged into the default branch
+     and has no uncommitted changes, then delete the merged local
+     branches;
+   - delete remote branches in the owner's repos that are merged into the
+     default branch and have no open PR (GitHub's "Automatically delete
+     head branches" does this where it's on);
+   - never delete an unmerged branch or a dirty worktree. List unmerged
+     branches with no open PR and no commit in four weeks under "Needs
+     the owner", with their last commit date, for the owner to decide.
+6. **Report.** In this week's fleet report,
    `~/research/Fleet/Weekly/YYYY-MM-DD.md`, dated by this week's Monday
    (`date -d "$(( ($(date +%u) + 6) % 7 )) days ago" +%F`; create it if
    it's missing):
-   - write the `## Maintenance` section: the PR or issue, and one line per
-     item you fixed or that needs the owner;
+   - write the `## Maintenance` section: the PR or issue, one line per
+     item you fixed or that needs the owner, and the branches and
+     worktrees you removed;
    - put a `## Act now` section at the very top that gathers every
      owner action from every section, or "Nothing" if there is none.
    Then rewrite `~/research/Fleet/Status.md` as the fleet's standing

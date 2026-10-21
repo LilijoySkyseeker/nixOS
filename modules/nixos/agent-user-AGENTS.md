@@ -89,6 +89,10 @@ container: anything you write is on the owner's machine.
   `master` that way (2026-10-21). If work needs an unmerged PR, wait for
   it to merge and then branch from the default branch, or put both in one
   PR.
+- Once your PR merges, remove its worktree and delete its branch, locally
+  and on the remote. The weekly maintenance run sweeps up what's left:
+  merged branches piled up by the dozen before it did (73 on nixOS,
+  2026-10-21).
 - No AI attribution anywhere: no `Co-authored-by` trailers, "Generated
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
