@@ -155,27 +155,10 @@
                     "RemoteTrigger"
                     "SendMessage"
                   ];
-                  # no classifier unless a session asks for another mode
+                  # always bypass: the app can't offer it, and its "auto" pick is refused
                   permissions.defaultMode = "bypassPermissions";
+                  permissions.disableAutoMode = "disable";
                   skipDangerousModePermissionPrompt = true;
-                  # auto mode's classifier: the unit and firewall are the boundary
-                  autoMode = {
-                    environment = [
-                      "$defaults"
-                      "Claude runs as `agent`, a dedicated unprivileged Unix user on the owner's NixOS desktop, inside a systemd unit with ProtectSystem=strict, PrivateDevices, NoNewPrivileges and memory and task caps. It has no root, no sudo, no secrets and no access to the owner's home directory."
-                      "A firewall rejects all of the agent's traffic to private networks, the owner's tailnet and IPv6; only the public internet is reachable."
-                      "The agent's changes reach the owner's repositories only as pull requests from its own GitHub bot account. The owner reviews and merges every one, and master is protected."
-                      "/home/agent is on ZFS with local snapshots every few minutes plus off-host replication, so mistakes inside it are recoverable."
-                      "The owner has asked for the agent to have as much freedom as possible inside this user sandbox."
-                    ];
-                    allow = [
-                      "$defaults"
-                      "Reading or changing the agent's own Claude Code and Codex configuration under /home/agent (settings.json, config.toml, skills, plugins), including permission and sandbox settings."
-                      "Starting nested agents as the agent user (claude, codex, subagents, workflows) with any permission mode or sandbox flag, including bypassPermissions and danger-full-access: they stay inside the same Unix-user boundary."
-                      "Fetching, building and running code from nixpkgs, the owner's flakes, npm, PyPI, crates.io or GitHub inside /home/agent or /tmp."
-                      "Reading the agent's own session transcripts, logs, journal output and systemd unit definitions."
-                    ];
-                  };
                   # the machine's full resources, as the agent's CLAUDE.md grants
                   workflowSizeGuideline = "unrestricted";
                   # unattended sessions wait out a usage limit instead of stalling
