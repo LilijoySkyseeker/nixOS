@@ -62,10 +62,11 @@ container: anything you write is on the owner's machine.
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
   Codex has no setting for it, so this line is the control.
-- Two weekly jobs run Claude unattended from systemd timers:
-  `agent-flake-update` (flake inputs, and the stable hosts' move to each
-  new NixOS release) and `agent-friction-review` (turns `ENVIRONMENT.md`
-  into a PR). Their prompts are in the nixOS repo's
+- Every Sunday night, `agent-weekly.timer` runs three Claude jobs
+  unattended, in order: `agent-flake-update` (flake inputs, and the stable
+  hosts' move to each new NixOS release), `agent-security-watch` (the
+  week's security news against the fleet, as a research note and fix PRs)
+  and `agent-friction-review` (turns `ENVIRONMENT.md` into a PR). Their prompts are in the nixOS repo's
   `modules/nixos/agent-jobs/`; a new job is a PR there. Anything you need
   but can't get, such as an account the agents should own or a missing
   tool, goes in `ENVIRONMENT.md`, and the weekly review brings it to the

@@ -95,15 +95,6 @@
             TimeoutStartSec = "6h";
           };
       };
-      # weekly; Persistent catches up on a run missed while torrent was off
-      agentTimer = onCalendar: {
-        wantedBy = [ "timers.target" ];
-        timerConfig = {
-          OnCalendar = onCalendar;
-          Persistent = true;
-          RandomizedDelaySec = "1h";
-        };
-      };
       # codex app-server is the remote-control host; the managed daemon
       # (`codex remote-control start`) refuses a nix-packaged CLI
       codexRemote = pkgs.writeShellScript "codex-remote-control" ''
@@ -308,11 +299,43 @@
           };
         };
 
-        # scheduled jobs: Claude, by the owner's choice (more Claude usage)
+        # scheduled jobs: Claude, by the owner's choice (more Claude usage),
+        # one after another; each can also be started by hand
         services.agent-flake-update = agentJob "Weekly flake update and stable release move, as a PR" ./agent-jobs/flake-update.md;
-        timers.agent-flake-update = agentTimer "Sat 04:00";
-        services.agent-friction-review = agentJob "Weekly review of ~/work/ENVIRONMENT.md, as a PR" ./agent-jobs/friction-review.md;
-        timers.agent-friction-review = agentTimer "Sun 04:00";
+        services.agent-security-watch =
+          agentJob "Weekly security research for the fleet, as a note and PRs" ./agent-jobs/security-watch.md
+          // {
+            # sees this week's flake-update PR
+            after = agentUnitDeps.after ++ [ "agent-flake-update.service" ];
+          };
+        services.agent-friction-review =
+          agentJob "Weekly review of ~/work/ENVIRONMENT.md, as a PR" ./agent-jobs/friction-review.md
+          // {
+            # last, so the other jobs' friction is in the log
+            after = agentUnitDeps.after ++ [
+              "agent-flake-update.service"
+              "agent-security-watch.service"
+            ];
+          };
+        targets.agent-weekly = {
+          description = "The agents' weekly scheduled jobs";
+          wants = [
+            "agent-flake-update.service"
+            "agent-security-watch.service"
+            "agent-friction-review.service"
+          ];
+        };
+        # late Sunday, just after the owner's weekly Claude usage resets, so
+        # the jobs spend the start of the week's limit; Persistent catches
+        # up on a run missed while torrent was off
+        timers.agent-weekly = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = "Sun 23:30";
+            Persistent = true;
+            Unit = "agent-weekly.target";
+          };
+        };
 
         # one cap for both agents' sessions: a runaway agent can't take the
         # desktop down with it

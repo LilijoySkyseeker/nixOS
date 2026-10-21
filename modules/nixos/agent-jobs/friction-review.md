@@ -1,4 +1,5 @@
-You are running unattended from the `agent-friction-review` timer: nobody
+You are running unattended from the weekly agent jobs (`agent-friction-review`, which runs
+last, so this week's job runs may have added entries): nobody
 is watching this session, and your reply only goes to the journal. Your
 result is a pull request the owner reviews.
 

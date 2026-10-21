@@ -43,11 +43,13 @@ thinkpad it has no `@blank` snapshots to preserve.
 This host (only) runs `agent-user`: an `agent` Unix user whose
 `claude-remote-control` and `codex-remote-control` services run Claude
 Code and Codex sessions with no permission prompts, reachable from the
-Claude and ChatGPT apps. Two weekly timers run Claude unattended in the
-same sandbox and open PRs for you to review: `agent-flake-update`
-(Saturdays; flake inputs, and moving the stable hosts to each new NixOS
-release) and `agent-friction-review` (Sundays; the agents' friction log).
-Their prompts are in `modules/nixos/agent-jobs/`. Run one now with
+Claude and ChatGPT apps. Every Sunday at 23:30, `agent-weekly.timer` runs
+three Claude jobs unattended, one after another, in the same sandbox:
+`agent-flake-update` (flake inputs, and moving the stable hosts to each
+new NixOS release, as a PR), `agent-security-watch` (the week's security
+news against the fleet, as a note in `Vault/Research/Computing/Security
+watch/` and fix PRs) and `agent-friction-review` (the agents' friction
+log, as a PR or issue). Their prompts are in `modules/nixos/agent-jobs/`. Run one now with
 `run0 systemctl start agent-flake-update`, and follow it with
 `journalctl -fu agent-flake-update`. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
 `/home/agent/research`) and can't reach the LAN or tailnet. Its

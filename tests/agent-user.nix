@@ -165,7 +165,7 @@ pkgs.testers.runNixOSTest {
 
         # both agents' remote-control units and the scheduled jobs: same
         # sandbox, one shared cap
-        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-friction-review"]:
+        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-security-watch", "agent-friction-review"]:
             def sprop(p):
                 return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
             for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
@@ -177,7 +177,7 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
-        for timer in ["agent-flake-update.timer", "agent-friction-review.timer"]:
+        for timer in ["agent-weekly.timer"]:
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
         mem = machine.succeed("systemctl show agent.slice -p MemoryMax --value").strip()

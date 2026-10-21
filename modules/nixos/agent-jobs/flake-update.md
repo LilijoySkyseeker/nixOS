@@ -1,6 +1,6 @@
-You are running unattended from the `agent-flake-update` timer: nobody is
-watching this session, and your reply only goes to the journal. Your
-result is a pull request the owner reviews.
+You are running unattended as `agent-flake-update`, the first of the
+weekly agent jobs: nobody is watching this session, and your reply only
+goes to the journal. Your result is a pull request the owner reviews.
 
 Update the nixOS flake's inputs, and move the stable inputs to a new NixOS
 release when one has shipped.
