@@ -103,9 +103,15 @@ fix_codex_login() {
   as_agent codex login --device-auth || true
 }
 
-chk_service() { systemctl is-active --quiet claude-remote-control; }
+chk_codex_config() {
+  grep -qx 'sandbox_mode = "danger-full-access"' "$agent_home/.codex/config.toml" 2>/dev/null
+}
+fix_codex_config() { systemctl restart codex-agent-config; }
+
+# is-active with several units passes when any one is active
+chk_service() { systemctl is-active --quiet claude-remote-control && systemctl is-active --quiet codex-remote-control; }
 fix_service() {
-  systemctl restart claude-agent-settings claude-remote-control
+  systemctl restart claude-agent-settings codex-agent-config claude-remote-control codex-remote-control
   sleep 3
 }
 
@@ -140,10 +146,12 @@ item "Claude login and workspace trust" chk_claude "run claude once in ~agent/wo
 item "Remote Control consent" chk_consent "run claude remote-control once" fix_consent
 item "codex plugin installed" chk_codex_plugin "install codex@openai-codex as the agent" fix_codex_plugin
 item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
-item "remote-control service running" chk_service "restart the agent services" fix_service
+item "codex config merged" chk_codex_config "rerun codex-agent-config" fix_codex_config
+item "remote-control services running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""
-note "not checkable here: Trusted Devices (claude.ai → Settings → Account)"
+note "not checkable here: Trusted Devices (claude.ai → Settings → Account), and"
+note "  Codex pairing (torrent listed under Codex remote in the ChatGPT app)"
 
 if [ "$failed" -eq 0 ]; then
   echo "all good"

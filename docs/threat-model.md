@@ -35,7 +35,7 @@ later audit folds them in.
 
 | Since | Principal | Reaches | Bounded by |
 |---|---|---|---|
-| 2026-10-06 | **`agent`** (torrent): an AI agent running with no permission prompts, so treat it as prompt-injectable | the internet; `~agent`; `Vault/Research` via bindfs; the nix daemon (`allowed-users`). lilijoy, in group `agent`, reaches `~agent/work`; git refuses agent-owned repos there for lilijoy | the Unix user itself, the `agent-egress` chain (no LAN or tailnet, IPv6 loopback only), the `claude-remote-control` unit's sandbox, and sshd `DenyUsers`. See `hardening.md`, "The `agent` user"; design record in `~/Projects/agenticsandbox/` |
+| 2026-10-06 | **`agent`** (torrent): an AI agent running with no permission prompts, so treat it as prompt-injectable | the internet; `~agent`; `Vault/Research` via bindfs; the nix daemon (`allowed-users`). lilijoy, in group `agent`, reaches `~agent/work`; git refuses agent-owned repos there for lilijoy | the Unix user itself, the `agent-egress` chain (no LAN or tailnet, IPv6 loopback only), the `claude-remote-control` and `codex-remote-control` units' sandbox, and sshd `DenyUsers`. See `hardening.md`, "The `agent` user"; design record in `~/Projects/agenticsandbox/` |
 
 ## Removed since the current model
 

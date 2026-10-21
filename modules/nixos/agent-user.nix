@@ -5,9 +5,10 @@
     let
       bot = "LilijoySkyseeker-agent";
       # orientation + the user's working rule (the same file as their own
-      # user-level CLAUDE.md, so there's no copy to drift)
-      agentClaudeMd = pkgs.writeText "agent-CLAUDE.md" (
-        builtins.readFile ./agent-user-CLAUDE.md
+      # user-level CLAUDE.md, so there's no copy to drift); Claude and Codex
+      # both read it
+      agentInstructions = pkgs.writeText "agent-AGENTS.md" (
+        builtins.readFile ./agent-user-AGENTS.md
         + "\n"
         + builtins.readFile ../home-manager/claude-code/user-claude.md
       );
@@ -35,6 +36,53 @@
         ''
         + builtins.readFile ./agent-setup.sh;
       };
+      # sandbox shared by both agents' remote-control units: every agent
+      # session is a child of one of them
+      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
+      agentSandbox = {
+        User = "agent";
+        Group = "agent";
+        WorkingDirectory = "/home/agent/work";
+        Restart = "always";
+        RestartSec = 30;
+        Slice = "agent.slice";
+        NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
+        PrivateTmp = true;
+        PrivateDevices = true; # no /dev/kvm or /dev/net/tun (F4)
+        ProtectSystem = "strict";
+        ReadWritePaths = [ "/home/agent" ];
+        # world-writable daemon sockets: VPN, tailnet and VM control (F5)
+        InaccessiblePaths = [
+          "-/run/mullvad-vpn"
+          "-/run/tailscale"
+          "-/run/libvirt"
+        ];
+      };
+      agentEnvironment = {
+        HOME = "/home/agent";
+        PATH = lib.mkForce "/run/wrappers/bin:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin";
+      };
+      # stop with the firewall: a stopped or failed firewall drops agent-egress
+      agentUnitDeps = {
+        wantedBy = [ "multi-user.target" ];
+        wants = [ "network-online.target" ];
+        bindsTo = [ "firewall.service" ];
+        after = [
+          "network-online.target"
+          "firewall.service"
+        ];
+      };
+      # codex app-server is the remote-control host; the managed daemon
+      # (`codex remote-control start`) refuses a nix-packaged CLI
+      codexRemote = pkgs.writeShellScript "codex-remote-control" ''
+        exec ${pkgs.codex}/bin/codex app-server < <(
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"codex-remote-control","version":"1"},"capabilities":{"experimentalApi":true}}}' \
+            '{"jsonrpc":"2.0","method":"initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"remoteControl/enable","params":{"ephemeral":true}}'
+          exec sleep infinity
+        )
+      '';
       # agent-egress rules per family; IPv6 rejects all but loopback
       egress = [
         {
@@ -175,50 +223,76 @@
             '';
         };
 
-        services.claude-remote-control = {
+        services.claude-remote-control = agentUnitDeps // {
           description = "Claude Code Remote Control server for the agent user";
-          wantedBy = [ "multi-user.target" ];
-          wants = [ "network-online.target" ];
-          # stop with the firewall: a stopped or failed firewall drops agent-egress
-          bindsTo = [ "firewall.service" ];
-          after = [
-            "network-online.target"
-            "firewall.service"
-          ];
           # skipped until the one-time `claude auth login`
           unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
-          environment = {
-            HOME = "/home/agent";
+          environment = agentEnvironment // {
             # keep the account's claude.ai connectors (and their data) out
             ENABLE_CLAUDEAI_MCP_SERVERS = "false";
-            PATH = lib.mkForce "/run/wrappers/bin:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin";
           };
+          serviceConfig = agentSandbox // {
+            ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
+          };
+        };
+
+        # merge the keys this repo owns into the agent's CLI-owned config.toml
+        services.codex-agent-config = {
+          description = "Merge repo-owned keys into the agent's Codex config";
+          wantedBy = [ "multi-user.target" ];
+          before = [ "codex-remote-control.service" ];
           serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
             User = "agent";
             Group = "agent";
-            WorkingDirectory = "/home/agent/work";
-            ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
-            Restart = "always";
-            RestartSec = 30;
-
-            # sandbox: every agent session is a child of this unit
-            # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
-            NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
-            PrivateTmp = true;
-            PrivateDevices = true; # no /dev/kvm or /dev/net/tun (F4)
-            ProtectSystem = "strict";
-            ReadWritePaths = [ "/home/agent" ];
-            # world-writable daemon sockets: VPN, tailnet and VM control (F5)
-            InaccessiblePaths = [
-              "-/run/mullvad-vpn"
-              "-/run/tailscale"
-              "-/run/libvirt"
-            ];
-            # a runaway agent can't take the desktop down with it
-            MemoryMax = "64G";
-            TasksMax = 4096;
-            CPUWeight = 50;
           };
+          script =
+            let
+              managed = pkgs.writeText "agent-codex-config.json" (
+                builtins.toJSON {
+                  # no prompts and no inner sandbox, as Claude's bypassPermissions;
+                  # the Unix user and its units are the boundary
+                  sandbox_mode = "danger-full-access";
+                  approval_policy = "never";
+                }
+              );
+            in
+            ''
+              f=/home/agent/.codex/config.toml
+              mkdir -p /home/agent/.codex
+              cur=$(mktemp)
+              if [ -s "$f" ]; then
+                ${pkgs.remarshal}/bin/toml2json "$f" > "$cur"
+              else
+                echo '{}' > "$cur"
+              fi
+              ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$cur" ${managed} \
+                | ${pkgs.remarshal}/bin/json2toml > "$f.tmp"
+              rm -f "$cur"
+              chmod 600 "$f.tmp"
+              mv "$f.tmp" "$f"
+            '';
+        };
+
+        services.codex-remote-control = agentUnitDeps // {
+          description = "Codex remote control host for the agent user";
+          # skipped until the one-time `codex login` (pairing: agent-setup)
+          unitConfig.ConditionPathExists = "/home/agent/.codex/auth.json";
+          environment = agentEnvironment;
+          serviceConfig = agentSandbox // {
+            ExecStart = codexRemote;
+            # the app-server's JSON-RPC replies and notifications
+            StandardOutput = "null";
+          };
+        };
+
+        # one cap for both agents' sessions: a runaway agent can't take the
+        # desktop down with it
+        slices.agent.sliceConfig = {
+          MemoryMax = "64G";
+          TasksMax = 4096;
+          CPUWeight = 50;
         };
 
         tmpfiles.rules = [
@@ -232,13 +306,21 @@
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
-          "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentClaudeMd}"
+          "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentInstructions}"
+          "d /home/agent/.codex 0700 agent agent -"
+          "L+ /home/agent/.codex/AGENTS.md - - - - ${agentInstructions}"
           "d /home/agent/.claude/skills 0755 agent agent -"
+          # codex's user skill directory
+          "d /home/agent/.agents 0755 agent agent -"
+          "d /home/agent/.agents/skills 0755 agent agent -"
         ]
         # the user's skills, from the same directory their home-manager links
-        ++ lib.mapAttrsToList (
-          name: _: "L+ /home/agent/.claude/skills/${name} - - - - ${sharedSkills}/${name}"
-        ) (builtins.readDir sharedSkills);
+        ++ lib.concatLists (
+          lib.mapAttrsToList (name: _: [
+            "L+ /home/agent/.claude/skills/${name} - - - - ${sharedSkills}/${name}"
+            "L+ /home/agent/.agents/skills/${name} - - - - ${sharedSkills}/${name}"
+          ]) (builtins.readDir sharedSkills)
+        );
 
         # systemd mount + automount, not fileSystems
         # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
