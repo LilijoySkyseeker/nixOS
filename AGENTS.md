@@ -65,6 +65,13 @@ copy the path back from `<mountpoint>/.zfs/snapshot/<timestamp>/` (see
 - Branch from an up-to-date `master` and open a PR; the user reviews and
   merges every one, with a real merge commit. A direct commit to `master`
   is only for a typo-sized fix.
+- **Never stack branches or PRs.** Every branch starts from an
+  up-to-date `origin/master`, and every PR targets `master`. When stacked
+  PRs merge out of order, the later ones land in their parent branch
+  instead of `master`, and the merge screen doesn't show it: #142 and #144
+  never reached `master` that way (2026-10-21). If work needs an unmerged
+  PR, wait for it to merge and then branch from `master`, or put both in
+  one PR.
 - Conventional Commits, enforced by the `commit-msg` hook:
   `type(scope): subject`.
 - **The why goes in the commit body**: the constraint, the decision and
