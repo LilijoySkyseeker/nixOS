@@ -73,6 +73,10 @@ in
             package = pkgs-unstable.sudo.override { withInsults = true; };
           };
         }
+        # eMudhra's intermediates under this root have trivially recoverable keys
+        {
+          pki.caCertificateBlacklist = [ "emSign ECC Root CA - G3" ]; # TODO: remove once nixos-unstable and nixos-26.05 both ship cacert >= 3.131.1
+        }
       ];
 
       # 26.11 change for zfs security
