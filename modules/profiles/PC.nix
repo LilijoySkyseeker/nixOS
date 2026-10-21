@@ -65,6 +65,8 @@ in
         # closed source
         spotify
         claude-code
+        chatgpt
+        inputs.llm-agents.packages.${pkgs-unstable.stdenv.hostPlatform.system}.claude-desktop
 
         # temp copy from stable
         feishin
