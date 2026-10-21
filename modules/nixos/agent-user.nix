@@ -23,6 +23,8 @@
       webFetch = pkgs.writeShellApplication {
         name = "web-fetch";
         runtimeInputs = [
+          pkgs.coreutils
+          pkgs.gnugrep
           pkgs.curl
           pkgs.curl-impersonate
           pkgs.xvfb-run

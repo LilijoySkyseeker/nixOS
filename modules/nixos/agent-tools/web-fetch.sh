@@ -51,7 +51,8 @@ if blocked "$code" || shell_only; then
   # file downloads stay on the curl tiers
   [ "$mode" = file ] && { echo "web-fetch: blocked ($code) at $tier" >&2; exit 1; }
   code=200
-  xvfb-run -a browser-fetch "$url" > "$body" || code=000
+  # backstop for the browser's own 150s limit
+  timeout --kill-after=10 170 xvfb-run -a browser-fetch "$url" > "$body" || code=000
   tier=browser
 fi
 if blocked "$code"; then
