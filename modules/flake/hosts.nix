@@ -65,7 +65,12 @@ in
         nixosModules."health-alerts"
         nixosModules."backup-canary"
         # torrent only, not profile-pc: hotkeys hardcode this desk's outputs
-        { home-manager.users.lilijoy.imports = [ homeManagerModules."audio-switch" ]; }
+        {
+          home-manager.users.lilijoy.imports = [
+            homeManagerModules."audio-switch"
+            homeManagerModules."update-keys"
+          ];
+        }
         # torrent only, not profile-pc: static-IP printer/scanner entries are
         # spoofable on roaming thinkpad; unfree scan blob confined here (ADR-0003)
         nixosModules."brother-mfc-l2740dw"
