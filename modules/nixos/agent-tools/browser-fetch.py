@@ -43,6 +43,11 @@ async def main(url):
                     and not any(c in title.lower() for c in CHALLENGE)
                 ):
                     break
+            # out of time on a challenge, or nothing titled: not the page (a
+            # real but short page still passes)
+            if not title or any(c in title.lower() for c in CHALLENGE):
+                print(f"browser-fetch: unresolved challenge ({title!r})", file=sys.stderr)
+                sys.exit(1)
             # the status of the document that finally loaded, after any
             # challenge's redirect
             status = await tab.evaluate(
