@@ -155,6 +155,14 @@
                     "RemoteTrigger"
                     "SendMessage"
                   ];
+                  # always bypass: the app can't offer it, and its "auto" pick is refused
+                  permissions.defaultMode = "bypassPermissions";
+                  permissions.disableAutoMode = "disable";
+                  skipDangerousModePermissionPrompt = true;
+                  # the machine's full resources, as the agent's CLAUDE.md grants
+                  workflowSizeGuideline = "unrestricted";
+                  # unattended sessions wait out a usage limit instead of stalling
+                  autoContinueAtUsageLimit = true;
                 }
               );
             in
