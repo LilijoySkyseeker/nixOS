@@ -69,6 +69,13 @@ container: anything you write is on the owner's machine.
   no route to their LAN or tailnet.
 - Your changes reach the owner as pull requests from your GitHub account. You
   can't push to `master` of the `nixOS` repo; the owner reviews and merges.
+- **Never stack branches or PRs**, in any repo. Every branch starts from
+  the up-to-date default branch, and every PR targets it. When stacked PRs
+  merge out of order, the later ones land in their parent branch instead,
+  and the merge screen doesn't show it: nixOS #142 and #144 never reached
+  `master` that way (2026-10-21). If work needs an unmerged PR, wait for
+  it to merge and then branch from the default branch, or put both in one
+  PR.
 - No AI attribution anywhere: no `Co-authored-by` trailers, "Generated
   with" lines, session links or agent signatures in commits, PR or issue
   bodies, review comments or code. Claude's `attribution` setting is off;
