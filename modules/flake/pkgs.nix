@@ -14,8 +14,8 @@
     };
     overlays = [
       # a test broken by Cython 3.3.0 fails the build (NixOS/nixpkgs#576442),
-      # taking piper-tts and calibre with it; drop once NixOS/nixpkgs#576063
-      # reaches nixos-unstable
+      # taking piper-tts and calibre with it
+      # TODO: drop when NixOS/nixpkgs#576063 is in nixos-unstable
       (_: prev: {
         pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
           (_: pyPrev: {
@@ -27,9 +27,9 @@
           })
         ];
         # speechd-minimal stopped installing its python module, which
-        # calibre's tests import; drop once NixOS/nixpkgs#576062 reaches
-        # nixos-unstable. Scoped to calibre to avoid rebuilding speechd's
-        # other dependents.
+        # calibre's tests import. Scoped to calibre to avoid rebuilding
+        # speechd's other dependents.
+        # TODO: drop when NixOS/nixpkgs#576062 is in nixos-unstable
         calibre = prev.calibre.override {
           speechd-minimal = prev.speechd-minimal.overrideAttrs (old: {
             nativeBuildInputs = old.nativeBuildInputs ++ [ prev.python3Packages.python ];
