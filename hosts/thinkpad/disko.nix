@@ -3,14 +3,11 @@
   # disko
   disko.devices =
     let
-      rootSsd = vars.mkZfsRootSsd;
       zfsProps = vars.zfsProps config; # see vars.nix
     in
-    {
-      disk = {
-        # Root pool disks
-        nvme-a = rootSsd 1 "nvme-Samsung_SSD_970_EVO_Plus_500GB_S58SNS0R706072M" "16G";
-      };
+    # ESP, then LUKS2 holding LVM: a RAM-sized swap LV (hibernation) and zroot
+    vars.mkEncryptedRootSsd "nvme-Samsung_SSD_970_EVO_Plus_500GB_S58SNS0R706072M" "64G"
+    // {
       zpool = {
         zroot = {
           type = "zpool";
@@ -30,21 +27,20 @@
               mountpoint = "/nix";
               options = zfsProps "zroot" "local/nix";
             };
-            "local/state" = {
+            # Secure Boot keys: outside zrepl's snapshots and replication
+            "local/secureboot" = {
               type = "zfs_fs";
-              mountpoint = "/nix/state"; # sub dir are just mountpoint
-              options = zfsProps "zroot" "local/state";
+              mountpoint = "/var/lib/sbctl";
+              options = zfsProps "zroot" "local/secureboot";
             };
             "local/root" = {
               type = "zfs_fs";
               mountpoint = "/";
-              postCreateHook = "zfs snapshot zroot/local/root@blank";
               options = zfsProps "zroot" "local/root";
             };
             "local/home" = {
               type = "zfs_fs";
               mountpoint = "/home";
-              postCreateHook = "zfs snapshot zroot/local/home@blank";
               options = zfsProps "zroot" "local/home";
             };
           };

@@ -78,5 +78,61 @@ _: {
         };
       };
     };
+
+    # disko.devices for an encrypted root SSD: ESP, then one LUKS2 container
+    # holding LVM with a swap LV (the hibernation image) and zroot. One
+    # unlock opens both; myEncryptedRoot and myHibernate match these names
+    # (LUKS `crypt`, swap `/dev/mapper/vg-swap`)
+    mkEncryptedRootSsd = id: swapSize: {
+      disk.root = {
+        type = "disk";
+        device = "/dev/disk/by-id/${id}";
+        content = {
+          type = "gpt";
+          partitions = {
+            esp = {
+              # lanzaboote keeps several kernels and initrds here, and Windows'
+              # boot files share it on a dual-boot machine
+              size = "2G";
+              type = "EF00";
+              content = {
+                type = "filesystem";
+                format = "vfat";
+                mountpoint = "/boot";
+                mountOptions = [ "umask=0077" ];
+              };
+            };
+            luks = {
+              size = "100%";
+              content = {
+                type = "luks";
+                name = "crypt";
+                settings.allowDiscards = true;
+                content = {
+                  type = "lvm_pv";
+                  vg = "vg";
+                };
+              };
+            };
+          };
+        };
+      };
+      lvm_vg.vg = {
+        type = "lvm_vg";
+        lvs = {
+          swap = {
+            size = swapSize;
+            content.type = "swap";
+          };
+          zfs = {
+            size = "100%FREE";
+            content = {
+              type = "zfs";
+              pool = "zroot";
+            };
+          };
+        };
+      };
+    };
   };
 }

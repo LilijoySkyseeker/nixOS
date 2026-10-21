@@ -27,6 +27,11 @@ in
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"
+        nixosModules."encrypted-root"
+        nixosModules."secure-boot"
+        nixosModules.hibernate
+        nixosModules."hibernate-only"
+        nixosModules."reboot-notice"
       ];
     };
     #==================================================
