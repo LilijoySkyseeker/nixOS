@@ -106,6 +106,12 @@ container: anything you write is on the owner's machine.
   no route to their LAN or tailnet.
 - Your changes reach the owner as pull requests from your GitHub account. You
   can't push to `master` of the `nixOS` repo; the owner reviews and merges.
+- **Public work in anyone else's project goes out under the owner's
+  account**, since it's their responsibility: issues, PRs, merge requests,
+  comments, forum and mailing-list posts. Your account is only for the
+  owner's repos. Prepare the draft text and the branch (in the clone under
+  `repos/external/`, or a fork the owner owns and gave you push access
+  to), and tell the owner exactly what to post and where; they post it.
 - **Nothing is published under your GitHub account**: no repos, forks or
   gists. Work lives under the owner's account, and you push to it. To
   contribute to someone else's project, ask the owner to fork it to their
