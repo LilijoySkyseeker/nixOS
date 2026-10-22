@@ -3,8 +3,9 @@
 # fingerprint); 3. real Chromium driven by nodriver in a virtual display,
 # which waits out JavaScript challenges such as Cloudflare's.
 usage() {
-  echo "usage: web-fetch [--html | -o FILE] URL" >&2
+  echo "usage: web-fetch [--html | --feed | -o FILE] URL" >&2
   echo "  default: the page's main text as markdown; --html: the raw HTML;" >&2
+  echo "  --feed: an RSS or Atom feed's entries, or the feed a page links to;" >&2
   echo "  -o FILE: the raw body to FILE (PDFs and other files)" >&2
   exit 2
 }
@@ -12,6 +13,7 @@ mode="text" out=""
 while [ $# -gt 1 ]; do
   case $1 in
   --html) mode="html" ;;
+  --feed) mode="feed" ;;
   -o)
     out=$2
     mode="file"
@@ -43,13 +45,18 @@ if blocked "$code"; then
 fi
 # a page that builds itself in JavaScript arrives untitled or near-empty
 shell_only() {
-  [ "$mode" = file ] && return 1
+  [ "$mode" = file ] || [ "$mode" = feed ] && return 1
   ! grep -qiE '<title>[^<]+' "$body" && return 0
   [ "$(extract-text "$url" < "$body" | wc -c)" -lt 300 ]
 }
 if blocked "$code" || shell_only; then
-  # file downloads stay on the curl tiers
-  [ "$mode" = file ] && { echo "web-fetch: blocked ($code) at $tier" >&2; exit 1; }
+  # file downloads and feeds stay on the curl tiers: Chromium shows XML
+  # as a page of its own
+  case $mode in file | feed)
+    echo "web-fetch: blocked ($code) at $tier" >&2
+    exit 1
+    ;;
+  esac
   code=200
   # backstop for the browser's own 150s limit
   timeout --kill-after=10 170 xvfb-run -a browser-fetch "$url" > "$body" || code=000
@@ -64,4 +71,15 @@ case $mode in
 file) cp "$body" "$out" ;;
 html) cat "$body" ;;
 text) extract-text "$url" < "$body" ;;
+feed)
+  # a page rather than a feed: follow the feed it links to, once
+  if entries=$(read-feed "$url" < "$body"); then
+    printf '%s\n' "$entries"
+  elif [ $? -eq 3 ] && [ -z "${WEB_FETCH_FOLLOWED:-}" ]; then
+    echo "web-fetch: following $entries" >&2
+    WEB_FETCH_FOLLOWED=1 exec "$0" --feed "$entries"
+  else
+    exit 1
+  fi
+  ;;
 esac

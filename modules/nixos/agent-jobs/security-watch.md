@@ -33,6 +33,10 @@ which is why this runs every day.
      systemd, Tailscale, Mullvad, and each self-hosted service;
    - news: LWN, Ars Technica, BleepingComputer, Hacker News, for big
      events like #140's.
+   Read a source through its feed where it has one: `web-fetch --feed
+   URL`, given the feed or the site's page. LWN's pages can refuse
+   you; its feed, `https://lwn.net/headlines/rss`, doesn't. oss-security
+   is `https://seclists.org/rss/oss-sec.rss`.
    Also recheck the items already waiting on a channel. Add any source
    that proves better, and say so in your entry.
 4. **Judge each item against the fleet:** does a host run the affected

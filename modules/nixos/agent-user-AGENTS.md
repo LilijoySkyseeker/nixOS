@@ -91,6 +91,10 @@ container: anything you write is on the owner's machine.
   other file), trying curl with browser headers, then curl-impersonate,
   then real Chromium through nodriver, which waits out Cloudflare-style
   challenges. Save long pages to a file rather than printing them whole.
+  `web-fetch --feed URL` prints an RSS or Atom feed's entries, dated and
+  linked; given a site's page, it finds the feed the page links to. For
+  "what's new on this site", a feed is quicker than the pages and is
+  rarely walled.
   For papers, the open routes are often quicker: arXiv, Europe PMC, and
   the Unpaywall, OpenAlex and Crossref APIs.
   The owner authorizes getting past bot walls whenever you read for their
