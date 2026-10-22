@@ -57,8 +57,18 @@ systemd-cryptenroll --fido2-device=auto $dev   # once per YubiKey, one plugged i
 systemd-cryptenroll $dev                         # lists the slots
 ```
 
-To check a YubiKey's slot without rebooting, with it plugged in:
-`cryptsetup open --test-passphrase --token-only --token-id <its token id from cryptsetup luksDump> $dev`.
+To check a YubiKey's slot without rebooting, with only that key plugged in:
+
+```sh
+run0 --pty env LD_LIBRARY_PATH=/run/current-system/sw/lib/cryptsetup \
+  cryptsetup open --test-passphrase --token-only \
+  --token-id <its token id from cryptsetup luksDump> $dev
+```
+
+Token IDs are separate from keyslot numbers. The library search path lets
+cryptsetup load systemd's FIDO2 handler on NixOS. A successful test asks for
+the YubiKey PIN and touch and exits with status 0; add `--verbose` to
+cryptsetup to display the result. If it fails silently, use `--debug`.
 
 **When the PIN stops working and the passphrase is asked for**, the Secure
 Boot state changed: a firmware update, Secure Boot keys changed, or Windows

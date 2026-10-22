@@ -152,7 +152,8 @@ in
         programs.home-manager.enable = true;
 
         stylix.targets.firefox.profileNames = [ "default" ];
-        stylix.targets.qt.platform = "qtct";
+        # qtct set QT_STYLE_OVERRIDE=kvantum, which broke Plasma 6.7 QML (black desktop); Plasma themes Qt itself.
+        stylix.targets.qt.enable = false;
       };
 
       # service for yubikey

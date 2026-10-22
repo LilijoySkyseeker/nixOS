@@ -37,7 +37,10 @@
           configurationLimit = lib.mkDefault 10;
         };
 
-        environment.systemPackages = [ pkgs.sbctl ];
+        environment.systemPackages = [
+          pkgs.sbctl
+          pkgs.efibootmgr # firmware BootOrder, which Windows resets to put itself first
+        ];
       };
     };
 }
