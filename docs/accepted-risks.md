@@ -80,8 +80,11 @@ phase.
 
 **What would change the answer:** the reverse direction is *not*
 accepted and was fixed — vps could reach root on homelab through an
-arithmetic injection in `deploy-guards.nix` (`F-P7-03`, fixed in
-`b51e328`).
+arithmetic injection in the old `deploy-guards.nix` (`F-P7-03`, fixed in
+`b51e328`). What vps now feeds homelab's push-deploy is its two
+revisions, which only reach git as 40-character hex shas (`is_revision`
+in `modules/flake/deploy-revision.nix`), and its kernel links, which
+are only compared as strings. Neither ever chooses what homelab builds.
 
 ### AR-3 — zrepl's daemon and its SSH transport both run as root
 

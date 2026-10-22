@@ -1,6 +1,6 @@
 { config, ... }:
 let
-  deployGuardsScript = config.flake.deployGuardsScript;
+  deployRevisionScript = config.flake.deployRevisionScript;
 in
 {
   flake.modules.nixos."pull-deploy" =
@@ -15,11 +15,12 @@ in
     in
     {
       options.myPullDeploy = {
-        enable = lib.mkEnableOption "pull master, build-test, and switch on a schedule";
+        enable = lib.mkEnableOption "deploy master's latest revision on a schedule";
 
-        flakeDir = lib.mkOption {
+        repoUrl = lib.mkOption {
           type = lib.types.str;
-          description = "Path to the local flake checkout to pull and rebuild from.";
+          default = "https://github.com/LilijoySkyseeker/nixOS.git";
+          description = "Git URL to mirror master from. Public, so no credentials.";
         };
 
         hostAttr = lib.mkOption {
@@ -30,7 +31,7 @@ in
         dates = lib.mkOption {
           type = lib.types.str;
           default = "Thu 03:00";
-          description = "systemd OnCalendar spec for the pull/build/switch job.";
+          description = "systemd OnCalendar spec for the deploy job.";
         };
 
         scheduleEnable = lib.mkOption {
@@ -51,7 +52,7 @@ in
         autoReboot = lib.mkOption {
           type = lib.types.bool;
           default = true;
-          description = "Whether to reboot automatically when a switch changes the running kernel/initrd.";
+          description = "Whether to reboot automatically when this job's switch changes the running kernel/initrd.";
         };
 
         operation = lib.mkOption {
@@ -69,17 +70,6 @@ in
           description = "Only run the deploy job while on AC power (e.g. for laptops).";
         };
 
-        minSwitchInterval = lib.mkOption {
-          type = lib.types.ints.positive;
-          default = 6 * 24 * 60 * 60;
-          description = ''
-            Minimum seconds since /nix/var/nix/profiles/system's last
-            activation before this scheduled job will build/switch. Manual
-            switches count too (they update the same profile symlink), so a
-            manual deploy this week defers next week's scheduled one.
-          '';
-        };
-
         protectedUnits = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
@@ -89,73 +79,100 @@ in
             restarting them mid-run.
           '';
         };
-
-        sshKeyPath = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          description = ''
-            SSH identity file to use for this job's git fetch, when this
-            service (which runs as root) has no SSH identity of its own --
-            e.g. a PC host where root has no home-manager profile at all,
-            unlike the flakeDir-owning user. Root can read the file
-            regardless of its permissions. Leave null to use whatever
-            identity root's own SSH client would otherwise resolve.
-          '';
-        };
       };
 
       config = lib.mkIf cfg.enable {
         systemd.services.pull-deploy = {
-          description = "Pull latest master and switch if it builds";
+          description = "Deploy master's latest revision";
+          # the switch it runs may change this unit; restarting it then
+          # would kill the run before its post-switch steps (as nixos-upgrade)
+          restartIfChanged = false;
+          unitConfig.X-StopOnRemoval = false;
           path = with pkgs; [
             git
-            openssh
             nixos-rebuild
             nix
             coreutils
+            systemd
           ];
           script = ''
             set -euo pipefail
-            cd ${cfg.flakeDir}
-            ${lib.optionalString (
-              cfg.sshKeyPath != null
-            ) "export DEPLOY_GUARDS_IDENTITY_FILE=${lib.escapeShellArg cfg.sshKeyPath}"}
+            ${deployRevisionScript}
 
-            ${deployGuardsScript}
+            mirror="$STATE_DIRECTORY/mirror.git"
+            profile=/nix/var/nix/profiles/system
+            # what this operation installs: the running system for a
+            # switch, the next boot's profile for a boot
+            deployed=${if cfg.operation == "switch" then "/run/current-system" else "$profile"}
 
-            require_clean_master
-            fetch_and_merge_master
+            revision_of() {
+              "$1/sw/bin/nixos-version" --configuration-revision 2>/dev/null || true
+            }
 
-            last_switch=$(stat -c %Y /nix/var/nix/profiles/system)
-            check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
+            record_success() {
+              touch "$STATE_DIRECTORY/deployed"
+              # the deployed nixpkgs' date, e.g. 26.05.20261020.cd4ea8d
+              local d
+              d=$(cut -d. -f3 "$deployed/nixos-version")
+              case "$d" in
+                [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9])
+                  touch -d "''${d:0:4}-''${d:4:2}-''${d:6:2}" "$STATE_DIRECTORY/nixpkgs-date"
+                  ;;
+                *) echo "No nixpkgs date in $(cat "$deployed/nixos-version"); nixpkgs-date not updated." >&2 ;;
+              esac
+            }
+
+            mirror_fetch "$mirror" ${lib.escapeShellArg cfg.repoUrl}
+            target=$(mirror_master "$mirror")
+            running=$(revision_of /run/current-system)
+            installed=$(revision_of "$profile")
+
+            case "$(deploy_decision "$mirror" "$running" "$installed" "$target")" in
+              current)
+                echo "Already at $target."
+                record_success
+                exit 0
+                ;;
+              manual)
+                echo "This host runs ''${running:-an unknown revision} (profile: ''${installed:-unknown}), not on master's history: a manual deploy. Not replacing it; deploy master by hand to resume." >&2
+                exit 1
+                ;;
+            esac
+
             check_protected_units_inactive "${lib.concatStringsSep " " cfg.protectedUnits}"
 
-            if nixos-rebuild build --flake .#${cfg.hostAttr}; then
-              nixos-rebuild ${cfg.operation} --flake .#${cfg.hostAttr}
-            else
-              echo "Build failed, not switching." >&2
-              exit 1
-            fi
+            kernel_before=$(readlink /run/current-system/kernel)
+            nixos-rebuild ${cfg.operation} --flake "git+file://$mirror?rev=$target#${cfg.hostAttr}"
+            record_success
+
+            ${lib.optionalString (cfg.autoReboot && cfg.operation == "switch") ''
+              # only a kernel this switch brought in, not one a manual
+              # switch left unbooted
+              kernel_after=$(readlink /run/current-system/kernel)
+              if [ "$kernel_after" != "$kernel_before" ] && [ "$kernel_after" != "$(readlink /run/booted-system/kernel)" ]; then
+                echo "Kernel changed, rebooting."
+                systemctl reboot
+              fi
+            ''}
           '';
-          unitConfig = lib.mkIf cfg.requireACPower {
-            ConditionACPower = true;
-          };
+          unitConfig.ConditionACPower = lib.mkIf cfg.requireACPower true;
           serviceConfig = {
             Type = "oneshot";
             User = "root";
+            StateDirectory = "pull-deploy";
             # runs real activation (nixos-rebuild switch/boot), so no
             # filesystem/kernel sandboxing
             NoNewPrivileges = true;
-            ExecStartPost = lib.optionals cfg.autoReboot [
-              (pkgs.writeShellScript "reboot-if-kernel-changed" ''
-                if [ "$(readlink /run/booted-system/kernel)" != "$(readlink /run/current-system/kernel)" ]; then
-                  echo "Kernel/initrd changed, rebooting."
-                  systemctl reboot
-                fi
-              '')
-            ];
           };
         };
+
+        # staleness markers exist from activation, so health-alerts doesn't
+        # page "missing" before the first run
+        systemd.tmpfiles.rules = [
+          "d /var/lib/pull-deploy 0755 root root -"
+          "f /var/lib/pull-deploy/deployed 0644 root root -"
+          "f /var/lib/pull-deploy/nixpkgs-date 0644 root root -"
+        ];
 
         systemd.timers.pull-deploy = lib.mkIf cfg.scheduleEnable {
           wantedBy = [ "timers.target" ];

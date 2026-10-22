@@ -25,6 +25,9 @@ in
         inputs.impermanence.nixosModules.impermanence
         inputs.nix-flatpak.nixosModules.nix-flatpak
       ];
+      # the commit this system was built from; pull-deploy/push-deploy
+      # compare it with master
+      system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
       environment.systemPackages =
         with pkgs-unstable;
         [

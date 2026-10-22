@@ -204,11 +204,9 @@ lives in one file.
 - **A VM test node boots straight from its built closure and never runs a
   real install or `nixos-rebuild switch`.**
   `/nix/var/nix/profiles/system` won't exist unless the test creates it —
-  needed by anything that stats a target's "current generation" over ssh.
-  Add `ln -sfn /run/current-system /nix/var/nix/profiles/system`, and pin
-  its mtime (`touch -h -d @0 ...`, not `-L`) if anything nearby checks
-  elapsed time, so the symlink's just-created mtime can't race a
-  same-second skip guard.
+  needed by anything that reads a target's installed generation over ssh
+  (push-deploy asks its `nixos-version`). Add
+  `ln -sfn /run/current-system /nix/var/nix/profiles/system`.
 - **`documentation.nixos.enable` (on by default) needs
   `nixos-render-docs`, which pulls a real Python source fetch** — an
   unexpected network dependency in an isolated test VM. Set

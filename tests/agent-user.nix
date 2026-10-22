@@ -188,7 +188,7 @@ pkgs.testers.runNixOSTest {
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
         # each activation of the weekly target reaches both jobs, not
-        # just the first (they skip here: no Claude login in the VM)
+        # just the first (they fail here: no Claude login in the VM)
         jobs = ["agent-flake-update", "agent-maintenance"]
         def ran():
             return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}
@@ -204,6 +204,9 @@ pkgs.testers.runNixOSTest {
         for j in jobs:
             check(seen[0][j] not in ("", "0"), f"{j} never ran")
             check(seen[1][j] != seen[0][j], f"{j} didn't run on the second activation")
+            # no login: the job fails (and so pages), it doesn't skip
+            result = machine.succeed(f"systemctl show {j} -p Result --value").strip()
+            check(result == "exit-code", f"{j}: Result={result!r}, expected a failure")
         # GPU and KVM: bound in and allowed; tun and display nodes refused
         for unit in ["claude-remote-control", "codex-remote-control"]:
             allow = machine.succeed(f"systemctl show {unit} -p DeviceAllow --value")

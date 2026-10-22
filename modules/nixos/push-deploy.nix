@@ -1,6 +1,6 @@
 { config, ... }:
 let
-  deployGuardsScript = config.flake.deployGuardsScript;
+  deployRevisionScript = config.flake.deployRevisionScript;
 in
 {
   flake.modules.nixos."push-deploy" =
@@ -15,11 +15,12 @@ in
     in
     {
       options.myPushDeploy = {
-        enable = lib.mkEnableOption "build locally and push+activate on a remote target host on a schedule";
+        enable = lib.mkEnableOption "build locally and push+activate this host's own revision on a remote target host on a schedule";
 
-        flakeDir = lib.mkOption {
+        repoUrl = lib.mkOption {
           type = lib.types.str;
-          description = "Path to the local flake checkout to build from (evaluation/build happens on THIS machine).";
+          default = "https://github.com/LilijoySkyseeker/nixOS.git";
+          description = "Git URL to mirror master from. Public, so no credentials.";
         };
 
         hostAttr = lib.mkOption {
@@ -75,17 +76,6 @@ in
           '';
         };
 
-        minSwitchInterval = lib.mkOption {
-          type = lib.types.ints.positive;
-          default = 6 * 24 * 60 * 60;
-          description = ''
-            Minimum seconds since the target's /nix/var/nix/profiles/system
-            was last activated (checked remotely over SSH) before this
-            scheduled job will build/push, so a manual deploy this week
-            defers next week's scheduled one.
-          '';
-        };
-
         operation = lib.mkOption {
           type = lib.types.enum [
             "switch"
@@ -105,6 +95,10 @@ in
       config = lib.mkIf cfg.enable {
         systemd.services."push-deploy-${cfg.hostAttr}" = {
           description = "Build locally and push+activate ${cfg.hostAttr} on ${cfg.targetHost}";
+          # a switch of this host mid-push would otherwise kill the push
+          # before it records success or checks the target's kernel
+          restartIfChanged = false;
+          unitConfig.X-StopOnRemoval = false;
           path = with pkgs; [
             git
             nixos-rebuild
@@ -114,31 +108,57 @@ in
           ];
           script = ''
             set -euo pipefail
-            cd ${cfg.flakeDir}
+            ${deployRevisionScript}
 
-            ${deployGuardsScript}
+            mirror="$STATE_DIRECTORY/mirror.git"
+            mirror_fetch "$mirror" ${lib.escapeShellArg cfg.repoUrl}
 
-            require_clean_master
-            fetch_and_merge_master
+            # the target follows this host: it only gets a revision this
+            # host has already switched to itself
+            target=$(/run/current-system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
+            if ! is_revision "$target"; then
+              echo "This host runs ''${target:-an unknown revision}, not a master revision; not pushing it to ${cfg.targetHost}." >&2
+              exit 1
+            fi
 
             export NIX_SSHOPTS="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"
 
-            last_switch=$(ssh $NIX_SSHOPTS ${cfg.targetHost} stat -c %Y /nix/var/nix/profiles/system)
-            check_min_switch_interval ${toString cfg.minSwitchInterval} "$last_switch"
+            # hosts/vps/configuration.nix's vps-deploy dispatcher matches
+            # these exact strings
+            running=$(ssh $NIX_SSHOPTS ${cfg.targetHost} /run/current-system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
+            installed=$(ssh $NIX_SSHOPTS ${cfg.targetHost} /nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
 
+            case "$(deploy_decision "$mirror" "$running" "$installed" "$target")" in
+              current)
+                echo "${cfg.targetHost} is already at $target."
+                touch "$STATE_DIRECTORY/deployed-${cfg.hostAttr}"
+                exit 0
+                ;;
+              manual)
+                echo "${cfg.targetHost} runs ''${running:-an unknown revision} (profile: ''${installed:-unknown}), not on master's history: a manual deploy. Not replacing it; deploy it by hand to resume." >&2
+                exit 1
+                ;;
+            esac
+
+            ${lib.optionalString cfg.rebootIfKernelChanged ''
+              kernel_before=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+            ''}
             nixos-rebuild ${cfg.operation} \
-              --flake .#${cfg.hostAttr} \
+              --flake "git+file://$mirror?rev=$target#${cfg.hostAttr}" \
               --target-host ${cfg.targetHost} \
               ${lib.optionalString (cfg.elevate == "sudo") "--sudo"}
+            touch "$STATE_DIRECTORY/deployed-${cfg.hostAttr}"
 
             ${lib.optionalString cfg.rebootIfKernelChanged ''
               # reboot goes through the same sudo/run0 alias as the switch;
               # hosts/vps/configuration.nix's vps-deploy dispatcher matches
               # this exact string
+              # only a kernel this switch brought in, not one a manual
+              # switch left unbooted
               booted=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/booted-system/kernel)
-              current=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
-              if [ "$booted" != "$current" ]; then
-                echo "Kernel/initrd changed on ${cfg.targetHost}, rebooting."
+              kernel_after=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+              if [ "$kernel_after" != "$kernel_before" ] && [ "$kernel_after" != "$booted" ]; then
+                echo "Kernel changed on ${cfg.targetHost}, rebooting."
                 ssh $NIX_SSHOPTS ${cfg.targetHost} "sudo systemctl reboot"
               fi
             ''}
@@ -146,6 +166,7 @@ in
           serviceConfig = {
             Type = "oneshot";
             User = "root";
+            StateDirectory = "push-deploy";
             # sandbox VM-tested in tests/push-deploy-sandbox.nix. PrivateTmp:
             # nixos-rebuild-ng's ssh ControlMaster socket; /root/.cache: nix
             # eval scratch, created by tmpfiles below (ReadWritePaths won't)
@@ -153,7 +174,6 @@ in
             ProtectSystem = "strict";
             PrivateTmp = true;
             ReadWritePaths = [
-              cfg.flakeDir # fetch_and_merge_master writes here
               "/root/.ssh" # known_hosts (StrictHostKeyChecking=accept-new)
               "/root/.cache" # nix's own eval/build scratch
             ];
@@ -161,10 +181,13 @@ in
         };
 
         # ReadWritePaths targets must exist before the unit's mount namespace
-        # is set up
+        # is set up; the staleness marker exists from activation, so
+        # health-alerts doesn't page "missing" before the first run
         systemd.tmpfiles.rules = [
           "d /root/.cache 0700 root root -"
           "d /root/.ssh 0700 root root -"
+          "d /var/lib/push-deploy 0755 root root -"
+          "f /var/lib/push-deploy/deployed-${cfg.hostAttr} 0644 root root -"
         ];
 
         systemd.timers."push-deploy-${cfg.hostAttr}" = lib.mkIf cfg.scheduleEnable {

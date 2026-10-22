@@ -132,7 +132,6 @@
       agentJob = description: prompt: {
         inherit description;
         inherit (agentUnitDeps) wants bindsTo after;
-        unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
         environment = claudeEnvironment;
         serviceConfig =
           builtins.removeAttrs agentSandbox [
@@ -142,6 +141,8 @@
           // {
             Type = "oneshot";
             StandardInput = "file:${prompt}";
+            # fail, not skip, so a logged-out agent pages as a failed unit
+            ExecStartPre = "${pkgs.coreutils}/bin/test -e /home/agent/.claude/.credentials.json";
             # one job at a time: they share the vault reports and the nixOS
             # checkout, and two timers can fire together after downtime
             ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";

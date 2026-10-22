@@ -75,6 +75,10 @@ let
         # virtio disk during a real switch
         boot.loader.grub.enable = false;
         environment.etc."push-deploy-test-marker".text = "after";
+        # still behind head after the push, so deployer-broken gets as far
+        # as nixos-rebuild instead of stopping at "manual"; head itself
+        # can't be named here, its commit contains this toplevel
+        system.configurationRevision = originRev originBase "base";
         # docs pull in nixos-render-docs, which isn't needed in the closure
         documentation.enable = false;
       };
@@ -100,6 +104,72 @@ let
     }
   '';
 
+  # the origin the unit mirrors: `base` is what target runs before and after
+  # the push, `head` (the target flake) what the deployer runs and so
+  # pushes. base is its own derivation: the pushed toplevel names it, and
+  # head's commit contains that toplevel
+  originBase = pkgs.runCommand "push-deploy-test-origin-base" { nativeBuildInputs = [ pkgs.git ]; } ''
+    export HOME=$TMPDIR
+    git init -q -b master $out
+    git -C $out -c user.email=t@example.invalid -c user.name=test commit -q --allow-empty -m base
+    git -C $out rev-parse HEAD > $TMPDIR/base
+    mv $TMPDIR/base $out/base
+  '';
+  # a rev-pinned flake can't have its lock written, so origin commits one,
+  # as the real repo does; a path: input locks to its NAR hash
+  lockedPath = path: ''
+    {
+      "flake": false,
+      "locked": {
+        "lastModified": 1,
+        "narHash": "$(nix --extra-experimental-features nix-command --store dummy:// hash path --sri ${path})",
+        "path": "${path}",
+        "type": "path"
+      },
+      "original": { "path": "${path}", "type": "path" }
+    }
+  '';
+  origin =
+    pkgs.runCommand "push-deploy-test-origin"
+      {
+        nativeBuildInputs = [
+          pkgs.git
+          pkgs.nix
+        ];
+      }
+      ''
+        export HOME=$TMPDIR
+        # the store isn't owned by the build user
+        git -c safe.directory='*' clone -q ${originBase} work
+        cd work
+        cat > flake.nix <<'FLAKE'
+        ${targetFlake}
+        FLAKE
+        cat > flake.lock <<LOCK
+        {
+          "nodes": {
+            "prebuiltToplevel": ${lockedPath targetToplevel},
+            "prebuiltNixosRebuild": ${lockedPath targetNixosRebuild},
+            "root": {
+              "inputs": {
+                "prebuiltToplevel": "prebuiltToplevel",
+                "prebuiltNixosRebuild": "prebuiltNixosRebuild"
+              }
+            }
+          },
+          "root": "root",
+          "version": 7
+        }
+        LOCK
+        git add flake.nix flake.lock
+        git -c user.email=t@example.invalid -c user.name=test commit -q -m head
+        mkdir $out
+        git rev-parse HEAD > $out/head
+        git clone -q --bare . $out/repo.git
+      '';
+  # import-from-derivation: the revisions exist only once these are built
+  originRev = drv: name: pkgs.lib.removeSuffix "\n" (builtins.readFile "${drv}/${name}");
+
   deployerNode =
     { ... }:
     {
@@ -107,7 +177,8 @@ let
       virtualisation.memorySize = 3072;
       virtualisation.diskSize = 8192;
 
-      environment.systemPackages = [ pkgs.git ];
+      # what the deployer "switched to itself", so it pushes head
+      system.configurationRevision = originRev origin "head";
 
       # registers the prebuilt closures in the VM's nix db at boot so nix
       # doesn't try to build them offline; never read, only presence counts
@@ -116,12 +187,11 @@ let
 
       myPushDeploy = {
         enable = true;
-        flakeDir = "/root/flakeDir";
+        repoUrl = "file://${origin}/repo.git";
         hostAttr = "target";
         targetHost = "deploy@target";
         identityFile = "/root/.ssh/deploy_test_key";
         scheduleEnable = false;
-        minSwitchInterval = 1; # positive-integer type; effectively "no wait"
         operation = "switch";
         rebootIfKernelChanged = false;
         elevate = "sudo";
@@ -132,6 +202,8 @@ let
     { ... }:
     {
       imports = [ targetAccessConfig ];
+      # an ancestor of head, so the push counts as behind, not manual
+      system.configurationRevision = originRev originBase "base";
       environment.etc."push-deploy-test-marker".text = "before";
     };
 in
@@ -154,28 +226,11 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    TARGET_FLAKE = ${builtins.toJSON targetFlake}
-
-    def push_flake(node):
-        node.succeed(f"cat > /root/flakeDir/flake.nix <<'FLAKE'\n{TARGET_FLAKE}\nFLAKE")
-        node.succeed(
-            "cd /root/flakeDir && git add flake.nix && "
-            "git -c user.email=a@example.invalid -c user.name=deployer "
-            "commit -qm 'push target toplevel' && git push -q origin master"
-        )
-
     def setup_deployer(node):
         node.succeed("mkdir -p -m 700 /root/.ssh")
         node.succeed(
             "install -m 600 ${snakeOilEd25519PrivateKey} /root/.ssh/deploy_test_key"
         )
-        # A bare "origin" so fetch_and_merge_master (git fetch + ff-only
-        # merge) has something real to talk to, entirely locally -- what's
-        # under test is the ssh/nix machinery against `target`, not this
-        # repo's actual git remote.
-        node.succeed("git init -q --bare /root/origin.git")
-        node.succeed("git clone -q /root/origin.git /root/flakeDir")
-        push_flake(node)
 
     start_all()
     deployer.wait_for_unit("multi-user.target")
@@ -189,17 +244,12 @@ pkgs.testers.runNixOSTest {
     with subtest("target has a real profile symlink, like an installed host would"):
         # A VM test node boots straight from its built closure and never
         # runs a real `nixos-rebuild switch`/install, so
-        # /nix/var/nix/profiles/system -- which myPushDeploy's own script
-        # stats over ssh before it will proceed -- doesn't exist yet.
+        # /nix/var/nix/profiles/system -- whose nixos-version myPushDeploy
+        # asks over ssh before it will proceed -- doesn't exist yet.
         # Every real, already-installed host has this; recreate it so the
         # test target matches that reality instead of a boot-only VM's.
         target.succeed("mkdir -p /nix/var/nix/profiles")
         target.succeed("ln -sfn /run/current-system /nix/var/nix/profiles/system")
-        # `stat` (no -L) reports the symlink's own mtime, which would
-        # otherwise be "just now" and risk tripping minSwitchInterval's
-        # skip guard on a same-second race. Pin it far enough in the past
-        # that elapsed time is unambiguous either way.
-        target.succeed("touch -h -d @0 /nix/var/nix/profiles/system")
 
     with subtest("the properly-hardened unit pushes and activates for real"):
         setup_deployer(deployer)
@@ -217,6 +267,10 @@ pkgs.testers.runNixOSTest {
     with subtest("the push actually reached target -- not just a clean exit"):
         marker = target.succeed("cat /etc/push-deploy-test-marker").strip()
         assert marker == "after", f"target's marker did not flip: {marker!r}"
+        # the mirror and the marker live in the StateDirectory, through
+        # ProtectSystem=strict
+        deployer.succeed("test -d /var/lib/push-deploy/mirror.git/objects")
+        deployer.succeed("test /var/lib/push-deploy/deployed-target -nt /var/lib/push-deploy/mirror.git/HEAD")
 
     with subtest("PrivateTmp is load-bearing: without it, the same unit fails"):
         # no marker reset: /etc is read-only after a real switch; the marker
@@ -234,7 +288,12 @@ pkgs.testers.runNixOSTest {
         unit_journal = deployer_broken.succeed(
             "journalctl -u push-deploy-target.service --no-pager -n 200"
         )
-        assert "Permission" in unit_journal or "Read-only" in unit_journal, (
+        # python 3.14's tempfile reports an unwritable /tmp as "No usable
+        # temporary directory"; older ones as a permission/read-only error
+        assert any(
+            s in unit_journal
+            for s in ["Permission", "Read-only", "No usable temporary directory"]
+        ), (
             "expected a permission/read-only failure from nixos-rebuild-ng's "
             f"own tmpdir creation, got:\n{unit_journal}"
         )

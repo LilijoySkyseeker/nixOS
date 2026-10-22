@@ -330,47 +330,66 @@ Two things worth knowing before touching anything nearby:
 
 ## Updates & deploy
 
-Inputs change only through a PR: someone runs `nix flake update` on a
-branch, every host builds (pre-push) and the VM tests run, and the user
-merges. No host updates inputs itself. A 30-day staleness alert on
-homelab's `/etc/nixos/flake.lock` pages when no lock update has landed.
+Inputs change only through a PR: the agent's weekly `agent-flake-update`
+job (torrent, Mon 00:15) runs `nix flake update` on a branch, builds every
+host and opens the PR, and the user merges. No host updates inputs itself.
 
-Hosts then adopt `master` on their own weekly schedule, servers first so
-a bad update reaches them before the PCs used to fix them:
+Hosts then deploy a **revision**, never a checkout. Every host records the
+commit it was built from (`system.configurationRevision`, set in
+`profile-default`; `nixos-version --configuration-revision` prints it), and
+each deploy unit keeps a root-owned bare mirror of the repo in its
+`StateDirectory`, builds from `git+file://<mirror>?rev=<rev>`, and so needs
+no credentials, worktree or `safe.directory`:
 
-| Host | Module | When | What it does |
-|---|---|---|---|
-| `homelab` | `myPullDeploy` | Tue 03:00 | fetch master, build, `switch`; reboots only if the kernel changed |
-| `vps` | `myPushDeploy` (on homelab) | Wed 03:00 | homelab builds vps's config and pushes+activates it over SSH; vps is too small to build |
-| `torrent`, `thinkpad` | `myPullDeploy` | Thu 03:00 | fetch master, build, `boot` (applies at next reboot) |
+| Host | Module | When | Target revision | What it does |
+|---|---|---|---|---|
+| `homelab` | `myPullDeploy` | Tue 03:00 | master | `switch`; reboots only if this switch changed the kernel |
+| `vps` | `myPushDeploy` (on homelab) | Wed 03:00 | **the revision homelab runs** | homelab builds vps's config and pushes+activates it over SSH; vps is too small to build |
+| `torrent`, `thinkpad` | `myPullDeploy` | Thu 03:00 | master | `boot` (applies at next reboot) |
 
-By hand on homelab: `cd /etc/nixos && git pull && nh os switch`; for vps,
-`systemctl start push-deploy-vps` on homelab.
+vps following homelab's own revision makes "servers first" a gate, not
+just a calendar order: vps never gets a commit homelab hasn't switched to.
 
-All of them share one safe-switch core (`modules/flake/deploy-guards.nix`,
-a plain shell fragment usable from either nixpkgs pin):
+Each run compares two revisions with the target
+(`deploy_decision` in `modules/flake/deploy-revision.nix`): the running
+system's (`/run/current-system`) and the installed profile's, which can
+be ahead after a failed activation or a `boot` not yet rebooted into.
 
-- **clean-checkout check + fetch + fast-forward-only merge**, so a
-  scheduled run always builds fresh `origin/master`, never a stale or
-  dirty local checkout. On the PCs the checkout is the user's own
-  `~/dotfiles`: if it's dirty or on a branch, the run skips.
-- **`minSwitchInterval`** (default 6 days): skips if
-  `/nix/var/nix/profiles/system` (the symlink's own mtime, the last
-  activation by any route) is more recent, so a manual deploy this week
-  defers the scheduled one.
-- **`protectedUnits`**: skips rather than switch while a listed unit is
-  active (homelab: the multi-day restic upload).
+- **current**: the running system is the target; the run records success.
+- **deploy**: both are ancestors of (or equal to) the target: deploy it.
+  This retries a failed activation, and on the PCs re-runs the cheap
+  `boot` weekly until the host reboots.
+- **manual**: either is off master's history (a branch commit, a dirty or
+  unknown build, a staged manual `boot`): someone deployed by hand. The
+  run fails rather than revert it, so it pages through the failed-units
+  check until the host is back on master's history, either deployed by
+  hand or because its branch commit was merged.
+- **`protectedUnits`**: a behind host defers rather than switch while a
+  listed unit is active (homelab: the multi-day restic upload).
 
-Skips exit 0, so they never page; a 21-day staleness alert on each
-host's system profile catches a host that keeps skipping. A failed run
-pages through the failed-units check. homelab's two deploy timers are
-not `Persistent`, so an outage doesn't trigger a catch-up deploy at boot
-on top of zrepl's own catch-up replication.
+Staleness markers measure outcomes: `/var/lib/pull-deploy/deployed` and
+homelab's `/var/lib/push-deploy/deployed-vps` are touched only when a run
+ends at the target, and `/var/lib/pull-deploy/nixpkgs-date` carries the
+deployed nixpkgs' date, so a stall anywhere from the agent's PR to the
+deploy pages after 30 days. homelab's two deploy timers are not
+`Persistent`, so an outage doesn't trigger a catch-up deploy at boot on
+top of zrepl's own catch-up replication.
 
-A service running as root against a *user*-owned `flakeDir` (the PCs)
-needs `safe.directory` (set per invocation by the guard) and an SSH
-identity to fetch with (`myPullDeploy.sshKeyPath`), since root has none
-of its own there.
+The deploy units restart nothing of their own mid-run
+(`restartIfChanged = false`, as `nixos-upgrade`), and reboot only when
+their own switch brought in a new kernel. homelab persists
+`/var/lib/{pull,push}-deploy` across its root rollback, or every reboot
+would reset the staleness clocks.
+
+By hand, from a clean checkout of a pushed commit: `nixos-rebuild switch
+--flake .#homelab --target-host root@homelab`, or on homelab `cd /etc/nixos
+&& git pull && nh os switch`. For vps, `systemctl start push-deploy-vps`
+on homelab runs the same guard, so it won't replace a manual or unknown
+revision; to recover from one, deploy clean master directly as root (vps
+can't build its own closure): `nixos-rebuild switch --flake .#vps
+--target-host root@vps` from torrent or homelab. A deploy from a dirty
+tree or an unmerged branch counts as manual until the host is back on
+master's history.
 
 ## Secrets
 

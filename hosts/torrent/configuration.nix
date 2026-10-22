@@ -13,13 +13,10 @@
 
   myPullDeploy = {
     enable = true;
-    flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "torrent";
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
-    # root has no SSH identity here; reuse lilijoy's, already trusted by origin
-    sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
   # System installed pkgs
@@ -156,10 +153,10 @@
     checkSmart = false;
     # no backupStaleness: homelab's own myHealthAlerts watches this host's replicas
     #
-    # profile mtime catches a pull-deploy that skips (guards exit 0, so no
-    # failed unit); 504h = 21 days, weekly deploys plus two weeks of slack
+    # a pull-deploy that stops running; a failed one pages as a failed
+    # unit. 504h = 21 days, weekly deploys plus two weeks of slack
     staleMarkerFiles = {
-      "/nix/var/nix/profiles/system" = 504;
+      "/var/lib/pull-deploy/deployed" = 504;
     };
   };
 }

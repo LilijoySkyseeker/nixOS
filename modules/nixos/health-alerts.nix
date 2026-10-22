@@ -96,20 +96,14 @@ _: {
             - **A run that silently never finishes** (hung, retrying forever)
               — e.g. the offsite restic backup, which has no local ZFS
               dataset to measure via `backupStaleness`.
-            - **A run that never happens at all.** Every guard in
-              `deployGuardsScript` ends in `exit 0`, so a deploy that skips
-              (dirty tree, wrong branch, min-interval, protected unit) is
-              recorded as success and never enters `systemctl --failed`.
-              Pointing this at `/nix/var/nix/profiles/system` measures the
-              outcome instead of the attempt: that symlink's mtime is the
-              last time the host was *actually* activated, by any route —
-              scheduled, push-deployed or manual.
+            - **A run that never happens at all**, or keeps deferring: e.g.
+              pull-deploy's `deployed` marker, touched only when the host
+              ends a run at master's revision, while a protected-unit
+              deferral exits 0 without touching it.
 
-            Note the check below uses a non-dereferencing `stat`, which
-            matters for the profile symlink specifically: it points into the
-            nix store, and store paths all have mtime 1 (1970), so a
-            dereferencing `stat -L` here would report every host as
-            permanently stale.
+            The check below uses a non-dereferencing `stat`, so a marker
+            that is a symlink into the store (mtime 1, 1970) reports the
+            link's own mtime rather than every host being permanently stale.
           '';
         };
       };
