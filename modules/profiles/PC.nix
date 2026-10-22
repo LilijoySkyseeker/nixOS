@@ -121,6 +121,16 @@ in
         uninstallUnmanaged = false;
         packages = [
           "info.beyondallreason.bar"
+          # hytale's official linux launcher, not on flathub. first-install seed
+          # only: the launcher updates itself and the game, so this never needs a bump
+          rec {
+            appId = "com.hypixel.HytaleLauncher";
+            sha256 = "sha256-JXbjLsxYaj1eMAlCa9NZV//ll3LFkXx0tmqSgaaYbn0=";
+            bundle = "${pkgs-unstable.fetchurl {
+              url = "https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-2026.10.21-3c04223.flatpak";
+              hash = sha256;
+            }}";
+          }
         ];
       };
 
