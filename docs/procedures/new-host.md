@@ -20,6 +20,10 @@ shape; the vps README has the gotchas for a specific real deploy
    (see `docs/architecture.md` for how existing hosts are composed and
    its "Navigating" section for how to find a module's actual
    registration key).
+   Also add `tag:<name>` to `tailscale/policy.hujson` (`tagOwners` and
+   the grants), and merge it before minting the host's pre-tagged auth
+   key: merging to `master` applies the policy, and edits made in the
+   admin console are overwritten.
 3. Before the target is reachable over SSH via a sops-decrypted secret
    (e.g. Tailscale), that host's SSH host key needs pre-generating
    **outside the repo checkout, even gitignored** — never stage key
