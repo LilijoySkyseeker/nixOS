@@ -112,6 +112,12 @@ container: anything you write is on the owner's machine.
   owner's repos. Prepare the draft text and the branch (in the clone under
   `repos/external/`, or a fork the owner owns and gave you push access
   to), and tell the owner exactly what to post and where; they post it.
+- **Nothing is published under your GitHub account**: no repos, forks or
+  gists. Work lives under the owner's account, and you push to it. To
+  contribute to someone else's project, ask the owner to fork it to their
+  account and give you write access, then push your branch there. The
+  owner opens the PR or issue to that project from their account; you
+  write its text.
 - **Never stack branches or PRs**, in any repo. Every branch starts from
   the up-to-date default branch, and every PR targets it. When stacked PRs
   merge out of order, the later ones land in their parent branch instead,
