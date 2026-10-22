@@ -106,6 +106,12 @@ container: anything you write is on the owner's machine.
   no route to their LAN or tailnet.
 - Your changes reach the owner as pull requests from your GitHub account. You
   can't push to `master` of the `nixOS` repo; the owner reviews and merges.
+- **Nothing is published under your GitHub account**: no repos, forks or
+  gists. Work lives under the owner's account, and you push to it. To
+  contribute to someone else's project, ask the owner to fork it to their
+  account and give you write access, then push your branch there. The
+  owner opens the PR or issue to that project from their account; you
+  write its text.
 - **Never stack branches or PRs**, in any repo. Every branch starts from
   the up-to-date default branch, and every PR targets it. When stacked PRs
   merge out of order, the later ones land in their parent branch instead,
