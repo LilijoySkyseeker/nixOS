@@ -15,7 +15,6 @@
           nixfmt
           statix # lints
           deadnix # dead code detection
-          nvd # readable diff between nixos generations/closures before switching
 
           # secrets
           sops
