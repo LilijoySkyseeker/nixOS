@@ -13,9 +13,10 @@
         + builtins.readFile ../home-manager/claude-code/user-claude.md
       );
       sharedSkills = ../home-manager/claude-code/skills;
-      # web-fetch: pages past bot walls (curl, curl-impersonate, then real
-      # Chromium through nodriver in a virtual display)
+      # web-fetch: pages and feeds past bot walls (curl, curl-impersonate,
+      # then real Chromium through nodriver in a virtual display)
       fetchPython = pkgs.python3.withPackages (ps: [
+        ps.feedparser
         ps.nodriver
         ps.trafilatura
         ps.html2text
@@ -33,6 +34,9 @@
           '')
           (pkgs.writeShellScriptBin "extract-text" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
+          '')
+          (pkgs.writeShellScriptBin "read-feed" ''
+            exec ${fetchPython}/bin/python3 ${./agent-tools/read-feed.py} "$@"
           '')
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
