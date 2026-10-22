@@ -24,4 +24,5 @@ container, read the standing rules in `docs/hardening.md`. The short form:
 
 A change that touches firewall rules, open ports, secrets wiring,
 authentication, or adds or exposes a service gets `/security-review`
-before the PR opens.
+before the PR opens, with the other agent's review in parallel (see
+`AGENTS.md`).
