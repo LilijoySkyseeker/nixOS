@@ -51,6 +51,26 @@ pkgs.runCommand "deploy-revision"
     expect manual '$(touch pwned)' "$two" "shell in the revision"
     [ ! -e pwned ] || fail "revision string was executed"
 
+    decide() { # $1 expected, $2 running, $3 profile, $4 target, $5 label
+      local got
+      got=$(deploy_decision "$mirror" "$2" "$3" "$4")
+      [ "$got" = "$1" ] || fail "$5: expected $1, got $got"
+      echo "ok: $5 -> $got"
+    }
+    decide current "$two" "$two" "$two" "running and installed the target"
+    decide deploy "$one" "$one" "$two" "both behind"
+    decide deploy "$one" "$two" "$two" "profile set, activation failed or boot not rebooted"
+    decide manual "$one" "$side" "$two" "a manual boot staged in the profile"
+    decide manual "$side" "$two" "$two" "running a manual switch"
+    decide manual "" "$two" "$two" "running revision unknown"
+
+    # a clean branch commit deployed by hand resumes once a real merge
+    # makes it an ancestor of master
+    git -C origin merge -q --no-ff -m merge side
+    merged=$(git -C origin rev-parse HEAD)
+    mirror_fetch "$mirror" "file://$TMPDIR/origin"
+    expect behind "$side" "$merged" "a merged branch commit"
+
     is_revision "$two" || fail "a full sha is a revision"
     ! is_revision "''${two:0:12}" || fail "a short sha is not a revision"
     ! is_revision "$two-dirty" || fail "a dirty rev is not a revision"
@@ -61,7 +81,7 @@ pkgs.runCommand "deploy-revision"
     three=$(git -C origin rev-parse HEAD)
     mirror_fetch "$mirror" "file://$TMPDIR/origin"
     [ "$(mirror_master "$mirror")" = "$three" ] || fail "refetch missed the new commit"
-    expect behind "$two" "$three" "after a refetch"
+    expect behind "$merged" "$three" "after a refetch"
 
     touch $out
   ''

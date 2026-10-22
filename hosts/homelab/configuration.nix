@@ -544,6 +544,8 @@
       # no zrepl entry: its cursors, holds and bookmarks live in ZFS
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
       "/var/lib/restore-drill" # restore-drill success marker, same staleness pattern
+      "/var/lib/pull-deploy" # deploy staleness markers and the repo mirror
+      "/var/lib/push-deploy" # vps deploy staleness marker and the repo mirror
     ];
     files = [
       "/etc/machine-id"

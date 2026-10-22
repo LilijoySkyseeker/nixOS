@@ -204,6 +204,9 @@ pkgs.testers.runNixOSTest {
         for j in jobs:
             check(seen[0][j] not in ("", "0"), f"{j} never ran")
             check(seen[1][j] != seen[0][j], f"{j} didn't run on the second activation")
+            # no login: the job fails (and so pages), it doesn't skip
+            result = machine.succeed(f"systemctl show {j} -p Result --value").strip()
+            check(result == "exit-code", f"{j}: Result={result!r}, expected a failure")
         # GPU and KVM: bound in and allowed; tun and display nodes refused
         for unit in ["claude-remote-control", "codex-remote-control"]:
             allow = machine.succeed(f"systemctl show {unit} -p DeviceAllow --value")

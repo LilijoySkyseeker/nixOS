@@ -95,6 +95,10 @@ in
       config = lib.mkIf cfg.enable {
         systemd.services."push-deploy-${cfg.hostAttr}" = {
           description = "Build locally and push+activate ${cfg.hostAttr} on ${cfg.targetHost}";
+          # a switch of this host mid-push would otherwise kill the push
+          # before it records success or checks the target's kernel
+          restartIfChanged = false;
+          unitConfig.X-StopOnRemoval = false;
           path = with pkgs; [
             git
             nixos-rebuild
@@ -120,21 +124,25 @@ in
             export NIX_SSHOPTS="-i ${cfg.identityFile} -o StrictHostKeyChecking=accept-new"
 
             # hosts/vps/configuration.nix's vps-deploy dispatcher matches
-            # this exact string
-            running=$(ssh $NIX_SSHOPTS ${cfg.targetHost} /nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
+            # these exact strings
+            running=$(ssh $NIX_SSHOPTS ${cfg.targetHost} /run/current-system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
+            installed=$(ssh $NIX_SSHOPTS ${cfg.targetHost} /nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision 2>/dev/null || true)
 
-            case "$(revision_relation "$mirror" "$running" "$target")" in
+            case "$(deploy_decision "$mirror" "$running" "$installed" "$target")" in
               current)
                 echo "${cfg.targetHost} is already at $target."
                 touch "$STATE_DIRECTORY/deployed-${cfg.hostAttr}"
                 exit 0
                 ;;
               manual)
-                echo "${cfg.targetHost} runs ''${running:-an unknown revision}, which isn't on master's history: a manual deploy. Not replacing it; deploy it by hand to resume." >&2
+                echo "${cfg.targetHost} runs ''${running:-an unknown revision} (profile: ''${installed:-unknown}), not on master's history: a manual deploy. Not replacing it; deploy it by hand to resume." >&2
                 exit 1
                 ;;
             esac
 
+            ${lib.optionalString cfg.rebootIfKernelChanged ''
+              kernel_before=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+            ''}
             nixos-rebuild ${cfg.operation} \
               --flake "git+file://$mirror?rev=$target#${cfg.hostAttr}" \
               --target-host ${cfg.targetHost} \
@@ -145,10 +153,12 @@ in
               # reboot goes through the same sudo/run0 alias as the switch;
               # hosts/vps/configuration.nix's vps-deploy dispatcher matches
               # this exact string
+              # only a kernel this switch brought in, not one a manual
+              # switch left unbooted
               booted=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/booted-system/kernel)
-              current=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
-              if [ "$booted" != "$current" ]; then
-                echo "Kernel/initrd changed on ${cfg.targetHost}, rebooting."
+              kernel_after=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+              if [ "$kernel_after" != "$kernel_before" ] && [ "$kernel_after" != "$booted" ]; then
+                echo "Kernel changed on ${cfg.targetHost}, rebooting."
                 ssh $NIX_SSHOPTS ${cfg.targetHost} "sudo systemctl reboot"
               fi
             ''}

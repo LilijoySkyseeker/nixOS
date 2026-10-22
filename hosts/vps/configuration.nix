@@ -87,9 +87,12 @@ let
         ;;
     esac
 
-    # myPushDeploy's "what does vps run" check -- exact match, no
-    # wildcard, since this one has no interpolated store path to bound
+    # myPushDeploy's "what does vps run, and what is installed" checks --
+    # exact match, no wildcard, since these have no store path to bound
     case "$cmd" in
+      "/run/current-system/sw/bin/nixos-version --configuration-revision")
+        exec /run/current-system/sw/bin/nixos-version --configuration-revision
+        ;;
       "/nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision")
         exec /nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision
         ;;

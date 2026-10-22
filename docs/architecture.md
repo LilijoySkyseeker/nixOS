@@ -350,14 +350,20 @@ no credentials, worktree or `safe.directory`:
 vps following homelab's own revision makes "servers first" a gate, not
 just a calendar order: vps never gets a commit homelab hasn't switched to.
 
-Each run compares the host's revision with the target
-(`modules/flake/deploy-revision.nix`):
+Each run compares two revisions with the target
+(`deploy_decision` in `modules/flake/deploy-revision.nix`): the running
+system's (`/run/current-system`) and the installed profile's, which can
+be ahead after a failed activation or a `boot` not yet rebooted into.
 
-- **current**: nothing to do; the run records success.
-- **behind** (the host runs an ancestor of the target): deploy it.
-- **manual** (anything else: a branch commit, a dirty or unknown build):
-  someone deployed by hand. The run fails rather than revert it, so it
-  pages through the failed-units check until master is deployed by hand.
+- **current**: the running system is the target; the run records success.
+- **deploy**: both are ancestors of (or equal to) the target: deploy it.
+  This retries a failed activation, and on the PCs re-runs the cheap
+  `boot` weekly until the host reboots.
+- **manual**: either is off master's history (a branch commit, a dirty or
+  unknown build, a staged manual `boot`): someone deployed by hand. The
+  run fails rather than revert it, so it pages through the failed-units
+  check until the host is back on master's history, either deployed by
+  hand or because its branch commit was merged.
 - **`protectedUnits`**: a behind host defers rather than switch while a
   listed unit is active (homelab: the multi-day restic upload).
 
@@ -369,11 +375,21 @@ deploy pages after 30 days. homelab's two deploy timers are not
 `Persistent`, so an outage doesn't trigger a catch-up deploy at boot on
 top of zrepl's own catch-up replication.
 
+The deploy units restart nothing of their own mid-run
+(`restartIfChanged = false`, as `nixos-upgrade`), and reboot only when
+their own switch brought in a new kernel. homelab persists
+`/var/lib/{pull,push}-deploy` across its root rollback, or every reboot
+would reset the staleness clocks.
+
 By hand, from a clean checkout of a pushed commit: `nixos-rebuild switch
 --flake .#homelab --target-host root@homelab`, or on homelab `cd /etc/nixos
-&& git pull && nh os switch`; for vps, `systemctl start push-deploy-vps` on
-homelab. A deploy from a dirty tree or an unmerged branch counts as manual
-until master is deployed again.
+&& git pull && nh os switch`. For vps, `systemctl start push-deploy-vps`
+on homelab runs the same guard, so it won't replace a manual or unknown
+revision; to recover from one, deploy clean master directly as root (vps
+can't build its own closure): `nixos-rebuild switch --flake .#vps
+--target-host root@vps` from torrent or homelab. A deploy from a dirty
+tree or an unmerged branch counts as manual until the host is back on
+master's history.
 
 ## Secrets
 

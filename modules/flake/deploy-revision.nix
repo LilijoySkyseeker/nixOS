@@ -41,6 +41,27 @@ _: {
       fi
     }
 
+    # $1: mirror directory, $2: revision /run/current-system runs, $3: the
+    # installed profile's revision, $4: target revision. prints:
+    #   current  the running system is the target
+    #   deploy   both are on the target's history: (re)deploy it. the
+    #            profile can be ahead of the running system after a failed
+    #            activation or a not-yet-rebooted `boot`, so this retries both
+    #   manual   either one is off master's history: someone deployed by
+    #            hand (a staged `boot` included), so don't replace it
+    deploy_decision() {
+      local running profile
+      running=$(revision_relation "$1" "$2" "$4")
+      profile=$(revision_relation "$1" "$3" "$4")
+      if [ "$running" = manual ] || [ "$profile" = manual ]; then
+        echo manual
+      elif [ "$running" = current ]; then
+        echo current
+      else
+        echo deploy
+      fi
+    }
+
     # $1: space-separated systemd unit names. skips (does not kill) if any
     # is currently active
     check_protected_units_inactive() {

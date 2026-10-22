@@ -39,21 +39,32 @@ push through the mirror) are the tests. Rollout needs one manual deploy of
 each host from clean master, since no host records a revision yet and
 vps's current dispatcher rejects the new revision check. The design:
 
-1. `system.configurationRevision = self.rev or "dirty"` on every host.
-2. A deploy makes the running revision equal a target revision:
-   - already equal: exit, nothing to do (replaces `minSwitchInterval`);
-   - running revision dirty or not an ancestor of the target: skip and
-     alert (ancestry via GitHub's compare API, so no local checkout);
-   - otherwise `nixos-rebuild <op> --flake
-     github:LilijoySkyseeker/nixOS/<rev>#<host>`, then reboot only if
-     this run changed the kernel.
-3. Targets: homelab and the PCs take master HEAD; vps takes the
-   revision homelab is running (read locally by push-deploy).
-4. One alert: a host behind master for more than 8 days, or any skip
-   other than "already at target". It replaces the profile-mtime and
-   `flake.lock` staleness alerts.
+1. `system.configurationRevision = self.rev or self.dirtyRev or null`
+   on every host (profile-default).
+2. Each deploy unit mirrors master into a root-owned bare repo in its
+   StateDirectory and builds `git+file://<mirror>?rev=<rev>`. A run
+   compares the running system's and the profile's revisions with the
+   target (`deploy_decision`): running = target → record success; both
+   on the target's history → deploy (retries a failed activation);
+   either off it → manual: fail and page, never revert. Reboot only if
+   this run's switch brought in a new kernel; `restartIfChanged =
+   false` so the switch can't kill the run.
+3. Targets: homelab and the PCs take master; vps takes the revision
+   homelab runs (read locally by push-deploy).
+4. Alerts: a failed run pages as a failed unit. Markers
+   `/var/lib/pull-deploy/{deployed,nixpkgs-date}` and
+   `/var/lib/push-deploy/deployed-vps` (persisted on homelab) replace
+   the profile-mtime and `flake.lock` staleness alerts.
 5. `agent-flake-update` fails, not skips, when its credentials are
    missing.
+
+Codex's adversarial review (2026-10-21) found and this branch fixed:
+profile-as-truth after a failed activation, the unit being killed by
+its own switch, homelab's rollback wiping the markers, and reboots for
+a kernel a manual switch left. Known test gaps: the VM test pushes a
+closure whose revision can't be head (it would contain itself), so
+"current after a push" is covered only by the fragment test, and it
+uses plain ssh rather than vps's dispatcher.
 
 Deleted: `deploy-guards.nix`, `minSwitchInterval` and the vps
 dispatcher's `stat` exception, `/etc/nixos` and `~/dotfiles` as deploy
