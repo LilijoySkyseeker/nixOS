@@ -9,5 +9,6 @@ _: {
     pkgs: with pkgs; [
       jq # JSON on the command line: `tailscale status --json`, webhook payloads
       openssl # `rand` for generating secret values, `s_client` for inspecting TLS
+      nvd # `nvd diff /run/current-system <new-closure>` before a switch
     ];
 }
