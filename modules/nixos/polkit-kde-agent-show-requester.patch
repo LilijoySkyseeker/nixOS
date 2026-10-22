@@ -1,0 +1,121 @@
+diff --git a/QuickAuthDialog.cpp b/QuickAuthDialog.cpp
+index ca430b1..8ddaf81 100644
+--- a/QuickAuthDialog.cpp
++++ b/QuickAuthDialog.cpp
+@@ -15,14 +15,65 @@
+ #include <KRuntimePlatform>
+ #include <KUser>
+ 
++#include <QFile>
+ #include <QQmlApplicationEngine>
+ #include <QQmlContext>
+ #include <QQuickWindow>
++#include <QRegularExpression>
+ #include <QTimer>
+ 
++// Command line of the process that asked polkit, read from the pid polkitd puts in the
++// details. The process wrote its own argv, so this informs the user; it proves nothing.
++static QString requesterCommandLine(const PolkitQt1::Details &details)
++{
++    bool ok = false;
++    const uint pid = details.lookup(QStringLiteral("polkit.subject-pid")).toUInt(&ok);
++    if (!ok || pid == 0) {
++        return {};
++    }
++
++    QFile file(QStringLiteral("/proc/%1/cmdline").arg(pid));
++    if (!file.open(QIODevice::ReadOnly)) {
++        return {};
++    }
++    constexpr qint64 maxLength = 4096;
++    QByteArray raw = file.read(maxLength + 1);
++    const bool truncated = raw.size() > maxLength;
++    raw.truncate(maxLength);
++    if (raw.endsWith('\0')) {
++        raw.chop(1);
++    }
++    if (raw.isEmpty()) {
++        return {};
++    }
++
++    QStringList args;
++    for (const QByteArray &rawArg : raw.split('\0')) {
++        QString arg = QString::fromLocal8Bit(rawArg);
++        // control, separator and bidi/format characters could fake line breaks or reorder the text
++        for (QChar &c : arg) {
++            const QChar::Category category = c.category();
++            if (category == QChar::Other_Control || category == QChar::Other_Format || category == QChar::Separator_Line
++                || category == QChar::Separator_Paragraph) {
++                c = QLatin1Char('?');
++            }
++        }
++        static const QRegularExpression unsafe(QStringLiteral("[^A-Za-z0-9_@%+=:,./-]"));
++        if (arg.isEmpty() || arg.contains(unsafe)) {
++            arg = QLatin1Char('\'') + arg.replace(QLatin1Char('\''), QLatin1String("'\\''")) + QLatin1Char('\'');
++        }
++        args << arg;
++    }
++    QString command = args.join(QLatin1Char(' '));
++    if (truncated) {
++        command += QStringLiteral(" …");
++    }
++    return command;
++}
++
+ QuickAuthDialog::QuickAuthDialog(const QString &actionId,
+                                  const QString &message,
+-                                 [[maybe_unused]] const PolkitQt1::Details &details,
++                                 const PolkitQt1::Details &details,
+                                  const PolkitQt1::Identity::List &identities)
+     : QObject(nullptr)
+     , m_actionId(actionId)
+@@ -30,6 +81,7 @@ QuickAuthDialog::QuickAuthDialog(const QString &actionId,
+     auto engine = new QQmlApplicationEngine(this);
+     QVariantMap props = {
+         {"mainText", message},
++        {"requesterCommand", requesterCommandLine(details)},
+     };
+ 
+     const auto actions = PolkitQt1::Authority::instance()->enumerateActionsSync();
+diff --git a/qml/QuickAuthDialog.qml b/qml/QuickAuthDialog.qml
+index 283b9c2..306777e 100644
+--- a/qml/QuickAuthDialog.qml
++++ b/qml/QuickAuthDialog.qml
+@@ -35,6 +35,7 @@ Kirigami.AbstractApplicationWindow {
+     // passed in by QuickAuthDialog.cpp
+     property string mainText
+     property string subtitle
++    property string requesterCommand
+     property string descriptionString
+     property string descriptionActionId
+     property string descriptionVendorName
+@@ -164,6 +165,29 @@ Kirigami.AbstractApplicationWindow {
+                     font.weight: Font.Bold
+                 }
+ 
++                // command line of the process that asked, from QuickAuthDialog.cpp
++                ColumnLayout {
++                    Layout.fillWidth: true
++                    visible: root.requesterCommand.length !== 0
++                    spacing: Kirigami.Units.smallSpacing
++
++                    QQC2.Label {
++                        color: Kirigami.Theme.disabledTextColor
++                        text: i18n("Requested by:")
++                    }
++
++                    QQC2.Label {
++                        Layout.fillWidth: true
++                        text: root.requesterCommand
++                        textFormat: Text.PlainText
++                        wrapMode: Text.WrapAnywhere
++                        // keeps the password field on screen for long commands
++                        maximumLineCount: 6
++                        elide: Text.ElideRight
++                        font: Kirigami.Theme.fixedWidthFont
++                    }
++                }
++
+                 // user information, only shown if there is more than one user to select from
+                 Flow {
+                     spacing: Kirigami.Units.smallSpacing
