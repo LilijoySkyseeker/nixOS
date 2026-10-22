@@ -263,6 +263,10 @@ in
 
   # needed for the nix daemon to accept closures vps-deploy copies in
   nix.settings.trusted-users = [ "vps-deploy" ];
+
+  # /nix is a fixed 18G partition and each nixpkgs bump adds ~5G: room for two generations plus an incoming push
+  programs.nh.clean.extraArgs = lib.mkForce "--keep-since 7d --keep 2";
+  nix.settings.auto-optimise-store = true;
   services.openssh = {
     enable = true;
     # force port 22 closed
