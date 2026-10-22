@@ -48,6 +48,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # a re-run keeps its original commit and still gets the master token,
+      # so re-running an old apply would restore an old policy
+      - name: refuse anything but master's current head
+        run: |
+          head=$(git ls-remote origin refs/heads/master | cut -f1)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::$GITHUB_SHA is not master's head ($head); merge a new change instead"
+            exit 1
+          fi
       - uses: tailscale/gitops-acl-action@5a4a17f5708e9bf96f4ee915a95e9f83c2eebe1a # v1.5.2
         with:
           oauth-client-id: ${{ vars.TS_APPLY_CLIENT_ID }}
