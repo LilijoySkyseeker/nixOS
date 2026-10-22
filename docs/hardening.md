@@ -141,24 +141,23 @@ here; it is already applied in the SSH bullet below.
 ### Observability
 
 11. **A guard that declines to act must be watched by something that
-    measures the outcome, not the attempt.** Every guard in
-    `deploy-guards.nix` ends in `exit 0` — correctly, since a deferred
-    deploy is not an error — so systemd records a skip as success and
-    it never enters `systemctl --failed`. A check that only watches
-    units therefore cannot distinguish "deployed weekly for a year"
-    from "skipped every week for a year". Two consequences, both of
-    which bit this fleet:
+    measures the outcome, not the attempt.** A deferred run is not an
+    error, so it exits 0 and systemd records it as success; it never
+    enters `systemctl --failed`. A check that only watches units
+    therefore cannot distinguish "ran weekly for a year" from "deferred
+    every week for a year". Two consequences, both of which bit this
+    fleet:
 
-    - **Watch the result the guard exists to produce.** For deploys
-      that is `/nix/var/nix/profiles/system`, whose mtime is the last
-      real activation by any route, so it stays honest when a host is
-      updated by hand. Prefer an existing artefact like this over a
-      bespoke marker the guarded unit writes about itself — the
-      bespoke one records that the *unit* ran, and will alarm on a host
-      that is perfectly current because a human deployed it.
-      (Non-obvious: `stat` that path **without** `-L`. Store paths all
-      have mtime 1, so dereferencing reports every host as permanently
-      stale.)
+    - **Watch the result the guard exists to produce, and touch it
+      only when that result holds.** For deploys that is
+      `/var/lib/pull-deploy/deployed`, touched only when a run ends with
+      the host at master's revision, including a run that finds a human
+      already deployed it, so a manual deploy of master doesn't alarm. A
+      deferral (a protected unit) leaves it alone. Marking "the unit
+      ran" instead, or the system profile's mtime, alarms on a quiet
+      week with nothing merged and stays silent on a host that keeps
+      deferring. (Non-obvious: health-alerts `stat`s markers **without**
+      `-L`, because store paths all have mtime 1.)
     - **Never hang `OnSuccess=` off a unit that can skip.** systemd
       cannot tell a skip from a real run, and `SuccessExitStatus=` does
       not help — it makes the exit *count* as success, so `OnSuccess=`

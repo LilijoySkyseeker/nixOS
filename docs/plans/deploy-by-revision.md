@@ -33,7 +33,11 @@ read from a git checkout" and gating it with clocks and dirty-checks:
 
 ## State
 
-Designed, not started. The design:
+Implemented on this branch (2026-10-21): every host builds;
+`deploy-revision` (fragment, git only) and `push-deploy-sandbox` (VM, real
+push through the mirror) are the tests. Rollout needs one manual deploy of
+each host from clean master, since no host records a revision yet and
+vps's current dispatcher rejects the new revision check. The design:
 
 1. `system.configurationRevision = self.rev or "dirty"` on every host.
 2. A deploy makes the running revision equal a target revision:

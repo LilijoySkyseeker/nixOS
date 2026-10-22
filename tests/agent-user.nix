@@ -188,7 +188,7 @@ pkgs.testers.runNixOSTest {
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
         # each activation of the weekly target reaches both jobs, not
-        # just the first (they skip here: no Claude login in the VM)
+        # just the first (they fail here: no Claude login in the VM)
         jobs = ["agent-flake-update", "agent-maintenance"]
         def ran():
             return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}

@@ -344,7 +344,6 @@
   # by hand: cd /etc/nixos && git pull && nh os switch
   myPullDeploy = {
     enable = true;
-    flakeDir = "/etc/nixos";
     hostAttr = "homelab";
     dates = "Tue 03:00";
     operation = "switch";
@@ -360,7 +359,6 @@
   sops.secrets.homelab_vps_deploy_key = { };
   myPushDeploy = {
     enable = true;
-    flakeDir = "/etc/nixos";
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
@@ -391,14 +389,14 @@
       # weekly restic: 312h = 13 days, deliberately not 336h (2 weeks), which
       # coincides with the next scheduled run and lets it mask a missed one
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
-      # a failed deploy pages via the failed-units check, but a skipped one
-      # exits 0, so watch the outcome: the profile symlink's mtime is the
-      # last activation by any route. 504h = 21 days: weekly deploys, plus
-      # room for a restic deferral and a week of slack.
-      "/nix/var/nix/profiles/system" = 504;
-      # no input update merged in 30 days; mtime changes only when
-      # pull-deploy fast-forwards a new lock
-      "/etc/nixos/flake.lock" = 720;
+      # a failed deploy pages via the failed-units check; these catch one
+      # that stops running or keeps deferring (restic). 504h = 21 days:
+      # weekly deploys, plus room for a restic deferral and a week of slack
+      "/var/lib/pull-deploy/deployed" = 504;
+      "/var/lib/push-deploy/deployed-vps" = 504;
+      # mtime is the deployed nixpkgs' date: no input update has reached
+      # this host in 30 days, wherever the chain stalled
+      "/var/lib/pull-deploy/nixpkgs-date" = 720;
       # touched by an all-PASS scripts/restore-drill run
       # (docs/procedures/backup-restore.md); 2160h = 90 days, quarterly drills
       "/var/lib/restore-drill/last-drill-success" = 2160;

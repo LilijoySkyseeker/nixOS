@@ -43,9 +43,9 @@
         dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
       };
 
-      deploy-guards = import ../../tests/deploy-guards.nix {
+      deploy-revision = import ../../tests/deploy-revision.nix {
         pkgs = config.flake.pkgsUnstable;
-        deployGuardsScript = config.flake.deployGuardsScript;
+        deployRevisionScript = config.flake.deployRevisionScript;
       };
 
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {

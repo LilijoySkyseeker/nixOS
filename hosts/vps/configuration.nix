@@ -87,11 +87,11 @@ let
         ;;
     esac
 
-    # myPushDeploy's minSwitchInterval pre-check -- exact match, no
+    # myPushDeploy's "what does vps run" check -- exact match, no
     # wildcard, since this one has no interpolated store path to bound
     case "$cmd" in
-      "stat -c %Y /nix/var/nix/profiles/system")
-        exec ${pkgs.coreutils}/bin/stat -c %Y /nix/var/nix/profiles/system
+      "/nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision")
+        exec /nix/var/nix/profiles/system/sw/bin/nixos-version --configuration-revision
         ;;
     esac
 
@@ -403,12 +403,8 @@ in
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkZfs = false;
     checkSmart = false;
-    # homelab push-deploys this host and exits 0 when a guard defers, so the
-    # profile's mtime is the only signal activations stopped; 504h = 21 days,
-    # weekly deploys plus two weeks of slack
-    staleMarkerFiles = {
-      "/nix/var/nix/profiles/system" = 504;
-    };
+    # deploy staleness is homelab's: it pushes this host and watches
+    # /var/lib/push-deploy/deployed-vps
   };
 
   # this box has no real block devices for smartd to monitor

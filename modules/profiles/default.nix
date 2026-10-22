@@ -25,6 +25,8 @@ in
         inputs.impermanence.nixosModules.impermanence
         inputs.nix-flatpak.nixosModules.nix-flatpak
       ];
+      # pull-deploy/push-deploy tell a scheduled deploy from a manual one by it
+      system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
       environment.systemPackages =
         with pkgs-unstable;
         [

@@ -14,14 +14,11 @@
 
   myPullDeploy = {
     enable = true;
-    flakeDir = "/home/lilijoy/dotfiles";
     hostAttr = "thinkpad";
     dates = "Thu 03:00";
     autoReboot = false;
     operation = "boot";
     requireACPower = true;
-    # root has no SSH identity here; reuse lilijoy's, already trusted by origin
-    sshKeyPath = "/home/lilijoy/.ssh/id_ed25519";
   };
 
   # System installed pkgs
@@ -174,11 +171,11 @@
     # after weeks off, the Persistent timer fires one catch-up batch;
     # cooldownHours keeps it to one
     #
-    # profile mtime catches a pull-deploy that skips (guards exit 0). 720h,
-    # not torrent's 504: a laptop goes dark for weeks and requireACPower
-    # legitimately skips battery Thursdays
+    # a pull-deploy that stops running. 720h, not torrent's 504: a laptop
+    # goes dark for weeks and requireACPower legitimately skips battery
+    # Thursdays
     staleMarkerFiles = {
-      "/nix/var/nix/profiles/system" = 720;
+      "/var/lib/pull-deploy/deployed" = 720;
     };
   };
 }
