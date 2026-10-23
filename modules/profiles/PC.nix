@@ -61,6 +61,7 @@ in
         signal-desktop
         picard # music metadata tool
         calibre
+        paseo-desktop # client for the agents' paseo daemon on torrent
 
         # closed source
         spotify
