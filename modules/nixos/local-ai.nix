@@ -46,14 +46,23 @@ _: {
         '';
       };
 
+      # gaming marker: survives a llama-swap restart mid-game, gone on reboot
+      gamingMarker = "/run/local-ai/gaming";
+      setGaming = pkgs.writeShellScript "local-ai-set-gaming" ''
+        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
+          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active
+      '';
+
       # gamemode runs these as the user who started the game
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
+        touch ${gamingMarker} || true
         # block loads first, so nothing reloads behind the unload
         ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
           -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active || true
         ${lib.getExe pkgs.curl} -s -m 14 -X POST ${swapUrl}/api/models/unload || true
       '';
       gamingEnd = pkgs.writeShellScript "local-ai-gaming-end" ''
+        rm -f ${gamingMarker}
         ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
           -d '{"name":null}' ${swapUrl}/api/profiles/active || true
       '';
@@ -155,6 +164,8 @@ _: {
         "d ${models} 2775 root models -"
         # group-writable whoever creates a file, world-readable for llama-swap's dynamic user
         "a+ ${models} - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::r-x"
+        # the gamemode hooks run as whoever plays
+        "d /run/local-ai 1777 root root -"
       ];
 
       systemd.services.claude-remote-control.serviceConfig = agentModelAccess;
@@ -242,6 +253,15 @@ _: {
           # loopback only: models come from /srv/models, never the network
           IPAddressAllow = "localhost";
           IPAddressDeny = "any";
+          # a restart mid-game starts with no profile: reapply the block
+          ExecStartPost = pkgs.writeShellScript "local-ai-restore-gaming" ''
+            [ -e ${gamingMarker} ] || exit 0
+            for _ in $(${pkgs.coreutils}/bin/seq 50); do
+              ${setGaming} >/dev/null && exit 0
+              ${pkgs.coreutils}/bin/sleep 0.2
+            done
+            exit 1
+          '';
         };
       };
 

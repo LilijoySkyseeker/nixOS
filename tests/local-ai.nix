@@ -71,9 +71,18 @@ pkgs.testers.runNixOSTest {
           active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
           assert active == "gaming", active
           assert status("qwen3.8-27b") == "404", "a model loaded while gaming"
+          # a llama-swap restart mid-game keeps the block
+          machine.succeed("systemctl restart llama-swap")
+          machine.wait_for_open_port(8080)
+          active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
+          assert active == "gaming", f"block lost on restart: {active}"
           machine.succeed("su lilijoy -s /bin/sh -c ${custom.end}")
           active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
           assert active == "null", active
+          machine.succeed("systemctl restart llama-swap")
+          machine.wait_for_open_port(8080)
+          active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
+          assert active == "null", f"block reapplied after the game ended: {active}"
           # no model files in the VM: the load is attempted and fails, it isn't 404
           assert status("qwen3.8-27b") != "404", "still blocked after the game ended"
 
