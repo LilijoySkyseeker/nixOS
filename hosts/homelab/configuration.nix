@@ -249,6 +249,8 @@
           "backup-canary torrent zroot/local/home v1";
         "zbackup/backup/torrent/zroot/local/root".expectedContent =
           "backup-canary torrent zroot/local/root v1";
+        "zbackup/backup/torrent/zroot/local/models".expectedContent =
+          "backup-canary torrent zroot/local/models v1";
         "zbackup/backup/thinkpad/zroot/local/home".expectedContent =
           "backup-canary thinkpad zroot/local/home v1";
         "zbackup/backup/thinkpad/zroot/local/root".expectedContent =
@@ -382,6 +384,7 @@
       # PCs can be off for long stretches; 336h = 2 weeks
       "zbackup/backup/torrent/zroot/local/home" = 336;
       "zbackup/backup/torrent/zroot/local/root" = 336;
+      "zbackup/backup/torrent/zroot/local/models" = 336;
       "zbackup/backup/thinkpad/zroot/local/home" = 336;
       "zbackup/backup/thinkpad/zroot/local/root" = 336;
     };

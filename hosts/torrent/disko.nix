@@ -50,6 +50,15 @@
               }
               // zfsProps "zroot" "local/home";
             };
+            # local-ai's model store; on a live host it needs a manual zfs create
+            "local/models" = {
+              type = "zfs_fs";
+              mountpoint = "/srv/models";
+              options = {
+                "com.sun:auto-snapshot" = "false";
+              }
+              // zfsProps "zroot" "local/models";
+            };
           };
         };
       };
