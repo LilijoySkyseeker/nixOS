@@ -4,15 +4,50 @@
     { lib, pkgs, ... }:
     let
       bot = "LilijoySkyseeker-agent";
-      # orientation + the user's working rule (the same file as their own
-      # user-level CLAUDE.md, so there's no copy to drift); Claude and Codex
-      # both read it
-      agentInstructions = pkgs.writeText "agent-AGENTS.md" (
-        builtins.readFile ./agent-user-AGENTS.md
-        + "\n"
-        + builtins.readFile ../home-manager/claude-code/user-claude.md
-      );
-      sharedSkills = ../home-manager/claude-code/skills;
+      # every agent harness: where it reads user-level instructions and
+      # skills, and the few lines only it needs; adding or dropping an agent
+      # is one entry here
+      harnesses = {
+        claude = {
+          instructions = ".claude/CLAUDE.md";
+          skills = ".claude/skills";
+          tail = ''
+            ## In Claude Code
+
+            - Your shell's `grep` is ugrep and `find` is bfs; both reject some
+              GNU syntax (see the `torrent-machine` skill).
+          '';
+        };
+        codex = {
+          instructions = ".codex/AGENTS.md";
+          skills = ".agents/skills";
+          tail = ''
+            ## In Codex
+
+            - You load a repo's `AGENTS.md` and `.agents/skills` only when your
+              working directory is inside it: start there (`-C <repo>`), or
+              read them yourself.
+          '';
+        };
+      };
+      # orientation, the harness's lines, then the user's working rule (the
+      # same file as their own user-level CLAUDE.md, so there's no copy to
+      # drift)
+      instructionsFor =
+        name: harness:
+        pkgs.writeText "agent-${name}-AGENTS.md" (
+          builtins.readFile ./agent-user-AGENTS.md
+          + "\n"
+          + harness.tail
+          + "\n"
+          + builtins.readFile ../home-manager/claude-code/user-claude.md
+        );
+      # the user's skills (their own sessions link the same directory) and
+      # the ones only about this sandbox
+      skillDirs = [
+        ../home-manager/claude-code/skills
+        ./agent-skills
+      ];
       # web-fetch: pages and feeds past bot walls (curl, curl-impersonate,
       # then real Chromium through nodriver in a virtual display)
       fetchPython = pkgs.python3.withPackages (ps: [
@@ -70,7 +105,7 @@
       };
       # torrent's RX 7900 XTX, by PCI path: DRM numbering follows probe order
       agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
-      # sandbox shared by both agents' units: every agent
+      # sandbox shared by every agent's units: every agent
       # session is a child of one of them
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
@@ -127,12 +162,26 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # an unattended Claude run in the agent sandbox; the prompt is a file
-      # in ./agent-jobs, so a job changes only through a reviewed PR
-      agentJob = description: prompt: {
+      # how each harness runs an unattended job: its environment, the login
+      # it needs, and its command reading the prompt on stdin
+      jobHarnesses = {
+        claude = {
+          environment = claudeEnvironment;
+          login = "/home/agent/.claude/.credentials.json";
+          command = "${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+        };
+        codex = {
+          environment = agentEnvironment;
+          login = "/home/agent/.codex/auth.json";
+          command = "${pkgs.codex}/bin/codex exec --skip-git-repo-check -C /home/agent/work -";
+        };
+      };
+      # an unattended run in the agent sandbox; the prompt is a file in
+      # ./agent-jobs, so a job changes only through a reviewed PR
+      agentJobWith = harness: description: prompt: {
         inherit description;
         inherit (agentUnitDeps) wants bindsTo after;
-        environment = claudeEnvironment;
+        inherit (harness) environment;
         serviceConfig =
           builtins.removeAttrs agentSandbox [
             "Restart"
@@ -142,14 +191,16 @@
             Type = "oneshot";
             StandardInput = "file:${prompt}";
             # fail, not skip, so a logged-out agent pages as a failed unit
-            ExecStartPre = "${pkgs.coreutils}/bin/test -e /home/agent/.claude/.credentials.json";
+            ExecStartPre = "${pkgs.coreutils}/bin/test -e ${harness.login}";
             # one job at a time: they share the vault reports and the nixOS
             # checkout, and two timers can fire together after downtime
-            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${harness.command}";
             # includes waiting on the lock behind the other jobs
             TimeoutStartSec = "18h";
           };
       };
+      # the scheduled jobs' default harness (see them below)
+      agentJob = agentJobWith jobHarnesses.claude;
       # codex app-server is the remote-control host; the managed daemon
       # (`codex remote-control start`) refuses a nix-packaged CLI
       codexRemote = pkgs.writeShellScript "codex-remote-control" ''
@@ -290,6 +341,19 @@
                   workflowSizeGuideline = "unrestricted";
                   # unattended sessions wait out a usage limit instead of stalling
                   autoContinueAtUsageLimit = true;
+                  # notes go in AGENTS.local.md, where every agent reads them
+                  autoMemoryEnabled = false;
+                  # only skills that can't work here: no browser pane, desktop,
+                  # docs connector or cloud routines (RemoteTrigger is denied),
+                  # and /init writes the CLAUDE.md the agents must not have
+                  skillOverrides = {
+                    "built-in-browser" = "off";
+                    "chrome-browser" = "off";
+                    "computer-use" = "off";
+                    docs = "off";
+                    schedule = "off";
+                    init = "off";
+                  };
                 }
               );
             in
@@ -331,6 +395,8 @@
                   # the Unix user and its units are the boundary
                   sandbox_mode = "danger-full-access";
                   approval_policy = "never";
+                  # notes go in AGENTS.local.md, where every agent reads them
+                  features.memories = false;
                 }
               );
             in
@@ -404,7 +470,7 @@
           };
         };
 
-        # one cap for both agents' sessions: a runaway agent can't take the
+        # one cap for every agent's sessions: a runaway agent can't take the
         # desktop down with it
         slices.agent.sliceConfig = {
           MemoryMax = "64G";
@@ -424,20 +490,25 @@
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
           "L+ /home/agent/.config/git/ignore - - - - ${gitIgnore}"
-          "L+ /home/agent/.claude/CLAUDE.md - - - - ${agentInstructions}"
           "d /home/agent/.codex 0700 agent agent -"
-          "L+ /home/agent/.codex/AGENTS.md - - - - ${agentInstructions}"
-          "d /home/agent/.claude/skills 0755 agent agent -"
-          # codex's user skill directory
+          # codex's user skill directory lives under it
           "d /home/agent/.agents 0755 agent agent -"
-          "d /home/agent/.agents/skills 0755 agent agent -"
         ]
-        # the user's skills, from the same directory their home-manager links
+        # each harness's instructions and skill links
         ++ lib.concatLists (
-          lib.mapAttrsToList (name: _: [
-            "L+ /home/agent/.claude/skills/${name} - - - - ${sharedSkills}/${name}"
-            "L+ /home/agent/.agents/skills/${name} - - - - ${sharedSkills}/${name}"
-          ]) (builtins.readDir sharedSkills)
+          lib.mapAttrsToList (
+            name: harness:
+            [
+              "L+ /home/agent/${harness.instructions} - - - - ${instructionsFor name harness}"
+              "d /home/agent/${harness.skills} 0755 agent agent -"
+            ]
+            ++ lib.concatMap (
+              dir:
+              lib.mapAttrsToList (skill: _: "L+ /home/agent/${harness.skills}/${skill} - - - - ${dir}/${skill}") (
+                builtins.readDir dir
+              )
+            ) skillDirs
+          ) harnesses
         );
 
         # systemd mount + automount, not fileSystems

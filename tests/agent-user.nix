@@ -247,12 +247,21 @@ pkgs.testers.runNixOSTest {
             assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
         # plus the user's working rule, the same file their own CLAUDE.md uses
         with open("${../modules/home-manager/claude-code/user-claude.md}") as f:
-            assert f.read() in md, "CLAUDE.md lacks the user's working rule"
-        # codex reads the same file, and both see the same skills
+            rule = f.read()
+        assert rule in md, "CLAUDE.md lacks the user's working rule"
+        # codex reads the same text, apart from each harness's own section
         codex_md = machine.succeed(as_agent("cat /home/agent/.codex/AGENTS.md"))
-        assert codex_md == md, "~/.codex/AGENTS.md differs from ~/.claude/CLAUDE.md"
+        with open("${../modules/nixos/agent-user-AGENTS.md}") as f:
+            shared = f.read()
+        for name, text in [("CLAUDE.md", md), ("codex AGENTS.md", codex_md)]:
+            assert text.startswith(shared), f"{name} doesn't start with the shared instructions"
+        assert rule in codex_md, "codex AGENTS.md lacks the user's working rule"
+        assert "## In Claude Code" in md and "## In Codex" in codex_md, "harness sections missing"
+        assert "## In Codex" not in md and "## In Claude Code" not in codex_md, "harness sections crossed"
+        # both see the same skills: the user's and the agent-only ones
         for d in ["/home/agent/.claude/skills", "/home/agent/.agents/skills"]:
-            machine.succeed(as_agent(f"test -f {d}/doghouse-review/SKILL.md"))
+            for skill in ["doghouse-review", "torrent-machine", "other-agents"]:
+                machine.succeed(as_agent(f"test -f {d}/{skill}/SKILL.md"))
         # bot-wall fetcher on the agent's PATH (no network in the VM to run it)
         machine.succeed(as_agent("command -v web-fetch"))
         rc, out = machine.execute(as_agent("web-fetch 2>&1"))
@@ -270,6 +279,9 @@ pkgs.testers.runNixOSTest {
         deny = machine.succeed("jq -c .permissions.deny /home/agent/.claude/settings.json").strip()
         for tool in ["RemoteTrigger", "SendMessage"]:
             assert f'"{tool}"' in deny, f"{tool} not denied: {deny!r}"
+        # notes live in AGENTS.local.md, not in Claude's own memory
+        mem = machine.succeed("jq -c .autoMemoryEnabled /home/agent/.claude/settings.json").strip()
+        assert mem == "false", f"autoMemoryEnabled={mem!r}"
         # a CLI-owned key survives the merge
         # as_agent() single-quotes its command, so write the CLI key as root
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")
@@ -280,7 +292,7 @@ pkgs.testers.runNixOSTest {
     with subtest("codex config"):
         machine.wait_for_unit("codex-agent-config.service")
         cfg = machine.succeed("cat /home/agent/.codex/config.toml")
-        for line in ['sandbox_mode = "danger-full-access"', 'approval_policy = "never"']:
+        for line in ['sandbox_mode = "danger-full-access"', 'approval_policy = "never"', "memories = false"]:
             assert line in cfg, f"missing {line!r}: {cfg!r}"
         # a CLI-owned key survives the merge
         machine.succeed("""printf 'model = "m"\\n' >> /home/agent/.codex/config.toml""")
