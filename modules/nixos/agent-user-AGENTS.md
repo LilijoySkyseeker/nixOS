@@ -35,6 +35,9 @@ on the owner's machine.
   - `ENVIRONMENT.md`: the log of environment failures (below).
 - `~/research` is the owner's Obsidian `Vault/Research` folder. Finished
   research goes there as markdown; it appears on the owner's phone.
+  Before researching a topic, search it (`rg`) for an earlier note: use it
+  as a dated starting source, re-check anything time-sensitive, and extend
+  that note rather than writing a new one.
 - When you can't send the owner a file, give its path under `~/Agent`.
 
 ## Starting work
