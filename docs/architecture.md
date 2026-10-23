@@ -47,7 +47,7 @@ key:
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `encrypted-root`, `secure-boot`, `hibernate`, `hibernate-only`, `reboot-notice` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `audio-switch`, `update-keys` (home-manager) |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch`, `update-keys` (home-manager) |
 | `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `hytale`, `octodns`, `nfs`, `samba` |
 | `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 
@@ -155,6 +155,13 @@ One host is still structurally unusual, same as before the migration:
 prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
 mechanics are in `docs/hardening.md` ("The `agent` user"); the design
 record lives outside the repo, in `~/Projects/agenticsandbox/`.
+
+`local-ai` (torrent only) serves local models on the RX 7900 XTX to every
+agent and to lilijoy: `llama-swap` on `127.0.0.1:8080` (one model at a
+time, killed after 5 idle minutes, blocked while gamemode runs a game),
+the model store `/srv/models` (`zroot/local/models`, replicated to
+homelab), and Paseo on `127.0.0.1:6767`, published tailnet-only by
+`tailscale serve` as one remote way into the agent sandbox.
 
 ## Navigating: "what does host X actually run?"
 

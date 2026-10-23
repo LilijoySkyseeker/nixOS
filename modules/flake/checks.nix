@@ -38,6 +38,12 @@
         agentUserModule = config.flake.modules.nixos."agent-user";
       };
 
+      local-ai = import ../../tests/local-ai.nix {
+        pkgs = config.flake.pkgsUnstable;
+        agentUserModule = config.flake.modules.nixos."agent-user";
+        localAiModule = config.flake.modules.nixos."local-ai";
+      };
+
       docker-userns-remap = import ../../tests/docker-userns-remap.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
