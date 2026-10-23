@@ -50,10 +50,15 @@
               }
               // zfsProps "zroot" "local/home";
             };
-            # local-ai's model store; on a live host it needs a manual zfs create
+            # local-ai's model store; on a live host it needs a manual zfs create.
+            # nofail: not needed to boot, so a missing dataset only means no models
             "local/models" = {
               type = "zfs_fs";
               mountpoint = "/srv/models";
+              mountOptions = [
+                "defaults"
+                "nofail"
+              ];
               options = {
                 "com.sun:auto-snapshot" = "false";
               }
