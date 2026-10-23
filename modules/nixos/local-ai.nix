@@ -134,6 +134,11 @@ _: {
         }
       );
 
+      # set once by the owner: `paseo daemon set-password`, as agent
+      paseoHasPassword = pkgs.writeShellScript "paseo-has-password" ''
+        exec ${lib.getExe pkgs.jq} -e '.daemon.auth.password | strings | startswith("$2")' /home/agent/.paseo/config.json
+      '';
+
       # the agent's sessions write models; privilege on the units, not the user
       agentModelAccess = {
         ReadWritePaths = [ models ];
@@ -281,6 +286,9 @@ _: {
           PATH = lib.mkForce crc.environment.PATH;
         };
         serviceConfig = crc.serviceConfig // {
+          # without a password paseo grants owner rights to any client, and a
+          # web page's websocket to loopback needs no cors: no password, no daemon
+          ExecCondition = "${paseoHasPassword}";
           ExecStart = "${lib.getExe pkgs.paseo} daemon run";
         };
       };
@@ -299,7 +307,7 @@ _: {
           Type = "oneshot";
           RemainAfterExit = true;
           # never publish a paseo without its password (a fresh ~/.paseo has none)
-          ExecCondition = "${lib.getExe pkgs.jq} -e '.daemon.auth.password | strings | length > 0' /home/agent/.paseo/config.json";
+          ExecCondition = "${paseoHasPassword}";
           ExecStart = "${lib.getExe config.services.tailscale.package} serve --bg --https=6767 http://127.0.0.1:6767";
           ExecStop = "${lib.getExe config.services.tailscale.package} serve --https=6767 off";
         };

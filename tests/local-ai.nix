@@ -106,13 +106,19 @@ pkgs.testers.runNixOSTest {
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
               assert prop(p) == want, f"paseo {p}={prop(p)!r}"
           assert "firewall.service" in prop("BindsTo"), prop("BindsTo")
-          machine.succeed("systemctl stop paseo")
-          # without a password set in the VM, start it bare and check it binds loopback only
-          machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          # no password yet (a fresh setup): the daemon declines to start
+          machine.succeed("systemctl start paseo || true")
+          assert prop("ActiveState") != "active", "paseo ran without a password"
+          # with a bcrypt hash it starts, on loopback, and refuses anonymous clients
+          machine.succeed("""h=$(${pkgs.mkpasswd}/bin/mkpasswd -m bcrypt -R 10 vm-secret) && jq --arg h "$h" '.daemon.auth.password = $h' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl start paseo")
           machine.wait_for_open_port(6767, timeout=120)
           listen = machine.succeed("ss -Hltn 'sport = :6767' | awk '{print $4}'").split()
           assert listen == ["127.0.0.1:6767"], listen
           machine.succeed("curl -sf 127.0.0.1:6767/api/health")
+          anon = machine.succeed("curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:6767/api/agents").strip()
+          assert anon == "401", f"anonymous /api/agents: {anon}"
+          authed = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer vm-secret' 127.0.0.1:6767/api/agents").strip()
+          assert authed != "401", f"authenticated /api/agents: {authed}"
     '';
 }
