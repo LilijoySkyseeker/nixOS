@@ -14,7 +14,7 @@ _: {
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # only the game servers are meant to be public (hosts/vps/README.md);
+      # public: the game servers and the website (hosts/vps/README.md);
       # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [
@@ -57,6 +57,14 @@ _: {
             type = "TXT";
             ttl = 300;
             value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
+          }
+        ];
+        # the website lives at the apex; www redirects there
+        www = [
+          {
+            type = "CNAME";
+            ttl = 300;
+            value = "${domainNoDot}.";
           }
         ];
         # IPv4-only on purpose: game ports are only DNAT'd over IPv4 on the vps,
