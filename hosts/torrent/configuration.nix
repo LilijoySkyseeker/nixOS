@@ -79,6 +79,12 @@
 
   # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
+  # gguf files: large sequential reads that don't compress; cached once in the
+  # page cache by llama.cpp's mmap instead of twice (arc + page cache)
+  myZfsDatasetProperties."zroot/local/models" = {
+    recordsize = "1M";
+    primarycache = "metadata";
+  };
 
   # zfs snapshots served to homelab's zrepl puller; passive side: holds no
   # homelab credential and homelab owns retention, so a compromise here can't
@@ -91,6 +97,8 @@
       datasets = [
         "zroot/local/home"
         "zroot/local/root"
+        # open model weights, kept in case their downloads disappear
+        "zroot/local/models"
       ];
       clients.homelab.publicKey = vars.zreplPullerKey;
     };
@@ -128,6 +136,7 @@
     datasets = [
       "zroot/local/home"
       "zroot/local/root"
+      "zroot/local/models"
     ];
   };
 
@@ -136,6 +145,7 @@
   myBackupCanary.paths = {
     "/home/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/home v1";
     "/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/root v1";
+    "/srv/models/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/models v1";
   };
 
   # failed-unit / stuck-switch alerts to Discord; one fleet-wide webhook,

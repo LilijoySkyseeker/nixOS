@@ -101,7 +101,7 @@ zrepl extends `root_fs` with the **full source dataset path**
 zbackup/backup/homelab/zdata/storage/storage
 zbackup/backup/homelab/zdata/storage/storage-bulk
 zbackup/backup/homelab/zroot/local/state
-zbackup/backup/torrent/zroot/local/{home,root}
+zbackup/backup/torrent/zroot/local/{home,root,models}
 zbackup/backup/thinkpad/zroot/local/{home,root}
 ```
 
