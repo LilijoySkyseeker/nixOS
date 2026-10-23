@@ -18,6 +18,12 @@ in
       wgAddress = "10.100.0.2";
       domain = lib.removeSuffix "." vars.domain;
 
+      # a friend who opens a game server's address in a browser: show them how to connect
+      gameOops = game: ''
+        bind ${wgAddress}
+        redir https://${domain}/oops/${game}/ 302
+      '';
+
       # the site loads nothing from third parties
       securityHeaders = ''
         header {
@@ -66,6 +72,9 @@ in
           bind ${wgAddress}
           redir https://${domain}{uri} permanent
         '';
+        virtualHosts."minecraft.${domain}".extraConfig = gameOops "minecraft";
+        virtualHosts."factorio.${domain}".extraConfig = gameOops "factorio";
+        virtualHosts."hytale.${domain}".extraConfig = gameOops "hytale";
       };
       # the bind address only exists once wg0 is up
       systemd.services.caddy = {

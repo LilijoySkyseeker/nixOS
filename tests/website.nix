@@ -39,6 +39,12 @@ pkgs.testers.runNixOSTest {
       services.caddy.virtualHosts."skyseekerlabs.net".hostName = lib.mkForce "http://skyseekerlabs.net";
       services.caddy.virtualHosts."www.skyseekerlabs.net".hostName =
         lib.mkForce "http://www.skyseekerlabs.net";
+      services.caddy.virtualHosts."minecraft.skyseekerlabs.net".hostName =
+        lib.mkForce "http://minecraft.skyseekerlabs.net";
+      services.caddy.virtualHosts."factorio.skyseekerlabs.net".hostName =
+        lib.mkForce "http://factorio.skyseekerlabs.net";
+      services.caddy.virtualHosts."hytale.skyseekerlabs.net".hostName =
+        lib.mkForce "http://hytale.skyseekerlabs.net";
 
       # no network to pull from: the test publishes the stand-in site itself
       systemd.timers.website-deploy.enable = false;
@@ -80,6 +86,12 @@ pkgs.testers.runNixOSTest {
         r = get("/projects/?x=1", host="www.skyseekerlabs.net")
         assert " 301" in r.splitlines()[0], r
         assert "location: https://skyseekerlabs.net/projects/?x=1" in r.lower(), r
+
+    with subtest("a game server's address in a browser goes to its oops page"):
+        for game in ["minecraft", "factorio", "hytale"]:
+            r = get("/", host=f"{game}.skyseekerlabs.net")
+            assert " 302" in r.splitlines()[0], r
+            assert f"location: https://skyseekerlabs.net/oops/{game}/" in r.lower(), r
 
     with subtest("website-status writes status.json, served uncached"):
         machine.succeed("systemctl start website-status.service")
