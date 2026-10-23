@@ -41,11 +41,15 @@ in
       # caddy: the public site, ACME through the vps's 80/443 DNAT
       services.caddy = {
         enable = true;
-        package = pkgs-stable.caddy;
+        # Go 1.27: stable's go 1.26.8 lacks 1.26.9's net/http and net/textproto fixes
+        # TODO: drop when NixOS/nixpkgs#571809 (go 1.26.9) is in nixos-26.05
+        package = pkgs-stable.caddy.override { buildGoModule = pkgs-stable.buildGo127Module; };
         # no HTTP/3: the vps doesn't forward UDP 443
+        # no HTTP/2: caddy 2.11.7's vendored x/net 0.59 has the HTTP/2 server DoS bugs
+        # TODO: drop when a caddy release with caddyserver/caddy#8179 (x/net 0.60) is in nixos-26.05, and restore h2
         globalConfig = ''
           servers {
-            protocols h1 h2
+            protocols h1
           }
         '';
         virtualHosts.${domain}.extraConfig = ''
