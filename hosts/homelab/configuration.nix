@@ -547,6 +547,8 @@
       "/var/lib/backup-restore-test" # canary restore-test success markers, same staleness pattern
       "/var/lib/pull-deploy" # deploy staleness markers and the repo mirror
       "/var/lib/push-deploy" # vps deploy staleness marker and the repo mirror
+      "/var/lib/caddy" # ACME account and certs, so a reboot doesn't re-request them
+      "/var/lib/website" # the site's mirror, its built GC root and status.json
     ];
     files = [
       "/etc/machine-id"

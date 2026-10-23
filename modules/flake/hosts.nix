@@ -110,6 +110,7 @@ in
         nixosModules.octodns
         nixosModules.nfs
         nixosModules.samba
+        nixosModules.website
       ];
     };
     #==================================================

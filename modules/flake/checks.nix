@@ -48,6 +48,11 @@
         deployRevisionScript = config.flake.deployRevisionScript;
       };
 
+      website = import ../../tests/website.nix {
+        pkgs = config.flake.pkgsStable;
+        websiteModule = config.flake.modules.nixos.website;
+      };
+
       push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
         pkgs = config.flake.pkgsUnstable;
         pushDeployModule = config.flake.modules.nixos."push-deploy";

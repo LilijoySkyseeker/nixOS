@@ -346,6 +346,16 @@ in
         proto = "udp";
         sourcePort = 5520; # hytale (QUIC)
       }
+      {
+        destination = "10.100.0.2:80";
+        proto = "tcp";
+        sourcePort = 80; # website: ACME challenges and the https redirect
+      }
+      {
+        destination = "10.100.0.2:443";
+        proto = "tcp";
+        sourcePort = 443; # website
+      }
     ];
   };
 
@@ -378,6 +388,11 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 5520 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name hytale-flood -j DROP
+
+    # website: cap new HTTP(S) connections per source IP
+    iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
+      -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
+      --hashlimit-mode srcip --hashlimit-name http-new -j DROP
   '';
 
   # tear down the raw-table chain; the firewall's stop path only flushes
