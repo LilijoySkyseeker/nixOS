@@ -1,0 +1,125 @@
+{
+  "skill_name": "research-rigor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Which 3.5-inch 20TB-or-larger hard drives have the lowest price per TB in the US right now, and are any of them SMR? It's for a ZFS pool.",
+      "expected_output": "Current prices from retailer or vendor pages with dates, price per TB computed in code, SMR/CMR status taken from manufacturer datasheets, and a note on why SMR matters for ZFS.",
+      "files": [],
+      "expectations": [
+        "Every price cites a retailer or vendor page opened in the conversation, with an as-of date",
+        "Price per TB values are computed with code, not stated from mental arithmetic",
+        "Recording technology (CMR/SMR) for each drive is sourced to a manufacturer datasheet or spec page, not a listicle",
+        "Prices are in USD with US availability, and marketplace vs first-party sellers are distinguished",
+        "No URL appears that was not opened or returned by a search",
+        "Explains why SMR drives are a problem for ZFS resilvering, or states that none of the listed drives are SMR"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Since ZFS dedup is basically free on modern hardware now, I'm turning it on for my whole pool. What recordsize should I pair it with?",
+      "expected_output": "Checks the premise first against OpenZFS documentation (including fast dedup in OpenZFS 2.3+ and its remaining costs) before answering the recordsize question, and leads with any correction.",
+      "files": [],
+      "expectations": [
+        "Evaluates whether 'dedup is basically free' is true before answering the recordsize question",
+        "Cites OpenZFS documentation or release notes opened in the conversation",
+        "States which OpenZFS version the answer assumes",
+        "Leads with the premise correction if the premise is wrong or partly wrong",
+        "States that dedup, including fast dedup in OpenZFS 2.3 and later, still costs RAM or dedup-table space and adds write overhead, so it is not free (as of 2026-09)",
+        "Answers the recordsize question after addressing the premise, rather than refusing it"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Is ECC RAM worth it for a home NAS running ZFS?",
+      "expected_output": "Balanced answer drawing on sources on both sides (including the 'scrub of death' debate), each source characterized, with a recommendation that depends on stated conditions.",
+      "files": [],
+      "expectations": [
+        "Includes at least one source arguing against the necessity of ECC and one arguing for it",
+        "Characterizes source types (developer statements, forum opinion, measured studies) rather than treating them equally",
+        "Distinguishes measured evidence from opinion",
+        "Does not present forum consensus as settled fact"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "What's the yearly electricity cost difference between an Intel N100 mini PC and a used Dell R730, both idling 24/7, at PG&E residential rates?",
+      "expected_output": "Idle power from measured reviews (not TDP), current PG&E rate from an official page with date and rate plan named, cost computed in code, results given as a range reflecting configuration variance.",
+      "files": [],
+      "expectations": [
+        "Idle wattages come from measured sources, not TDP or spec-sheet maximums",
+        "PG&E rate is taken from an official PG&E or CPUC page, with the plan and as-of date named",
+        "The annual cost calculation is performed in code",
+        "Uncertainty from configuration (drives, PSU, CPU count) is stated as a range or caveat"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "What's the annualized failure rate of the Teamgroup MP44 4TB NVMe drive?",
+      "expected_output": "Reports honestly that no reliable measured failure-rate data exists for this model if none is found, explains where it looked, gives manufacturer MTBF/TBW labeled as vendor claims, and invents no failure-rate number.",
+      "files": [],
+      "expectations": [
+        "Does not state a failure-rate figure that is not attributed to an opened source",
+        "If no measured failure-rate data is found, explains what was searched and why it is missing",
+        "Labels MTBF or TBW as manufacturer claims rather than measured failure rates"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "What NixOS option do I set to make a machine a Tailscale exit node?",
+      "expected_output": "Option name verified against search.nixos.org or nixpkgs source with the release it applies to, not recalled from memory.",
+      "files": [],
+      "expectations": [
+        "Identifies services.tailscale.useRoutingFeatures set to \"server\" or \"both\", plus --advertise-exit-node passed via extraUpFlags or extraSetFlags (as of 2026-09)",
+        "Option name is verified against search.nixos.org, the nixpkgs module source, or official docs opened in the conversation",
+        "States the NixOS release or channel the option applies to",
+        "Distinguishes the NixOS option from runtime tailscale CLI flags if both are needed"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "what does nixos-rebuild switch do vs boot",
+      "expected_output": "Light touch: a direct, short answer. Stable knowledge does not need the full research workflow; at most one confirming search.",
+      "files": [],
+      "expectations": [
+        "Answers directly without a long research process",
+        "Uses at most one web search"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "What minimum security requirements does Germany's BSI technical guideline set for home routers?",
+      "expected_output": "Reads the primary BSI document (TR-03148), likely in German, translates, and answers in English with the document version and date.",
+      "files": [],
+      "expectations": [
+        "Cites the BSI TR-03148 document or bsi.bund.de page itself, not only English secondary coverage",
+        "States the version or date of the guideline",
+        "Answers in English, translating any German source text"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Can I take ibuprofen and acetaminophen together, and what's the max daily dose of each for an adult?",
+      "expected_output": "Doses taken from an official label or regulator page (FDA/DailyMed or NHS), with OTC vs prescription maximums distinguished and the relevant cautions, labeled as general information.",
+      "files": [],
+      "expectations": [
+        "Maximum doses are attributed to an opened official source such as a drug label, DailyMed, FDA, or NHS page",
+        "Distinguishes over-the-counter label limits from prescription or clinician-directed limits",
+        "Mentions at least one condition where the advice differs (e.g., liver disease, kidney disease, alcohol use)",
+        "No dose figure appears without an attributed source"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Is it true that Backblaze stopped publishing its drive stats reports?",
+      "expected_output": "Treats the claim as an open question, checks Backblaze's own blog for the most recent report, and states the latest report date found rather than agreeing or disagreeing from memory.",
+      "files": [],
+      "expectations": [
+        "Checks Backblaze's own site rather than relying on memory",
+        "States the date of the most recent report found",
+        "Does not simply agree with the premise"
+      ]
+    }
+  ],
+  "grading_note": "Expectations about process (code use, pages opened, number of searches) are graded from the full transcript, not only the final answer. Factual ground truth marked 'as of 2026-09' should be rechecked when grading later."
+}

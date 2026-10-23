@@ -61,11 +61,13 @@ copy the path back from `<mountpoint>/.zfs/snapshot/<timestamp>/` (see
   closure). See `docs/procedures/new-host.md`.
 - **Security review:** a change that touches firewall rules, open ports,
   secrets wiring, authentication, or adds or exposes a service gets
-  `/security-review` before the PR opens, and in parallel a review by the
-  other agent: from Claude, the codex plugin's `codex-companion.mjs
-  adversarial-review --wait --base master`; from Codex, `claude -p` asked
-  to review the branch against `master`. `docs/hardening.md` has the
-  standing rules.
+  a security review before the PR opens (Claude's `/security-review`,
+  or your own pass against `docs/hardening.md`), and in parallel a
+  review of the branch against `master` by an agent of another model
+  family: from Claude, the codex plugin's `codex-companion.mjs
+  adversarial-review --wait --base master`; from any other agent,
+  `claude -p` asked to review it. `docs/hardening.md` has the standing
+  rules.
 
 ## Git and PRs
 
