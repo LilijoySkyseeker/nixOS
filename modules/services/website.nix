@@ -13,6 +13,7 @@ in
       # public repo, no credentials; only main is ever built
       repoUrl = "https://github.com/LilijoySkyseeker/skyseekerlabs.net.git";
       stateDir = "/var/lib/website";
+      statusDir = "/var/lib/website-status";
       # homelab's end of the vps tunnel
       wgAddress = "10.100.0.2";
       domain = lib.removeSuffix "." vars.domain;
@@ -47,7 +48,7 @@ in
           ${securityHeaders}
           # written by website-status, read by the page's status stickers
           handle /status.json {
-            root * ${stateDir}
+            root * ${statusDir}
             header Cache-Control "no-store"
             file_server
           }
@@ -78,7 +79,14 @@ in
       ];
 
       # website-deploy: build main's newest commit and swap it in
-      # root because profile-server's allowed-users is root only; build-only, so fully sandboxed
+      # its own user, so evaluating the site's flake can't read anything root-only
+      users.users.website = {
+        isSystemUser = true;
+        group = "website";
+      };
+      users.groups.website = { };
+      # profile-server allows root only; this adds the deploy user (the lists merge)
+      nix.settings.allowed-users = [ "website" ];
       systemd.services.website-deploy = {
         description = "Build skyseekerlabs.net from main and publish it";
         after = [ "network-online.target" ];
@@ -87,6 +95,7 @@ in
           git
           nix
           coreutils
+          findutils
         ];
         environment = {
           REPO_URL = repoUrl;
@@ -96,6 +105,8 @@ in
         script = ''
           set -euo pipefail
           mirror="$STATE_DIRECTORY/mirror.git"
+          builds="$STATE_DIRECTORY/builds"
+          mkdir -p "$builds"
           [ -d "$mirror/objects" ] || git init -q --bare "$mirror"
           git -C "$mirror" fetch -q --prune "$REPO_URL" "+refs/heads/main:refs/heads/main"
           rev=$(git -C "$mirror" rev-parse refs/heads/main)
@@ -103,21 +114,33 @@ in
             "" | *[!0-9a-f]*) echo "Not a revision: '$rev'" >&2; exit 1 ;;
           esac
 
-          if [ "$(cat "$STATE_DIRECTORY/rev" 2>/dev/null || true)" = "$rev" ] && [ -e "$STATE_DIRECTORY/current" ]; then
+          if [ "$(readlink "$STATE_DIRECTORY/current" 2>/dev/null || true)" = "builds/$rev" ] && [ -e "$builds/$rev" ]; then
             exit 0
           fi
 
-          # the out-link is the GC root; mv -T swaps it in atomically
-          nix build --no-write-lock-file --out-link "$STATE_DIRECTORY/next" "git+file://$mirror?ref=main&rev=$rev"
-          mv -T "$STATE_DIRECTORY/next" "$STATE_DIRECTORY/current"
-          echo "$rev" > "$STATE_DIRECTORY/rev"
+          # each build's out-link is its GC root and is never renamed
+          nix build --no-write-lock-file --out-link "$builds/$rev" "git+file://$mirror?ref=main&rev=$rev"
+
+          # a symlink in the output could point caddy at any file it can read
+          if [ -n "$(find "$builds/$rev/" -type l -print -quit)" ]; then
+            echo "Build $rev contains symlinks; not publishing it." >&2
+            rm -f "$builds/$rev"
+            exit 1
+          fi
+
+          ln -sfn "builds/$rev" "$STATE_DIRECTORY/current.new"
+          mv -T "$STATE_DIRECTORY/current.new" "$STATE_DIRECTORY/current"
           touch "$STATE_DIRECTORY/deployed"
+          # keep the live build and the one before it; older roots go, and gc takes them
+          ls -1t "$builds" | tail -n +3 | while read -r old; do rm -f "$builds/$old"; done
           echo "Published $rev."
         '';
         serviceConfig = {
           Type = "oneshot";
+          User = "website";
+          Group = "website";
           StateDirectory = "website";
-          # caddy reads current/ and status.json from here
+          # caddy reads current/ from here
           StateDirectoryMode = "0755";
           NoNewPrivileges = true;
           PrivateTmp = true;
@@ -149,7 +172,7 @@ in
           days_since() { [ -e "$1" ] && echo $(( (now - $(stat -c %Y "$1")) / 86400 )) || echo null; }
           uptime_days=$(( $(cut -d. -f1 /proc/uptime) / 86400 ))
           deployed=null
-          [ -e "$STATE_DIRECTORY/deployed" ] && deployed="\"$(date -u -d "@$(stat -c %Y "$STATE_DIRECTORY/deployed")" +%Y-%m-%dT%H:%M:%SZ)\""
+          [ -e ${stateDir}/deployed ] && deployed="\"$(date -u -d "@$(stat -c %Y ${stateDir}/deployed)" +%Y-%m-%dT%H:%M:%SZ)\""
           # mtime is the deployed nixpkgs' date (myPullDeploy)
           nixpkgs_days=$(days_since /var/lib/pull-deploy/nixpkgs-date)
           printf '{"uptime_days": %s, "deployed": %s, "nixpkgs_days": %s}\n' \
@@ -158,13 +181,14 @@ in
         '';
         serviceConfig = {
           Type = "oneshot";
-          StateDirectory = "website";
+          StateDirectory = "website-status";
+          # caddy serves status.json from here
           StateDirectoryMode = "0755";
           NoNewPrivileges = true;
           PrivateTmp = true;
           PrivateNetwork = true;
           ProtectSystem = "strict";
-          ReadWritePaths = [ stateDir ];
+          ReadWritePaths = [ statusDir ];
           ProtectHome = true;
           ProtectKernelModules = true;
           ProtectKernelTunables = true;
