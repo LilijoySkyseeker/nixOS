@@ -47,6 +47,18 @@ pkgs.testers.runNixOSTest {
           assert prop("PrivateDevices") == "yes", prop("PrivateDevices")
           assert prop("MemoryMax") != "infinity", prop("MemoryMax")
 
+      with subtest("llama-swap: no cross-origin reads, no stored captures"):
+          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: https://evil.example' 127.0.0.1:8080/v1/models")
+          assert "evil.example" not in hdrs and "access-control-allow-origin: *" not in hdrs.lower(), hdrs
+          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
+          assert "http://127.0.0.1:8080" in hdrs, hdrs
+
+      with subtest("paseo is never published without a password"):
+          # the vm's config has no password, so the serve unit must decline
+          machine.succeed("systemctl start paseo-tailscale-serve || true")
+          res = machine.succeed("systemctl show paseo-tailscale-serve -p ActiveState -p ConditionResult --value")
+          assert "active" not in res.split()[0:1], res
+
       with subtest("gamemode hook blocks loads, and its end lifts the block"):
           def status(model):
               return machine.succeed(

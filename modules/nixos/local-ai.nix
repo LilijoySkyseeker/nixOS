@@ -162,6 +162,15 @@ _: {
         settings = {
           # flash-next reads about 90 GB before it's healthy
           healthCheckTimeout = 900;
+          # no stored request/response bodies: private prompts stay out of its api
+          captureBuffer = 0;
+          # only llama-swap's own ui may read responses in a browser; the
+          # permissive default lets any web page read loopback (firefox has
+          # no private network access check)
+          security.cors.allowedOrigins = [
+            "http://127.0.0.1:8080"
+            "http://localhost:8080"
+          ];
           globalTTL = 300;
           models = {
             "qwen3.8-27b" = {
@@ -289,6 +298,8 @@ _: {
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
+          # never publish a paseo without its password (a fresh ~/.paseo has none)
+          ExecCondition = "${lib.getExe pkgs.jq} -e '.daemon.auth.password | strings | length > 0' /home/agent/.paseo/config.json";
           ExecStart = "${lib.getExe config.services.tailscale.package} serve --bg --https=6767 http://127.0.0.1:6767";
           ExecStop = "${lib.getExe config.services.tailscale.package} serve --https=6767 off";
         };
