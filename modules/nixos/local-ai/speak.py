@@ -28,6 +28,10 @@ def gpu_free():
 
 
 def speak_text(text, voice, speed, out):
+    # japanese text needs mecab and unidic, which aren't installed
+    if voice.startswith("j"):
+        sys.exit("speak: Japanese voices can't read text here (no MeCab/UniDic); "
+                 "use another voice, or give Japanese phonemes with --ipa")
     # audio.cpp's kokoro, with eSpeak-ng as the phonemizer
     backend = "vulkan" if gpu_free() else "cpu"
     cmd = [AUDIOCPP_CLI, "--task", "tts", "--family", "kokoro_tts",

@@ -50,7 +50,10 @@ Two commands on `PATH`, for files any agent can read:
   (Whisper, punctuated). `-o DIR` keeps the transcript and the JSON. Any
   format ffmpeg reads, video included. One language per file: `-l auto`
   detects it once. 12 minutes of English take about 10-25 s on the GPU.
-- `speak "text" -o out.wav`: Kokoro v1.0, fast (54 voices: `-v`).
+- `speak "text" -o out.wav`: Kokoro v1.0, fast. English first (`af_*`,
+  `am_*`, `bf_*`, `bm_*`), and also Spanish, French, Hindi, Italian,
+  Portuguese and Mandarin voices (`-v`, by prefix). Japanese voices only
+  speak `--ipa` input: Japanese text needs MeCab and UniDic, not installed.
   `speak --ipa "χaˈlɛθ" -o out.wav` speaks exact IPA phonemes; symbols
   outside Kokoro's set are named and dropped.
 
