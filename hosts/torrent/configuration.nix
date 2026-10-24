@@ -82,11 +82,12 @@
 
   # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
-  # gguf files: large sequential reads that don't compress; cached once in the
-  # page cache by llama.cpp's mmap instead of twice (arc + page cache)
+  # gguf files: large sequential reads that don't compress. primarycache stays
+  # "all": llama.cpp's mmap faults 4 KiB pages, and without the arc each fault
+  # rereads the whole 1M record (the 16 GiB arc cap bounds the double caching)
   myZfsDatasetProperties."zroot/local/models" = {
     recordsize = "1M";
-    primarycache = "metadata";
+    primarycache = "all";
   };
 
   # zfs snapshots served to homelab's zrepl puller; passive side: holds no
