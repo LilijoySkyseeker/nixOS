@@ -83,6 +83,10 @@ name the exact files. To add a model:
 
 Don't download models into `~/work`: it's backed up too, so every model would be stored twice.
 
+The store archives only what's in use: a model a service entry or command
+names. Test candidates in `~/work/scratch`, or delete a tested model that
+lost out, so it doesn't linger here (owner, 2026-10-23).
+
 ## Sharing the GPU
 
 The owner's desktop and games come first.
