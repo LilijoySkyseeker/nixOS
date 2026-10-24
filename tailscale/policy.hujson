@@ -1,7 +1,6 @@
-// Tailnet ACL / policy file, managed in the Tailscale admin console
-// (https://login.tailscale.com/admin/acls/file) — not applied by Nix.
-// Kept here only as a reference copy; update this file whenever the
-// console policy changes so the two don't drift.
+// Tailnet policy file. This file is the source of truth: merging to master
+// applies it to the tailnet (.github/workflows/tailscale-policy.yml), and
+// any edit made in the admin console is overwritten by the next apply.
 //
 // Notes:
 // - All hosts in this repo join as tagged devices (see
@@ -57,6 +56,34 @@
             "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["192.168.1.0/24"],
             "ip":  ["*"],
+        },
+    ],
+
+    // checked by Tailscale on every PR and apply; a failing test rejects the policy
+    "tests": [
+        // homelab pulls zrepl backups over ssh and push-deploys vps
+        {
+            "src":    "tag:homelab",
+            "proto":  "tcp",
+            "accept": ["tag:torrent:22", "tag:thinkpad:22", "tag:vps:22"],
+        },
+        // admin ssh: vps has no ssh outside the tailnet
+        {
+            "src":    "tag:torrent",
+            "proto":  "tcp",
+            "accept": ["tag:homelab:22", "tag:vps:22"],
+        },
+        // admin ssh, and the homelab nfs mounts
+        {
+            "src":    "tag:thinkpad",
+            "proto":  "tcp",
+            "accept": ["tag:homelab:22", "tag:homelab:2049", "tag:vps:22"],
+        },
+        // vps is public-facing and initiates nothing on the tailnet
+        {
+            "src":   "tag:vps",
+            "proto": "tcp",
+            "deny":  ["tag:torrent:22", "tag:thinkpad:22", "tag:homelab:22"],
         },
     ],
 
