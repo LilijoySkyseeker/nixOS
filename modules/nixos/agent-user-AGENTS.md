@@ -35,6 +35,9 @@ on the owner's machine.
   - `ENVIRONMENT.md`: the log of environment failures (below).
 - `~/research` is the owner's Obsidian `Vault/Research` folder. Finished
   research goes there as markdown; it appears on the owner's phone.
+  Before researching a topic, search it (`rg`) for an earlier note: use it
+  as a dated starting source, re-check anything time-sensitive, and extend
+  that note rather than writing a new one.
 - When you can't send the owner a file, give its path under `~/Agent`.
 
 ## Starting work
@@ -86,6 +89,11 @@ on the owner's machine.
 
 ## Working with the owner
 
+- A problem isn't solved until the fix is declarative and reproducible as
+  far as it can be: in the nixOS repo or the project's own repo, so a
+  rebuild or reinstall gets it back. A manual step that can't be declared
+  (a secret, a setting kept only in an app) is written down where the next
+  person will look, and named in your reply.
 - When you put a decision to the owner, restate it in full every time: the
   problem, a concrete example, each option with its trade-offs, and your
   recommendation. Don't point back to "3a above".
