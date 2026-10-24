@@ -37,8 +37,11 @@ waits on a terminal.
   yourself:
   `ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_API_KEY=local ANTHROPIC_MODEL=<model> ANTHROPIC_SMALL_FAST_MODEL=<model> CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude --append-system-prompt "You are <model> running locally, not Claude." -p ...`
 - The local model is free and uncapped but slower and weaker than the
-  cloud models. It's the one to use for private material, for work the
-  cloud models refuse, and as a third opinion.
+  cloud models. It's the one to use for private material and for work the
+  cloud models refuse, with its output checked. Don't use Qwen3.8-27B for
+  code review or to check another agent's answer: it hallucinated review
+  results in an earlier session (owner, 2026-10-23). Revisit once
+  Flash-Next has been tested.
 
 ## Rules
 

@@ -1,4 +1,4 @@
-"""speak: local text-to-speech. Kokoro v1.0 from text or IPA phonemes; --hq for Qwen3-TTS."""
+"""speak: Kokoro v1.0 text-to-speech, from text or from IPA phonemes."""
 
 import argparse
 import os
@@ -39,26 +39,6 @@ def speak_text(text, voice, speed, out):
     if run.returncode != 0 and backend == "vulkan":
         cmd[cmd.index("vulkan")] = "cpu"
         run = subprocess.run(cmd, capture_output=True, text=True)
-    if run.returncode != 0:
-        sys.exit(f"speak: audio.cpp failed:\n{run.stderr.strip()}")
-
-
-QWEN_VOICES = ["aiden", "dylan", "eric", "ono_anna", "ryan", "serena", "sohee", "uncle_fu", "vivian"]
-
-
-def speak_hq(text, voice, style, out):
-    # qwen3-tts customvoice: nicer voices with an optional style instruction
-    if voice not in QWEN_VOICES:
-        sys.exit(f"speak: --hq voices are {', '.join(QWEN_VOICES)}")
-    backend = "vulkan" if gpu_free() else "cpu"
-    if backend == "cpu":
-        print("speak: the GPU is busy or a game runs; --hq on the CPU is slow", file=sys.stderr)
-    cmd = [AUDIOCPP_CLI, "--task", "tts", "--family", "qwen3_tts",
-           "--model", f"{AUDIO}/qwen3-tts-12hz-1.7b-customvoice-q8_0.gguf", "--backend", backend,
-           "--speaker", voice, "--text", text, "--out", out]
-    if style:
-        cmd += ["--instruct", style]
-    run = subprocess.run(cmd, capture_output=True, text=True)
     if run.returncode != 0:
         sys.exit(f"speak: audio.cpp failed:\n{run.stderr.strip()}")
 
@@ -109,30 +89,17 @@ def speak_ipa(phonemes, voice, speed, out):
 def main():
     p = argparse.ArgumentParser(
         prog="speak",
-        description="Local text-to-speech. Default: Kokoro v1.0, fast, from TEXT or from "
-        "--ipa phonemes (Kokoro's IPA alphabet) for exact pronunciations. --hq: Qwen3-TTS, "
-        "nicer voices with an optional --style, text only.")
+        description="Kokoro v1.0 text-to-speech. Give TEXT, or --ipa with phonemes in "
+        "Kokoro's IPA alphabet for exact pronunciations.")
     p.add_argument("text", nargs="?", help="text to speak (English and other eSpeak languages)")
     p.add_argument("--ipa", help="IPA phonemes to speak instead of TEXT, e.g. 'χaˈlɛθ'")
-    p.add_argument("--hq", action="store_true", help="Qwen3-TTS instead of Kokoro (text only, GPU)")
-    p.add_argument("-v", "--voice",
-                   help="Kokoro voice (default af_heart; the list: ls " + AUDIO + "/kokoro-82m-hf/voices), "
-                   "or with --hq one of " + ", ".join(QWEN_VOICES) + " (default vivian)")
-    p.add_argument("--style", help="with --hq: a style or emotion, e.g. 'warm and cheerful'")
+    p.add_argument("-v", "--voice", default="af_heart",
+                   help="voice id (default af_heart); the list: ls " + AUDIO + "/kokoro-82m-hf/voices")
     p.add_argument("-s", "--speed", type=float, default=1.0)
     p.add_argument("-o", "--out", default="speech.wav", help="output WAV (default speech.wav)")
     a = p.parse_args()
     if bool(a.text) == bool(a.ipa):
         p.error("give TEXT or --ipa, not both")
-    if a.hq:
-        if a.ipa:
-            p.error("--hq takes text, not --ipa (IPA is Kokoro's)")
-        speak_hq(a.text, a.voice or "vivian", a.style, a.out)
-        print(a.out)
-        return
-    if a.style:
-        p.error("--style needs --hq")
-    a.voice = a.voice or "af_heart"
     if a.ipa:
         speak_ipa(a.ipa, a.voice, a.speed, a.out)
     else:

@@ -1,8 +1,7 @@
 # local-ai-speech: speech tools on torrent for every agent and the user
 # - transcribe: speech-to-text with who said what (audio.cpp: nemotron
 #   diarization + asr), on the RX 7900 XTX when no game runs and VRAM is free
-# - speak: kokoro v1.0 text-to-speech from text or IPA phonemes, or qwen3-tts
-#   (--hq) for nicer voices
+# - speak: kokoro v1.0 text-to-speech, from text or IPA phonemes
 # models live in /srv/models/audio (local-ai's model store)
 { inputs, ... }:
 {

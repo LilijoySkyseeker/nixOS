@@ -1,6 +1,6 @@
 ---
 name: local-ai
-description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, a third opinion, OCR of scans or PDFs, transcribing audio (with who said what), text-to-speech (including from IPA) - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
+description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, OCR of scans or PDFs, transcribing audio (with who said what), text-to-speech (including from IPA) - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
 ---
 
 # Local models on torrent
@@ -50,9 +50,7 @@ Two commands on `PATH`, for files any agent can read:
   minutes of audio on the GPU.
 - `speak "text" -o out.wav`: Kokoro v1.0, fast (54 voices: `-v`).
   `speak --ipa "χaˈlɛθ" -o out.wav` speaks exact IPA phonemes; symbols
-  outside Kokoro's set are named and dropped. `speak --hq -v ryan --style
-  "calm" "text"`: Qwen3-TTS, nicer voices (aiden, dylan, eric, ono_anna,
-  ryan, serena, sohee, uncle_fu, vivian), text only.
+  outside Kokoro's set are named and dropped.
 
 Both use the GPU directly, outside llama-swap, when no game runs and VRAM
 is free, and fall back to the CPU otherwise (speaker labels on the CPU run

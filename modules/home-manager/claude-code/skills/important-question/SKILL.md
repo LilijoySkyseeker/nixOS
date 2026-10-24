@@ -18,10 +18,9 @@ Use every agent you can call, at least two model families:
 - **Codex:** your own subagent if you are Codex, else
   `codex --search exec --skip-git-repo-check --ephemeral -C ~/work/scratch -o <file> "<prompt>" < /dev/null`
   (the answer is in `<file>`; delete it once you've merged).
-- **The local model**, if its server answers
-  (`curl -sf http://127.0.0.1:8080/health`): `claude-local -p --permission-mode bypassPermissions "<prompt>" < /dev/null`,
-  or the Codex form with the local provider (see the `other-agents` skill
-  where it exists). It is slower and weaker, but free and private.
+- **The local model** doesn't count toward the two families for now:
+  Qwen3.8-27B hallucinated review results in an earlier session (owner,
+  2026-10-23). Revisit once Flash-Next has been tested.
 
 If fewer than two families are reachable, say so and stop rather than pass
 one answer off as checked.
