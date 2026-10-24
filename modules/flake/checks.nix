@@ -28,6 +28,18 @@
         hibernateOnlyModule = config.flake.modules.nixos."hibernate-only";
       };
 
+      pc-desktop = import ../../tests/pc-desktop.nix {
+        pkgs = config.flake.pkgsUnstable;
+        specialArgs = {
+          inherit inputs;
+          inherit (config.flake) vars;
+          pkgs-unstable = config.flake.pkgsUnstable;
+          pkgs-stable = config.flake.pkgsStable;
+        };
+        profilePcModule = config.flake.modules.nixos."profile-pc";
+        kdeModule = config.flake.modules.nixos.kde;
+      };
+
       docker-publish-guard = import ../../tests/docker-publish-guard.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
