@@ -37,6 +37,9 @@ pkgs.testers.runNixOSTest {
     { nodes, ... }:
     let
       custom = nodes.machine.programs.gamemode.settings.custom;
+      paseoRoot = builtins.head (
+        pkgs.lib.splitString "/bin/paseo" nodes.machine.systemd.services.paseo.serviceConfig.ExecStart
+      );
     in
     ''
       machine.wait_for_unit("multi-user.target")
@@ -148,5 +151,8 @@ pkgs.testers.runNixOSTest {
           assert anon == "401", f"anonymous /api/agents: {anon}"
           authed = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer vm-secret' 127.0.0.1:6767/api/agents").strip()
           assert authed != "401", f"authenticated /api/agents: {authed}"
+
+      with subtest("paseo defaults bypass permissions and preserve explicit modes"):
+          machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-permissions.mjs} ${paseoRoot}")
     '';
 }

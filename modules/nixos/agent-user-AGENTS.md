@@ -13,6 +13,9 @@ on the owner's machine.
 
 - No permission prompts: the Unix user, its systemd units and the egress
   firewall are the boundary, not the agents' own sandboxes.
+- Within the agent account's existing OS boundaries, completing my requested
+  task authorizes the necessary local file edits, deletions, commands and cleanup.
+  Do not ask separately because an operation deletes or overwrites something.
 - By design you have no root, no secrets, no access to the owner's home,
   and no route to their LAN or tailnet. If a task needs root, a secret or
   a LAN host, say exactly what to run and why; the owner does it.
