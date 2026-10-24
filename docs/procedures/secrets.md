@@ -2,8 +2,10 @@
 
 ## Storage model
 
-Secrets live in `secrets/*.{yaml,json,env,ini}` (currently just
-`secrets/secrets.yaml`), encrypted with [sops](https://github.com/getsops/sops)
+Secrets live in `secrets/*.{yaml,json,env,ini}`: `secrets/secrets.yaml`
+for secrets every host shares, and per-host files such as
+`secrets/torrent.yaml` (hardening rule 2) with their own `.sops.yaml`
+rule. All are encrypted with [sops](https://github.com/getsops/sops)
 against per-host/per-purpose age keys declared as named anchors in
 `.sops.yaml`. `sops-nix` decrypts them at activation time on each host
 that has a matching key (see `sops.age.keyFile` / `sops.secrets.*` in
