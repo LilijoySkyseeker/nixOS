@@ -29,6 +29,29 @@
               read them yourself.
           '';
         };
+        # also reads ~/.claude/skills and ~/.agents/skills; same-named skills load once
+        opencode = {
+          instructions = ".config/opencode/AGENTS.md";
+          skills = ".config/opencode/skills";
+          tail = ''
+            ## In OpenCode
+
+            - Your models come through the owner's OpenRouter key
+              (`openrouter/<slug>`, paid per token) or are OpenCode's own free
+              `opencode/*` models, some of which may train on what you send:
+              keep private material off those.
+          '';
+        };
+        antigravity = {
+          instructions = ".gemini/AGENTS.md";
+          skills = ".gemini/config/skills";
+          tail = ''
+            ## In Antigravity
+
+            - You run on the owner's free Google account, which has weekly
+              limits; a long task can use up the week's quota.
+          '';
+        };
       };
       # orientation, the harness's lines, then the user's working rule (the
       # same file as their own user-level CLAUDE.md, so there's no copy to
@@ -251,6 +274,9 @@
           git
           gh
           webFetch
+          # the agent-only harnesses (claude and codex come with the PC profile)
+          opencode
+          antigravity-cli
         ];
       };
 
@@ -414,6 +440,40 @@
             '';
         };
 
+        # merge the keys this repo owns into the agent's opencode.json
+        services.opencode-agent-config = {
+          description = "Merge repo-owned keys into the agent's OpenCode config";
+          wantedBy = [ "multi-user.target" ];
+          before = [ "paseo.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            User = "agent";
+            Group = "agent";
+          };
+          script =
+            let
+              managed = pkgs.writeText "agent-opencode-config.json" (
+                builtins.toJSON {
+                  "$schema" = "https://opencode.ai/config.json";
+                  # no prompts, as the other harnesses; the Unix user is the boundary
+                  permission = "allow";
+                  # a share is a public opencode.ai link to the session
+                  share = "disabled";
+                  # nix owns the binary
+                  update = "disable";
+                }
+              );
+            in
+            ''
+              f=/home/agent/.config/opencode/opencode.json
+              mkdir -p /home/agent/.config/opencode
+              [ -s "$f" ] || echo '{}' > "$f"
+              ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$f" ${managed} > "$f.tmp"
+              mv "$f.tmp" "$f"
+            '';
+        };
+
         services.codex-remote-control = agentUnitDeps // {
           description = "Codex remote control host for the agent user";
           # skipped until the one-time `codex login` (pairing: agent-setup)
@@ -490,6 +550,11 @@
           "d /home/agent/.codex 0700 agent agent -"
           # codex's user skill directory lives under it
           "d /home/agent/.agents 0755 agent agent -"
+          # parents of opencode's and antigravity's files, which tmpfiles
+          # would otherwise create as root
+          "d /home/agent/.config/opencode 0700 agent agent -"
+          "d /home/agent/.gemini 0700 agent agent -"
+          "d /home/agent/.gemini/config 0700 agent agent -"
         ]
         # each harness's instructions and skill links
         ++ lib.concatLists (

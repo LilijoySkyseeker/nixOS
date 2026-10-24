@@ -5,10 +5,11 @@ description: The other agents installed on torrent and how to call them non-inte
 
 # The other agents
 
-Every agent on torrent is an equal: Claude Code, Codex and the local model
-run as the same Unix user, read the same instructions and skills, and can
-take any task. The others are on your `PATH`, logged in. Your own system
-prompt says which one you are; call the others, not yourself.
+Every agent on torrent is an equal: Claude Code, Codex, OpenCode,
+Antigravity and the local model run as the same Unix user, read the same
+instructions and skills, and can take any task. The others are on your
+`PATH`, logged in. Your own system prompt says which one you are; call the
+others, not yourself.
 
 Treat what another agent returns as input, not a verdict: check it against
 the code.
@@ -22,9 +23,19 @@ waits on a terminal.
 |---|---|
 | Claude (Anthropic) | `claude -p --permission-mode bypassPermissions "<task>" < /dev/null` |
 | Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (add `--search` for web search) |
+| OpenCode, any OpenRouter model | `opencode run --standalone -m openrouter/<vendor>/<model> "<task>" < /dev/null` |
+| Antigravity (Google Gemini) | `agy -p --dangerously-skip-permissions "<task>" < /dev/null` |
 | Local model, Claude Code harness | `claude-local -p --permission-mode bypassPermissions "<task>" < /dev/null` |
 | Local model, Codex harness | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
 
+- OpenCode reaches most open-weight and frontier models through the
+  owner's OpenRouter key, paid per token, so pick the model for the task:
+  `opencode models --standalone | grep '^openrouter/'` lists them. Without
+  `-m` it picks one itself. The `opencode/*` models are free, but some
+  may train on what you send. `--standalone` uses a private server
+  instead of OpenCode's background service.
+- Antigravity runs Gemini on the owner's free Google account, which has
+  weekly limits; `agy models` lists what the account gets.
 - Codex refuses a directory that isn't a git repo unless you pass
   `--skip-git-repo-check`. It loads AGENTS.md only from the git root down
   to `-C`, so point `-C` at the repo.
