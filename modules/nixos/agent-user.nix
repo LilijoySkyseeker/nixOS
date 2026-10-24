@@ -37,7 +37,7 @@
             ## In OpenCode
 
             - Your models come through the owner's OpenRouter key
-              (`openrouter/<slug>`, paid per token) or are OpenCode's own free
+              (`openrouter/<vendor>/<model>`, paid per token) or are OpenCode's own free
               `opencode/*` models, some of which may train on what you send:
               keep private material off those.
           '';
@@ -98,6 +98,15 @@
           '')
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
+      };
+      # cloud media and model calls with the owner's OpenRouter key
+      openrouterCurl = pkgs.writeShellApplication {
+        name = "openrouter-curl";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.curl
+        ];
+        text = builtins.readFile ./agent-tools/openrouter-curl.sh;
       };
       # git identity: the bot's noreply address (its public GitHub id)
       gitIdentity = pkgs.writeText "agent-git-identity" ''
@@ -274,6 +283,7 @@
           git
           gh
           webFetch
+          openrouterCurl
           # the agent-only harnesses (claude and codex come with the PC profile)
           opencode
           antigravity-cli
@@ -462,6 +472,9 @@
                   share = "disabled";
                   # nix owns the binary
                   update = "disable";
+                  # the key agent-setup writes, shared with openrouter-curl;
+                  # 2.0.32 ignores it in the newer `providers.*.settings` form
+                  provider.openrouter.options.apiKey = "{file:/home/agent/.config/openrouter/key}";
                 }
               );
             in
@@ -553,6 +566,8 @@
           # parents of opencode's and antigravity's files, which tmpfiles
           # would otherwise create as root
           "d /home/agent/.config/opencode 0700 agent agent -"
+          # the owner's OpenRouter key, written by agent-setup
+          "d /home/agent/.config/openrouter 0700 agent agent -"
           "d /home/agent/.gemini 0700 agent agent -"
           "d /home/agent/.gemini/config 0700 agent agent -"
         ]

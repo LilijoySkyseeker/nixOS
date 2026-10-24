@@ -265,10 +265,11 @@ here; it is already applied in the SSH bullet below.
   OpenCode and Antigravity (`agy`) are the same: Paseo runs each as a
   child of its own unit, and `agy`'s own background daemon would need a
   systemd user manager, which `agent` doesn't get (no linger). Through
-  them the agent also holds the user's OpenRouter API key (in OpenCode's
-  database) and a Google login, both written by `agent-setup`. The
-  OpenRouter key should carry a credit limit, since anything running as
-  `agent` can spend it. OpenCode's session sharing, which publishes a
+  them the agent also holds the user's OpenRouter API key
+  (`~agent/.config/openrouter/key`, 0600, read by OpenCode and by
+  `openrouter-curl` for image, video and music generation) and a Google
+  login, both written by `agent-setup`. The OpenRouter key should carry a
+  credit limit, since anything running as `agent` can spend it. OpenCode's session sharing, which publishes a
   session as a public opencode.ai link, is off (`share = "disabled"`).
   `~agent/work` is shared the other way: lilijoy is in group `agent`, the
   home is `711` and `work` is `2770` with a default ACL. That grants the

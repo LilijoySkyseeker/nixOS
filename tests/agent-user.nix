@@ -268,12 +268,18 @@ pkgs.testers.runNixOSTest {
             for skill in ["doghouse-review", "torrent-machine", "other-agents"]:
                 machine.succeed(as_agent(f"test -f /home/agent/{skills}/{skill}/SKILL.md"))
         # their parents belong to the agent, or the harnesses can't write there
-        for d in [".config/opencode", ".gemini", ".gemini/config"]:
+        for d in [".config/opencode", ".config/openrouter", ".gemini", ".gemini/config"]:
             assert machine.succeed(f"stat -c %U /home/agent/{d}").strip() == "agent", d
+        assert machine.succeed("stat -c %a /home/agent/.config/openrouter").strip() == "700"
+        # with no key yet, openrouter-curl refuses before calling anything
+        rc, out = machine.execute(as_agent("openrouter-curl https://openrouter.ai/api/v1/models 2>&1"))
+        assert rc == 1 and "run0 agent-setup" in out, f"openrouter-curl without a key: rc={rc} {out!r}"
         # opencode's repo-owned keys
         machine.wait_for_unit("opencode-agent-config.service")
         oc = machine.succeed("cat /home/agent/.config/opencode/opencode.json")
         assert machine.succeed("jq -r .share /home/agent/.config/opencode/opencode.json").strip() == "disabled", oc
+        key_ref = machine.succeed("jq -r .provider.openrouter.options.apiKey /home/agent/.config/opencode/opencode.json").strip()
+        assert key_ref == "{file:/home/agent/.config/openrouter/key}", oc
         machine.succeed(as_agent("command -v opencode && command -v agy"))
         # bot-wall fetcher on the agent's PATH (no network in the VM to run it)
         machine.succeed(as_agent("command -v web-fetch"))
