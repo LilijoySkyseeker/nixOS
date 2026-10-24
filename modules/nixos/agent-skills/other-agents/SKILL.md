@@ -34,8 +34,8 @@ waits on a terminal.
   `-m` it picks one itself. The `opencode/*` models are free, but some
   may train on what you send. `--standalone` uses a private server
   instead of OpenCode's background service.
-- Antigravity runs Gemini on the owner's free Google account, which has
-  weekly limits; `agy models` lists what the account gets.
+- Antigravity runs Gemini on a free Google account set aside for the
+  agents, which has weekly limits; `agy models` lists what it gets.
 - Codex refuses a directory that isn't a git repo unless you pass
   `--skip-git-repo-check`. It loads AGENTS.md only from the git root down
   to `-C`, so point `-C` at the repo.

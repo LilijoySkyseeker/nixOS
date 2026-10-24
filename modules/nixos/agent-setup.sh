@@ -122,7 +122,7 @@ fix_opencode_config() { systemctl restart opencode-agent-config; }
 # `agy models` fails until someone has signed in
 chk_agy() { as_agent agy models </dev/null >/dev/null 2>&1; }
 fix_agy() {
-  note "sign in with your Google account (open the URL it shows, paste the code back), then type /exit"
+  note "sign in with the Google account for the agents, not your personal one (open the URL it shows, paste the code back), then type /exit"
   as_agent env -C "$agent_home/work" agy || true
 }
 
@@ -166,7 +166,7 @@ item "codex logged in" chk_codex_login "log the agent's codex in with your ChatG
 item "codex config merged" chk_codex_config "rerun codex-agent-config" fix_codex_config
 item "OpenRouter key in place" chk_openrouter "paste an OpenRouter key for the agents" fix_openrouter
 item "OpenCode config merged" chk_opencode_config "rerun opencode-agent-config" fix_opencode_config
-item "Antigravity signed in" chk_agy "sign the agent's agy in with your Google account" fix_agy
+item "Antigravity signed in" chk_agy "sign agy in with the Google account for the agents" fix_agy
 item "remote-control services running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""

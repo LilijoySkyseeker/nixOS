@@ -48,8 +48,8 @@
           tail = ''
             ## In Antigravity
 
-            - You run on the owner's free Google account, which has weekly
-              limits; a long task can use up the week's quota.
+            - You run on a free Google account set aside for the agents, which
+              has weekly limits; a long task can use up the week's quota.
           '';
         };
       };
