@@ -30,7 +30,7 @@ in
         ripgrep
         gitFull
         gh # GitHub CLI
-        # claude-code's codex@openai-codex plugin: the codex CLI, and node for its scripts
+        # the codex CLI, which claude calls directly (`codex exec`, `codex review`)
         codex
         nodejs
         gjs # for kdeconnect

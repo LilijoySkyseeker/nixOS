@@ -64,10 +64,9 @@ copy the path back from `<mountpoint>/.zfs/snapshot/<timestamp>/` (see
   a security review before the PR opens (Claude's `/security-review`,
   or your own pass against `docs/hardening.md`), and in parallel a
   review of the branch against `master` by an agent of another model
-  family: from Claude, the codex plugin's `codex-companion.mjs
-  adversarial-review --wait --base master`; from any other agent,
-  `claude -p` asked to review it. `docs/hardening.md` has the standing
-  rules.
+  family, through its own CLI: from Claude, `codex review --base master`;
+  from Codex, `claude -p` asked to review it (the `other-agents` skill has
+  the commands). `docs/hardening.md` has the standing rules.
 
 ## Git and PRs
 

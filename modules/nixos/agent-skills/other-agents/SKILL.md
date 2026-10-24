@@ -50,11 +50,17 @@ waits on a terminal.
 - **Review before a costly PR.** Before a PR that would be costly to get
   wrong (agent-user, firewall, deploys, migrations, deletions), have an
   agent of another model family review the branch against the base:
-  - From Claude: `node ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs adversarial-review --wait --base master`
-    (the `codex:codex-rescue` subagent also works). Its Codex runs in a
-    read-only sandbox, so it can't evaluate or build: do the builds and
-    runtime checks yourself.
-  - From Codex: `claude -p --permission-mode bypassPermissions "Review the branch <branch> against master for bugs and risks" < /dev/null`
-    in the repo.
-  - `/codex:review` and `/codex:adversarial-review` are the owner's to type.
+  - Codex reviewing: `codex review --base master < /dev/null` in the repo.
+    It runs Codex's built-in review with its full sandbox, so it can build
+    and evaluate too. The output is long; the verdict is at the end
+    (`| tail -40`). `--base` takes no custom instructions: for a focused
+    pass (security, an adversarial read), use `codex exec -C <repo>
+    "Review the diff master...HEAD for <focus>; report findings with
+    file:line" < /dev/null`.
+  - Claude reviewing: `claude -p --permission-mode bypassPermissions
+    "Review the branch <branch> against master for bugs and risks" <
+    /dev/null` in the repo.
+  - A change that touches security (firewall, ports, secrets,
+    authentication, an exposed service) gets both a security review and
+    the other family's review, in parallel, before the PR opens.
 - **Several opinions on one question:** the `important-question` skill.
