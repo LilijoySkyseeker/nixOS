@@ -148,6 +148,7 @@ in
           homeManagerModules."tooling-desktop"
           homeManagerModules."virt-manager"
           homeManagerModules."claude-code"
+          homeManagerModules."paseo-desktop"
         ];
         home = {
           stateVersion = "23.11";
