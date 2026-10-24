@@ -162,6 +162,10 @@ time, killed after 5 idle minutes, blocked while gamemode runs a game),
 the model store `/srv/models` (`zroot/local/models`, replicated to
 homelab), and Paseo on `127.0.0.1:6767`, published tailnet-only by
 `tailscale serve` as one remote way into the agent sandbox.
+Paseo defaults Claude and Codex sessions to bypassed permissions, including
+their local aliases and sessions restored with saved default modes. Explicit
+Plan and Read-only modes still work. The Unix account, systemd sandbox and
+egress firewall remain the execution boundary.
 
 ## Navigating: "what does host X actually run?"
 

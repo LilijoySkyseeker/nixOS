@@ -14,6 +14,10 @@ _: {
       ...
     }:
     let
+      # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
+      paseo = pkgs.paseo.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
+      });
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
       swapUrl = "http://127.0.0.1:${toString config.services.llama-swap.port}";
@@ -321,7 +325,7 @@ _: {
           # without a password paseo grants owner rights to any client, and a
           # web page's websocket to loopback needs no cors: no password, no daemon
           ExecCondition = "${paseoHasPassword}";
-          ExecStart = "${lib.getExe pkgs.paseo} daemon run";
+          ExecStart = "${lib.getExe paseo} daemon run";
         };
       };
 

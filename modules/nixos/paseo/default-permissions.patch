@@ -1,0 +1,89 @@
+--- a/packages/server/src/server/agent/providers/claude/agent.ts
++++ b/packages/server/src/server/agent/providers/claude/agent.ts
+@@ -1019,9 +1019,9 @@
+   defaultModeId: PermissionMode;
+ } {
+   if (claudeAutoModeUnavailableOn(env)) {
+-    return { modes: DEFAULT_MODES.filter((mode) => mode.id !== "auto"), defaultModeId: "default" };
+-  }
+-  return { modes: DEFAULT_MODES, defaultModeId: "auto" };
++    return { modes: DEFAULT_MODES.filter((mode) => mode.id !== "auto"), defaultModeId: "bypassPermissions" };
++  }
++  return { modes: DEFAULT_MODES, defaultModeId: "bypassPermissions" };
+ }
+ 
+ function coerceSessionMetadata(metadata: AgentMetadata | undefined): Partial<AgentSessionConfig> {
+@@ -2336,7 +2336,11 @@
+       );
+     }
+ 
+-    this.currentMode = isPermissionMode(config.modeId) ? config.modeId : "default";
++    const requestedMode = isPermissionMode(config.modeId) ? config.modeId : "default";
++    this.currentMode =
++      requestedMode === "default" || requestedMode === "auto"
++        ? "bypassPermissions"
++        : requestedMode;
+     if (this.currentMode !== "plan") {
+       this.planResumeMode = this.currentMode;
+     }
+--- a/packages/server/src/server/agent/providers/codex-app-server-agent.ts
++++ b/packages/server/src/server/agent/providers/codex-app-server-agent.ts
+@@ -260,7 +260,7 @@
+   },
+ ];
+ 
+-const DEFAULT_CODEX_MODE_ID = "auto";
++const DEFAULT_CODEX_MODE_ID = "full-access";
+ 
+ interface CodexAppServerClientLike {
+   request(method: string, params?: unknown): Promise<unknown>;
+@@ -3555,8 +3555,11 @@
+     if (config.modeId !== undefined) {
+       validateCodexMode(config.modeId);
+     }
+-    this.hasWorkflowModeOverride = config.modeId !== undefined;
+-    this.currentMode = config.modeId ?? DEFAULT_CODEX_MODE_ID;
++    this.hasWorkflowModeOverride = true;
++    this.currentMode =
++      config.modeId === "auto" || config.modeId === "auto-review"
++        ? DEFAULT_CODEX_MODE_ID
++        : (config.modeId ?? DEFAULT_CODEX_MODE_ID);
+     this.providerOptions =
+       validateProviderOptions("codex", CodexProviderOptionsSchema, config.providerOptions) ?? {};
+     this.config = config;
+@@ -4064,6 +4067,14 @@
+   private async ensureThreadLoaded(): Promise<void> {
+     if (!this.client || !this.currentThreadId) return;
+     const params: Record<string, unknown> = { threadId: this.currentThreadId };
++    const preset = MODE_PRESETS[this.currentMode] ?? MODE_PRESETS[DEFAULT_CODEX_MODE_ID];
++    if (this.providerOptions.approval_policy === undefined) {
++      params.approvalPolicy = preset.approvalPolicy;
++    }
++    if (this.providerOptions.sandbox_mode === undefined) {
++      params.sandbox = preset.sandbox;
++    }
++    params.approvalsReviewer = preset.approvalsReviewer;
+     const developerInstructions = composeSystemPromptParts(
+       this.config.systemPrompt,
+       this.config.daemonAppendSystemPrompt,
+@@ -7413,17 +7424,15 @@
+     ]);
+     return {
+       models,
+-      defaultModeId: autoReviewEnabled ? "auto-review" : DEFAULT_CODEX_MODE_ID,
++      defaultModeId: DEFAULT_CODEX_MODE_ID,
+       modes: autoReviewEnabled
+         ? CODEX_MODES
+         : CODEX_MODES.filter((mode) => mode.id !== "auto-review"),
+     };
+   }
+ 
+-  async resolveDefaultModeId(input: ResolveAgentDefaultModeInput): Promise<string> {
+-    return (await this.resolveAutoReviewEnabled(input.signal))
+-      ? "auto-review"
+-      : DEFAULT_CODEX_MODE_ID;
++  async resolveDefaultModeId(_input: ResolveAgentDefaultModeInput): Promise<string> {
++    return DEFAULT_CODEX_MODE_ID;
+   }
+ 
+   private async fetchModelsFromAppServer(
