@@ -42,8 +42,8 @@ Nothing caps VRAM, and the owner's desktop and games use the same card;
 they come first. Before a big job, check
 `/sys/bus/pci/devices/0000:03:00.0/mem_info_vram_used`, and free the GPU
 when you're done. Get tools with `nix shell` (`nixpkgs#vulkan-tools`,
-ROCm from `rocmPackages`). The shared local model server is in the
-`local-ai` skill: use it rather than loading a second copy of a model.
+ROCm from `rocmPackages`). The `local-ai` skill describes the local
+transcription and speech commands; there is no local LLM service.
 
 A Nix-built GPU program that finds no Vulkan device but runs elsewhere
 probably pins an older nixpkgs: torrent's Mesa needs the system's glibc.
@@ -61,7 +61,7 @@ leaves as you, through the same egress firewall.
   and no IPv6 egress.
 - torrent's DNS blocks some sites (some people-search brokers resolve to
   nothing or to 127.0.0.1). Don't route around the resolver.
-- Localhost works: local services (the model server, Paseo) are reachable
+- Localhost works: local services (Paseo) are reachable
   on 127.0.0.1.
 
 ## Tools and quirks

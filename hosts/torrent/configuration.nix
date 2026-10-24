@@ -77,18 +77,8 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
-  # zfs arc capped at 16 GiB, so qwen3.8-flash-next's memory-mapped experts stay in RAM
-  boot.kernelParams = [ "zfs.zfs_arc_max=17179869184" ];
-
   # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
-  # gguf files: large sequential reads that don't compress. primarycache stays
-  # "all": llama.cpp's mmap faults 4 KiB pages, and without the arc each fault
-  # rereads the whole 1M record (the 16 GiB arc cap bounds the double caching)
-  myZfsDatasetProperties."zroot/local/models" = {
-    recordsize = "1M";
-    primarycache = "all";
-  };
 
   # zfs snapshots served to homelab's zrepl puller; passive side: holds no
   # homelab credential and homelab owns retention, so a compromise here can't
@@ -101,8 +91,6 @@
       datasets = [
         "zroot/local/home"
         "zroot/local/root"
-        # open model weights, kept in case their downloads disappear
-        "zroot/local/models"
       ];
       clients.homelab.publicKey = vars.zreplPullerKey;
     };
@@ -140,7 +128,6 @@
     datasets = [
       "zroot/local/home"
       "zroot/local/root"
-      "zroot/local/models"
     ];
   };
 
@@ -149,7 +136,6 @@
   myBackupCanary.paths = {
     "/home/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/home v1";
     "/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/root v1";
-    "/srv/models/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/models v1";
   };
 
   # paseo daemon password: only its bcrypt hash, in a torrent-only sops file;

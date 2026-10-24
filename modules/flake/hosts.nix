@@ -74,8 +74,8 @@ in
         # torrent only, not profile-pc: static-IP printer/scanner entries are
         # spoofable on roaming thinkpad; unfree scan blob confined here (ADR-0003)
         nixosModules."brother-mfc-l2740dw"
-        # torrent only: its RX 7900 XTX serves the local models
-        nixosModules."local-ai"
+        # torrent only: cloud-agent access and local speech on its RX 7900 XTX
+        nixosModules."paseo"
         nixosModules."local-ai-speech"
       ];
     };
