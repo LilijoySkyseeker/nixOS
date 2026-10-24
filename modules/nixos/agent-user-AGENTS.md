@@ -84,7 +84,7 @@ on the owner's machine.
   work; the line is access control (no paywall or login bypass).
 - `other-agents` skill: calling the other agents for a second opinion,
   review or handoff; review by another model family before a costly PR.
-- `local-ai` skill: local transcription and text-to-speech on the GPU.
+- `local-ai` skill: local transcription of audio and video on the GPU.
 - `torrent-machine` skill: hardware, caps, VMs, network, shell quirks.
 - Scheduled jobs (flake update, maintenance, security watch) run
   unattended from the nixOS repo's `modules/nixos/agent-jobs/` and report
