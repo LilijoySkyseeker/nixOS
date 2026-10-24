@@ -55,6 +55,9 @@ on the owner's machine.
 - Your changes reach the owner as pull requests from your GitHub account.
   You can't push to `master` of the `nixOS` repo; the owner reviews and
   merges.
+- Open a PR as a draft while any of its work is still pending (a review,
+  a test, an answer from the owner), and mark it ready only when nothing
+  but the owner's review is left. The owner merges ready PRs.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
 - **Never stack branches or PRs**, in any repo: every branch starts from
