@@ -43,11 +43,13 @@ request.
 
 Two commands on `PATH`, for files any agent can read:
 
-- `transcribe FILE` prints `[hh:mm:ss] speaker_N: text` lines (Nemotron
-  diarization + ASR, English). `--no-speakers` gives plain text with
-  Parakeet v3 (25 European languages). `-o DIR` keeps `transcript.txt` and
-  `turns.json`. Any format ffmpeg reads, video included. About 25 s for 12
-  minutes of audio on the GPU.
+- `transcribe FILE` prints `[hh:mm:ss] speaker_N: text` lines. English by
+  default (Nemotron diarization + ASR). `-l auto` (or `-l de`, `-l ja`, ...)
+  for any of Whisper large-v3-turbo's ~99 languages, with speakers matched
+  word by word. `--no-speakers` for a plain timestamped transcript
+  (Whisper, punctuated). `-o DIR` keeps the transcript and the JSON. Any
+  format ffmpeg reads, video included. One language per file: `-l auto`
+  detects it once. 12 minutes of English take about 10-25 s on the GPU.
 - `speak "text" -o out.wav`: Kokoro v1.0, fast (54 voices: `-v`).
   `speak --ipa "χaˈlɛθ" -o out.wav` speaks exact IPA phonemes; symbols
   outside Kokoro's set are named and dropped.

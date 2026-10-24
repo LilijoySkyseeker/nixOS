@@ -1,6 +1,7 @@
 # local-ai-speech: speech tools on torrent for every agent and the user
-# - transcribe: speech-to-text with who said what (audio.cpp: nemotron
-#   diarization + asr), on the RX 7900 XTX when no game runs and VRAM is free
+# - transcribe: speech-to-text with who said what (audio.cpp's nemotron
+#   diarization + asr for english, whisper.cpp large-v3-turbo for any language),
+#   on the RX 7900 XTX when no game runs and VRAM is free
 # - speak: kokoro v1.0 text-to-speech, from text or IPA phonemes
 # models live in /srv/models/audio (local-ai's model store)
 { inputs, ... }:
@@ -13,23 +14,23 @@
       audiocpp = inputs.audio-cpp.packages.${pkgs.stdenv.hostPlatform.system}.vulkan;
       espeak = pkgs.espeak-ng;
 
+      # whisper large-v3-turbo for any language, on vulkan
+      whisperCpp = pkgs.whisper-cpp.override { vulkanSupport = true; };
       transcribe = pkgs.writeShellApplication {
         name = "transcribe";
         runtimeInputs = [
           audiocpp
+          whisperCpp
           pkgs.ffmpeg-headless
-          pkgs.jq
-          pkgs.coreutils
-          pkgs.gnused
         ];
         text = ''
-          AUDIO=${audio}
+          export LOCAL_AI_AUDIO=${audio}
           # the RX 7900 XTX, as in local-ai's gpu
-          VRAM_DEV=/sys/bus/pci/devices/0000:03:00.0
+          export VRAM_DEV=/sys/bus/pci/devices/0000:03:00.0
           # local-ai's gamemode hook
-          GAMING_MARKER=/run/local-ai/gaming
-        ''
-        + builtins.readFile ./local-ai/transcribe.sh;
+          export GAMING_MARKER=/run/local-ai/gaming
+          exec ${pkgs.python3}/bin/python3 -I ${./local-ai/transcribe.py} "$@"
+        '';
       };
 
       speakPython = pkgs.python3.withPackages (ps: [
