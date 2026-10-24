@@ -1,6 +1,6 @@
 ---
 name: local-ai
-description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, a third opinion, OCR of scans or PDFs - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
+description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, OCR of scans or PDFs, transcribing audio (with who said what), text-to-speech (including from IPA) - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
 ---
 
 # Local models on torrent
@@ -39,6 +39,28 @@ curl -s 127.0.0.1:8080/v1/chat/completions -H 'content-type: application/json' \
 as a base64 `image_url` with the text `OCR:` to `paddleocr-vl`, one page per
 request.
 
+## Speech
+
+Two commands on `PATH`, for files any agent can read:
+
+- `transcribe FILE` prints `[hh:mm:ss] speaker_N: text` lines. English by
+  default (Nemotron diarization + ASR). `-l auto` (or `-l de`, `-l ja`, ...)
+  for any of Whisper large-v3-turbo's ~99 languages, with speakers matched
+  word by word. `--no-speakers` for a plain timestamped transcript
+  (Whisper, punctuated). `-o DIR` keeps the transcript and the JSON. Any
+  format ffmpeg reads, video included. One language per file: `-l auto`
+  detects it once. 12 minutes of English take about 10-25 s on the GPU.
+- `speak "text" -o out.wav`: Kokoro v1.0, fast. English first (`af_*`,
+  `am_*`, `bf_*`, `bm_*`), and also Spanish, French, Hindi, Italian,
+  Portuguese and Mandarin voices (`-v`, by prefix). Japanese voices only
+  speak `--ipa` input: Japanese text needs MeCab and UniDic, not installed.
+  `speak --ipa "χaˈlɛθ" -o out.wav` speaks exact IPA phonemes; symbols
+  outside Kokoro's set are named and dropped.
+
+Both use the GPU directly, outside llama-swap, when no game runs and VRAM
+is free, and fall back to the CPU otherwise (speaker labels on the CPU run
+at about a third of real time).
+
 ## A whole agent on a local model
 
 - **Claude Code:** `claude-local -p "<task>"`. It's on PATH and needs no
@@ -63,6 +85,10 @@ name the exact files. To add a model:
 2. Add a `models` entry in that module, by PR.
 
 Don't download models into `~/work`: it's backed up too, so every model would be stored twice.
+
+The store archives only what's in use: a model a service entry or command
+names. Test candidates in `~/work/scratch`, or delete a tested model that
+lost out, so it doesn't linger here (owner, 2026-10-23).
 
 ## Sharing the GPU
 

@@ -42,6 +42,10 @@
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
+    # audio.cpp: speech models on vulkan (local-ai-speech); not in nixpkgs
+    audio-cpp.url = "github:0xShug0/audio.cpp";
+    audio-cpp.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
     # claude-desktop, until nixpkgs has it (NixOS/nixpkgs#537215)
     llm-agents.url = "github:numtide/llm-agents.nix";
     llm-agents.inputs.nixpkgs.follows = "nixpkgs-unstable";

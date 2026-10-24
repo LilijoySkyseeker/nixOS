@@ -76,6 +76,7 @@ in
         nixosModules."brother-mfc-l2740dw"
         # torrent only: its RX 7900 XTX serves the local models
         nixosModules."local-ai"
+        nixosModules."local-ai-speech"
       ];
     };
     #==================================================
