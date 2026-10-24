@@ -86,6 +86,15 @@ _: {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
+            # enabled outright: the merge keeps an earlier `enabled = false`
+            opencode = {
+              enabled = true;
+              command = [ (lib.getExe pkgs.opencode) ];
+            };
+            antigravity = {
+              enabled = true;
+              command = [ (lib.getExe pkgs.antigravity-cli) ];
+            };
             local = {
               extends = "claude";
               label = "Local in Claude Code";
@@ -131,9 +140,7 @@ _: {
             lib.genAttrs
               [
                 "copilot"
-                "opencode"
                 "pi"
-                "antigravity"
                 "muse"
                 "omp"
               ]

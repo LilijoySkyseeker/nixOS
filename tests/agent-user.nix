@@ -249,19 +249,38 @@ pkgs.testers.runNixOSTest {
         with open("${../modules/home-manager/claude-code/user-claude.md}") as f:
             rule = f.read()
         assert rule in md, "CLAUDE.md lacks the user's working rule"
-        # codex reads the same text, apart from each harness's own section
-        codex_md = machine.succeed(as_agent("cat /home/agent/.codex/AGENTS.md"))
+        # every harness reads the same text, apart from its own section
         with open("${../modules/nixos/agent-user-AGENTS.md}") as f:
             shared = f.read()
-        for name, text in [("CLAUDE.md", md), ("codex AGENTS.md", codex_md)]:
-            assert text.startswith(shared), f"{name} doesn't start with the shared instructions"
-        assert rule in codex_md, "codex AGENTS.md lacks the user's working rule"
-        assert "## In Claude Code" in md and "## In Codex" in codex_md, "harness sections missing"
-        assert "## In Codex" not in md and "## In Claude Code" not in codex_md, "harness sections crossed"
-        # both see the same skills: the user's and the agent-only ones
-        for d in ["/home/agent/.claude/skills", "/home/agent/.agents/skills"]:
+        harnesses = {
+            "Claude Code": (".claude/CLAUDE.md", ".claude/skills"),
+            "Codex": (".codex/AGENTS.md", ".agents/skills"),
+            "OpenCode": (".config/opencode/AGENTS.md", ".config/opencode/skills"),
+            "Antigravity": (".gemini/AGENTS.md", ".gemini/config/skills"),
+        }
+        for name, (instructions, skills) in harnesses.items():
+            text = machine.succeed(as_agent(f"cat /home/agent/{instructions}"))
+            assert text.startswith(shared), f"{name}: doesn't start with the shared instructions"
+            assert rule in text, f"{name}: lacks the user's working rule"
+            for other in harnesses:
+                assert (f"## In {other}" in text) == (other == name), f"{name}: harness section for {other}"
+            # the same skills: the user's and the agent-only ones
             for skill in ["doghouse-review", "torrent-machine", "other-agents"]:
-                machine.succeed(as_agent(f"test -f {d}/{skill}/SKILL.md"))
+                machine.succeed(as_agent(f"test -f /home/agent/{skills}/{skill}/SKILL.md"))
+        # their parents belong to the agent, or the harnesses can't write there
+        for d in [".config/opencode", ".config/openrouter", ".gemini", ".gemini/config"]:
+            assert machine.succeed(f"stat -c %U /home/agent/{d}").strip() == "agent", d
+        assert machine.succeed("stat -c %a /home/agent/.config/openrouter").strip() == "700"
+        # with no key yet, openrouter-curl refuses before calling anything
+        rc, out = machine.execute(as_agent("openrouter-curl https://openrouter.ai/api/v1/models 2>&1"))
+        assert rc == 1 and "run0 agent-setup" in out, f"openrouter-curl without a key: rc={rc} {out!r}"
+        # opencode's repo-owned keys
+        machine.wait_for_unit("opencode-agent-config.service")
+        oc = machine.succeed("cat /home/agent/.config/opencode/opencode.json")
+        assert machine.succeed("jq -r .share /home/agent/.config/opencode/opencode.json").strip() == "disabled", oc
+        key_ref = machine.succeed("jq -r .provider.openrouter.options.apiKey /home/agent/.config/opencode/opencode.json").strip()
+        assert key_ref == "{file:/home/agent/.config/openrouter/key}", oc
+        machine.succeed(as_agent("command -v opencode && command -v agy"))
         # bot-wall fetcher on the agent's PATH (no network in the VM to run it)
         machine.succeed(as_agent("command -v web-fetch"))
         rc, out = machine.execute(as_agent("web-fetch 2>&1"))

@@ -102,6 +102,30 @@ chk_codex_config() {
 }
 fix_codex_config() { systemctl restart codex-agent-config; }
 
+# one key file for every harness: opencode's config and the media skill's curl read it
+openrouter_key=$agent_home/.config/openrouter/key
+chk_openrouter() { as_agent test -s "$openrouter_key"; }
+fix_openrouter() {
+  local key
+  note "paste an OpenRouter API key with a credit limit (openrouter.ai → Keys); it isn't echoed"
+  read -rs key
+  echo
+  [ -n "$key" ] || return 0
+  # on stdin, never in an argument; the inner shell expands $1
+  # shellcheck disable=SC2016
+  printf '%s\n' "$key" | as_agent sh -c 'umask 077; cat > "$1"' sh "$openrouter_key"
+}
+
+chk_opencode_config() { jq -e '.share == "disabled"' "$agent_home/.config/opencode/opencode.json" >/dev/null 2>&1; }
+fix_opencode_config() { systemctl restart opencode-agent-config; }
+
+# `agy models` fails until someone has signed in
+chk_agy() { as_agent agy models </dev/null >/dev/null 2>&1; }
+fix_agy() {
+  note "sign in with the Google account for the agents, not your personal one (open the URL it shows, paste the code back), then type /exit"
+  as_agent env -C "$agent_home/work" agy || true
+}
+
 # is-active with several units passes when any one is active
 chk_service() { systemctl is-active --quiet claude-remote-control && systemctl is-active --quiet codex-remote-control; }
 fix_service() {
@@ -140,6 +164,9 @@ item "Claude login and workspace trust" chk_claude "run claude once in ~agent/wo
 item "Remote Control consent" chk_consent "run claude remote-control once" fix_consent
 item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
 item "codex config merged" chk_codex_config "rerun codex-agent-config" fix_codex_config
+item "OpenRouter key in place" chk_openrouter "paste an OpenRouter key for the agents" fix_openrouter
+item "OpenCode config merged" chk_opencode_config "rerun opencode-agent-config" fix_opencode_config
+item "Antigravity signed in" chk_agy "sign agy in with the Google account for the agents" fix_agy
 item "remote-control services running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""

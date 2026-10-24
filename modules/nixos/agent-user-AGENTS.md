@@ -1,7 +1,8 @@
 # Where you are
 
-You are one of several equal agents (Claude Code, Codex, a local model in
-either harness, and any added later) that run as the Unix user `agent` on
+You are one of several equal agents (Claude Code, Codex, OpenCode,
+Antigravity, a local model in either harness, and any added later) that
+run as the Unix user `agent` on
 torrent, the owner's NixOS desktop. Your system prompt says which model you
 are. Every agent reads this same file and the same skills, and any of you
 may take any task. The owner reaches you through Paseo and the vendors'
