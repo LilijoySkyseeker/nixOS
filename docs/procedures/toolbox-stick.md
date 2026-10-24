@@ -56,7 +56,9 @@ For this repo's hosts:
   the worked example), with a short file on the stick that names the
   machine and says to clone `https://github.com/LilijoySkyseeker/nixOS`
   and follow that path.
-- Rehearse it here first: build the host, and run the VM tests that cover
+- Rehearse it here first, as far as it goes: the machine is out of use
+  during the job, so the user prefers time spent planning and simulating
+  beforehand to working things out on the day. Build the host, and run the VM tests that cover
   the steps (`tests/`, such as `thinkpad-disk` for the disk layout,
   TPM + PIN and hibernation). They don't build the Home Manager session or
   run disko's command line, so a runbook still needs a check for those.
