@@ -50,10 +50,10 @@
         agentUserModule = config.flake.modules.nixos."agent-user";
       };
 
-      local-ai = import ../../tests/local-ai.nix {
+      paseo = import ../../tests/paseo.nix {
         pkgs = config.flake.pkgsUnstable;
         agentUserModule = config.flake.modules.nixos."agent-user";
-        localAiModule = config.flake.modules.nixos."local-ai";
+        paseoModule = config.flake.modules.nixos."paseo";
       };
 
       docker-userns-remap = import ../../tests/docker-userns-remap.nix {
