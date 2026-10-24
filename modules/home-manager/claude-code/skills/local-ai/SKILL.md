@@ -15,7 +15,7 @@ killing it after 5 idle minutes.
 | `model` id | What | Notes |
 |---|---|---|
 | `qwen3.8-27b` | Qwen3.8-27B, fully on the GPU; reads images | The default. About 40 tok/s, 128K context |
-| `qwen3.8-flash-next` | 125B MoE, experts in system RAM | Stronger and much slower, up to 80 GB of RAM. Untested so far |
+| `qwen3.8-flash-next` | 125B MoE, most experts in system RAM | Stronger and slower: about 16 tok/s, prompts about 680 tok/s, 131k context. Up to about 50 GB of RAM; the first load reads it from disk (about 4–5 min). For private deep work; not while the owner games |
 | `paddleocr-vl` | PaddleOCR-VL-1.6 | A page image in, markdown out |
 
 `curl -s 127.0.0.1:8080/v1/models` lists them; `curl -s 127.0.0.1:8080/running`
