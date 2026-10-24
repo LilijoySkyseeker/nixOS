@@ -1,6 +1,7 @@
 # Windows settings for a PC that dual-boots with NixOS, matching the
 # NixOS side (modules/nixos/hibernate-only.nix):
 #   - the hardware clock is UTC, as Linux keeps it
+#   - Fast Startup off: it leaves NTFS half-mounted for the other OS
 #   - hibernate in place of sleep: lid closed, sleep button, critical
 #     battery and idle all hibernate; Sleep is hidden from the power menu
 #   - the power button shuts down, as on NixOS (its default is sleep, which
@@ -12,6 +13,8 @@
 #
 # Run once per Windows install, from an administrator PowerShell:
 #   powershell -ExecutionPolicy Bypass -File dual-boot.ps1 [-IdleMinutes 60] [-NoSignInOnResume]
+# Check afterwards with `powercfg /qh`, not `/q`: /q hides the button, lid
+# and sign-in settings, so they look unset.
 param([int]$IdleMinutes = 60, [switch]$NoSignInOnResume)
 
 $ErrorActionPreference = 'Stop'
@@ -19,12 +22,21 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     throw 'Run this from an administrator PowerShell.'
 }
 
+# native commands don't throw on failure, even with ErrorActionPreference Stop
+function powercfg { & powercfg.exe @args; if ($LASTEXITCODE) { throw "powercfg $args failed ($LASTEXITCODE)" } }
+
 # hardware clock in UTC
 New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' `
     -Name RealTimeIsUniversal -PropertyType QWord -Value 1 -Force | Out-Null
 
-# hibernation on (it also backs the power menu's Hibernate entry)
+# hibernation on, with a full hibernation file: the reduced one only backs
+# Fast Startup, not a hibernated session (it also backs the power menu's entry)
 powercfg /hibernate on
+powercfg /hibernate /type full
+
+# Fast Startup off
+New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' `
+    -Name HiberbootEnabled -PropertyType DWord -Value 0 -Force | Out-Null
 
 # action values: 0 nothing, 1 sleep, 2 hibernate, 3 shut down
 foreach ($mode in '/setacvalueindex', '/setdcvalueindex') {
@@ -57,6 +69,8 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     Write-Warning 'winget not found: install PowerToys (Microsoft.PowerToys) by hand.'
 } else {
     winget install --id Microsoft.PowerToys --exact --silent --accept-package-agreements --accept-source-agreements
+    # nonzero also when it's already installed; not worth stopping for
+    if ($LASTEXITCODE) { Write-Warning "winget exited ${LASTEXITCODE}: check PowerToys is installed." }
 }
 
 Write-Host "Done. Idle hibernate after $IdleMinutes minutes; the clock change applies from the next boot."
