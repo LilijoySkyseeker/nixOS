@@ -16,6 +16,8 @@ in
       statusDir = "/var/lib/website-status";
       # homelab's end of the vps tunnel
       wgAddress = "10.100.0.2";
+      # vps's end: its SNAT makes every visitor arrive from here
+      vpsWgAddress = "10.100.0.1";
       domain = lib.removeSuffix "." vars.domain;
 
       # a friend who opens a game server's address in a browser: show them how to connect
@@ -47,7 +49,9 @@ in
         # no HTTP/3: the vps doesn't forward UDP 443
         # no HTTP/2: caddy 2.11.7's vendored x/net 0.59 has the HTTP/2 server DoS bugs
         # TODO: drop when a caddy release with caddyserver/caddy#8179 (x/net 0.60) is in nixos-26.05, and restore h2
+        # admin API on a socket only caddy can reach, so the sandbox can deny loopback
         globalConfig = ''
+          admin unix//run/caddy/admin.sock
           servers {
             protocols h1
           }
@@ -84,6 +88,50 @@ in
       systemd.services.caddy = {
         after = [ "wireguard-wg0.service" ];
         wants = [ "wireguard-wg0.service" ];
+      };
+      # caddy: sandbox on top of the upstream unit's NoNewPrivileges, PrivateTmp, ProtectSystem=full
+      systemd.services.caddy.serviceConfig = {
+        RuntimeDirectory = "caddy";
+        RuntimeDirectoryMode = "0700";
+        ProtectSystem = "strict";
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        RestrictNamespaces = true;
+        RestrictAddressFamilies = [
+          "AF_UNIX"
+          "AF_INET"
+          "AF_INET6"
+        ];
+        SystemCallFilter = [
+          "@system-service"
+          "~@privileged"
+        ];
+        SystemCallErrorNumber = "EPERM";
+        # upstream also grants CAP_NET_ADMIN, for HTTP/3's UDP buffers; HTTP/3 is off
+        CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+        AmbientCapabilities = [
+          ""
+          "CAP_NET_BIND_SERVICE"
+        ];
+        # public internet only: no LAN, tailnet, docker, loopback services or IPv6
+        IPAddressDeny = [
+          "0.0.0.0/8"
+          "10.0.0.0/8"
+          "100.64.0.0/10"
+          "127.0.0.0/8"
+          "169.254.0.0/16"
+          "172.16.0.0/12"
+          "192.168.0.0/16"
+          "224.0.0.0/3"
+          "::/0"
+        ];
+        IPAddressAllow = [
+          vpsWgAddress
+          # systemd-resolved's stub, for ACME's lookups
+          "127.0.0.53"
+        ];
       };
       # tunnel only: the LAN NIC carries a public IPv6
       networking.firewall.interfaces.wg0.allowedTCPPorts = [

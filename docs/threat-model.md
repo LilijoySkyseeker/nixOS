@@ -43,7 +43,10 @@ Since 2026-10-06 `vps` serves no public HTTP(S) itself (no Caddy, Anubis
 or public Jellyfin; Jellyfin is tailnet-only) and runs no CrowdSec.
 Public HTTP(S) is back since the website (`modules/services/website.nix`):
 vps DNATs 80/443 to Caddy on homelab's wg0 address, which serves a static
-site built from the public `skyseekerlabs.net` repo's `main`. vps's
+site built from the public `skyseekerlabs.net` repo's `main`. Caddy's
+sandbox reaches only the public internet, resolved's stub and the vps's
+tunnel address: not the LAN, the tailnet, homelab's loopback services or
+IPv6 (`tests/website.nix`). vps's
 public surface is those DNAT'd ports and WireGuard, so §2's exposure
 map still overstates it.
 

@@ -359,7 +359,8 @@ in
     ];
   };
 
-  # SNAT forwarded traffic to our wg0 IP so source IP's are preserved
+  # SNAT forwarded traffic to our wg0 IP so replies return through the tunnel;
+  # homelab sees every forwarded client as 10.100.0.1, so per-IP limits live here
   networking.firewall.extraCommands = ''
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
