@@ -201,15 +201,20 @@ _: {
               ];
             };
             "qwen3.8-flash-next" = {
-              # TODO: untested on torrent; tune --n-cpu-moe once measured
-              description = "Qwen3.8-Flash-Next, experts in system RAM: stronger, slower";
+              description = "Qwen3.8-Flash-Next, most experts in system RAM: stronger, slower";
               cmd = lib.concatStringsSep " " [
                 llamaServer
                 "--port \${PORT}"
                 "-m ${models}/qwen3.8-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf"
                 "--mmproj ${models}/qwen3.8-flash-next/mmproj-F16.gguf --no-mmproj-offload"
-                "-ngl 99 --cpu-moe -fa on -c 131072"
-                "--jinja"
+                # experts of 45 of 48 layers in RAM: ~17.4 GiB of VRAM, room for the desktop
+                "-ngl 99 --n-cpu-moe 45 -fa on"
+                # 131k like qwen3.8-27b (claude-local's window); an 8-bit kv cache pays for it
+                "-c 131072 -ctk q8_0 -ctv q8_0"
+                # big prompt batches: ~3x faster prompts with the experts in RAM
+                "-ub 4096 -b 4096"
+                # the same template as qwen3.8-27b: it raises on a mid-conversation system message
+                "--jinja --chat-template-file ${qwenTemplate}"
               ];
             };
             "paddleocr-vl" = {
