@@ -17,6 +17,17 @@ keys:
   - &yubikey-keychain age1yubikey1qgty804u2cw2l5hr5at8rwrtdesj2lcegxeak96yn07drqmsnsez736qquk # 5C NFC, serial 27674308
   - &yubikey-torrent age1yubikey1qfcfvhue5lu3gtklnw2arf5htecj27zc20suqqv324hugvh94jss577qayj # 5C Nano, serial 29680883
 creation_rules:
+  # torrent-only secrets: torrent's machine key decrypts, the owner's keys
+  # edit; no other host can read them (first matching rule wins)
+  - path_regex: secrets/torrent\.yaml$
+    key_groups:
+      - age:
+        - *torrent-machine
+        - *torrent-age
+        - *nixos-thinkpad
+        - *thinkpad-ssh
+        - *yubikey-keychain
+        - *yubikey-torrent
   - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:

@@ -68,7 +68,7 @@ _: {
       '';
 
       # repo-owned keys merged into the agent's ~/.paseo/config.json; the
-      # daemon password's bcrypt hash stays in that file, never here
+      # daemon password's bcrypt hash comes from the host's sops secret, never here
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
           "$schema" = "https://paseo.sh/schemas/paseo.config.v1.json";
@@ -143,7 +143,7 @@ _: {
         }
       );
 
-      # set once by the owner: `paseo daemon set-password`, as agent
+      # the hash paseo-agent-config writes from the host's sops secret
       paseoHasPassword = pkgs.writeShellScript "paseo-has-password" ''
         exec ${lib.getExe pkgs.jq} -e '.daemon.auth.password | strings | startswith("$2")' /home/agent/.paseo/config.json
       '';
@@ -290,6 +290,13 @@ _: {
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
           ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          # the password hash, from a paseo-password-hash credential the host
+          # loads from sops; without one the file keeps whatever it has
+          hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
+          if [ -r "$hash" ]; then
+            ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
+            mv "$f.tmp2" "$f.tmp"
+          fi
           chmod 600 "$f.tmp"
           mv "$f.tmp" "$f"
         '';
@@ -317,10 +324,15 @@ _: {
       # which the agent's egress rules never see. never funnel
       systemd.services.paseo-tailscale-serve = {
         description = "Expose Paseo on the tailnet (tailscale serve, not funnel)";
+        # after the config step has written the password, or the condition below
+        # fails on a first boot and nothing retries it
         after = [
           "tailscaled.service"
           "tailscaled-autoconnect.service"
+          "paseo-agent-config.service"
+          "paseo.service"
         ];
+        requires = [ "paseo-agent-config.service" ];
         wants = [ "tailscaled.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {

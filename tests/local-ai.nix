@@ -21,6 +21,11 @@ pkgs.testers.runNixOSTest {
       programs.gamemode.enable = true;
       # no tailnet in the VM
       systemd.services.paseo-tailscale-serve.wantedBy = lib.mkForce [ ];
+      # stands in for torrent's sops secret: bcrypt of "vm-secret"
+      environment.etc."paseo-test-hash".text =
+        "$2b$10$6uKC1atpyRerzGiJpPO.EuRdbYW2bfwXkdKbNKqvGrugpC4fA1K0O";
+      systemd.services.paseo-agent-config.serviceConfig.LoadCredential =
+        "paseo-password-hash:/etc/paseo-test-hash";
       virtualisation.memorySize = 4096;
       environment.systemPackages = [
         pkgs.curl
@@ -53,11 +58,18 @@ pkgs.testers.runNixOSTest {
           hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
           assert "http://127.0.0.1:8080" in hdrs, hdrs
 
+      with subtest("tailscale serve waits for the password to be written"):
+          deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
+          assert deps.count("paseo-agent-config.service") == 2, deps
+
       with subtest("paseo is never published without a password"):
-          # the vm's config has no password, so the serve unit must decline
+          # with the hash removed from the config, the serve unit must decline
+          machine.wait_for_unit("paseo-agent-config.service")
+          machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl start paseo-tailscale-serve || true")
           res = machine.succeed("systemctl show paseo-tailscale-serve -p ActiveState -p ConditionResult --value")
           assert "active" not in res.split()[0:1], res
+          machine.succeed("systemctl restart paseo-agent-config")
 
       with subtest("gamemode hook blocks loads, and its end lifts the block"):
           def status(model):
@@ -106,20 +118,24 @@ pkgs.testers.runNixOSTest {
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
           assert machine.succeed("jq -r .daemon.relay.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
           assert machine.succeed("jq -r .agents.providers.copilot.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
-          # an existing key (the owner's password hash) survives the merge
+          # the hash comes from the credential, and the merge writes it back over a stale one
+          want = machine.succeed("cat /etc/paseo-test-hash").strip()
+          assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want, cfg
           machine.succeed("""jq '.daemon.auth.password = "x"' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl restart paseo-agent-config")
-          assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == "x"
+          assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
           assert machine.succeed("stat -c %a /home/agent/.paseo/config.json").strip() == "600"
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
               assert prop(p) == want, f"paseo {p}={prop(p)!r}"
           assert "firewall.service" in prop("BindsTo"), prop("BindsTo")
-          # no password yet (a fresh setup): the daemon declines to start
+          # no password (the hash removed): the daemon declines to start
+          machine.succeed("systemctl stop paseo")
+          machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl start paseo || true")
           assert prop("ActiveState") != "active", "paseo ran without a password"
-          # with a bcrypt hash it starts, on loopback, and refuses anonymous clients
-          machine.succeed("""h=$(${pkgs.mkpasswd}/bin/mkpasswd -m bcrypt -R 10 vm-secret) && jq --arg h "$h" '.daemon.auth.password = $h' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          # with the credential's hash back it starts, on loopback, and refuses anonymous clients
+          machine.succeed("systemctl restart paseo-agent-config")
           machine.succeed("systemctl start paseo")
           machine.wait_for_open_port(6767, timeout=120)
           listen = machine.succeed("ss -Hltn 'sport = :6767' | awk '{print $4}'").split()

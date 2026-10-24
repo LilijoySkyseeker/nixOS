@@ -148,6 +148,19 @@
     "/srv/models/.backup-canary/canary.txt" = "backup-canary torrent zroot/local/models v1";
   };
 
+  # paseo daemon password: only its bcrypt hash, in a torrent-only sops file;
+  # the plaintext lives in the owner's password manager
+  sops.secrets.paseo_password_hash = {
+    sopsFile = ../../secrets/torrent.yaml;
+    restartUnits = [
+      "paseo-agent-config.service"
+      "paseo.service"
+      "paseo-tailscale-serve.service"
+    ];
+  };
+  systemd.services.paseo-agent-config.serviceConfig.LoadCredential =
+    "paseo-password-hash:${config.sops.secrets.paseo_password_hash.path}";
+
   # failed-unit / stuck-switch alerts to Discord; one fleet-wide webhook,
   # shared on purpose (write-only sink, worst case is forged alerts)
   sops.secrets.discord_webhook = {
