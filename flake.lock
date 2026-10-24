@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "audio-cpp": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792795687,
+        "narHash": "sha256-iKUNjE3PBHWPf5UYy62gBQIvBKo1jrPRK1olwozkb1s=",
+        "owner": "0xShug0",
+        "repo": "audio.cpp",
+        "rev": "a7f18608702b84108178b94a8a65e7d3d26544b4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "0xShug0",
+        "repo": "audio.cpp",
+        "type": "github"
+      }
+    },
     "base16": {
       "inputs": {
         "fromYaml": "fromYaml"
@@ -608,6 +628,7 @@
     },
     "root": {
       "inputs": {
+        "audio-cpp": "audio-cpp",
         "disko": "disko",
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",

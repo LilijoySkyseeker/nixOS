@@ -1,6 +1,6 @@
 ---
 name: local-ai
-description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, a third opinion, OCR of scans or PDFs - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
+description: Use when work should run on torrent's own GPU instead of a cloud model - private material, uncapped tokens, a third opinion, OCR of scans or PDFs, transcribing audio (with who said what), text-to-speech (including from IPA) - or when calling, adding or downloading a local model, or running Claude Code or Codex against one.
 ---
 
 # Local models on torrent
@@ -38,6 +38,25 @@ curl -s 127.0.0.1:8080/v1/chat/completions -H 'content-type: application/json' \
 **OCR:** render each page (`pdftoppm -r 200 -png in.pdf page`), then send it
 as a base64 `image_url` with the text `OCR:` to `paddleocr-vl`, one page per
 request.
+
+## Speech
+
+Two commands on `PATH`, for files any agent can read:
+
+- `transcribe FILE` prints `[hh:mm:ss] speaker_N: text` lines (Nemotron
+  diarization + ASR, English). `--no-speakers` gives plain text with
+  Parakeet v3 (25 European languages). `-o DIR` keeps `transcript.txt` and
+  `turns.json`. Any format ffmpeg reads, video included. About 25 s for 12
+  minutes of audio on the GPU.
+- `speak "text" -o out.wav`: Kokoro v1.0, fast (54 voices: `-v`).
+  `speak --ipa "χaˈlɛθ" -o out.wav` speaks exact IPA phonemes; symbols
+  outside Kokoro's set are named and dropped. `speak --hq -v ryan --style
+  "calm" "text"`: Qwen3-TTS, nicer voices (aiden, dylan, eric, ono_anna,
+  ryan, serena, sohee, uncle_fu, vivian), text only.
+
+Both use the GPU directly, outside llama-swap, when no game runs and VRAM
+is free, and fall back to the CPU otherwise (speaker labels on the CPU run
+at about a third of real time).
 
 ## A whole agent on a local model
 
