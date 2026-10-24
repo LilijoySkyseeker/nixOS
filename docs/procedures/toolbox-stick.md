@@ -37,17 +37,29 @@ folder, so a job can run across reboots and between the two.
 ## Handing over a job: runbooks
 
 The agents on the stick read `Runbooks/` when they start and
-follow the runbook meant for their machine. The stick's
-`Runbooks/README.md` has the format: name the machine first, by
-hostname (`thinkpad`) or by maker, model and serial, then the goal, the
-steps, and how to check each one.
+follow the runbook meant for their machine. **How to write one** is in the
+stick's `Runbooks/README.md` (in the `usb-toolbox` repo at
+`stick/Runbooks/README.md`, on torrent `~/work/repos/usb-toolbox`): name
+the machine first, say who does each step (agent, a script with the
+user's yes or secret, or the user's hands), run every command before the
+day, check actual state, gate before anything irreversible, and delete
+the runbook from the stick when the job is done. The stick's agents keep
+their own rules for working with the user at the machine (windows on the
+screen, commands shown before a YubiKey touch, ETAs, notes).
+
+For this repo's hosts:
 
 - You can't reach the stick from here: write the runbook and ask the user
   to copy it into the stick's `Runbooks/`.
-- This repo is public, so the runbook can live here (in
-  `docs/plans/<slug>.md`, say), with a short file on the stick that names
-  the machine and says to clone
-  `https://github.com/LilijoySkyseeker/nixOS` and follow that path.
+- The runbook for a host lives in this repo, beside the config it
+  depends on (`docs/procedures/<host>-<job>.md`; `thinkpad-reinstall.md` is
+  the worked example), with a short file on the stick that names the
+  machine and says to clone `https://github.com/LilijoySkyseeker/nixOS`
+  and follow that path.
+- Rehearse it here first: build the host, and run the VM tests that cover
+  the steps (`tests/`, such as `thinkpad-disk` for the disk layout,
+  TPM + PIN and hibernation). They don't build the Home Manager session or
+  run disko's command line, so a runbook still needs a check for those.
 - The stick's agent reads this file and `AGENTS.md` only when it works
   inside a clone. Write the rules that matter into the runbook: which
   branch to install, never to touch `secrets/`, what to check after each

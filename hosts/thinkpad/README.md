@@ -96,10 +96,22 @@ recovery key is in Bitwarden). Its boot files were copied onto this ESP
 (systemd-boot, shown for 2 seconds) lists it next to NixOS. If Windows
 ever puts itself first in the firmware boot order, put "Linux Boot
 Manager" back first (`efibootmgr -o`, or the firmware's boot menu).
+Windows' firmware entry points at this ESP too, so Windows boots from the
+Samsung disk; the Intel disk's own ESP still holds its original boot files.
+
+**BitLocker isn't bound to Secure Boot here.** Started through
+systemd-boot, Windows can't use PCR 7 (its log shows events 813, 881 and
+893), so BitLocker seals to PCRs 0, 2, 4 and 11. PCR 4 measures every boot
+binary on the way, systemd-boot's included, so expect the 48-digit
+recovery key once after an update changes systemd-boot, or when Windows is
+started another way (F12 straight to Windows Boot Manager). Windows RE
+lives on the Intel disk's Recovery partition and must stay enabled
+(`reagentc /info`): `manage-bde -on` fails without it.
 
 `files/windows/dual-boot.ps1` sets Windows to match NixOS: hardware clock
-in UTC, hibernate in place of sleep, nothing on idle until a 60-minute
-hibernate, and PowerToys Awake to pause that timer.
+in UTC, Fast Startup off, hibernate in place of sleep with a full
+hibernation file, nothing on idle until a 60-minute hibernate, and
+PowerToys Awake to pause that timer.
 
 ## Power
 
@@ -107,6 +119,9 @@ No sleep: lid closed, critical battery and 60 minutes idle all hibernate
 (`myHibernateOnly`, safe on ZFS through `myHibernate`). Nothing happens
 before that: no dimming, no screen off, no auto-lock, so lock by hand
 (Meta+L) when leaving it. The battery applet's "Manually block sleep and
-screen locking" switch pauses the idle timer for long jobs. Resuming isn't
+screen locking" switch pauses the idle timer for long jobs. So does any
+app holding an inhibitor (the battery applet lists them): the Claude
+desktop app's remote-device feature takes a 5-minute keep-awake every
+25 to 45 minutes, so idle hibernate never fires while it runs. Resuming isn't
 a restart, so a pull-deploy's update waits for one; a notification says
 when (`myRebootNotice`).
