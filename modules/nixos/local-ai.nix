@@ -324,10 +324,15 @@ _: {
       # which the agent's egress rules never see. never funnel
       systemd.services.paseo-tailscale-serve = {
         description = "Expose Paseo on the tailnet (tailscale serve, not funnel)";
+        # after the config step has written the password, or the condition below
+        # fails on a first boot and nothing retries it
         after = [
           "tailscaled.service"
           "tailscaled-autoconnect.service"
+          "paseo-agent-config.service"
+          "paseo.service"
         ];
+        requires = [ "paseo-agent-config.service" ];
         wants = [ "tailscaled.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {

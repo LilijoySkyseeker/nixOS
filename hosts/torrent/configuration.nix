@@ -155,6 +155,7 @@
     restartUnits = [
       "paseo-agent-config.service"
       "paseo.service"
+      "paseo-tailscale-serve.service"
     ];
   };
   systemd.services.paseo-agent-config.serviceConfig.LoadCredential =

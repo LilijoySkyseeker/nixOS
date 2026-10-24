@@ -58,6 +58,10 @@ pkgs.testers.runNixOSTest {
           hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
           assert "http://127.0.0.1:8080" in hdrs, hdrs
 
+      with subtest("tailscale serve waits for the password to be written"):
+          deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
+          assert deps.count("paseo-agent-config.service") == 2, deps
+
       with subtest("paseo is never published without a password"):
           # with the hash removed from the config, the serve unit must decline
           machine.wait_for_unit("paseo-agent-config.service")
