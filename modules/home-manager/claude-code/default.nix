@@ -133,13 +133,9 @@ _: {
           pr = "";
           sessionUrl = false;
         };
-        # OpenAI's codex plugin (/codex:review, /codex:adversarial-review),
-        # installed at the next interactive start; agent-user enables it too
-        extraKnownMarketplaces.openai-codex.source = {
-          source = "github";
-          repo = "openai/codex-plugin-cc";
-        };
-        enabledPlugins."codex@openai-codex" = true;
+        # no codex plugin: claude and codex call each other's own CLIs
+        # (`codex exec`, `codex review`, `claude -p`); off where it's still installed
+        enabledPlugins."codex@openai-codex" = false;
       };
 
       jsonFormat = pkgs-unstable.formats.json { };

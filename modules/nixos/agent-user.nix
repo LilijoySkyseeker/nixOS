@@ -320,12 +320,9 @@
                     pr = "";
                     sessionUrl = false;
                   };
-                  # OpenAI's codex plugin, as in the user's own settings
-                  extraKnownMarketplaces.openai-codex.source = {
-                    source = "github";
-                    repo = "openai/codex-plugin-cc";
-                  };
-                  enabledPlugins."codex@openai-codex" = true;
+                  # no codex plugin: the agents call each other's own CLIs
+                  # (other-agents skill); off where it's still installed
+                  enabledPlugins."codex@openai-codex" = false;
                   # keep session transcripts ~forever (default deletes after 30 days; 0 is rejected)
                   cleanupPeriodDays = 36500;
                   # the built-in twins: routines and messages into the user's sessions
