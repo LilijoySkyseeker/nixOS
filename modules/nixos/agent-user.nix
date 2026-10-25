@@ -290,6 +290,27 @@
         ];
       };
 
+      # opencode runs on the bun it's built with, and bun 1.4.2 bundles the
+      # brotli out-of-bounds write and trusts the eMudhra intermediates
+      # (GHSA-663w-cv8g-jj2p, GHSA-26q8-h657-pf84); only the build's bun changes,
+      # so the node_modules hash stays
+      # TODO: drop when NixOS/nixpkgs#577354 (bun 1.4.4) is in nixos-unstable
+      nixpkgs.overlays = [
+        (_: prev: {
+          opencode = prev.opencode.overrideAttrs (old: {
+            nativeBuildInputs = lib.remove prev.bun old.nativeBuildInputs ++ [
+              (prev.bun.overrideAttrs {
+                version = "1.4.4";
+                src = prev.fetchurl {
+                  url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip";
+                  hash = "sha256-4ERutVmVdy65iUvrrppr42jZhai5Jx7hJEhvmUbu3XY=";
+                };
+              })
+            ];
+          });
+        })
+      ];
+
       # no inbound ssh
       services.openssh.settings.DenyUsers = [ "agent" ];
 
