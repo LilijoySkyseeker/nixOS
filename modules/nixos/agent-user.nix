@@ -79,13 +79,42 @@
         ps.trafilatura
         ps.html2text
       ]);
+      # web-fetch's curls decode whatever brotli a fetched server sends, and
+      # brotli 1.2.0's decoder has an out-of-bounds write (CVE-2026-111497)
+      # TODO: drop when NixOS/nixpkgs#577208 (brotli 1.2.1) is in nixos-unstable
+      fetchCurl = pkgs.curl.override {
+        brotli = pkgs.brotli.overrideAttrs {
+          version = "1.2.1";
+          src = pkgs.fetchFromGitHub {
+            owner = "google";
+            repo = "brotli";
+            tag = "v1.2.1";
+            hash = "sha256-llY72cYffDv0ugsH0p89xIPEbElV4L8u7U/Fe8hT3gI=";
+          };
+        };
+      };
+      # curl-impersonate builds its own static brotli from a tarball
+      # TODO: drop when nixos-unstable's curl-impersonate is 2.3.1 or later (lexiforest/curl-impersonate#357)
+      fetchCurlImpersonate = pkgs.curl-impersonate.overrideAttrs (old: {
+        postPatch = old.postPatch + ''
+          substituteInPlace CMakeLists.txt \
+            --replace-fail '${old.passthru.deps."brotli-1.2.0.tar.gz"}' '${
+              pkgs.fetchurl {
+                url = "https://github.com/google/brotli/archive/refs/tags/v1.2.1.tar.gz";
+                hash = "sha256-mNNdEaeNxFOuu30Qw3SPP3P/eMgmfA3Gl7hjH2e/fo8=";
+              }
+            }' \
+            --replace-fail 816c96e8e8f193b40151dad7e8ff37b1221d019dbcb9c35cd3fadbfe6477dfec \
+              98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f
+        '';
+      });
       webFetch = pkgs.writeShellApplication {
         name = "web-fetch";
         runtimeInputs = [
           pkgs.coreutils
           pkgs.gnugrep
-          pkgs.curl
-          pkgs.curl-impersonate
+          fetchCurl
+          fetchCurlImpersonate
           pkgs.xvfb-run
           (pkgs.writeShellScriptBin "browser-fetch" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium
