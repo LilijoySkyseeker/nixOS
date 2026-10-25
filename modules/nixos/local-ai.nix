@@ -30,8 +30,6 @@ _: {
 
       modelIds = [
         "qwen3.8-27b"
-        "qwen3.8-flash-next"
-        "paddleocr-vl"
       ];
 
       # claude code driving a local model: no anthropic login or traffic, and
@@ -110,10 +108,6 @@ _: {
                   label = "Qwen3.8-27B (local)";
                   isDefault = true;
                 }
-                {
-                  id = "qwen3.8-flash-next";
-                  label = "Qwen3.8-Flash-Next (local, slow)";
-                }
               ];
               # anthropic server-side tools don't exist on a local endpoint
               disallowedTools = [ "WebSearch" ];
@@ -131,10 +125,6 @@ _: {
                   id = "qwen3.8-27b";
                   label = "Qwen3.8-27B (local)";
                   isDefault = true;
-                }
-                {
-                  id = "qwen3.8-flash-next";
-                  label = "Qwen3.8-Flash-Next (local, slow)";
                 }
               ];
             };
@@ -187,8 +177,6 @@ _: {
         listenAddress = "127.0.0.1";
         port = 8080;
         settings = {
-          # flash-next reads about 90 GB before it's healthy
-          healthCheckTimeout = 900;
           # no stored request/response bodies: private prompts stay out of its api
           captureBuffer = 0;
           # only llama-swap's own ui may read responses in a browser; the
@@ -209,34 +197,6 @@ _: {
                 "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf --no-mmproj-offload"
                 "-ngl 99 -fa on -c 131072"
                 "--jinja --chat-template-file ${qwenTemplate}"
-              ];
-            };
-            "qwen3.8-flash-next" = {
-              description = "Qwen3.8-Flash-Next, most experts in system RAM: stronger, slower";
-              cmd = lib.concatStringsSep " " [
-                llamaServer
-                "--port \${PORT}"
-                "-m ${models}/qwen3.8-flash-next/Qwen3.8-Flash-Next-UD-Q3_K_XL-00001-of-00003.gguf"
-                "--mmproj ${models}/qwen3.8-flash-next/mmproj-F16.gguf --no-mmproj-offload"
-                # experts of 45 of 48 layers in RAM: ~17.4 GiB of VRAM, room for the desktop
-                "-ngl 99 --n-cpu-moe 45 -fa on"
-                # 131k like qwen3.8-27b (claude-local's window); an 8-bit kv cache pays for it
-                "-c 131072 -ctk q8_0 -ctv q8_0"
-                # big prompt batches: ~3x faster prompts with the experts in RAM
-                "-ub 4096 -b 4096"
-                # the same template as qwen3.8-27b: it raises on a mid-conversation system message
-                "--jinja --chat-template-file ${qwenTemplate}"
-              ];
-            };
-            "paddleocr-vl" = {
-              description = "PaddleOCR-VL-1.6: page image to markdown (prompt: OCR:)";
-              cmd = lib.concatStringsSep " " [
-                llamaServer
-                "--port \${PORT}"
-                "-m ${models}/paddleocr-vl/PaddleOCR-VL-1.6-GGUF.gguf"
-                "--mmproj ${models}/paddleocr-vl/PaddleOCR-VL-1.6-GGUF-mmproj.gguf"
-                "-ngl 99 -c 16384"
-                "--jinja"
               ];
             };
           };
@@ -264,7 +224,7 @@ _: {
           BindPaths = [ "-/dev/dri" ];
           DeviceAllow = [ "${gpu} rw" ];
           SupplementaryGroups = [ "render" ];
-          # flash-next's experts sit in RAM; the rest of the 96 GB is the desktop's
+          # bound model loading and CPU vision memory alongside the desktop
           MemoryMax = "80G";
           # loopback only: models come from /srv/models, never the network
           IPAddressAllow = "localhost";

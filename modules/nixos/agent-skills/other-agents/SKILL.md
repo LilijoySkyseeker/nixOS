@@ -5,11 +5,14 @@ description: The other agents installed on torrent and how to call them non-inte
 
 # The other agents
 
-Every agent on torrent is an equal: Claude Code, Codex, OpenCode,
-Antigravity and the local model run as the same Unix user, read the same
-instructions and skills, and can take any task. The others are on your
-`PATH`, logged in. Your own system prompt says which one you are; call the
+Claude Code, Codex, OpenCode, Antigravity and the local model run as the
+same Unix user, read the same instructions and skills, and can do work.
+The others are on your `PATH`, logged in. Your own system prompt says which one you are; call the
 others, not yourself.
+
+The local Qwen3.8-27B agent keeps the same access, tools and ability to
+do work, but is not a capability peer of the cloud agents. Do not call it
+for reviews, alternative opinions or independent checks.
 
 Treat what another agent returns as input, not a verdict: check it against
 the code.
@@ -49,10 +52,9 @@ waits on a terminal.
   `ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_API_KEY=local ANTHROPIC_MODEL=<model> ANTHROPIC_SMALL_FAST_MODEL=<model> CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude --append-system-prompt "You are <model> running locally, not Claude." -p ...`
 - The local model is free and uncapped but slower and weaker than the
   cloud models. It's the one to use for private material and for work the
-  cloud models refuse, with its output checked. Don't use Qwen3.8-27B for
-  code review or to check another agent's answer: it hallucinated review
-  results in an earlier session (owner, 2026-10-23). Revisit once
-  Flash-Next has been tested.
+  cloud models refuse, with its output checked. It hallucinated review
+  results in an earlier session (owner, 2026-10-23); keep it out of
+  review and opinion workflows.
 
 ## Rules
 

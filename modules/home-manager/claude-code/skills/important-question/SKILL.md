@@ -1,6 +1,6 @@
 ---
 name: important-question
-description: Use when the user says "important question", or asks for an answer checked by several agents or model families. Each available agent answers the question independently, in parallel, and you merge their reports into one answer, labelling each claim by who made it and putting conflicts first.
+description: Use when the user says "important question", or asks for an answer checked by several agents or model families. Each eligible agent answers the question independently, in parallel, and you merge their reports into one answer, labelling each claim by who made it and putting conflicts first.
 ---
 
 # Important question
@@ -11,16 +11,16 @@ Only the user starts this; don't suggest it.
 
 ## 1. Pick the answerers
 
-Use every agent you can call, at least two model families:
+Use every eligible cloud agent you can call, at least two model families:
 
 - **Claude:** a `general-purpose` subagent if you are Claude, else
   `claude -p --permission-mode bypassPermissions "<prompt>" < /dev/null`.
 - **Codex:** your own subagent if you are Codex, else
   `codex --search exec --skip-git-repo-check --ephemeral -C ~/work/scratch -o <file> "<prompt>" < /dev/null`
   (the answer is in `<file>`; delete it once you've merged).
-- **The local model** doesn't count toward the two families for now:
-  Qwen3.8-27B hallucinated review results in an earlier session (owner,
-  2026-10-23). Revisit once Flash-Next has been tested.
+- **Exclude the local model entirely.** Do not call Qwen3.8-27B for an
+  alternative opinion or independent check; it is available for doing
+  work, not for this workflow (owner, 2026-10-25).
 
 If fewer than two families are reachable, say so and stop rather than pass
 one answer off as checked.
@@ -51,5 +51,5 @@ the user is paying for, so never drop them to make the answer tidier.
 - **Conflicts first.** Each one with every side and its sources. You may
   say which side is better sourced, but the user decides.
 - **Then the answer**, with each claim labelled by who made it:
-  **[all]**, or the names, such as **[Claude]**, **[Codex, Local]**.
+  **[all]**, or the names, such as **[Claude]**, **[Claude, Codex]**.
 - Write for a phone screen: short sections, no wide tables.

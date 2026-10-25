@@ -77,14 +77,11 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
-  # zfs arc capped at 16 GiB, so qwen3.8-flash-next's memory-mapped experts stay in RAM
-  boot.kernelParams = [ "zfs.zfs_arc_max=17179869184" ];
-
   # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   # gguf files: large sequential reads that don't compress. primarycache stays
   # "all": llama.cpp's mmap faults 4 KiB pages, and without the arc each fault
-  # rereads the whole 1M record (the 16 GiB arc cap bounds the double caching)
+  # rereads the whole 1M record
   myZfsDatasetProperties."zroot/local/models" = {
     recordsize = "1M";
     primarycache = "all";

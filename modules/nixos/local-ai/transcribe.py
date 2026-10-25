@@ -1,7 +1,6 @@
 """transcribe: speech-to-text on torrent, with who said what.
 
-English with speakers by default (Nemotron ASR); any language, or no speakers,
-with Whisper large-v3-turbo.
+Whisper large-v3-turbo recognizes the speech in every mode.
 Speaker labels come from Nemotron diarization, which works on any language.
 """
 
@@ -43,29 +42,11 @@ def stamp(seconds):
     return f"[{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}]"
 
 
-def diarize(work, backend, log, for_nemotron):
+def diarize(work, backend, log):
     args = ["--task", "diar", "--family", "nemotron_3_diar", "--mode", "streaming",
             "--model", f"{AUDIO}/nemotron-3-diarization-bf16.gguf", "--audio", f"{work}/in.wav",
             "--turns-out", f"{work}/diar.json", "--out-dir", f"{work}/diar"]
-    if for_nemotron:
-        # the profile and frame probabilities nemotron asr reads to split speakers
-        args += ["--session-option", "nemotron_3_diar.latency_profile=asr_la13",
-                 "--request-option", "return_frame_probabilities=true"]
     return audiocpp(backend, log, *args)
-
-
-def english(work, backend, log):
-    # nemotron asr splits the audio by the diarizer's speakers itself
-    if not diarize(work, backend, log, True):
-        return None
-    if not audiocpp(backend, log, "--task", "asr", "--family", "nemotron_asr",
-                    "--model", f"{AUDIO}/nemotron-3.5-asr-streaming-0.6b-q8_0.gguf",
-                    "--audio", f"{work}/in.wav", "--out-dir", f"{work}/asr",
-                    "--request-option", f"speaker_probabilities={work}/diar/speaker_probabilities.safetensors",
-                    "--turns-out", f"{work}/turns.json"):
-        return None
-    turns = json.load(open(f"{work}/turns.json"))
-    return [f"{stamp(t['start_sample'] / RATE)} {t['speaker_id']}: {t.get('text', '').strip()}" for t in turns]
 
 
 def whisper(work, backend, log, speakers, lang):
@@ -87,7 +68,7 @@ def whisper(work, backend, log, speakers, lang):
             for s in out["transcription"] if s["text"].strip()]
     if not speakers:
         return [f"{stamp(a)} {t.strip()}" for a, _, t in segs]
-    if not diarize(work, backend, log, False):
+    if not diarize(work, backend, log):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
              for t in json.load(open(f"{work}/diar.json"))]
@@ -116,7 +97,7 @@ def main():
     p = argparse.ArgumentParser(
         prog="transcribe",
         description="Speech-to-text on torrent, with who said what. English by default "
-        "(Nemotron); any language with -l (Whisper large-v3-turbo, about 99 languages). "
+        "(Whisper large-v3-turbo); any language with -l. "
         "Any audio or video file ffmpeg reads.")
     p.add_argument("file")
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
@@ -138,12 +119,8 @@ def main():
             backend = "vulkan" if ok else "cpu"
             if not ok:
                 print(f"transcribe: {why}, using the CPU (slower)", file=sys.stderr)
-        # nemotron asr only where it adds something: english with speaker labels;
-        # whisper does the rest, punctuated
-        if a.lang or a.no_speakers:
-            go = lambda b: whisper(work, b, log, not a.no_speakers, a.lang or "en")
-        else:
-            go = lambda b: english(work, b, log)
+        # assign speakers after recognition, so diarization does not gate speech
+        go = lambda b: whisper(work, b, log, not a.no_speakers, a.lang or "en")
         lines = go(backend)
         if lines is None and backend == "vulkan":
             print("transcribe: the GPU run failed, retrying on the CPU", file=sys.stderr)

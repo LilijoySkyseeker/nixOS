@@ -298,6 +298,9 @@ here; it is already applied in the SSH bullet below.
     lilijoy write to it and `llama-swap` reads it, so a malicious model
     file reaches llama.cpp's GGUF parser as an unprivileged user with the
     GPU.
+- **Local transcription (`modules/nixos/local-ai-speech.nix`).** Runs as
+  the caller with the agent units' existing GPU boundary. Speech models
+  live under the shared work folder and its normal home backups.
 - **Custom `systemd.services` sandboxing**: add `NoNewPrivileges = true`
   plus, when the unit's actual job allows it, the full stack —
   `ProtectSystem = "strict"` (with `ReadWritePaths` for whatever it

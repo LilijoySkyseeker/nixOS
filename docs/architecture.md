@@ -156,7 +156,7 @@ prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
 mechanics are in `docs/hardening.md` ("The `agent` user"); the design
 record lives outside the repo, in `~/Projects/agenticsandbox/`.
 
-`local-ai` (torrent only) serves local models on the RX 7900 XTX to every
+`local-ai` (torrent only) serves Qwen3.8-27B on the RX 7900 XTX to every
 agent and to lilijoy: `llama-swap` on `127.0.0.1:8080` (one model at a
 time, killed after 5 idle minutes, blocked while gamemode runs a game),
 the model store `/srv/models` (`zroot/local/models`, replicated to
@@ -165,7 +165,15 @@ homelab), and Paseo on `127.0.0.1:6767`, published tailnet-only by
 Paseo defaults Claude and Codex sessions to bypassed permissions, including
 their local aliases and sessions restored with saved default modes. Explicit
 Plan and Read-only modes still work. The Unix account, systemd sandbox and
-egress firewall remain the execution boundary.
+egress firewall remain the execution boundary. The local model has the same
+access to work, but is excluded from reviews and independent second opinions.
+
+`local-ai-speech` installs `transcribe`: Whisper large-v3-turbo for every
+language, with optional Nemotron speaker labels. Its models live under
+`~/Agent/projects/local-ai/models/audio`, covered by home backups; see
+[provisioning](procedures/local-speech.md). It yields the GPU while gaming.
+Flash-Next, PaddleOCR and local text-to-speech are retired. The model-store
+dataset and its replication stay for Qwen3.8-27B; do not destroy them.
 
 ## Navigating: "what does host X actually run?"
 
