@@ -8,6 +8,11 @@
 pkgs.testers.runNixOSTest {
   name = "local-ai";
 
+  # agent-user sets nixpkgs options of its own, so the node imports nixpkgs
+  # itself and needs torrent's unfree setting
+  node.pkgsReadOnly = false;
+  defaults.nixpkgs.config.allowUnfree = true;
+
   nodes.machine =
     { lib, ... }:
     {
