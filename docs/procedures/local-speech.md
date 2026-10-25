@@ -33,3 +33,20 @@ Check them against the copies in use since 2026-10-23 (`sha256sum -c`):
 
 Keep only files a command uses (the owner, 2026-10-23): delete a model
 that's been replaced, and update this table.
+
+## Retiring the other models
+
+After merging the retirement change and switching torrent, confirm
+`curl -fsS http://127.0.0.1:8080/v1/models` lists only `qwen3.8-27b` and
+`transcribe` works with the three files above. Then the owner can remove
+only the retired model directories:
+
+```sh
+rm -r -- /srv/models/qwen3.8-flash-next /srv/models/paddleocr-vl /srv/models/audio
+```
+
+Keep `/srv/models/qwen3.8-27b`, its model and vision projector, and
+`/srv/models/.backup-canary`. Keep `zroot/local/models`, its replication
+and the homelab replica: do not destroy either dataset. Existing snapshots
+retain deleted files until normal retention expires, so space is not
+necessarily freed immediately.
