@@ -366,6 +366,44 @@
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
     dates = "Wed 03:00";
   };
+  # heartbeat: check in with vps every 5m through the deploy key's
+  # dispatcher. vps alerts when homelab goes silent; vps-ok below goes stale
+  # when vps does. own known_hosts in the state dir: ProtectHome hides /root
+  systemd.services.heartbeat-vps = {
+    description = "Check in with vps, so each notices the other going silent";
+    path = with pkgs-stable; [
+      openssh
+      coreutils
+    ];
+    script = ''
+      ssh -i ${config.sops.secrets.homelab_vps_deploy_key.path} \
+        -o BatchMode=yes -o ConnectTimeout=20 \
+        -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/var/lib/heartbeat/known_hosts \
+        vps-deploy@vps heartbeat
+      touch /var/lib/heartbeat/vps-ok
+    '';
+    serviceConfig = {
+      Type = "oneshot";
+      StateDirectory = "heartbeat";
+      # docs/hardening.md sandboxing baseline; root only to read the key
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictNamespaces = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+    };
+  };
+  systemd.timers.heartbeat-vps = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*:0/5";
+  };
+
   # no catch-up run at boot after an outage: it would contend with zrepl's
   # own post-boot catch-up replication; next week's run is soon enough
   systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
@@ -406,6 +444,8 @@
       # myBackupRestoreTest's canary restore-and-verify, catches it stopping entirely
       "/var/lib/backup-restore-test/zbackup-last-success" = 30; # daily check
       "/var/lib/backup-restore-test/restic-last-success" = 312; # matches restic's own staleness threshold above
+      # heartbeat-vps succeeding; stale means vps or the path to it is down
+      "/var/lib/heartbeat/vps-ok" = 1;
     };
   };
 
@@ -548,6 +588,7 @@
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
       "/var/lib/restore-drill" # restore-drill success marker, same staleness pattern
       "/var/lib/backup-restore-test" # canary restore-test success markers, same staleness pattern
+      "/var/lib/heartbeat" # vps heartbeat marker and vps's pinned host key
       "/var/lib/pull-deploy" # deploy staleness markers and the repo mirror
       "/var/lib/push-deploy" # vps deploy staleness marker and the repo mirror
       "/var/lib/caddy" # ACME account and certs, so a reboot doesn't re-request them
