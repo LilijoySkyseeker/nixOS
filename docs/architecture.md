@@ -167,6 +167,11 @@ their local aliases and sessions restored with saved default modes. Explicit
 Plan and Read-only modes still work. The Unix account, systemd sandbox and
 egress firewall remain the execution boundary. The local model has the same
 access to work, but is excluded from reviews and independent second opinions.
+`paseo-resume` checks unarchived sessions every five minutes and continues
+those stopped on a usage limit once their account quota is available. Claude's
+transcript-only background-task notices do not clear a preceding limit. The
+watcher starts with `multi-user.target`, including activation while Paseo is
+already running, and is also wanted by Paseo for daemon restarts.
 
 `local-ai-speech` installs `transcribe`: Whisper large-v3-turbo for every
 language, with optional Nemotron speaker labels. Its models live under
