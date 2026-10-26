@@ -385,6 +385,8 @@
     '';
     serviceConfig = {
       Type = "oneshot";
+      # under the 5m interval: a hung run would block every later tick
+      TimeoutStartSec = "2min";
       StateDirectory = "heartbeat";
       # docs/hardening.md sandboxing baseline; root only to read the key
       NoNewPrivileges = true;
