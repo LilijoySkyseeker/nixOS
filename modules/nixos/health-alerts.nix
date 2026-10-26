@@ -47,6 +47,18 @@ _: {
           description = "Whether to check ZFS pool health. Disable on hosts with no ZFS pools (e.g. cloud VMs) — otherwise `zpool status -x` reporting \"no pools available\" gets treated as unhealthy on every run.";
         };
 
+        poolCapacityWarn = lib.mkOption {
+          type = lib.types.int;
+          default = 80;
+          description = "Pool capacity (percent allocated) at which to warn. ZFS slows down past about 80%.";
+        };
+
+        poolCapacityCritical = lib.mkOption {
+          type = lib.types.int;
+          default = 90;
+          description = "Pool capacity at which to alert again, separately from the warning, so a filling pool isn't hidden by the warning's cooldown.";
+        };
+
         checkSmart = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -145,6 +157,9 @@ _: {
             cooldown=$(( ${toString cfg.cooldownHours} * 3600 ))
             now=$(date +%s)
 
+            # a failed post leaves no stamp, so the next run retries it, and
+            # fails the unit so the journal and `systemctl --failed` show it
+            post_failed=0
             notify() {
               key="$1"; title="$2"; body="$3"
               stamp="$state/$key"
@@ -154,9 +169,13 @@ _: {
                   return
                 fi
               fi
-              echo "$now" > "$stamp"
               payload=$(jq -n --arg content "**[${config.networking.hostName}] $title**\n\`\`\`\n$body\n\`\`\`" '{content: $content}')
-              echo "$payload" | curl -sS -K ${cfg.webhookUrlFile} -H "Content-Type: application/json" --data-binary @- >/dev/null
+              if echo "$payload" | curl -sS --fail --retry 2 --max-time 30 -K ${cfg.webhookUrlFile} -H "Content-Type: application/json" --data-binary @- >/dev/null; then
+                echo "$now" > "$stamp"
+              else
+                echo "health-check: could not post alert '$title': $body" >&2
+                post_failed=1
+              fi
             }
 
             clear_alert() {
@@ -173,6 +192,21 @@ _: {
                 clear_alert zfs-unhealthy
                 clear_alert zfs-error
               fi
+
+              # pool capacity: a warning, then a separate critical alert
+              # process substitution, not a pipe: notify must run in this shell
+              while read -r pool cap; do
+                pool_key=$(printf '%s' "$pool" | tr -c 'a-zA-Z0-9_-' '-')
+                if [ "$cap" -ge ${toString cfg.poolCapacityCritical} ]; then
+                  notify "pool-critical-$pool_key" "ZFS pool nearly full" "$pool is $cap% full (critical at ${toString cfg.poolCapacityCritical}%)"
+                elif [ "$cap" -ge ${toString cfg.poolCapacityWarn} ]; then
+                  notify "pool-warn-$pool_key" "ZFS pool filling up" "$pool is $cap% full (warning at ${toString cfg.poolCapacityWarn}%)"
+                  clear_alert "pool-critical-$pool_key"
+                else
+                  clear_alert "pool-warn-$pool_key"
+                  clear_alert "pool-critical-$pool_key"
+                fi
+              done < <(zpool list -H -p -o name,capacity 2>/dev/null)
             ''}
 
             ${lib.optionalString cfg.checkSmart ''
@@ -195,7 +229,9 @@ _: {
               # making no progress, distinct from an individual run failing)
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
-                  stale_key="backup-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"
+                  # keyed on the full dataset name: torrent's and thinkpad's
+                  # .../home share a basename
+                  stale_key="backup-stale-$(printf '%s' ${lib.escapeShellArg dataset} | tr -c 'a-zA-Z0-9_-' '-')"
                   # `|| true`: zfs list fails on a not-yet-created dataset;
                   # the empty "$newest" check below handles that case
                   newest=$(zfs list -t snapshot -H -p -o creation -s creation ${lib.escapeShellArg dataset} 2>/dev/null | tail -1) || true
@@ -262,6 +298,8 @@ _: {
             else
               clear_alert stuck-switch
             fi
+
+            exit "$post_failed"
           '';
           serviceConfig = {
             Type = "oneshot";
