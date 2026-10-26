@@ -42,46 +42,18 @@
   };
 
   # docker settings
-  # SECURITY: the LAN NIC has a public IPv6 and myDockerPublishGuard is
-  # IPv4-only; do not set `ipv6 = true` or restore userland-proxy without
-  # extending the guard to ip6tables, or the game ports go internet-facing
+  # SECURITY: the LAN NIC has a public IPv6 and nothing filters
+  # docker-published ports; `ipv6 = true` or the userland-proxy would put
+  # the game ports on it directly, past vps's per-IP rate limits
   virtualisation.docker.daemon.settings = {
     userland-proxy = false;
-  };
-
-  # docker-published ports bypass networking.firewall.interfaces, so the
-  # game ports' wg0/tailscale0 scoping is enforced here in DOCKER-USER;
-  # no LAN exception on purpose
-  myDockerPublishGuard = {
-    enable = true;
-    allowedInterfaces = [
-      "wg0" # public players, DNAT'd in by vps (its networking.nat.forwardPorts)
-      "tailscale0" # our own devices
-    ];
-    ports = [
-      {
-        port = 25565;
-        protocol = "tcp";
-        comment = "minecraft: java edition";
-      }
-      {
-        port = 19132;
-        protocol = "udp";
-        comment = "minecraft: geyser bedrock listener";
-      }
-      {
-        port = 34197;
-        protocol = "udp";
-        comment = "factorio";
-      }
-    ];
   };
 
   # oci containers
   virtualisation.oci-containers.backend = "docker";
 
   # container uid 0 != host uid 0; per-path uid migrations live in
-  # modules/services/{factorio,minecraft}.nix next to their paths
+  # modules/services/minecraft.nix next to its paths
   myDockerUserns.enable = true;
 
   # update microcode
@@ -543,7 +515,7 @@
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
       "/var/lib/tailscale" # node identity/state; authKeyFile is single-use
       "/var/lib/health-alerts" # alert dedup stamps
-      "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
+      "/var/lib/docker" # container images/layers, avoids re-pulling the minecraft image every boot
       # no zrepl entry: its cursors, holds and bookmarks live in ZFS
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
       "/var/lib/restore-drill" # restore-drill success marker, same staleness pattern

@@ -337,11 +337,6 @@ in
         sourcePort = 19132; # minecraft: geyser (bedrock edition)
       }
       {
-        destination = "10.100.0.2:34197";
-        proto = "udp";
-        sourcePort = 34197; # factorio
-      }
-      {
         destination = "10.100.0.2:5520";
         proto = "udp";
         sourcePort = 5520; # hytale (QUIC)
@@ -380,12 +375,7 @@ in
       -m hashlimit --hashlimit-above 1000/second --hashlimit-burst 500 \
       --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
 
-    # factorio: cap packet rate per source IP
-    iptables -t raw -A vps-ratelimit -p udp --dport 34197 \
-      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
-      --hashlimit-mode srcip --hashlimit-name factorio-flood -j DROP
-
-    # hytale: cap packet rate per source IP; factorio's figure, not measured
+    # hytale: cap packet rate per source IP; a guess, not measured
     iptables -t raw -A vps-ratelimit -p udp --dport 5520 \
       -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
       --hashlimit-mode srcip --hashlimit-name hytale-flood -j DROP

@@ -27,7 +27,7 @@ let
     ];
   };
 
-  # bind-mount data owned by the pre-remap uid (like /srv/factorio/main's 845:845)
+  # bind-mount data owned by the pre-remap uid (an image's baked-in uid)
   preSeed = [
     "d /srv/test-app 0755 845 845 -"
     "f /srv/test-app/pre-existing 0644 845 845 - already-here"

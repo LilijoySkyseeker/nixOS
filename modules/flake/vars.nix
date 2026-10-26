@@ -11,7 +11,7 @@ _: {
     # sops secret); both source hosts pin it to a forced `zrepl stdinserver`
     zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
     username = "lilijoy";
-    # public domain fronted by hosts/vps (minecraft, factorio subdomains,
+    # public domain fronted by hosts/vps (website and game subdomains,
     # see services/octodns.nix)
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files

@@ -98,7 +98,6 @@ in
         nixosModules."health-alerts"
         nixosModules."push-deploy"
         nixosModules."zrepl"
-        nixosModules."docker-publish-guard"
         nixosModules."docker-userns-remap"
         nixosModules."zfs-dataset-properties"
         nixosModules."datasets"
@@ -108,7 +107,6 @@ in
         nixosModules.immich
         nixosModules.beets
         nixosModules.minecraft
-        nixosModules.factorio
         nixosModules.hytale
         nixosModules.octodns
         nixosModules.nfs

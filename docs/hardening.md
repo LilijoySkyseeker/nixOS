@@ -171,14 +171,10 @@ here; it is already applied in the SSH bullet below.
 - **Shared server baseline lives in `modules/profiles/server.nix`**,
   imported by every server-class host (currently `homelab`, `vps`):
   `nix.settings.allowed-users = [ "root" ]`, `security.sudo.enable =
-  false`, `security.auditd.enable`/`security.audit.enable` with an
-  execve audit rule. Host-specific hardware tweaks (e.g. an
+  false`. Host-specific hardware tweaks (e.g. an
   `ethtool`/`networkd-dispatcher` rule tied to a specific NIC name)
   must NOT live here — they silently break on hosts without that
   interface. Put those in the host's own `configuration.nix` instead.
-  Any new persist-capable host that gets `security.auditd`/
-  `security.audit` needs `/var/log` in its impermanence persistence
-  list, or the audit trail is wiped every boot.
 - **Persisting a `DynamicUser=true` service's `StateDirectory=`.**
   systemd creates `/var/lib/<name>` as a symlink into
   `/var/lib/private/<name>` for `StateDirectory=`-managed paths under

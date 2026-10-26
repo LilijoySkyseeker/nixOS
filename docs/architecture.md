@@ -48,7 +48,7 @@ key:
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `encrypted-root`, `secure-boot`, `hibernate`, `hibernate-only`, `reboot-notice` |
 | `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch`, `update-keys` (home-manager) |
-| `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `hytale`, `octodns`, `nfs`, `samba` |
+| `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `hytale`, `octodns`, `nfs`, `samba` |
 | `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 
 ### Which nixpkgs a host tracks
@@ -99,7 +99,7 @@ isn't already on the system.
   pulls it in).
 - `"profile-server"` does **not** import `"profile-default"` itself — it's
   meant to be combined with it separately, same as before the migration.
-  Adds headless-role config (auditd, no interactive sudo, root's own
+  Adds headless-role config (no interactive sudo, root's own
   home-manager profile). `homelab` and `vps` both list `"profile-default"`
   and `"profile-server"` side by side in `hosts.nix`, not through
   `"profile-server"`.
@@ -124,7 +124,7 @@ not the boundary itself:
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
-  beets, factorio, minecraft, hytale, octodns, nfs, samba), each
+  beets, minecraft, hytale, octodns, nfs, samba), each
   registering as `flake.modules.nixos.<name>` and listed per-host in
   `modules/flake/hosts.nix`. No options surface. Reach for
   `modules/services/` over an inline host-config block once the config is

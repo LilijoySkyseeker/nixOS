@@ -117,7 +117,7 @@ _: {
             PrivateTmp = true;
             ReadWritePaths = map (m: m.path) cfg.migrations;
             # completion markers, kept out of the migrated trees: a host-root
-            # owned marker there breaks factorio's own `chown -R` at start
+            # owned marker there breaks an image's own `chown -R` at start
             StateDirectory = "docker-userns-remap-migrate";
             # narrower than full root: chown, owner-gated metadata ops, and
             # DAC caps to traverse the 0700 game-server trees

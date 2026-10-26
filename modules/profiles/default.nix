@@ -70,11 +70,7 @@ in
           // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
         })
         {
-          sudo = {
-            enable = false;
-            execWheelOnly = true;
-            package = pkgs-unstable.sudo.override { withInsults = true; };
-          };
+          sudo.enable = false;
         }
       ];
 
@@ -97,17 +93,6 @@ in
         ];
       };
       sops.secrets."tailscale_authkey_${config.networking.hostName}" = { };
-
-      # pin github.com: root fetches deploys from it, and /root isn't persisted so
-      # accept-new would be TOFU every boot. key checked against github's published
-      # fingerprint; on rotation, unattended deploys fail closed until updated here
-      programs.ssh.knownHosts."github.com" = {
-        hostNames = [
-          "github.com"
-          "ssh.github.com"
-        ];
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
-      };
 
       # journald: persistent, size-capped; 26.05 only has `extraConfig`,
       # 26.11 only `settings.Journal`, and 26.11 no longer pins Storage

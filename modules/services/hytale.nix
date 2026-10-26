@@ -31,7 +31,6 @@ in
 
       # networking: tailnet and wg0 (vps's DNAT'd game port) only; the LAN NIC
       # has a public IPv6. a native service, so these INPUT rules do apply
-      # (no myDockerPublishGuard entry needed)
       networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
         5520 # hytale (QUIC)
       ];

@@ -196,8 +196,7 @@ Sixteen third-party Modrinth projects are resolved **by slug at every
 container start** — every reboot, and every switch touching the unit —
 at the `alpha` release channel, with
 `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further transitive
-artifacts nobody has listed. Both Factorio servers do the same through
-`UPDATE_MODS_ON_START`. The Hytale server (2026-10-14) goes further: it
+artifacts nobody has listed. The Hytale server (2026-10-14) goes further: it
 replaces its own server JAR, assets and `start.sh` from Hytale's update
 service, applied when no one is online. Only the first-install seed JAR
 is hash-pinned. Clients refuse a server whose protocol version differs,
@@ -377,7 +376,7 @@ it leaves this file entirely.
 | ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
 | ~~D11~~ | **Moot 2026-10-06.** `flake-update-test` was deleted; inputs change only through a PR the user merges, and the `master` ruleset requires one. | `F-P7-10` |
 | ~~D12~~ | **Answered 2026-09-03 — not accepted, and fixed.** `noexec` added to `nfs-homelab-mounts.nix`, closing the last execution path from a homelab-controlled filesystem onto both laptops. AR-6 marked superseded. | `F-P6-05` |
-| ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
+| ~~D13~~ | **Answered 2026-08-27, revisited 2026-10-25.** A guard limited the game ports to wg0 and tailscale0; it was removed because the ports are internet-public through vps anyway, so LAN reach adds nothing. | `F-P4-02`, `F-P3-04` |
 | ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |
 
 ~~Two of these have a written home waiting for them: **D2** must land in

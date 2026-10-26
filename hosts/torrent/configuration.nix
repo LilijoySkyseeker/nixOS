@@ -53,7 +53,6 @@
     }))
   ];
   boot.kernelModules = [ "r8125" ];
-  nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
 
   # cpu power management
   powerManagement.cpuFreqGovernor = "performance";

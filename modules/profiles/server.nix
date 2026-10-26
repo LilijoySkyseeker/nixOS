@@ -18,12 +18,6 @@ in
       # disable sudo
       security.sudo.enable = false;
 
-      # audit log of every executed command; /var/log is in each host's
-      # persistence list, else impermanence wipes it
-      security.auditd.enable = true;
-      security.audit.enable = true;
-      security.audit.rules = [ "-a exit,always -F arch=b64 -S execve" ];
-
       # nh, nix helper
       programs.nh = {
         flake = "/etc/nixos";

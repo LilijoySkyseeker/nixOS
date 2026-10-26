@@ -40,11 +40,6 @@
         kdeModule = config.flake.modules.nixos.kde;
       };
 
-      docker-publish-guard = import ../../tests/docker-publish-guard.nix {
-        pkgs = config.flake.pkgsUnstable;
-        dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
-      };
-
       agent-user = import ../../tests/agent-user.nix {
         pkgs = config.flake.pkgsUnstable;
         agentUserModule = config.flake.modules.nixos."agent-user";

@@ -13,8 +13,8 @@ in
       '';
 
       # networking: tailnet and wg0 (vps's DNAT'd game ports) only; the LAN NIC
-      # has a public IPv6. INPUT rules don't constrain docker publishes:
-      # myDockerPublishGuard on homelab enforces this list -- change both together
+      # has a public IPv6. INPUT rules don't constrain docker publishes, which
+      # reach the LAN too
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
         25565
       ];
@@ -39,7 +39,7 @@ in
       ];
 
       # deny non-owner access to server state; mode only since the owning uid
-      # comes from the image (same as factorio.nix)
+      # comes from the image
       systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
 
       # docker userns-remap ownership migration; 1000 is itzg's baked-in uid
