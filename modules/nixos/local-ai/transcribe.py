@@ -1,16 +1,19 @@
 """transcribe: speech-to-text on torrent, with who said what.
 
-Whisper large-v3-turbo recognizes the speech in every mode.
+Whisper large-v3-turbo recognizes the speech in every mode, and a second
+pass re-transcribes the stretches where it looped.
 Speaker labels come from Nemotron diarization, which works on any language.
 """
 
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import wave
 
 AUDIO = os.environ["LOCAL_AI_AUDIO"]
 VRAM_DEV = os.environ["VRAM_DEV"]
@@ -49,11 +52,11 @@ def diarize(work, backend, log):
     return audiocpp(backend, log, *args)
 
 
-def whisper(work, backend, log, speakers, lang):
+def recognize(wav, out, backend, log, speakers, lang, extra=()):
     cmd = ["whisper-cli", "-m", f"{AUDIO}/ggml-large-v3-turbo-q8_0.bin", "-l", lang,
-           "-t", str(os.cpu_count()), "-np", "-oj", "-of", f"{work}/w", "-f", f"{work}/in.wav",
+           "-t", str(os.cpu_count()), "-np", "-oj", "-of", out, "-f", wav,
            # skip music and silence, where whisper otherwise invents text
-           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin"]
+           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin", *extra]
     if speakers:
         # one segment per word, so each word goes to the speaker talking then
         cmd += ["-ml", "1", "-sow"]
@@ -61,11 +64,69 @@ def whisper(work, backend, log, speakers, lang):
         cmd.append("-ng")
     if not run(cmd, log):
         return None
-    out = json.load(open(f"{work}/w.json"))
-    print(f"transcribe: language {out.get('result', {}).get('language', '?')}", file=sys.stderr)
+    res = json.load(open(f"{out}.json"))
     # word segments carry their own leading space (none in chinese or japanese)
     segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"])
-            for s in out["transcription"] if s["text"].strip()]
+            for s in res["transcription"] if s["text"].strip()]
+    return segs, res.get("result", {}).get("language", "?")
+
+
+def looping(segs):
+    """Indices of the segments where whisper repeats itself: a run of 6 words
+    that comes back 3 or more times within 60 words."""
+    words = [(re.sub(r"\W", "", w.lower()), i) for i, (_, _, t) in enumerate(segs) for w in t.split()]
+    words = [(w, i) for w, i in words if w]
+    grams = [tuple(w for w, _ in words[k:k + 6]) for k in range(len(words) - 5)]
+    hit = set()
+    for k, gram in enumerate(grams):
+        at = [j for j in range(k, min(k + 60, len(grams))) if grams[j] == gram]
+        if len(at) >= 3:
+            hit.update(i for j in at for _, i in words[j:j + 6])
+    return sorted(hit)
+
+
+def repair(work, segs, backend, log, speakers, lang):
+    """Re-transcribe each looping stretch without carried-over context (-mc 0).
+    That setting ends most loops but drops more words on clean speech, so it
+    runs only where the first pass looped (sweep, 2026-10-25)."""
+    hit = looping(segs)
+    # stretches of looping segments, merged when under 30 s apart
+    spans = []
+    for i in hit:
+        if spans and segs[i][0] - segs[spans[-1][1]][1] < 30:
+            spans[-1][1] = i
+        else:
+            spans.append([i, i])
+    fixed = 0
+    for first, last in reversed(spans):
+        # from the end of the segment before to the start of the one after
+        a = segs[first - 1][1] if first else 0.0
+        b = segs[last + 1][0] if last + 1 < len(segs) else segs[last][1]
+        clip = f"{work}/clip.wav"
+        with wave.open(f"{work}/in.wav") as src, wave.open(clip, "wb") as dst:
+            dst.setparams(src.getparams())
+            src.setpos(int(a * RATE))
+            dst.writeframes(src.readframes(int((b - a) * RATE)))
+        got = recognize(clip, f"{work}/clip", backend, log, speakers, lang, ["-mc", "0"])
+        if got is None:
+            continue
+        new = [(x + a, y + a, t) for x, y, t in got[0]]
+        # keep the second pass only if it loops less than the first
+        if len(looping(new)) < len(looping(segs[first:last + 1])):
+            segs[first:last + 1] = new
+            fixed += 1
+    if spans:
+        print(f"transcribe: {len(spans)} looping stretches, {fixed} re-transcribed", file=sys.stderr)
+    return segs
+
+
+def whisper(work, backend, log, speakers, lang):
+    got = recognize(f"{work}/in.wav", f"{work}/w", backend, log, speakers, lang)
+    if got is None:
+        return None
+    segs, detected = got
+    print(f"transcribe: language {detected}", file=sys.stderr)
+    segs = repair(work, segs, backend, log, speakers, lang)
     if not speakers:
         return [f"{stamp(a)} {t.strip()}" for a, _, t in segs]
     if not diarize(work, backend, log):
