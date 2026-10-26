@@ -9,9 +9,9 @@
         zreplModule = config.flake.modules.nixos."zrepl";
       };
 
-      zfs-space-guard = import ../../tests/zfs-space-guard.nix {
+      health-alerts = import ../../tests/health-alerts.nix {
         pkgs = config.flake.pkgsUnstable;
-        zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
+        healthAlertsModule = config.flake.modules.nixos."health-alerts";
       };
 
       zfs-dataset-properties = import ../../tests/zfs-dataset-properties.nix {

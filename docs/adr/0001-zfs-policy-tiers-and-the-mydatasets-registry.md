@@ -1,6 +1,7 @@
 ---
-status: accepted
+status: superseded
 date: 2026-09-05
+superseded_by: 0002-fleet-data-classes.md
 ---
 
 # ZFS policy tiers and the `myDatasets` registry

@@ -131,16 +131,6 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # emergency space reclaim: `systemctl start zfs-emergency-prune.service`
-  myZfsSpaceGuard = {
-    enable = true;
-    datasets = [
-      "zroot/local/home"
-      "zroot/local/root"
-      "zroot/local/models"
-    ];
-  };
-
   # backup restore-test canaries: content must match homelab's
   # myBackupRestoreTest.zbackup.targets byte for byte
   myBackupCanary.paths = {

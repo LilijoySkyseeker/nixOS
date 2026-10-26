@@ -6,9 +6,11 @@ offsite restic path see the last section; for deployment status see
 `docs/plans/` (`in-progress/` for what's still being verified).
 
 Which of these paths a given dataset gets is a per-dataset decision, made
-via the `myDatasets` registry (`modules/nixos/datasets.nix`) and its four
-tiers -- see
-[`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`](adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md).
+via the `myDatasets` registry (`modules/nixos/datasets.nix`). Its design is
+being reworked by
+[`docs/adr/0002-fleet-data-classes.md`](adr/0002-fleet-data-classes.md),
+which supersedes ADR-0001's four tiers; this document describes what's
+deployed now.
 restic's dataset list below is the union of the pre-registry hardcoded
 list and a recursive walk of every `offsite`-tier root the registry
 declares. Existing services stay on the hardcoded list; only new
@@ -62,35 +64,32 @@ Under pull, homelab dials out, the sources only answer, and retention
 authority stays on homelab.
 
 Use `myZrepl.push` only where pull genuinely loses coverage — a machine
-whose online windows a 15m puller would miss. It has a real cost beyond the
+whose online windows a 5m puller would miss. It has a real cost beyond the
 above; see "push is welded to its snapshotter" below.
 
 ## Retention
 
 | Preset | Grid | Snapshots | Window | Applies to |
 |---|---|---|---|---|
-| `source` | `1x1h(keep=all) \| 48x1h \| 7x1d` | ~67 | ~9 days | snapshots on the host that owns the data, pruned by homelab's pull job |
-| `ceiling` | `1x1h(keep=all) \| 48x1h \| 30x1d` | ~90 | ~32 days | enforced on-box by each host's own `snap` job |
-| `archive` | `168x1h \| 30x1d \| 12x30d` | ~210 | ~13 months | every copy in `zbackup` |
+| `source` | `1x1h(keep=all) \| 24x1h` | ~36 | ~1 day | snapshots on the host that owns the data, pruned by homelab's pull jobs |
+| `ceiling` | `1x1h(keep=all) \| 24x1h \| 7x1d` | ~43 | ~8 days | enforced on-box by each host's own `snap` job |
+| `archive` | `1x1h(keep=all) \| 48x1h \| 30x1d` | ~90 | ~1 month | every copy in `zbackup` |
+
+Why these: snapshots cost what changes or gets deleted while they're kept,
+not what they hold, and local snapshots pinned ~1.25 TB of deletions on
+torrent until its pool filled (2026-10-25). The backup pool holds the
+history, so sources keep a day. A month covers every restore ever needed.
+The design this is a step towards is
+[`docs/adr/0002-fleet-data-classes.md`](adr/0002-fleet-data-classes.md).
 
 Snapshot interval is a uniform **5m** on all three hosts
-(`myZrepl.snapshot.interval`). Replication runs on its own schedule —
-**15m** for every pull job, including homelab's local one. The two are
-deliberately separate: snapshots are cheap and local, whereas each
-replication run costs I/O on a pool sitting behind a USB link.
-
-That link was the binding constraint when these intervals were chosen: all
-four drives shared one USB 2.0 (480 Mbps) upstream, a hard ~40-60MB/s
-ceiling across the lot. Replacing the enclosure's cable on 2026-08-23 moved
-them to USB 3.0 (5000 Mbps) and the recurring `uas_eh_*` faults stopped, so
-the 15m interval and the tiered `archive` grid are now conservative rather
-than forced. They have not been re-tuned; see `hosts/homelab/README.md` for
-how to check the link is still negotiating 5000.
+(`myZrepl.snapshot.interval`), and every pull job, including homelab's
+local one, runs every **5m** too, so `zbackup` is at most a few minutes
+behind.
 
 `ceiling` is deliberately slacker than `source` so that in normal running
 the puller's stricter rules are what actually prune; the ceiling only takes
-over once a peer has been unreachable long enough that the alternative is
-unbounded growth.
+over once a peer has been unreachable for more than a day.
 
 ## Layout on zbackup
 
@@ -175,7 +174,7 @@ These each cost real investigation; none are obvious from the config.
   leading bucket `keep=all`, sized at least as wide as the job's pull
   interval — it short-circuits before ever building a destroy list for
   that bucket (`if b.keepCount == RetentionGridKeepCountAll { return nil
-  }`). This is what `retention.archive`'s leading `1x15m(keep=all)` is
+  }`). This is what `retention.archive`'s leading `1x1h(keep=all)` is
   for; caught on homelab's `local-pull` job first, but applies to every
   receiving job (`local-pull` and every `pull.remotes.*`) since they all
   default to `retention.archive`.
