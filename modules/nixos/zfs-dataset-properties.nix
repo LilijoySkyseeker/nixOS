@@ -48,8 +48,8 @@ _: {
           serviceConfig = {
             Type = "oneshot";
 
-            # runs as root (zfs set isn't delegable here); otherwise the same
-            # sandbox as zfs-space-guard.nix
+            # runs as root (zfs set isn't delegable here); otherwise
+            # docs/hardening.md's sandboxing baseline
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;
