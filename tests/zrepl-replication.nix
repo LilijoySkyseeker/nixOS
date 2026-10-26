@@ -176,7 +176,9 @@ pkgs.testers.runNixOSTest {
         assert "uid=" not in out, f"got a shell instead of the forced command: {out!r}"
 
     with subtest("a pull lands data at root_fs/<full source path>"):
-        puller.succeed("zrepl signal wakeup sourcehost")
+        # a wakeup sent while the previous one is still pending fails with
+        # "already woken up"; retry until the job takes it
+        puller.wait_until_succeeds("zrepl signal wakeup sourcehost", timeout=60)
         puller.wait_until_succeeds(
             "zfs list -H -o name backup/backup/sourcehost/tank/data", timeout=180
         )
@@ -203,7 +205,7 @@ pkgs.testers.runNixOSTest {
         # An unguarded grid rule condemns every snapshot it does not
         # match rather than ignoring it, so without protectRegexes this
         # is exactly what a prune would destroy first.
-        puller.succeed("zrepl signal wakeup sourcehost")
+        puller.wait_until_succeeds("zrepl signal wakeup sourcehost", timeout=60)
         # Both jobs run on a 10s interval here, so 20s covers at least one
         # full prune cycle on each side -- long enough that a missing
         # protect rule would have destroyed @blank by the assert below.
@@ -282,7 +284,7 @@ pkgs.testers.runNixOSTest {
                 "backup/backup/sourcehost/tank/data | wc -l"
             ).strip()
         )
-        puller.succeed("zrepl signal wakeup sourcehost")
+        puller.wait_until_succeeds("zrepl signal wakeup sourcehost", timeout=60)
         puller.wait_until_succeeds(
             "test $(zfs list -t snapshot -H -o name "
             "backup/backup/sourcehost/tank/data | wc -l) -gt %d" % n_before,
