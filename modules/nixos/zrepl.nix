@@ -498,62 +498,54 @@ _: {
         retention = {
           source = lib.mkOption {
             type = lib.types.str;
-            default = "1x1h(keep=all) | 48x1h | 7x1d";
+            default = "1x1h(keep=all) | 24x1h";
             description = ''
-              Retention on whichever host owns the data, uniform across
-              every host: an hour at full 5m granularity, then hourly for
-              two days, then daily for a week.
+              Retention on whichever host owns the data, pruned by the
+              puller: an hour at full 5m granularity, then hourly for a
+              day. ~36 snapshots.
 
-              ~67 snapshots, ~9 day window. The full-granularity hour is
-              the "undo an accidental rm" window; the 9 day tail means a
-              multi-day outage of the backup server doesn't immediately
-              leave the source as the only copy of recent history.
+              Local snapshots pin everything deleted while they exist, and
+              the backup pool already holds the history, so the source keeps
+              only a short undo window (ADR-0002).
             '';
           };
 
           ceiling = lib.mkOption {
             type = lib.types.str;
-            default = "1x1h(keep=all) | 48x1h | 30x1d";
+            default = "1x1h(keep=all) | 24x1h | 7x1d";
             description = ''
               Upper bound enforced locally by the snap job, independent of
-              any peer: an hour at full granularity, hourly for two days,
-              daily for a month. ~90 snapshots, ~32 day window.
+              any peer: an hour at full granularity, hourly for a day,
+              daily for a week. ~43 snapshots, ~8 day window.
 
               Intentionally slacker than retention.source so that in
               normal operation the puller's stricter rules are what
               actually prune, and this only takes effect once a peer has
-              been unreachable long enough that the alternative is
-              unbounded growth. Whatever the outage length, snapshot count
-              stops at ~90 rather than climbing at ~8.6k/month.
+              been unreachable for more than a day. It also bounds how long
+              an outage can pin deleted data on the source.
             '';
           };
 
           archive = lib.mkOption {
             type = lib.types.str;
-            default = "1x15m(keep=all) | 168x1h | 30x1d | 12x30d";
+            default = "1x1h(keep=all) | 48x1h | 30x1d";
             description = ''
-              Retention for copies living on the backup target: hourly for
-              a week, daily for a month, monthly for a year.
+              Retention for copies living on the backup target: every
+              snapshot for an hour, hourly for two days, daily for a month.
+              ~90 snapshots, ~32 day reach. A month covers every restore
+              ever needed; history beyond it held the churn that filled
+              zbackup (ADR-0002).
 
-              ~212 snapshots, ~13 month reach. Tiering rather than a flat
-              wall of dailies buys longer reach for well under half the
-              snapshot count, which matters here because every prune walks
-              the whole list on a pool already short on I/O headroom.
-
-              The source's 5m snapshots collapse to one per hour shortly
-              after arriving, past the leading bucket. That leading
-              1x15m(keep=all) bucket is load-bearing, not cosmetic: without
-              it, the grid's "keep the oldest snapshot per bucket, remove
+              The leading 1x1h(keep=all) bucket is load-bearing, not
+              cosmetic: without it, the grid's "keep the oldest snapshot per bucket, remove
               younger ones in the same bucket" rule (retentiongrid.go's
               RemoveYoungerSnapsExceedingKeepCount) marks the just-received
               newest snapshot for destruction on almost every pull cycle --
               directly colliding with the hold zrepl's endpoint places on
               that same snapshot (zrepl_last_received_J_<job>) to guarantee
               a valid incremental base. The destroy fails loudly every
-              cycle even though nothing is actually wrong. Widen this past
-              the pull interval (default 15m) if pull interval ever grows,
-              or drop to keep=all for a full hour for more fine-grained
-              recent history on the target as a side effect.
+              cycle even though nothing is actually wrong. Keep it wider
+              than the pull interval.
             '';
           };
         };
@@ -716,8 +708,8 @@ _: {
 
                   interval = lib.mkOption {
                     type = lib.types.str;
-                    default = "15m";
-                    description = "How often to attempt a pull from this remote.";
+                    default = "5m";
+                    description = "How often to attempt a pull from this remote. Matches the snapshot interval, so the backup pool is at most a few minutes behind.";
                   };
 
                   keepSender = keepSenderOption (
@@ -880,13 +872,8 @@ _: {
 
           interval = lib.mkOption {
             type = lib.types.str;
-            default = "15m";
-            description = ''
-              How often to replicate this host's own datasets into its
-              backup pool. Separate from snapshot.interval on purpose --
-              snapshots are cheap and local, whereas each replication run
-              costs I/O on the target pool.
-            '';
+            default = "5m";
+            description = "How often to replicate this host's own datasets into its backup pool.";
           };
 
           keepSender = keepSenderOption (
