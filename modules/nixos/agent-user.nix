@@ -168,7 +168,6 @@
       agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
       # sandbox shared by every agent's units: every agent
       # session is a child of one of them
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
         User = "agent";
         Group = "agent";
@@ -298,7 +297,6 @@
     in
     {
       # own group, not isNormalUser's default `users`
-      # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G2
       users.groups.agent = { };
       # lilijoy opens and drops files in ~/work; the agent gains nothing from this
       users.users.lilijoy.extraGroups = [ "agent" ];
@@ -639,7 +637,6 @@
         );
 
         # systemd mount + automount, not fileSystems
-        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G3
         mounts = [
           {
             what = "/home/lilijoy/Documents/Vault/Research";

@@ -1,6 +1,5 @@
 # agent-setup: check the agent's place on torrent and, after asking, fix what's missing.
 # run as root: `run0 agent-setup` (check and fix) or `run0 agent-setup --check` (report only)
-# plan: 2026-10-06-make-the-agent-s-place-reproducible-with-an-agent-setup-check-and-fix.md
 
 check_only=0
 [ "${1:-}" = "--check" ] && check_only=1

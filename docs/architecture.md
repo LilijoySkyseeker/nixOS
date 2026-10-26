@@ -1,11 +1,8 @@
 # Architecture
 
 How this repo composes, one layer at a time. See `README.md` for the quick
-structure guide; this is the deeper version. This describes the **dendritic
-flake** structure (flake-parts + import-tree), adopted in a repo-wide
-migration — see `docs/dendritic-migration-plan.md` for the migration's own
-rationale/history if useful, though this document is the current ground
-truth.
+structure guide; this is the deeper version: the **dendritic flake**
+structure (flake-parts + import-tree).
 
 ## The registration model
 
@@ -98,7 +95,7 @@ isn't already on the system.
   directly in `hosts.nix`, not `"profile-default"` — `"profile-pc"` already
   pulls it in).
 - `"profile-server"` does **not** import `"profile-default"` itself — it's
-  meant to be combined with it separately, same as before the migration.
+  meant to be combined with it separately.
   Adds headless-role config (auditd, no interactive sudo, root's own
   home-manager profile). `homelab` and `vps` both list `"profile-default"`
   and `"profile-server"` side by side in `hosts.nix`, not through
@@ -106,9 +103,7 @@ isn't already on the system.
 
 ## Module-organization boundary
 
-The directory-purpose split from before the migration still holds — what
-changed is the wiring mechanism (registration key vs. file-path import),
-not the boundary itself:
+What each directory is for:
 
 - **`modules/nixos/` and `modules/home-manager/`** — reusable option
   modules, each registering as `flake.modules.nixos.<name>` or
@@ -142,7 +137,7 @@ not the boundary itself:
   `devshell.nix` (the dev shell, now a `perSystem` module rather than the
   bare `mkShell` function that used to live at repo root).
 
-One host is still structurally unusual, same as before the migration:
+One host is structurally unusual:
 
 - **`vps`** pulls in no `modules/services/*` modules. It's a tunnel
   endpoint (wireguard, NAT/DNAT forwarding of the game ports), and that
@@ -153,8 +148,7 @@ One host is still structurally unusual, same as before the migration:
 `torrent` also carries a second, untrusted principal: `agent-user` adds an
 `agent` Unix user that runs `claude remote-control` with no permission
 prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
-mechanics are in `docs/hardening.md` ("The `agent` user"); the design
-record lives outside the repo, in `~/Projects/agenticsandbox/`.
+mechanics are in `docs/hardening.md` ("The `agent` user").
 
 `local-ai` (torrent only) serves local models on the RX 7900 XTX to every
 agent and to lilijoy: `llama-swap` on `127.0.0.1:8080` (one model at a
@@ -228,11 +222,8 @@ Derive it from source:
     };
   }
   ```
-  Reusing the name `config` for both would silently read the wrong object —
-  this bit us once during the migration (`modules/services/jellyfin.nix`,
-  `modules/nixos/nfs-homelab-mounts.nix`), and it fails loudly at eval time
-  with an unrelated-looking error ("attribute 'flake' missing"), not a clear
-  "you shadowed config" message.
+  Reusing the name `config` for both reads the wrong object, and fails at
+  eval time with an unrelated-looking error ("attribute 'flake' missing").
 - **`flake.modules` isn't a built-in flake-parts option.** It only exists
   because `flake.nix` imports `inputs.flake-parts.flakeModules.modules`
   explicitly. If that import is ever removed or a fresh flake-parts setup is
@@ -252,16 +243,10 @@ Derive it from source:
   a file's _usage_ from a host means removing it from `hosts.nix`'s
   per-host list, not (necessarily) deleting the file — and conversely, a
   file existing under `modules/` proves nothing about which hosts run it.
-  Always check `hosts.nix`, same as the old repo required checking each
-  host's/profile's `imports` list.
-- **Relative paths inside a converted file are still relative to that
-  file's own location on disk**, exactly like before — moving a file (e.g.
-  the `profiles/` → `modules/profiles/` move done in the migration) means
-  updating any `../` path literals inside it (this repo hit this for
-  `sops.defaultSopsFile` and the stylix background image path). Nix path
-  literals don't become "relative to however the file is imported" under
-  dendritic — this is a common misconception, not an actual behavior
-  change from before.
+  Always check `hosts.nix`.
+- **Relative paths are relative to the file's own location on disk**, not
+  to however it is imported: moving a file means updating its `../` path
+  literals (`sops.defaultSopsFile`, the stylix background image).
 - **Derivation hashes for a host can change even with zero functional
   difference.** Reordering which module declares a given
   `environment.systemPackages` (or similar list-typed option) entry first
@@ -276,27 +261,12 @@ Derive it from source:
   `modules/flake/hosts.nix` for which `inputs.nixpkgs-*.lib.nixosSystem` a
   host uses before assuming a module option exists on it.
 - **A shared module can quietly drag in packages/services that have
-  nothing to do with why it was wired into a given host.** Dendritic
-  modules are convenient specifically because importing one name can
-  pull in a whole bundle — but that convenience cuts both ways: nothing
-  stops a "general tooling" module from also enabling something
-  desktop- or role-specific, and a server host importing it gets that
-  too, silently. Caught live: `modules/profiles/server.nix` wires
-  `homeManagerModules.tooling` into every server host's root profile
-  for CLI tools (fzf, zoxide, git, fish, ...), but `tooling.nix` also
-  unconditionally enables `services.kdeconnect`, `programs.obs-studio`,
-  `programs.obsidian`, and `programs.firefox` — a phone-sync daemon, a
-  screen recorder, a notes app, and a whole browser, all landing in
-  vps's actual built closure with nothing in `server.nix` hinting at
-  it. Found via `nix why-depends <closure-path> <suspicious-package>`
-  against a real build, not by reading the importing file — reading
-  `server.nix` alone gives no reason to suspect any of this is in
-  there. When wiring a shared module into a new role, actually check
-  what it contains (or `nix why-depends` the result) rather than
-  trusting the name. Fixed 2026-08-26 by splitting the desktop-only
-  pieces into `modules/home-manager/tooling-desktop.nix`, imported only
-  by `modules/profiles/PC.nix` — see
-  `2026-08-25-reorganize-modules-home-manager-tooling-nix-it-s-w.md`.
+  nothing to do with why it was wired into a given host.** Importing one
+  name can pull in a whole bundle, and a server importing a "tooling"
+  module gets whatever desktop pieces it enables (desktop-only home-manager
+  tooling lives in `modules/home-manager/tooling-desktop.nix` for this
+  reason). When wiring a shared module into a new role, check what it
+  contains, or `nix why-depends` the built closure.
 
 ## Backups
 
@@ -320,8 +290,7 @@ for the tiers and why a registry exists at all.
 
 The latter two are both zrepl, configured by one shared module
 (`modules/nixos/zrepl.nix`, registered `"zrepl"`, listed for all three
-hosts). It replaced sanoid + syncoid and the former
-`modules/nixos/backup-push.nix`.
+hosts).
 
 **Full detail — roles, retention, the zrepl behaviours that are easy to get
 wrong, and offline behaviour — is in [`docs/backups.md`](backups.md).**
@@ -331,9 +300,8 @@ Restore steps are in
 Two things worth knowing before touching anything nearby:
 
 - `zbackup`'s layout is `zbackup/backup/<host>/<full source dataset
-  path>` — zrepl extends `root_fs` with the whole source path, so it is
-  deeper than the old syncoid names (`.../torrent/zroot/local/home`, not
-  `.../torrent/home`). `myHealthAlerts.backupStaleness` keys off these.
+  path>` — zrepl extends `root_fs` with the whole source path
+  (`.../torrent/zroot/local/home`). `myHealthAlerts.backupStaleness` keys off these.
 - zrepl destroys any snapshot it did not create unless a `regex` keep rule
   matches it. `myZrepl.protectRegexes` (default `^blank$`) is what keeps
   the impermanence rollback snapshots alive. See `docs/backups.md`'s
@@ -408,4 +376,3 @@ Encrypted with sops-nix. `.sops.yaml` maps named recipient keys (one per
 host/purpose, as YAML anchors) to a `path_regex` covering
 `secrets/*.{yaml,json,env,ini}`. Never edit `secrets/secrets.yaml` directly
 outside `sops secrets/secrets.yaml` — see `docs/procedures/secrets.md`.
-Unaffected by the dendritic migration — `secrets/` didn't move.

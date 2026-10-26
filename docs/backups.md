@@ -2,8 +2,7 @@
 
 How snapshots are taken and replicated across `homelab`, `torrent`, and
 `thinkpad`, and the zrepl behaviours that are easy to get wrong. For the
-offsite restic path see the last section; for deployment status see
-`docs/plans/` (`in-progress/` for what's still being verified).
+offsite restic path see the last section.
 
 Which of these paths a given dataset gets is a per-dataset decision, made
 via the `myDatasets` registry (`modules/nixos/datasets.nix`) and its four

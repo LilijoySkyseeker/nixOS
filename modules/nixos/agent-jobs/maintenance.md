@@ -25,7 +25,7 @@ half-done as the fleet moves on.
    - open PRs and issues in `LilijoySkyseeker/nixOS`: agent PRs waiting on
      the owner for over two weeks, PRs that conflict with `master`, "Left
      open" items in merged PRs from the past month that nobody picked up;
-   - handoff notes in `docs/plans/*.md` (not the archive subfolders) for
+   - handoff notes in `docs/plans/*.md` for
      work that has since merged or stalled, and docs that no longer match
      the code they describe.
 3. **Sort** each item into one of three:

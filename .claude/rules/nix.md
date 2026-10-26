@@ -109,10 +109,6 @@ wipes it`), in one or two lines. Not the history: no "originally",
 "found in review", incident narrative, alternatives considered, or plan
 ids.
 
-Older code carries `# plan: <date>-<slug>.md#D2` citations into the
-archived plans under `docs/plans/`. They still resolve; don't add new
-ones.
-
 ## Inline comments
 
 - Lowercase start, no terminal period, terse fragments over full

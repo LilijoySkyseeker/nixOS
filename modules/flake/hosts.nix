@@ -49,7 +49,6 @@ in
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         # torrent only, not profile-pc
-        # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F11
         nixosModules."agent-user"
         # agent-user's shared ~/work, at ~/Agent for lilijoy
         {

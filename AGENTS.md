@@ -105,10 +105,10 @@ what the user actually said), **State** (rewritten in place), **Next**.
 Read any matching note before starting. When the work merges, its goal
 and decisions go into the PR description and the note is deleted.
 
-`docs/plans/{todo,in-progress,done,rejected}/` and the
-`# plan: <date>-<slug>.md#D2` comments in code are an archive of the
-earlier plan system. Grep them for history; don't edit them or add new
-citations.
+The earlier plan system's archive (`docs/plans/{todo,done,rejected}/`)
+was removed from the tree on 2026-10-25. A plan slug or `F`/`D`/`G` id
+in an old commit message resolves through git history:
+`git log --all --oneline -- 'docs/plans/done/*<slug>*'`.
 
 ## Access
 
