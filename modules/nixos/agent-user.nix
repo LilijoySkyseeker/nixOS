@@ -137,11 +137,19 @@
         ];
         text = builtins.readFile ./agent-tools/openrouter-curl.sh;
       };
-      # git identity: the bot's noreply address (its public GitHub id)
+      # git identity: the bot's noreply address (its public GitHub id); gh
+      # from PATH as the credential helper, since `gh auth setup-git` writes a
+      # store path that the GC later removes
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
           name = ${bot}
           email = 338765425+${bot}@users.noreply.github.com
+        [credential "https://github.com"]
+          helper =
+          helper = !gh auth git-credential
+        [credential "https://gist.github.com"]
+          helper =
+          helper = !gh auth git-credential
       '';
       # git's user-wide ignore file: local notes stay out of every repo
       gitIgnore = pkgs.writeText "agent-git-ignore" ''
@@ -605,7 +613,6 @@
           "a+ /home/agent/work - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::---"
           # orientation for the agent; a store symlink, so edits go through the repo
           "d /home/agent/.claude 0700 agent agent -"
-          # ~/.gitconfig stays writable: gh auth setup-git puts its helper there
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
