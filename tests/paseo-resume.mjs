@@ -9,6 +9,7 @@ const reply = (text) => line({ type: 'assistant', isSidechain: false, message: {
 // as claude code writes it, then its notice
 const limit = line({ type: 'assistant', isSidechain: false, error: 'rate_limit', isApiErrorMessage: true, message: { model: '<synthetic>', content: [{ type: 'text', text: limitText }] } });
 const notice = line({ type: 'system', subtype: 'informational', content: 'Usage limit reached · continuing automatically at 2:40pm' });
+const taskNotice = line({ type: 'user', isSidechain: false, origin: { kind: 'task-notification', producer: 'session-task' }, queueTranscriptOnly: true, message: { role: 'user', content: '<task-notification>Agent failed: usage limit</task-notification>' } });
 const side = (s) => s.replace('"isSidechain":false', '"isSidechain":true');
 const claude = (status, ...lines) => [{ provider: 'claude', status, cwd: '/home/agent/work', persistence: { sessionId: 's' } }, async () => `{"cut":\n${lines.join('\n')}\n`];
 const hit = (agent, read = async () => null) => limitHit(agent, read);
@@ -16,10 +17,15 @@ const hit = (agent, read = async () => null) => limitHit(agent, read);
 assert.equal(await hit({ provider: 'codex', status: 'error', lastError: codex }), codex);
 assert.equal(await hit(...claude('idle', user, limit)), limitText);
 assert.equal(await hit(...claude('idle', user, limit, notice)), limitText);
+assert.equal(await hit(...claude('idle', user, limit, taskNotice, taskNotice)), limitText);
 // once paseo fails the turn (getpaseo/paseo#7636)
 assert.equal(await hit(...claude('error', user, limit)), limitText);
 // already continued, a subagent's limit, or the model only saying it
 assert.equal(await hit(...claude('idle', limit, user)), null);
+assert.equal(await hit(...claude('idle', limit, taskNotice, user)), null);
+assert.equal(await hit(...claude('idle', user, reply('Done'), taskNotice)), null);
+// a notification delivered as a new turn still supersedes the old limit
+assert.equal(await hit(...claude('idle', limit, taskNotice.replace('"queueTranscriptOnly":true', '"queueTranscriptOnly":false'))), null);
 assert.equal(await hit(...claude('idle', user, side(limit))), null);
 assert.equal(await hit(...claude('idle', user, reply(limitText))), null);
 // a turn still going, archived, waiting on a permission, no transcript, another error

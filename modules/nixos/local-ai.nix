@@ -268,7 +268,10 @@ _: {
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
-        wantedBy = [ "paseo.service" ];
+        wantedBy = [
+          "multi-user.target"
+          "paseo.service"
+        ];
         after = [ "paseo.service" ];
         bindsTo = [ "paseo.service" ];
         environment.HOME = "/home/agent";

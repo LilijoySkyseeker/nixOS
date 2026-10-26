@@ -28,6 +28,8 @@ export function claudeLimit(jsonl) {
       continue; // the cut first line, or a partial write
     }
     if ((e.type !== 'user' && e.type !== 'assistant') || e.isSidechain) continue;
+    // background completions can be appended after a limit without starting a turn
+    if (e.type === 'user' && e.origin?.kind === 'task-notification' && e.queueTranscriptOnly) continue;
     const synthetic = e.type === 'assistant' && e.isApiErrorMessage && e.error === 'rate_limit';
     return synthetic ? (e.message?.content?.[0]?.text ?? 'rate_limit') : null;
   }
