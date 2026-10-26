@@ -29,7 +29,7 @@ In order of how bad losing it would be:
 |---|---|
 | The internet | vps: WireGuard 51820/udp, and DNAT to homelab over wg0 for Minecraft (25565/tcp, 19132/udp), Hytale (5520/udp) and the website (80, 443 to a sandboxed Caddy). Per-source-IP hashlimits on vps are the only control in front of them, and they rate-limit, not authenticate. |
 | The internet, IPv6 | homelab's LAN NIC has a public IPv6 with nothing open on it. Docker's IPv6 and userland-proxy are off, which keeps the docker-published game ports off it. |
-| The LAN | homelab's docker-published game ports. Everything else is scoped to `tailscale0` or `wg0`. |
+| The LAN | nothing on homelab: services are scoped to `tailscale0` or `wg0`, and `myDockerPublishGuard` drops LAN traffic to the docker-published game ports. |
 | The tailnet | nearly everything: the ACL (`docs/tailscale-acl.json`) is flat, homelab advertises the LAN route and an exit node, and vps trusts `tailscale0` outright. |
 | GitHub | every host pulls `master` over HTTPS and deploys it (B1). |
 
