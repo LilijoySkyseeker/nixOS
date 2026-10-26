@@ -123,9 +123,6 @@ let
     { system.extraDependencies = [ newKernelSystem.toplevel ]; }
   ];
 
-  # outside the node: `pkgs.path` in a node's imports recurses
-  autoFormatRootDevice = pkgs.path + "/nixos/tests/common/auto-format-root-device.nix";
-
   oldKernel = targetSystem.config.boot.kernelPackages.kernel.version;
   newKernel = newKernelSystem.config.boot.kernelPackages.kernel.version;
 
@@ -146,7 +143,6 @@ pkgs.testers.runNixOSTest {
     {
       imports = [
         commonConfig
-        autoFormatRootDevice
         diskoModule
       ];
       # own root on the small vdb so the target disk is vda in both boots

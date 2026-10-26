@@ -56,13 +56,6 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        assertions = [
-          {
-            assertion = config.boot.initrd.systemd.enable;
-            message = "myHibernate needs boot.initrd.systemd.enable: the import ordering below only exists in the systemd initrd";
-          }
-        ];
-
         boot.resumeDevice = cfg.resumeDevice;
 
         # drops the `nohibernate` zfs.nix adds; safe only with the ordering below
