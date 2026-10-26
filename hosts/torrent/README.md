@@ -35,8 +35,8 @@ tailnet-only (`openFirewall = false` plus a `tailscale0` firewall rule),
 `zrepl stdinserver homelab`. Don't add unrestricted root keys here without
 reconsidering that posture.
 
-The impermanence migration has not happened on this host yet, and unlike
-thinkpad it has no `@blank` snapshots to preserve.
+The impermanence migration has not happened on this host yet, and it has
+no `@blank` snapshots to preserve.
 
 ## Agent user
 

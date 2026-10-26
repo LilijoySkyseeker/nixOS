@@ -335,9 +335,11 @@ Two things worth knowing before touching anything nearby:
   deeper than the old syncoid names (`.../torrent/zroot/local/home`, not
   `.../torrent/home`). `myHealthAlerts.backupStaleness` keys off these.
 - zrepl destroys any snapshot it did not create unless a `regex` keep rule
-  matches it. `myZrepl.protectRegexes` (default `^blank$`) is what keeps
-  the impermanence rollback snapshots alive. See `docs/backups.md`'s
-  Gotchas before changing any retention rule.
+  matches it. `myZrepl.protectRegexes` (default `^blank$`) is that rule.
+  No replicated source dataset has an impermanence `@blank` today, but an
+  impermanent dataset joining replication would lose its rollback point
+  without it. See `docs/backups.md`'s Gotchas before changing any
+  retention rule.
 
 ## Updates & deploy
 

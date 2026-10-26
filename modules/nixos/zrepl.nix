@@ -1,8 +1,7 @@
 _: {
-  # zrepl: snapshotting, local replication and both ends of remote replication
-  # pull is the default: a push client can DestroySnapshots on its own backup
-  # subtree, so a compromised source could wipe its history; push only where
-  # a puller would miss the host (e.g. a laptop online in short windows)
+  # zrepl: snapshotting, local replication and pull-based remote replication
+  # pull, never push: a push client can DestroySnapshots on its own backup
+  # subtree, so a compromised source could wipe its history
   flake.modules.nixos."zrepl" =
     {
       config,
@@ -20,65 +19,16 @@ _: {
       remoteDialTimeout = "60s";
 
       # zrepl spells the two ends asymmetrically: connect "ssh+stdinserver",
-      # serve "stdinserver"; callers use the connect spelling, these map it
+      # serve "stdinserver"
       mkConnect =
         t:
         {
-          "ssh+stdinserver" = {
-            type = "ssh+stdinserver";
-            inherit (t) host user port;
-            identity_file = toString t.identityFile;
-            dial_timeout = remoteDialTimeout;
-          }
-          // lib.optionalAttrs (t.sshOptions != [ ]) { options = t.sshOptions; };
-          "tcp" = {
-            type = "tcp";
-            inherit (t) address;
-            dial_timeout = remoteDialTimeout;
-          };
-          "tls" = {
-            type = "tls";
-            inherit (t) address;
-            ca = toString t.ca;
-            cert = toString t.cert;
-            key = toString t.key;
-            server_cn = t.serverCn;
-            dial_timeout = remoteDialTimeout;
-          };
-          "local" = {
-            type = "local";
-            listener_name = t.listenerName;
-            client_identity = t.clientIdentity;
-          };
+          type = "ssh+stdinserver";
+          inherit (t) host user port;
+          identity_file = toString t.identityFile;
+          dial_timeout = remoteDialTimeout;
         }
-        .${t.type};
-
-      mkServe =
-        s:
-        {
-          "ssh+stdinserver" = {
-            type = "stdinserver";
-            client_identities = lib.attrNames s.clients;
-          };
-          "tcp" = {
-            type = "tcp";
-            inherit (s) listen;
-            clients = lib.mapAttrs (_: c: c.address) s.clients;
-          };
-          "tls" = {
-            type = "tls";
-            inherit (s) listen;
-            ca = toString s.ca;
-            cert = toString s.cert;
-            key = toString s.key;
-            client_cns = lib.attrNames s.clients;
-          };
-          "local" = {
-            type = "local";
-            listener_name = s.listenerName;
-          };
-        }
-        .${s.type};
+        // lib.optionalAttrs (t.sshOptions != [ ]) { options = t.sshOptions; };
 
       # pattern -> bool map; a trailing "<" means the dataset and its children
       mkFilesystems = datasets: lib.genAttrs datasets (_: true);
@@ -111,12 +61,7 @@ _: {
         inherit regex;
       };
 
-      keepProtected = map protectRule (
-        cfg.protectRegexes
-        ++ lib.optional (
-          cfg.preserveLegacySnapshots && cfg.legacySnapshotPrefix != ""
-        ) "^${cfg.legacySnapshotPrefix}"
-      );
+      keepProtected = map protectRule cfg.protectRegexes;
 
       mkPruning = keepSender: keepReceiver: {
         keep_sender = keepSender;
@@ -125,12 +70,12 @@ _: {
 
       # placeholder.encryption is required: zrepl's "unspecified" default
       # fails every receive that creates a placeholder, and configcheck
-      # doesn't catch it
+      # doesn't catch it; "off": the receiving pool (zbackup) is unencrypted
       # security (F-P6-03): the source controls the send stream, so pin props
       # a hostile stream could set (e.g. mountpoint=/etc, canmount=on, shares);
       # -o and -x are exclusive per property, so each is in one list only
       mkRecv = {
-        placeholder.encryption = cfg.placeholderEncryption;
+        placeholder.encryption = "off";
         properties = {
           override = {
             mountpoint = "none";
@@ -150,11 +95,7 @@ _: {
       # ---- job builders, one per role ------------------------------
 
       # every dataset this host owns, however replicated; snap job default
-      ownedDatasets = lib.unique (
-        cfg.serve.datasets
-        ++ cfg.local.datasets
-        ++ lib.concatMap (t: t.datasets) (lib.attrValues cfg.push.targets)
-      );
+      ownedDatasets = lib.unique (cfg.serve.datasets ++ cfg.local.datasets);
 
       snapEnabled = cfg.snap.enable && cfg.snap.datasets != [ ];
 
@@ -176,7 +117,10 @@ _: {
       serveJob = lib.optional cfg.serve.enable {
         type = "source";
         name = "serve";
-        serve = mkServe cfg.serve;
+        serve = {
+          type = "stdinserver";
+          client_identities = lib.attrNames cfg.serve.clients;
+        };
         filesystems = mkFilesystems cfg.serve.datasets;
         snapshotting = ownedSnapshotting;
       };
@@ -185,31 +129,12 @@ _: {
         type = "pull";
         inherit name;
         connect = mkConnect r;
-        # pull jobs don't append the client identity, unlike sink jobs
+        # pull jobs don't append the client identity
         root_fs = r.rootFs;
         inherit (r) interval;
         recv = mkRecv;
         pruning = mkPruning r.keepSender r.keepReceiver;
       }) cfg.pull.remotes;
-
-      # push jobs keep their own snapshotting even with a snap job: push
-      # replicates only after its own snapshots (no interval field)
-      pushJobs = lib.mapAttrsToList (name: t: {
-        type = "push";
-        name = "push-${name}";
-        connect = mkConnect t;
-        filesystems = mkFilesystems t.datasets;
-        snapshotting = mkSnapshotting;
-        pruning = mkPruning t.keepSender t.keepReceiver;
-      }) cfg.push.targets;
-
-      sinkJob = lib.optional cfg.sink.enable {
-        type = "sink";
-        name = "sink";
-        serve = mkServe cfg.sink;
-        root_fs = cfg.sink.rootFs;
-        recv = mkRecv;
-      };
 
       # same-host replication: a source/pull pair joined by a listener name;
       # source+pull, not push+sink, so replication has its own interval
@@ -249,7 +174,7 @@ _: {
             format = "human";
           }
         ];
-        jobs = snapJob ++ serveJob ++ pullJobs ++ pushJobs ++ sinkJob ++ localJobs;
+        jobs = snapJob ++ serveJob ++ pullJobs ++ localJobs;
       };
 
       configFile = yamlFormat.generate "zrepl.yml" settings;
@@ -280,134 +205,10 @@ _: {
           inherit default;
           description = "zrepl keep rules applied to the receiving side's snapshots.";
         };
-
-      # one transport shape for every dialing role
-      connectOptions = {
-        type = lib.mkOption {
-          type = lib.types.enum [
-            "ssh+stdinserver"
-            "tcp"
-            "tls"
-            "local"
-          ];
-          default = cfg.defaultTransport;
-          defaultText = lib.literalExpression "config.myZrepl.defaultTransport";
-          description = "Transport used to dial the peer.";
-        };
-        host = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Peer hostname (ssh+stdinserver).";
-        };
-        user = lib.mkOption {
-          type = lib.types.str;
-          default = "root";
-          description = ''
-            SSH user on the peer (ssh+stdinserver).
-
-            This is root by design, and is not the privilege downgrade it
-            looks like. zrepl's stdinserver socket lives in the daemon's
-            RuntimeDirectory at mode 0700 (upstream's unit) and go-netssh
-            creates it with a bare net.Listen("unix", ...) and no chmod, so
-            under systemd's default umask only the owner can connect to it.
-            A non-root SSH user therefore needs Group/RuntimeDirectoryMode/
-            UMask overrides that also expose zrepl's *control* socket to
-            that group. The forced command in authorized_keys is the real
-            boundary here: the key can run exactly "zrepl stdinserver
-            <identity>" and nothing else, and the identity is fixed
-            server-side rather than asserted by the client.
-          '';
-        };
-        port = lib.mkOption {
-          type = lib.types.port;
-          default = 22;
-          description = "SSH port on the peer (ssh+stdinserver).";
-        };
-        identityFile = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          description = "SSH private key used to dial the peer (ssh+stdinserver), e.g. a sops secret path.";
-        };
-        sshOptions = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [ ];
-          example = [ "Compression=yes" ];
-          description = "Extra -o options passed to ssh (ssh+stdinserver).";
-        };
-        address = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          example = "homelab:8888";
-          description = "host:port of the peer (tcp/tls).";
-        };
-        ca = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          description = "CA certificate validating the peer (tls).";
-        };
-        cert = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          description = "Our client certificate (tls).";
-        };
-        key = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          description = "Private key for our client certificate (tls).";
-        };
-        serverCn = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Common name the peer's certificate must carry (tls).";
-        };
-        listenerName = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Listener name of the in-process peer job (local).";
-        };
-        clientIdentity = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Identity presented to the in-process peer job (local).";
-        };
-      };
     in
     {
       options.myZrepl = {
         enable = lib.mkEnableOption "zrepl-managed ZFS snapshotting and replication";
-
-        defaultTransport = lib.mkOption {
-          type = lib.types.enum [
-            "ssh+stdinserver"
-            "tcp"
-            "tls"
-            "local"
-          ];
-          default = "ssh+stdinserver";
-          description = ''
-            Transport every role defaults to, so a repo-wide change is a
-            one-line edit here rather than a per-host sweep. Individual
-            roles can still override it.
-          '';
-        };
-
-        placeholderEncryption = lib.mkOption {
-          type = lib.types.enum [
-            "off"
-            "inherit"
-          ];
-          default = "off";
-          description = ''
-            What to do with the encryption property when a receiving job
-            creates an intermediate placeholder dataset.
-
-            "off" suits an unencrypted receiving pool (zbackup);
-            "inherit" is for receiving into an encrypted root. There is no
-            third option worth exposing: zrepl's own default of
-            "unspecified" fails every receive that needs a placeholder,
-            and root_fs plus a full source path always needs one.
-          '';
-        };
 
         logLevel = lib.mkOption {
           type = lib.types.enum [
@@ -440,31 +241,13 @@ _: {
             one breaks the boot-time rollback. Since they are the oldest
             snapshot on their dataset (hence "replicated") and carry no
             zrepl prefix, every other keep rule would agree to destroy
-            them. hosts/thinkpad has these on both zroot/local/root and
-            zroot/local/home, which are exactly the datasets it serves.
+            them. No replicated source dataset carries one today
+            (homelab's root@blank is outside zrepl); this guards any that
+            joins replication.
 
             Anchor patterns (^...$) so a prefix match cannot catch more
             than intended.
           '';
-        };
-
-        preserveLegacySnapshots = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = ''
-            Keep pre-zrepl snapshots (see legacySnapshotPrefix) instead of
-            letting the first prune destroy them.
-
-            Turn off once zrepl has built up enough history of its own,
-            then destroy the leftovers by hand -- nothing ages them out
-            while this is on.
-          '';
-        };
-
-        legacySnapshotPrefix = lib.mkOption {
-          type = lib.types.str;
-          default = "autosnap_";
-          description = "Snapshot prefix of the tool zrepl replaced (sanoid's), protected while preserveLegacySnapshots is on.";
         };
 
         snapshot = {
@@ -476,9 +259,7 @@ _: {
               uniform across all hosts -- one cadence to reason about rather
               than a per-host matrix.
 
-              Note this also sets how often push jobs replicate, since an
-              active job replicates after each snapshot. Pull jobs are
-              exempt: they run on their own interval and simply collect
+              Pull jobs run on their own interval and simply collect
               whatever snapshots accumulated, so a source host's cadence
               does not drive network traffic.
             '';
@@ -575,15 +356,14 @@ _: {
 
               When on, the serve and local-source jobs switch to
               `snapshotting: manual` so the datasets aren't snapshotted
-              twice. Push jobs are exempt -- their replication is driven
-              by their snapshotter, so they must keep it.
+              twice.
             '';
           };
 
           datasets = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = ownedDatasets;
-            defaultText = lib.literalExpression "every dataset named by serve.datasets, local.datasets or push.targets.*.datasets";
+            defaultText = lib.literalExpression "every dataset named by serve.datasets or local.datasets";
             description = ''
               Datasets to snapshot and locally prune. Defaults to every
               dataset this host owns, so declaring a dataset for
@@ -608,7 +388,7 @@ _: {
           };
         };
 
-        # ---- passive sender (default topology, source hosts) --------
+        # ---- passive sender (source hosts) --------------------------
         serve = {
           enable = lib.mkEnableOption "passive source role: snapshot locally and serve those snapshots to a puller";
 
@@ -622,27 +402,15 @@ _: {
             description = "Datasets to snapshot and offer to pullers. Append \"<\" to include children.";
           };
 
-          type = lib.mkOption {
-            type = lib.types.enum [
-              "ssh+stdinserver"
-              "tcp"
-              "tls"
-              "local"
-            ];
-            default = cfg.defaultTransport;
-            defaultText = lib.literalExpression "config.myZrepl.defaultTransport";
-            description = "Transport this host listens on.";
-          };
-
           clients = lib.mkOption {
             default = { };
             description = ''
               Pullers allowed to connect, keyed by zrepl client identity.
 
-              For ssh+stdinserver this renders both halves of the wiring
-              from one declaration: the job's client_identities list, and
-              a forced-command entry in root's authorized_keys pinning that
-              key to `zrepl stdinserver <identity>`.
+              Renders both halves of the ssh wiring from one declaration:
+              the job's client_identities list, and a forced-command entry
+              in root's authorized_keys pinning that key to
+              `zrepl stdinserver <identity>`.
             '';
             type = lib.types.attrsOf (
               lib.types.submodule {
@@ -650,59 +418,67 @@ _: {
                   publicKey = lib.mkOption {
                     type = lib.types.str;
                     default = "";
-                    description = "Puller's SSH public key (ssh+stdinserver).";
-                  };
-                  address = lib.mkOption {
-                    type = lib.types.str;
-                    default = "";
-                    description = "Puller's source IP, mapped to this identity (tcp).";
+                    description = "Puller's SSH public key.";
                   };
                 };
               }
             );
           };
-
-          listen = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            example = "100.64.0.1:8888";
-            description = "Address to listen on (tcp/tls). Bind to the tailnet address, not 0.0.0.0.";
-          };
-
-          ca = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "CA certificate validating pullers (tls).";
-          };
-          cert = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "This host's server certificate (tls).";
-          };
-          key = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "Private key for this host's server certificate (tls).";
-          };
-          listenerName = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            description = "Listener name for in-process peers (local).";
-          };
         };
 
-        # ---- active receiver (default topology, backup server) ------
+        # ---- active receiver (backup server) ------------------------
         pull = {
           remotes = lib.mkOption {
             default = { };
             description = ''
               Remotes to pull from, keyed by job name. Each remote gets its
-              own job and its own root_fs, because pull jobs -- unlike sink
-              jobs -- do not append a client identity to root_fs.
+              own job and its own root_fs, because pull jobs do not append
+              a client identity to root_fs.
             '';
             type = lib.types.attrsOf (
               lib.types.submodule {
-                options = connectOptions // {
+                options = {
+                  host = lib.mkOption {
+                    type = lib.types.str;
+                    default = "";
+                    description = "Peer hostname.";
+                  };
+                  user = lib.mkOption {
+                    type = lib.types.str;
+                    default = "root";
+                    description = ''
+                      SSH user on the peer.
+
+                      This is root by design, and is not the privilege downgrade it
+                      looks like. zrepl's stdinserver socket lives in the daemon's
+                      RuntimeDirectory at mode 0700 (upstream's unit) and go-netssh
+                      creates it with a bare net.Listen("unix", ...) and no chmod, so
+                      under systemd's default umask only the owner can connect to it.
+                      A non-root SSH user therefore needs Group/RuntimeDirectoryMode/
+                      UMask overrides that also expose zrepl's *control* socket to
+                      that group. The forced command in authorized_keys is the real
+                      boundary here: the key can run exactly "zrepl stdinserver
+                      <identity>" and nothing else, and the identity is fixed
+                      server-side rather than asserted by the client.
+                    '';
+                  };
+                  port = lib.mkOption {
+                    type = lib.types.port;
+                    default = 22;
+                    description = "SSH port on the peer.";
+                  };
+                  identityFile = lib.mkOption {
+                    type = lib.types.nullOr lib.types.path;
+                    default = null;
+                    description = "SSH private key used to dial the peer, e.g. a sops secret path.";
+                  };
+                  sshOptions = lib.mkOption {
+                    type = lib.types.listOf lib.types.str;
+                    default = [ ];
+                    example = [ "Compression=yes" ];
+                    description = "Extra -o options passed to ssh.";
+                  };
+
                   rootFs = lib.mkOption {
                     type = lib.types.str;
                     example = "zbackup/backup/torrent";
@@ -735,122 +511,9 @@ _: {
           };
         };
 
-        # ---- active sender (opt-in, roaming hosts) ------------------
-        push = {
-          targets = lib.mkOption {
-            default = { };
-            description = ''
-              Sinks to push to, keyed by job name. Opt-in alternative to
-              the pull default, for hosts a puller would struggle to catch
-              online.
-
-              Understand the tradeoff before enabling: an authenticated
-              push client can call DestroySnapshots against its own subtree
-              on the sink, so a compromised host can delete its own backup
-              history. Pull does not have that property.
-            '';
-            type = lib.types.attrsOf (
-              lib.types.submodule {
-                options = connectOptions // {
-                  datasets = lib.mkOption {
-                    type = lib.types.listOf lib.types.str;
-                    default = [ ];
-                    description = "Datasets to snapshot and push. Append \"<\" to include children.";
-                  };
-
-                  keepSender = keepSenderOption (
-                    [
-                      notReplicatedRule
-                      (gridRule cfg.retention.source)
-                    ]
-                    ++ keepProtected
-                  );
-
-                  keepReceiver = keepReceiverOption ([ (gridRule cfg.retention.archive) ] ++ keepProtected);
-                };
-              }
-            );
-          };
-        };
-
-        # ---- passive receiver (only needed for push-mode peers) -----
-        sink = {
-          enable = lib.mkEnableOption "passive sink role: accept pushes from remote hosts";
-
-          rootFs = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            example = "zbackup/backup";
-            description = ''
-              Dataset pushes land under. Sink jobs append the client
-              identity as a single path component, so one sink serves every
-              pusher while confining each to its own subtree.
-            '';
-          };
-
-          type = lib.mkOption {
-            type = lib.types.enum [
-              "ssh+stdinserver"
-              "tcp"
-              "tls"
-              "local"
-            ];
-            default = cfg.defaultTransport;
-            defaultText = lib.literalExpression "config.myZrepl.defaultTransport";
-            description = "Transport this sink listens on.";
-          };
-
-          clients = lib.mkOption {
-            default = { };
-            description = "Pushers allowed to connect, keyed by client identity. Same shape as serve.clients.";
-            type = lib.types.attrsOf (
-              lib.types.submodule {
-                options = {
-                  publicKey = lib.mkOption {
-                    type = lib.types.str;
-                    default = "";
-                    description = "Pusher's SSH public key (ssh+stdinserver).";
-                  };
-                  address = lib.mkOption {
-                    type = lib.types.str;
-                    default = "";
-                    description = "Pusher's source IP, mapped to this identity (tcp).";
-                  };
-                };
-              }
-            );
-          };
-
-          listen = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            description = "Address to listen on (tcp/tls).";
-          };
-          ca = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "CA certificate validating pushers (tls).";
-          };
-          cert = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "This host's server certificate (tls).";
-          };
-          key = lib.mkOption {
-            type = lib.types.nullOr lib.types.path;
-            default = null;
-            description = "Private key for this host's server certificate (tls).";
-          };
-          listenerName = lib.mkOption {
-            type = lib.types.str;
-            default = "";
-            description = "Listener name for in-process peers (local).";
-          };
-        };
-
         # ---- same-host replication ---------------------------------
         local = {
-          enable = lib.mkEnableOption "same-host replication via zrepl's local transport (no ssh/tcp)";
+          enable = lib.mkEnableOption "same-host replication via zrepl's local transport (no ssh)";
 
           datasets = lib.mkOption {
             type = lib.types.listOf lib.types.str;
@@ -908,10 +571,6 @@ _: {
             message = "myZrepl.serve.enable is set but myZrepl.serve.datasets is empty.";
           }
           {
-            assertion = cfg.sink.enable -> cfg.sink.rootFs != "";
-            message = "myZrepl.sink.enable is set but myZrepl.sink.rootFs is empty.";
-          }
-          {
             assertion = cfg.local.enable -> (cfg.local.rootFs != "" && cfg.local.datasets != [ ]);
             message = "myZrepl.local.enable is set but myZrepl.local.rootFs or .datasets is empty.";
           }
@@ -935,45 +594,6 @@ _: {
           after = [ "local-fs.target" ];
         };
 
-        # security (F-P6-04): the puller destroys whatever snapshots it names,
-        # ignoring local keep rules; a non-zrepl hold tag can't be released
-        # over RPC; only ever @blank, holding zrepl_ snapshots pins the pool
-        systemd.services.zrepl-protect-blank = lib.mkIf (cfg.serve.enable && cfg.serve.datasets != [ ]) {
-          description = "Hold @blank on served datasets so a puller cannot destroy it";
-          wantedBy = [ "multi-user.target" ];
-          after = [ "zfs-mount.service" ];
-          path = [ pkgs.zfs ];
-          script = ''
-            set -uo pipefail
-            ${lib.concatMapStringsSep "\n" (dataset: ''
-              snap=${lib.escapeShellArg dataset}@blank
-              if ! zfs list -t snapshot -H -o name "$snap" >/dev/null 2>&1; then
-                # no @blank (not on impermanence, or a test pool): not an error
-                echo "zrepl-protect-blank: $snap does not exist, skipping"
-              elif zfs holds -H "$snap" | cut -f2 | grep -qx protect; then
-                echo "zrepl-protect-blank: $snap already held"
-              else
-                echo "zrepl-protect-blank: holding $snap"
-                zfs hold protect "$snap"
-              fi
-            '') cfg.serve.datasets}
-          '';
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            # no PrivateDevices: needs /dev/zfs
-            NoNewPrivileges = true;
-            ProtectSystem = "strict";
-            ProtectHome = true;
-            ProtectKernelModules = true;
-            ProtectKernelTunables = true;
-            ProtectKernelLogs = true;
-            ProtectControlGroups = true;
-            RestrictNamespaces = true;
-            PrivateTmp = true;
-          };
-        };
-
         # forced-command keys: each key only proxies to its own identity, no
         # shell, no claiming another host
         users.users.root.openssh.authorizedKeys.keys =
@@ -987,8 +607,7 @@ _: {
                 lib.filterAttrs (_: c: c.publicKey != "") role.clients
               );
           in
-          lib.optionals (cfg.serve.enable && cfg.serve.type == "ssh+stdinserver") (keysFor cfg.serve)
-          ++ lib.optionals (cfg.sink.enable && cfg.sink.type == "ssh+stdinserver") (keysFor cfg.sink);
+          lib.optionals cfg.serve.enable (keysFor cfg.serve);
 
         system.extraDependencies = lib.optional cfg.validateConfig configCheck;
       };

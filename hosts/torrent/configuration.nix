@@ -95,7 +95,6 @@
   # delete backup history. the local snap job prunes even if homelab is away
   myZrepl = {
     enable = true;
-    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [

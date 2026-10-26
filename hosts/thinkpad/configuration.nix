@@ -107,7 +107,6 @@
   # history; the local snap job keeps pruning while homelab is unreachable
   myZrepl = {
     enable = true;
-    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [

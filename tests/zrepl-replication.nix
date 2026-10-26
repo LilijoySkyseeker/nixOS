@@ -17,9 +17,6 @@
 #   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
 #     unguarded grid rule would condemn (see docs/backups.md "Gotchas")
 #   * a `snap` job snapshotting on its own, with no puller involved
-#   * `zrepl-protect-blank` making `@blank` genuinely undestroyable on the
-#     source, which `protectRegexes` cannot do -- that is the puller's
-#     pruning policy, and the source endpoint evaluates no keep rules
 #   * the receiver ignoring properties a *hostile sender* puts in the
 #     stream, simulated by poisoning the dataset and editing the source's
 #     own zrepl.yml the way an attacker with root there would
@@ -209,35 +206,6 @@ pkgs.testers.runNixOSTest {
         # protect rule would have destroyed @blank by the assert below.
         sourcehost.succeed("sleep 20")
         sourcehost.succeed("zfs list -t snapshot -o name -H | grep -q 'tank/data@blank'")
-
-    with subtest("zrepl-protect-blank makes @blank undestroyable locally (F-P6-04)"):
-        # protectRegexes above is the puller's *pruning policy*, and a
-        # policy is not a control: Sender.DestroySnapshots evaluates no
-        # keep rules, and a source job has no Pruning field at all, so a
-        # compromised or merely misconfigured puller can destroy @blank
-        # here. A foreign `zfs hold` is the backstop, because zrepl only
-        # recognises and releases its own zrepl_STEP_/zrepl_last_received_
-        # tags and cannot release this one over any RPC.
-        #
-        # restart, not start: the unit is wantedBy multi-user.target and
-        # already ran once at boot, before the pool existed, where it
-        # correctly skipped and exited 0.
-        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
-        holds = sourcehost.succeed("zfs holds -H tank/data@blank")
-        assert "protect" in holds, f"@blank should carry a foreign hold: {holds!r}"
-
-        # The point of the hold: destroy now fails. This is the same call
-        # the puller's endpoint makes, so if it fails locally it fails
-        # over RPC too.
-        sourcehost.fail("zfs destroy tank/data@blank")
-
-        # Must be idempotent -- it runs on every boot and an existing hold
-        # would otherwise make `zfs hold` error and fail the unit.
-        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
-        status = sourcehost.succeed(
-            "systemctl show zrepl-protect-blank.service -p ExecMainStatus --value"
-        ).strip()
-        assert status == "0", f"second run should succeed, got {status}"
 
     with subtest("the receiver ignores properties a hostile sender sends (F-P6-03)"):
         # The sender alone decides whether properties travel, so a source

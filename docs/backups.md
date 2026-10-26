@@ -40,13 +40,11 @@ than hand-written YAML:
 | `myZrepl.serve` | `source` | torrent, thinkpad — passive, answers pulls |
 | `myZrepl.pull.remotes.<name>` | `pull` | homelab — one job per remote |
 | `myZrepl.local` | `source` + `pull` pair | homelab — same-host replication |
-| `myZrepl.push.targets.<name>` | `push` | nobody currently; per-host opt-in |
-| `myZrepl.sink` | `sink` | nobody currently; only needed to receive pushes |
 
-Transport is pluggable (`myZrepl.defaultTransport`, currently
-`ssh+stdinserver`; `tcp`, `tls`, and `local` are also wired). Retention is
-three shared presets under `myZrepl.retention`, so changing a window
-changes every host at once.
+Remote roles use the `ssh+stdinserver` transport, homelab's own
+replication zrepl's in-process `local` one. Retention is three shared
+presets under `myZrepl.retention`, so changing a window changes every host
+at once.
 
 ## Why pull, not push
 
@@ -61,9 +59,9 @@ Net effect: a compromised torrent could delete its own backup history.
 Under pull, homelab dials out, the sources only answer, and retention
 authority stays on homelab.
 
-Use `myZrepl.push` only where pull genuinely loses coverage — a machine
-whose online windows a 15m puller would miss. It has a real cost beyond the
-above; see "push is welded to its snapshotter" below.
+So the module has no `push` or `sink` role. A machine whose online
+windows a 15m puller would miss is the case that would bring them back, at
+the cost above plus "push is welded to its snapshotter" below.
 
 ## Retention
 
@@ -183,23 +181,20 @@ These each cost real investigation; none are obvious from the config.
   rule keeps what it matches and only lists non-matches for destruction, so
   one matching rule is enough to hold a snapshot forever. Defaults to
   `^blank$` — the impermanence rollback point created once by disko's
-  `postCreateHook`, which cannot be regenerated without reinstalling.
-  thinkpad has one on both `zroot/local/root` and `zroot/local/home`, which
-  are exactly the datasets it serves. `myZrepl.preserveLegacySnapshots`
-  adds `^autosnap_` for the sanoid changeover; turn it off and clear the
-  leftovers by hand once zrepl has its own history, since nothing ages them
-  out while it is on.
+  `postCreateHook`, which cannot be regenerated without reinstalling. No
+  replicated source dataset has one today (homelab's `zroot/local/root@blank`
+  is outside zrepl); the rule is what would keep one alive if an
+  impermanent dataset joined replication.
 - **Push replication is welded to its snapshotter.**
   `modePush.RunPeriodic` is just `snapper.Run`
   (`internal/daemon/job/active.go`) and `PushJob` has no `interval` field,
   so setting a push job to `snapshotting: manual` leaves it replicating
   only on `zrepl signal wakeup`. This is why homelab's local replication is
-  a `source`+`pull` pair rather than `push`+`sink`, and why push jobs keep
-  their own snapshotting while `serve`/`local-source` are set to manual.
-- **`pull` does not append a client identity; `sink` does.**
+  a `source`+`pull` pair rather than `push`+`sink`: the snap job owns
+  snapshotting and `local-source` is set to manual.
+- **`pull` does not append a client identity** (a `sink` would).
   `PullJob.GetAppendClientIdentity()` returns false, so each pull job needs
-  its own explicit `root_fs`. A single sink, by contrast, serves many
-  clients and confines each to `root_fs/<identity>`.
+  its own explicit `root_fs`.
 - **A `snap` job has no replication cursor**, so `not_replicated` is inert
   there — zrepl substitutes `alwaysUpToDateReplicationCursorHistory`
   (`internal/daemon/job/snapjob.go`). The local ceiling can therefore
@@ -229,8 +224,8 @@ These each cost real investigation; none are obvious from the config.
   below cannot catch this — it only appears on a real receive. Valid
   values are `inherit` and `off`
   (`placeholdercreationencryptionproperty_enumer.go`);
-  `myZrepl.placeholderEncryption` defaults to `off` because `zbackup` is
-  not encrypted. This is covered by the `zrepl-replication` VM test.
+  the module sets `off` because `zbackup` is not encrypted. This is
+  covered by the `zrepl-replication` VM test.
 - **The config is validated at build time.** zrepl parses with
   `UnmarshalStrict`, so a stray or misspelled key is a hard startup
   failure. `myZrepl.validateConfig` (default on) runs `zrepl configcheck`

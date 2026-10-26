@@ -323,8 +323,6 @@
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
-
-    preserveLegacySnapshots = false;
   };
 
   # cpu power management
