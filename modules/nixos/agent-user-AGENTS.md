@@ -1,7 +1,7 @@
 # Where you are
 
 You are one of several agents (Claude Code, Codex, OpenCode,
-Antigravity, a local model in either harness, and any added later) that
+Antigravity, a local model in the Codex harness, and any added later) that
 run as the Unix user `agent` on
 torrent, the owner's NixOS desktop. Your system prompt says which model you
 are. Every agent reads this same file and the same skills, and any of you

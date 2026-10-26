@@ -51,15 +51,14 @@ restore instructions are in the nixOS repo's
 
 ## A whole agent on a local model
 
-- **Claude Code:** `claude-local -p "<task>"`. It's on PATH and needs no
-  Anthropic login. It tells the model it isn't Claude and sets the context
-  window. It uses `qwen3.8-27b`.
+It runs only in the Codex harness (the owner, 2026-10-25: faster than the
+Claude Code harness, and one option):
+
 - **Codex:** `codex exec -c model_provider=local
   -c 'model_providers.local.name="llama-server"'
   -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"'
   -c 'model_providers.local.wire_api="responses"' -m qwen3.8-27b "<task>"`.
-- **Paseo** (the owner's front end) lists both as "Local in Claude Code" and
-  "Local in Codex".
+- **Paseo** (the owner's front end) lists it as "Local".
 
 The local agent has the same access and tools and may do work like the
 cloud agents. It is not their capability peer: do not use it for reviews,

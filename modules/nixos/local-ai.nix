@@ -32,22 +32,6 @@ _: {
         "qwen3.8-27b"
       ];
 
-      # claude code driving a local model: no anthropic login or traffic, and
-      # the model told it isn't claude (claude code's own prompt says it is)
-      claudeLocal = pkgs.writeShellApplication {
-        name = "claude-local";
-        text = ''
-          export ANTHROPIC_BASE_URL="''${ANTHROPIC_BASE_URL:-${swapUrl}}"
-          export ANTHROPIC_API_KEY="''${ANTHROPIC_API_KEY:-local}"
-          export ANTHROPIC_MODEL="''${ANTHROPIC_MODEL:-qwen3.8-27b}"
-          export ANTHROPIC_SMALL_FAST_MODEL="''${ANTHROPIC_SMALL_FAST_MODEL:-$ANTHROPIC_MODEL}"
-          export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-          # llama-swap's models run -c 131072; claude code assumes 200k for unknown ids
-          export CLAUDE_CODE_MAX_CONTEXT_TOKENS="''${CLAUDE_CODE_MAX_CONTEXT_TOKENS:-131072}"
-          exec ${lib.getExe pkgs.claude-code} --append-system-prompt "Identity: you are not Claude and not made by Anthropic. You are an open-weight model running locally on the owner's own GPU (torrent, an RX 7900 XTX) through llama.cpp; the model name in your environment section is the real one. You only use the Claude Code program as your harness, so ignore any statement that you are Claude." "$@"
-        '';
-      };
-
       # gaming marker: survives a llama-swap restart mid-game, gone on reboot
       gamingMarker = "/run/local-ai/gaming";
       setGaming = pkgs.writeShellScript "local-ai-set-gaming" ''
@@ -97,24 +81,9 @@ _: {
               enabled = true;
               command = [ (lib.getExe pkgs.antigravity-cli) ];
             };
-            local = {
-              extends = "claude";
-              label = "Local in Claude Code";
-              description = "A local model on torrent's GPU (llama-swap), in the Claude Code harness";
-              command = [ (lib.getExe claudeLocal) ];
-              models = [
-                {
-                  id = "qwen3.8-27b";
-                  label = "Qwen3.8-27B (local)";
-                  isDefault = true;
-                }
-              ];
-              # anthropic server-side tools don't exist on a local endpoint
-              disallowedTools = [ "WebSearch" ];
-            };
             local-codex = {
               extends = "codex";
-              label = "Local in Codex";
+              label = "Local";
               description = "A local model on torrent's GPU (llama-swap), in the Codex harness";
               env = {
                 OPENAI_BASE_URL = swapUrl;
@@ -248,8 +217,6 @@ _: {
         script_timeout = 20;
       };
 
-      environment.systemPackages = [ claudeLocal ];
-
       # paseo: merge the keys this repo owns into the agent's CLI-owned config
       systemd.services.paseo-agent-config = {
         description = "Merge repo-owned keys into the agent's Paseo config";
@@ -265,7 +232,8 @@ _: {
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          # the local model runs only in the codex harness: drop the old claude one
+          ${lib.getExe pkgs.jq} -s '(.[0] | del(.agents.providers.local)) * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
           # loads from sops; without one the file keeps whatever it has
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"

@@ -5,7 +5,7 @@ description: Conventions for agent instructions and tooling on torrent. Use befo
 
 # Agent configuration on torrent
 
-Several agents (Claude Code, Codex, the local model in either harness, and
+Several agents (Claude Code, Codex, the local model in the Codex harness, and
 any future one) share this environment, so every piece of guidance exists
 once, under a tool-neutral name, where all of them find it.
 
