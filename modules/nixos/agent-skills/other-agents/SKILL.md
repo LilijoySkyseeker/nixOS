@@ -5,11 +5,14 @@ description: The other agents installed on torrent and how to call them non-inte
 
 # The other agents
 
-Every agent on torrent is an equal: Claude Code, Codex, OpenCode,
-Antigravity and the local model run as the same Unix user, read the same
-instructions and skills, and can take any task. The others are on your
-`PATH`, logged in. Your own system prompt says which one you are; call the
+Claude Code, Codex, OpenCode, Antigravity and the local model run as the
+same Unix user, read the same instructions and skills, and can do work.
+The others are on your `PATH`, logged in. Your own system prompt says which one you are; call the
 others, not yourself.
+
+The local Qwen3.8-27B agent keeps the same access, tools and ability to
+do work, but is not a capability peer of the cloud agents. Do not call it
+for reviews, alternative opinions or independent checks.
 
 Treat what another agent returns as input, not a verdict: check it against
 the code.
@@ -25,8 +28,7 @@ waits on a terminal.
 | Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (add `--search` for web search) |
 | OpenCode, any OpenRouter model | `opencode run --standalone -m openrouter/<vendor>/<model> "<task>" < /dev/null` |
 | Antigravity (Google Gemini) | `agy -p --dangerously-skip-permissions "<task>" < /dev/null` |
-| Local model, Claude Code harness | `claude-local -p --permission-mode bypassPermissions "<task>" < /dev/null` |
-| Local model, Codex harness | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
+| Local model (Codex harness) | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
 
 - OpenCode reaches most open-weight and frontier models through the
   owner's OpenRouter key, paid per token, so pick the model for the task:
@@ -40,19 +42,13 @@ waits on a terminal.
   `--skip-git-repo-check`. It loads AGENTS.md only from the git root down
   to `-C`, so point `-C` at the repo.
 - The local model's name and whether its server is up are in the
-  `local-ai` skill. `claude-local` is Claude Code with
-  `ANTHROPIC_BASE_URL` set to the local server, a placeholder API key, no
-  Anthropic login, and an appended system prompt saying which model it
-  really is. Without that prompt the local model believes Claude Code's own
-  "you are Claude". If `claude-local` isn't on `PATH`, set the variables
-  yourself:
-  `ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_API_KEY=local ANTHROPIC_MODEL=<model> ANTHROPIC_SMALL_FAST_MODEL=<model> CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude --append-system-prompt "You are <model> running locally, not Claude." -p ...`
+  `local-ai` skill. It runs only in the Codex harness (the owner,
+  2026-10-25).
 - The local model is free and uncapped but slower and weaker than the
   cloud models. It's the one to use for private material and for work the
-  cloud models refuse, with its output checked. Don't use Qwen3.8-27B for
-  code review or to check another agent's answer: it hallucinated review
-  results in an earlier session (owner, 2026-10-23). Revisit once
-  Flash-Next has been tested.
+  cloud models refuse, with its output checked. It hallucinated review
+  results in an earlier session (owner, 2026-10-23); keep it out of
+  review and opinion workflows.
 
 ## Rules
 

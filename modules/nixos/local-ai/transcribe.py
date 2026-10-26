@@ -1,17 +1,19 @@
 """transcribe: speech-to-text on torrent, with who said what.
 
-English with speakers by default (Nemotron ASR); any language, or no speakers,
-with Whisper large-v3-turbo.
+Whisper large-v3-turbo recognizes the speech in every mode, and a second
+pass re-transcribes the stretches where it looped.
 Speaker labels come from Nemotron diarization, which works on any language.
 """
 
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import wave
 
 AUDIO = os.environ["LOCAL_AI_AUDIO"]
 VRAM_DEV = os.environ["VRAM_DEV"]
@@ -43,36 +45,18 @@ def stamp(seconds):
     return f"[{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}]"
 
 
-def diarize(work, backend, log, for_nemotron):
+def diarize(work, backend, log):
     args = ["--task", "diar", "--family", "nemotron_3_diar", "--mode", "streaming",
             "--model", f"{AUDIO}/nemotron-3-diarization-bf16.gguf", "--audio", f"{work}/in.wav",
             "--turns-out", f"{work}/diar.json", "--out-dir", f"{work}/diar"]
-    if for_nemotron:
-        # the profile and frame probabilities nemotron asr reads to split speakers
-        args += ["--session-option", "nemotron_3_diar.latency_profile=asr_la13",
-                 "--request-option", "return_frame_probabilities=true"]
     return audiocpp(backend, log, *args)
 
 
-def english(work, backend, log):
-    # nemotron asr splits the audio by the diarizer's speakers itself
-    if not diarize(work, backend, log, True):
-        return None
-    if not audiocpp(backend, log, "--task", "asr", "--family", "nemotron_asr",
-                    "--model", f"{AUDIO}/nemotron-3.5-asr-streaming-0.6b-q8_0.gguf",
-                    "--audio", f"{work}/in.wav", "--out-dir", f"{work}/asr",
-                    "--request-option", f"speaker_probabilities={work}/diar/speaker_probabilities.safetensors",
-                    "--turns-out", f"{work}/turns.json"):
-        return None
-    turns = json.load(open(f"{work}/turns.json"))
-    return [f"{stamp(t['start_sample'] / RATE)} {t['speaker_id']}: {t.get('text', '').strip()}" for t in turns]
-
-
-def whisper(work, backend, log, speakers, lang):
+def recognize(wav, out, backend, log, speakers, lang, extra=()):
     cmd = ["whisper-cli", "-m", f"{AUDIO}/ggml-large-v3-turbo-q8_0.bin", "-l", lang,
-           "-t", str(os.cpu_count()), "-np", "-oj", "-of", f"{work}/w", "-f", f"{work}/in.wav",
+           "-t", str(os.cpu_count()), "-np", "-oj", "-of", out, "-f", wav,
            # skip music and silence, where whisper otherwise invents text
-           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin"]
+           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin", *extra]
     if speakers:
         # one segment per word, so each word goes to the speaker talking then
         cmd += ["-ml", "1", "-sow"]
@@ -80,14 +64,81 @@ def whisper(work, backend, log, speakers, lang):
         cmd.append("-ng")
     if not run(cmd, log):
         return None
-    out = json.load(open(f"{work}/w.json"))
-    print(f"transcribe: language {out.get('result', {}).get('language', '?')}", file=sys.stderr)
+    res = json.load(open(f"{out}.json"))
     # word segments carry their own leading space (none in chinese or japanese)
     segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"])
-            for s in out["transcription"] if s["text"].strip()]
+            for s in res["transcription"] if s["text"].strip()]
+    return segs, res.get("result", {}).get("language", "?")
+
+
+def looping(segs):
+    """Indices of the segments where whisper repeats itself: a run of 6 words
+    that comes back 3 or more times within 60 words."""
+    words = [(re.sub(r"\W", "", w.lower()), i) for i, (_, _, t) in enumerate(segs) for w in t.split()]
+    words = [(w, i) for w, i in words if w]
+    grams = [tuple(w for w, _ in words[k:k + 6]) for k in range(len(words) - 5)]
+    hit = set()
+    for k, gram in enumerate(grams):
+        at = [j for j in range(k, min(k + 60, len(grams))) if grams[j] == gram]
+        if len(at) >= 3:
+            hit.update(i for j in at for _, i in words[j:j + 6])
+    return sorted(hit)
+
+
+def repair(work, segs, backend, log, speakers, lang):
+    """Re-transcribe each looping stretch without carried-over context (-mc 0).
+    That setting ends most loops but drops more words on clean speech, so it
+    runs only where the first pass looped (sweep, 2026-10-25)."""
+    hit = looping(segs)
+    # stretches of looping segments, merged when under 30 s apart
+    spans = []
+    for i in hit:
+        if spans and segs[i][0] - segs[spans[-1][1]][1] < 30:
+            spans[-1][1] = i
+        else:
+            spans.append([i, i])
+    fixed = 0
+    for first, last in reversed(spans):
+        # from the end of the segment before to the start of the one after
+        a = segs[first - 1][1] if first else 0.0
+        b = segs[last + 1][0] if last + 1 < len(segs) else segs[last][1]
+        clip = f"{work}/clip.wav"
+        with wave.open(f"{work}/in.wav") as src, wave.open(clip, "wb") as dst:
+            dst.setparams(src.getparams())
+            src.setpos(int(a * RATE))
+            dst.writeframes(src.readframes(int((b - a) * RATE)))
+        got = recognize(clip, f"{work}/clip", backend, log, speakers, lang, ["-mc", "0"])
+        if got is None:
+            continue
+        new = [(x + a, y + a, t) for x, y, t in got[0]]
+        # keep the second pass only if it loops less than the first
+        if len(looping(new)) < len(looping(segs[first:last + 1])):
+            segs[first:last + 1] = new
+            fixed += 1
+    if spans:
+        print(f"transcribe: {len(spans)} looping stretches, {fixed} re-transcribed", file=sys.stderr)
+    if fixed:
+        # so the exported w.json matches the transcript
+        out = json.load(open(f"{work}/w.json"))
+        ts = lambda t: f"{int(t) // 3600:02d}:{int(t) % 3600 // 60:02d}:{t % 60:06.3f}".replace(".", ",")
+        out["transcription"] = [{"timestamps": {"from": ts(x), "to": ts(y)},
+                                 "offsets": {"from": round(x * 1000), "to": round(y * 1000)}, "text": t}
+                                for x, y, t in segs]
+        json.dump(out, open(f"{work}/w.json", "w"), ensure_ascii=False, indent=2)
+    return segs
+
+
+def whisper(work, backend, log, speakers, lang):
+    got = recognize(f"{work}/in.wav", f"{work}/w", backend, log, speakers, lang)
+    if got is None:
+        return None
+    segs, detected = got
+    print(f"transcribe: language {detected}", file=sys.stderr)
+    # the repair clips keep the file's language rather than detecting their own
+    segs = repair(work, segs, backend, log, speakers, detected if lang == "auto" else lang)
     if not speakers:
         return [f"{stamp(a)} {t.strip()}" for a, _, t in segs]
-    if not diarize(work, backend, log, False):
+    if not diarize(work, backend, log):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
              for t in json.load(open(f"{work}/diar.json"))]
@@ -116,13 +167,13 @@ def main():
     p = argparse.ArgumentParser(
         prog="transcribe",
         description="Speech-to-text on torrent, with who said what. English by default "
-        "(Nemotron); any language with -l (Whisper large-v3-turbo, about 99 languages). "
+        "(Whisper large-v3-turbo); any language with -l. "
         "Any audio or video file ffmpeg reads.")
     p.add_argument("file")
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
     p.add_argument("--no-speakers", action="store_true", help="skip speaker labels")
     p.add_argument("--cpu", action="store_true", help="force the CPU (speaker labels then run at about 1/3 real time)")
-    p.add_argument("-o", "--out", help="also write transcript.txt (and turns.json) to this directory")
+    p.add_argument("-o", "--out", help="also write transcript.txt, whisper's w.json and the speaker turns (diar.json) to this directory")
     a = p.parse_args()
     if not os.access(a.file, os.R_OK):
         sys.exit(f"transcribe: can't read {a.file}")
@@ -138,12 +189,8 @@ def main():
             backend = "vulkan" if ok else "cpu"
             if not ok:
                 print(f"transcribe: {why}, using the CPU (slower)", file=sys.stderr)
-        # nemotron asr only where it adds something: english with speaker labels;
-        # whisper does the rest, punctuated
-        if a.lang or a.no_speakers:
-            go = lambda b: whisper(work, b, log, not a.no_speakers, a.lang or "en")
-        else:
-            go = lambda b: english(work, b, log)
+        # assign speakers after recognition, so diarization does not gate speech
+        go = lambda b: whisper(work, b, log, not a.no_speakers, a.lang or "en")
         lines = go(backend)
         if lines is None and backend == "vulkan":
             print("transcribe: the GPU run failed, retrying on the CPU", file=sys.stderr)
@@ -155,7 +202,7 @@ def main():
         if a.out:
             os.makedirs(a.out, exist_ok=True)
             open(f"{a.out}/transcript.txt", "w").write(text)
-            for f in ("turns.json", "diar.json", "w.json"):
+            for f in ("diar.json", "w.json"):
                 if os.path.exists(f"{work}/{f}"):
                     shutil.copy(f"{work}/{f}", a.out)
     finally:

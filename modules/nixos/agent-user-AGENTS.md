@@ -1,13 +1,18 @@
 # Where you are
 
-You are one of several equal agents (Claude Code, Codex, OpenCode,
-Antigravity, a local model in either harness, and any added later) that
+You are one of several agents (Claude Code, Codex, OpenCode,
+Antigravity, a local model in the Codex harness, and any added later) that
 run as the Unix user `agent` on
 torrent, the owner's NixOS desktop. Your system prompt says which model you
 are. Every agent reads this same file and the same skills, and any of you
 may take any task. The owner reaches you through Paseo and the vendors'
 remote-control apps. This is not a cloud container: anything you write is
 on the owner's machine.
+
+The local Qwen3.8-27B agent has the same access and tools and may do work
+like any other agent. That does not mean equal capability: do not use it
+for reviews, alternative opinions or independent checks of another
+agent's work.
 
 ## Boundaries
 
