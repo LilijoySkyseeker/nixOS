@@ -10,25 +10,20 @@ place on purpose. Each entry names what the exposure actually is, why it
 is accepted, what would change the answer, and where the evidence lives.
 
 **What does not.** Work that is merely *deferred* (that is a handoff note in `docs/plans/`),
-a decision nobody has made yet (that is
-[`audits/2026-08-26/user-actions.md`](audits/2026-08-26/user-actions.md)
-§4), or a rule everyone should follow (that is
-[`hardening.md`](hardening.md)).
+a decision nobody has made yet (§2 below), or a rule everyone should
+follow (that is [`hardening.md`](hardening.md)).
+
+**Evidence ids** (`C1`, `H5`, `F-P8-02`, …) point into the 2026-08-26
+audit, removed from the tree on 2026-10-25:
+`git show 0aa27a5:docs/audits/2026-08-26/findings.md`.
 
 **Not accepted, ever:** a finding that's hard to fix only because agents
-run as `lilijoy`. That is a same-uid problem the agent-separation work is
-meant to remove: the agent's own Unix user, plus the "your place"
-hardening, both in `~/Projects/agenticsandbox`. Leave such a finding
+run as `lilijoy`. That is a same-uid problem the agents' own Unix user
+(`modules/nixos/agent-user.nix`) exists to remove. Leave such a finding
 **open** (in the PR description or a handoff note) with a dated note
-naming which of those fixes it.
+naming the fix.
 Don't record it here, and don't offer "accept" as the recommended option.
-(User, 2026-10-05; first applied to OpenRig F1/F3/F6/F7 in
-`2026-10-05-package-openrig-and-add-it-to-the-pc-profile.md#D4`.)
-
-**Scaffolded 2026-08-27**, during the 2026-08-26 audit's Phase 4. §1 is
-complete as far as it can be. **§2 is not acceptance** — it is the list
-of risks that cannot move into §1 until decisions D1–D14 are answered,
-recorded here so the shape of the finished document is visible.
+(User, 2026-10-05.)
 
 ---
 
@@ -36,7 +31,7 @@ recorded here so the shape of the finished document is visible.
 
 ### AR-1 — The configuration repository is public
 
-**Sits on:** [threat model](threat-model.md) §4.7 ·
+**Sits on:** [threat model](threat-model.md) B7 ·
 **Evidence:** `findings.md` C1, `F-P8-02`
 
 Every `.nix` file, every firewall rule, every service topology and every
@@ -60,7 +55,7 @@ exposure only; it retracts nothing already published.
 
 ### AR-2 — homelab holds root on vps, by design
 
-**Sits on:** [threat model](threat-model.md) §4.2 ·
+**Sits on:** [threat model](threat-model.md) B2 ·
 **Evidence:** `findings.md` H5, `F-P0-02`, `F-P2-10`, `F-P8-13`
 
 homelab push-deploys vps through the `vps-deploy` account. The forced
@@ -88,7 +83,7 @@ are only compared as strings. Neither ever chooses what homelab builds.
 
 ### AR-3 — zrepl's daemon and its SSH transport both run as root
 
-**Sits on:** [threat model](threat-model.md) §4.5 ·
+**Sits on:** [threat model](threat-model.md) B5 ·
 **Evidence:** [`backups.md`](backups.md); `hardening.md` "Dedicated
 service users"
 
@@ -109,7 +104,7 @@ supporting an unprivileged transport. Already the standing example in
 
 ### AR-4 — An interactive shell path executes code the flake lock does not cover
 
-**Sits on:** [threat model](threat-model.md) §4.7 ·
+**Sits on:** [threat model](threat-model.md) B7 ·
 **Evidence:** `findings-tail.md` §2, `F-P8-17`
 
 On the desktops, bash's `command_not_found_handle` runs `comma "$@"` (as
@@ -128,7 +123,7 @@ problem in `flake-update-test`, and it is *not* accepted.
 
 ### AR-5 — There is no CI, and that is the safer posture
 
-**Sits on:** [threat model](threat-model.md) §4.1 ·
+**Sits on:** [threat model](threat-model.md) B1 ·
 **Evidence:** `findings-tail.md` L-05, `F-P7-17`
 
 Confirmed by a full-history scan across every branch: no workflow file
@@ -160,36 +155,9 @@ and holds no credential, so the posture the acceptance protects is intact.
 2026-10-06: `plan-gate.yml` removed with the plan-file system; the repo has
 no workflow file again.
 
-### AR-6 — ~~The NFS shares are `nosuid,nodev` but not `noexec`~~
-
-**Superseded 2026-09-03 — no longer accepted, fixed instead.** The user
-decided D12 toward the fix, not acceptance: `noexec` is now in
-`modules/nixos/nfs-homelab-mounts.nix`'s shared `mountOpts`, closing the
-last execution path from a homelab-controlled filesystem onto both
-laptops. Build-verified on `thinkpad`/`torrent`. See
-`2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md`. Original
-acceptance text kept below for history.
-
-**Sits on:** [threat model](threat-model.md) §4.5 ·
-**Evidence:** `F-P6-05`; applied in `516ef31`
-
-Both laptop mounts of `/home/lilijoy/storage{,-bulk}` carry `nosuid` and
-`nodev`. `noexec` was considered and declined.
-
-**Why accepted (superseded, see above):** a media share will eventually
-have something legitimate run off it, and a `noexec` that gets removed
-under pressure is worse than one never set. A scan found nothing that is
-a program there today, so the risk accepted is small and the reasoning
-is about the future, not the present.
-
-**What would change the answer:** ~~D12. If the answer is "nothing will
-ever be run from those shares", `noexec` is one word and closes the last
-execution path from a homelab-controlled filesystem onto both
-laptops.~~ **Answered — see superseded note above.**
-
 ### AR-7 — The game servers auto-update their mods, and the mod set decides the game version
 
-**Sits on:** [threat model](threat-model.md) §4.7, adversary A6 ·
+**Sits on:** [threat model](threat-model.md) B6, and B1 for the supply chain ·
 **Evidence:** `findings.md` H3, `F-P4-03`, `F-P4-13` · **Decides D14**
 
 Sixteen third-party Modrinth projects are resolved **by slug at every
@@ -249,56 +217,9 @@ ceilings.
 
 ---
 
-### AR-8 — ~~The recovery ISO serves the whole filesystem, unauthenticated~~
-
-**Superseded 2026-10-06 — the recovery ISO was removed from the repo.**
-Recreate it from git history for a reinstall; this entry applies again if it returns.
-
-**Sits on:** [threat model](threat-model.md) §8, open question 6 ·
-**Evidence:** `findings.md` H6, `F-P4-01`, `F-P5-10` · **Decides D8**
-
-copyparty's rendered config on the isoimage has an empty `[accounts]`
-block with `A: *` on volume `/` — copyparty 1.20.20 expands `A` to
-`rgwmda.`: anonymous read, write, move, delete, and admin over the
-**entire filesystem**, on a host-wide port 3923, with the module's own
-sandbox nullified by `BindPaths=["/var/lib/copyparty", "/"]`. Only Unix
-DAC limits it. The ISO separately bakes in `vars.publicSshKeys` as root's
-`authorizedKeys` — these are SSH *public* keys, already plaintext
-elsewhere in this public repo, so this is not a credential leak; it is
-how the admin SSHes into the booted rescue environment as root. The
-distinct, LOW-rated issue here (`F-P5-10`/`L-03`) is the built ISO
-*artefact* sitting unverified in a user-writable `~/Downloads` with no
-checksum — since the flake is public and pinned, a swapped or
-attacker-built ISO with a matching filename would go undetected. That is
-an integrity/tampering concern, not a confidentiality one, and is tracked
-separately (a `.sha256` written alongside the build, verified before
-boot) rather than folded into this acceptance.
-
-**Why accepted:** confirmed by the user 2026-09-03 — the ISO is not
-meant to be secure, it is meant to make recovery of these hosts, or a
-third party's system it's booted on, as easy as possible. Unimpeded
-read/write access to a broken box's entire filesystem, with no
-credential to look up or type, is the point, not an oversight. This
-also covers using the media to help recover machines outside this
-fleet, where no pre-shared credential could exist in the first place.
-
-**What is being accepted, stated plainly:** anyone who boots this ISO on
-any network — not just the machine it's meant to rescue — gets
-unauthenticated full filesystem read/write/delete on the booted host. The
-ISO's physical and network handling (don't leave it plugged into an
-untrusted network, don't leave the built image sitting in a user-writable
-directory longer than needed) is the actual control, not anything in
-`copyparty-iso.nix`.
-
-**What would change the answer:** if the ISO's role changed from
-"disaster recovery, plugged in deliberately" to something routinely
-network-attached or handed to someone else unsupervised, this trade
-would need revisiting — that scenario is out of scope for what this
-image is for today.
-
 ### AR-9 — homelab runs immich 2.x, which is EOL and marked insecure
 
-**Sits on:** [threat model](threat-model.md) §4.4 ·
+**Sits on:** [threat model](threat-model.md) B4 ·
 **Evidence:** CVE-2026-59258, CVE-2026-82272 ·
 **Decided:** 2026-09-24, by the user, during the routine flake update
 (2026-09-24-routine-flake-update-2026-09-24-and-the-journald-extraconfig-removal.md#D1)
@@ -357,33 +278,13 @@ fix.
 ## 2. Not yet acceptable — blocked on a decision
 
 **These are not accepted.** Each is a risk whose acceptance is a real
-option, but which nobody has chosen yet. They live in
-[`audits/2026-08-26/user-actions.md`](audits/2026-08-26/user-actions.md)
-§4 as decisions D1–D14; when one is decided *toward acceptance*, it
-moves up into §1 with its reasoning, and when it is decided toward a fix
-it leaves this file entirely.
+option that nobody has chosen yet. Decided toward acceptance, it moves
+up into §1 as the next free AR number; decided toward a fix, it leaves
+this file. The answered decisions (D1, D3, D7–D14) are in git history.
 
 | # | If accepted, what is being accepted | Bears on |
 |---|---|---|
-| ~~D1~~ | **Answered — not accepted, and fixed.** All ten credentials from `F-P8-02` were rotated (rotation-runbook.md, closed 2026-09-01); the old exposed values no longer authenticate to anything. | C1, `F-P8-02` |
-| D2 | That `origin/master` is unsigned and unattended fleet root | H1 |
-| ~~D3~~ | **Answered 2026-08-27.** `master` had no protection and no rulesets at all; a ruleset now blocks force pushes and deletions with no bypass actors. Signed commits deliberately not enabled yet — that is D2. | H1, AR-5 |
-| D4 | That no backup copy is out of reach of a single root | C3 |
-| D5 | That torrent has no FDE. **thinkpad fixed:** LUKS2 with TPM2 + PIN, Secure Boot, and its swap inside the LUKS container (it never did hibernate before: ZFS adds `nohibernate`). | H7 |
-| D6 | That any tailnet device reaches nearly everything | ACL cluster |
-| ~~D7~~ | **Dropped 2026-10-06.** homelab isn't public; its public surface is being cut to a Minecraft port forward. | H8 |
-| ~~D8~~ | **Moot 2026-10-06.** The recovery ISO was removed (AR-8). | H6 |
-| ~~D9~~ | **Answered 2026-08-27 — nothing accepted, all three fixed.** KDE Connect scoped to `tailscale0`; Steam remote play and avahi/mDNS removed outright. | `F-P1-04`, `F-P5-06` |
-| ~~D10~~ | **Answered 2026-08-27 — nothing accepted.** The ports were Steam Remote Play's (`programs.steam.remotePlay.openFirewall`), and closed along with D9. | wave 2 §2.9 |
-| ~~D11~~ | **Moot 2026-10-06.** `flake-update-test` was deleted; inputs change only through a PR the user merges, and the `master` ruleset requires one. | `F-P7-10` |
-| ~~D12~~ | **Answered 2026-09-03 — not accepted, and fixed.** `noexec` added to `nfs-homelab-mounts.nix`, closing the last execution path from a homelab-controlled filesystem onto both laptops. AR-6 marked superseded. | `F-P6-05` |
-| ~~D13~~ | **Answered 2026-08-27 — not accepted, and fixed.** The user never reaches the game servers from the LAN, so `myDockerPublishGuard` now allows only wg0 and tailscale0 (wave 2 item 2.1, VM-tested). | `F-P4-02`, `F-P3-04` |
-| ~~D14~~ | **Answered 2026-08-27 — accepted, see AR-7.** Auto-update is kept deliberately; the game version now follows the mod set instead of leading it. | `F-P4-03`, `F-P4-13` |
-
-~~Two of these have a written home waiting for them: **D2** must land in
-this file as an explicit accepted risk if accepted (`findings.md` §5),
-and **D8** needs a written justification either way — "plausibly
-deliberate for recovery media" is not one, and threat model §8.6 asked
-for it directly.~~ **D8 done, 2026-09-03** — see AR-8 above. **D2** is
-still open; note its accepted-risk slot (if accepted) is not AR-7 —
-that's D14's — it would be the next free number.
+| D2 | That `master` is unsigned, unattended root on every host | B1 |
+| D4 | That no backup copy is out of reach of root on homelab: its B2 key can change the bucket's lifecycle rules, and torrent's and thinkpad's homes have no offsite copy | B5 |
+| D5 | That torrent has no full-disk encryption (thinkpad has LUKS2 with TPM2 + PIN and Secure Boot) | §1 asset 5 |
+| D6 | That any tailnet device reaches nearly everything | B4 |

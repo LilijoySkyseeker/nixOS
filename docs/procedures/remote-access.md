@@ -79,8 +79,7 @@ generally use it directly:
   not privilege, and **homelab → root on vps is by design**
   (`F-P0-02`). Treat the two hosts as one blast radius. See
   `hosts/vps/configuration.nix`'s comment, and
-  [`docs/audits/2026-08-26/findings.md`](../audits/2026-08-26/findings.md)
-  H5.
+  [threat model](../threat-model.md) B2.
 - It can never get an interactive shell, regardless of what shell is
   configured for it — the SSH key itself can't request anything other
   than the forced command.

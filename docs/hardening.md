@@ -6,18 +6,12 @@ https://xeiaso.net/blog/paranoid-nixos-2021-07-18/.
 
 ## Standing rules
 
-Eleven rules harvested from the 2026-08-26 fleet audit
-([`docs/audits/2026-08-26/`](audits/2026-08-26/)). They are the classes
-of mistake that audit found **more than once** — mostly *because* this
-document did not say them. They are deliberately short and imperative;
-the analysis, the `file:line` evidence and the severity reasoning stay
-in the audit and are linked rather than restated, so this file stays
-readable. Where a rule and its evidence ever disagree, the evidence
-wins — fix the rule here.
-
-Numbering matches [`findings.md`](audits/2026-08-26/findings.md) §4.
-Its rule 10 (`AllowTcpForwarding` defaults to `yes`) is not repeated
-here; it is already applied in the SSH bullet below.
+Rules harvested from the 2026-08-26 fleet audit: the classes of mistake
+it found more than once. Evidence ids (`C1`, `H3`, `F-P4-02`, …) point
+into that audit, removed from the tree on 2026-10-25:
+`git show 0aa27a5:docs/audits/2026-08-26/findings.md` (§4 has the
+rules' numbering; its rule 10, `AllowTcpForwarding`, is applied in the
+SSH bullet below). Where a rule and its evidence disagree, fix the rule.
 
 ### Secrets
 
@@ -55,8 +49,7 @@ here; it is already applied in the SSH bullet below.
    about the network ("we are behind CGNAT", "this NIC is LAN-only") is
    a rule that will silently become wrong: homelab's LAN NIC already
    carries a globally-routable RA-delegated IPv6 address, which is what
-   started this audit. (`findings.md` H4;
-   [threat model](threat-model.md) §2.1, §7.1)
+   started this audit. (`findings.md` H4)
 
 ### Privilege
 
@@ -94,7 +87,7 @@ here; it is already applied in the SSH bullet below.
    `zrepl configcheck`) or with
    `nix eval .#nixosConfigurations.<host>.config....` — not by reading
    the file you just wrote. This is why `PermitRootLogin` sat inert in
-   `extraConfig` on two hosts. ([threat model](threat-model.md) §7.2, `F-P3-18`)
+   `extraConfig` on two hosts. (`F-P3-18`)
 
 ### OCI containers
 
@@ -277,9 +270,6 @@ here; it is already applied in the SSH bullet below.
   lilijoy's tools then execute, so lilijoy only reads, edits and drops
   files there. Git's ownership check refuses agent-owned repos for
   lilijoy, so never add a `safe.directory` for that path.
-  (`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2`,
-  `#F9`; the design record lives outside the repo, in
-  `~/Projects/agenticsandbox/`.)
 - **`local-ai` on torrent (`modules/nixos/local-ai.nix`).** Every service
   listens on loopback only, and the agent can reach all of them.
   - **`llama-swap`:** a DynamicUser with the module's hardening, plus a
