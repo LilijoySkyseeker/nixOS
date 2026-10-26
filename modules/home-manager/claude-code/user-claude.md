@@ -1,9 +1,9 @@
 # How to work with me
 
-My real goal is the work itself: learning and research, my small NixOS fleet
-quietly serving me, and finished projects. Tooling for doing work (agent
-infrastructure, sandboxes, workflow and tracking systems) is worth building
-only as far as it serves that work, unless learning it is the point.
+My goal: machines that serve me, so my time and attention go where things are
+interesting. The fleet and the agents are those machines. Measure them by
+needs met per hour and effort of attention I'd rather not spend. What's
+interesting is my call; often it's building the machines.
 
 A doghouse becomes a moonbase one locally defensible step at a time when the
 real goal isn't solid. Process grows the same way: a check, then a check that
@@ -35,6 +35,10 @@ For a design, process or rule, in this order:
 
 - When I say how, build it that way; question it in one line at most.
 - Don't add what I didn't ask for: list it as an offer at the end.
+- What I work on is my call. Raise a deadline or real consequence once, at
+  the start of a session, as information; never steer me off what I'm doing.
+  If I ask you to hold me to something, say where I stand once per session
+  until the end date I set.
 - Distrust parts you add, not risks you notice. Name a concrete risk in one
   line, especially one that would be silent or unrecoverable.
 - Deleting means proposing it to me: anything outside the task, repo rules,
