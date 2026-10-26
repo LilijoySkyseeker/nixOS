@@ -39,7 +39,27 @@ A wall `web-fetch` can't pass goes in `~/work/ENVIRONMENT.md` (date, agent,
 URL, the error per tier, what you did instead). Known hard walls:
 archive.today (429s), some Cloudflare "interactive" challenges
 (FastPeopleSearch detail pages, Planet Minecraft, Fimfiction). The Wayback
-Machine (`web.archive.org/web/<ts>id_/<url>`) is often the fallback.
+Machine (`web.archive.org/web/<ts>id_/<url>`) is often the fallback; its
+availability API (`archive.org/wayback/available`) 429s, so ask for
+snapshot URLs directly.
+
+Routes that work where the obvious one doesn't:
+
+- **Reddit:** thread pages and `.json` are walled; append `.rss?limit=500`
+  to the thread URL (`web-fetch --feed`, or `-o FILE` for the whole Atom).
+  Images come from `i.redd.it/<id>.jpeg`.
+- **Search engines:** Google search and Lens 429 or CAPTCHA from torrent's
+  IP, and DuckDuckGo's HTML endpoint challenges. Google News RSS
+  (`news.google.com/rss/search?q=...`) and Bing through plain curl work.
+- **YouTube:** every client gets "Sign in to confirm you're not a bot",
+  so captions and audio can't be fetched. Ask the owner for the file and
+  transcribe it locally (the `local-ai` skill).
+- **PubMed:** pages want cookies; use the E-utilities API
+  (`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi`).
+- **PDFs:** WebFetch returns them as binary; save them with
+  `web-fetch -o` and run `pdftotext`.
+- **Tailscale:** the security bulletins page loads only its first entries;
+  read `tailscale.com/changelog`.
 
 ## GitHub
 
