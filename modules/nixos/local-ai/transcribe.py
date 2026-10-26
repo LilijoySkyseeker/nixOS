@@ -117,6 +117,14 @@ def repair(work, segs, backend, log, speakers, lang):
             fixed += 1
     if spans:
         print(f"transcribe: {len(spans)} looping stretches, {fixed} re-transcribed", file=sys.stderr)
+    if fixed:
+        # so the exported w.json matches the transcript
+        out = json.load(open(f"{work}/w.json"))
+        ts = lambda t: f"{int(t) // 3600:02d}:{int(t) % 3600 // 60:02d}:{t % 60:06.3f}".replace(".", ",")
+        out["transcription"] = [{"timestamps": {"from": ts(x), "to": ts(y)},
+                                 "offsets": {"from": round(x * 1000), "to": round(y * 1000)}, "text": t}
+                                for x, y, t in segs]
+        json.dump(out, open(f"{work}/w.json", "w"), ensure_ascii=False, indent=2)
     return segs
 
 
@@ -126,7 +134,8 @@ def whisper(work, backend, log, speakers, lang):
         return None
     segs, detected = got
     print(f"transcribe: language {detected}", file=sys.stderr)
-    segs = repair(work, segs, backend, log, speakers, lang)
+    # the repair clips keep the file's language rather than detecting their own
+    segs = repair(work, segs, backend, log, speakers, detected if lang == "auto" else lang)
     if not speakers:
         return [f"{stamp(a)} {t.strip()}" for a, _, t in segs]
     if not diarize(work, backend, log):
@@ -164,7 +173,7 @@ def main():
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
     p.add_argument("--no-speakers", action="store_true", help="skip speaker labels")
     p.add_argument("--cpu", action="store_true", help="force the CPU (speaker labels then run at about 1/3 real time)")
-    p.add_argument("-o", "--out", help="also write transcript.txt (and turns.json) to this directory")
+    p.add_argument("-o", "--out", help="also write transcript.txt, whisper's w.json and the speaker turns (diar.json) to this directory")
     a = p.parse_args()
     if not os.access(a.file, os.R_OK):
         sys.exit(f"transcribe: can't read {a.file}")
@@ -193,7 +202,7 @@ def main():
         if a.out:
             os.makedirs(a.out, exist_ok=True)
             open(f"{a.out}/transcript.txt", "w").write(text)
-            for f in ("turns.json", "diar.json", "w.json"):
+            for f in ("diar.json", "w.json"):
                 if os.path.exists(f"{work}/{f}"):
                     shutil.copy(f"{work}/{f}", a.out)
     finally:
