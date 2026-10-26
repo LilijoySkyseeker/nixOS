@@ -45,6 +45,8 @@ pkgs.testers.runNixOSTest {
       paseoRoot = builtins.head (
         pkgs.lib.splitString "/bin/paseo" nodes.machine.systemd.services.paseo.serviceConfig.ExecStart
       );
+      resumeExec = nodes.machine.systemd.services.paseo-resume.serviceConfig.ExecStart;
+      resumeScript = builtins.elemAt (pkgs.lib.splitString " " resumeExec) 1;
     in
     ''
       machine.wait_for_unit("multi-user.target")
@@ -163,5 +165,15 @@ pkgs.testers.runNixOSTest {
 
       with subtest("paseo defaults bypass permissions and preserve explicit modes"):
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-permissions.mjs} ${paseoRoot}")
+
+      with subtest("paseo-resume: decides on recorded limit messages, polls the daemon as agent"):
+          machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
+          machine.wait_for_unit("paseo-resume.service")
+          prop = lambda p: machine.succeed(f"systemctl show paseo-resume -p {p} --value").strip()
+          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("ProtectHome", "read-only")]:
+              assert prop(p) == want, f"paseo-resume {p}={prop(p)!r}"
+          # one poll in the unit's own sandbox, with its local credential
+          machine.succeed("systemd-run --wait --pipe --quiet -p User=agent -p ProtectSystem=strict -p ProtectHome=read-only "
+                          "-p ReadWritePaths=/home/agent/.paseo -E HOME=/home/agent -- ${resumeExec} --once")
     '';
 }

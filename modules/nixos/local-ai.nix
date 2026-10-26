@@ -264,6 +264,31 @@ _: {
         };
       };
 
+      # sends "continue" to an agent stopped on a usage limit once its quota is back
+      # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
+      systemd.services.paseo-resume = {
+        description = "Resume Paseo agents after their usage limit resets";
+        wantedBy = [ "paseo.service" ];
+        after = [ "paseo.service" ];
+        bindsTo = [ "paseo.service" ];
+        environment.HOME = "/home/agent";
+        serviceConfig = {
+          ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
+          Restart = "always";
+          RestartSec = 30;
+          User = "agent";
+          Group = "agent";
+          Slice = "agent.slice";
+          # the daemon's local credential and the cli's client id
+          ProtectSystem = "strict";
+          ProtectHome = "read-only";
+          ReadWritePaths = [ "/home/agent/.paseo" ];
+          PrivateTmp = true;
+          PrivateDevices = true;
+          NoNewPrivileges = true;
+        };
+      };
+
       # tailnet-only https in front of paseo; tailscaled (root) proxies to loopback,
       # which the agent's egress rules never see. never funnel
       systemd.services.paseo-tailscale-serve = {
