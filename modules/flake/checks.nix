@@ -14,6 +14,11 @@
         zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
       };
 
+      health-alerts = import ../../tests/health-alerts.nix {
+        pkgs = config.flake.pkgsUnstable;
+        healthAlertsModule = config.flake.modules.nixos."health-alerts";
+      };
+
       zfs-dataset-properties = import ../../tests/zfs-dataset-properties.nix {
         pkgs = config.flake.pkgsUnstable;
         zfsDatasetPropertiesModule = config.flake.modules.nixos."zfs-dataset-properties";

@@ -87,6 +87,13 @@ let
         ;;
     esac
 
+    # homelab's heartbeat: vps alerts when it stops (myHealthAlerts below)
+    case "$cmd" in
+      "heartbeat")
+        exec ${pkgs.coreutils}/bin/touch /var/lib/heartbeat/homelab
+        ;;
+    esac
+
     # myPushDeploy's "what does vps run, and what is installed" checks --
     # exact match, no wildcard, since these have no store path to bound
     case "$cmd" in
@@ -228,6 +235,13 @@ in
       "/var/log"
       "/var/lib/nixos" # avoids uid/gid complaints on reboot
       "/var/lib/tailscale" # node identity/state; authKeyFile is single-use
+      {
+        # homelab's heartbeat marker, written by vps-deploy's dispatcher
+        directory = "/var/lib/heartbeat";
+        user = "vps-deploy";
+        group = "vps-deploy";
+        mode = "0755";
+      }
     ];
     files = [
       "/etc/machine-id"
@@ -428,6 +442,9 @@ in
     checkSmart = false;
     # deploy staleness is homelab's: it pushes this host and watches
     # /var/lib/push-deploy/deployed-vps
+    # homelab checks in every 5m (heartbeat-vps there); silence means
+    # homelab, its network or the house is down
+    staleMarkerFiles."/var/lib/heartbeat/homelab" = 1;
   };
 
   # this box has no real block devices for smartd to monitor
