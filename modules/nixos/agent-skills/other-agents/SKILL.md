@@ -25,9 +25,9 @@ waits on a terminal.
 | Agent | Non-interactive command |
 |---|---|
 | Claude (Anthropic) | `claude -p --permission-mode bypassPermissions "<task>" < /dev/null` |
-| Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (add `--search` for web search) |
+| Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (for web search, `codex --search exec ...`: it's a top-level flag) |
 | OpenCode, any OpenRouter model | `opencode run --standalone -m openrouter/<vendor>/<model> "<task>" < /dev/null` |
-| Antigravity (Google Gemini) | `agy -p --dangerously-skip-permissions "<task>" < /dev/null` |
+| Antigravity (Google Gemini) | `agy --dangerously-skip-permissions -p "<task>" < /dev/null` (`-p` takes the next word as the prompt) |
 | Local model (Codex harness) | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
 
 - OpenCode reaches most open-weight and frontier models through the
@@ -37,7 +37,13 @@ waits on a terminal.
   may train on what you send. `--standalone` uses a private server
   instead of OpenCode's background service.
 - Antigravity runs Gemini on a free Google account set aside for the
-  agents, which has weekly limits; `agy models` lists what it gets.
+  agents, which has weekly limits; `agy models` lists what it gets. It
+  isn't logged in yet (2026-10-26): it stops at "You are not logged into
+  Antigravity", so use Codex or OpenCode for another family until then.
+- Codex on the owner's Plus plan can run out partway through a long
+  review ("You've hit your usage limit ... try again at <time>") and still
+  exit 0. Check the output for "usage limit" before trusting a Codex
+  result.
 - Codex refuses a directory that isn't a git repo unless you pass
   `--skip-git-repo-check`. It loads AGENTS.md only from the git root down
   to `-C`, so point `-C` at the repo.
