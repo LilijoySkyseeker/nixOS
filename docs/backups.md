@@ -6,9 +6,11 @@ offsite restic path see the last section; for deployment status see
 `docs/plans/` (`in-progress/` for what's still being verified).
 
 Which of these paths a given dataset gets is a per-dataset decision, made
-via the `myDatasets` registry (`modules/nixos/datasets.nix`) and its four
-tiers -- see
-[`docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md`](adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md).
+via the `myDatasets` registry (`modules/nixos/datasets.nix`). Its design is
+being reworked by
+[`docs/adr/0002-fleet-data-classes.md`](adr/0002-fleet-data-classes.md),
+which supersedes ADR-0001's four tiers; this document describes what's
+deployed now.
 restic's dataset list below is the union of the pre-registry hardcoded
 list and a recursive walk of every `offsite`-tier root the registry
 declares. Existing services stay on the hardcoded list; only new
