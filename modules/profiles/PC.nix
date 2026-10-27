@@ -3,6 +3,7 @@ let
   nixosModules = config.flake.modules.nixos;
   homeManagerModules = config.flake.modules.homeManager;
   vars = config.flake.vars;
+  inherit (config.flake) theme;
 in
 {
   flake.modules.nixos."profile-pc" =
@@ -165,6 +166,8 @@ in
         stylix.targets.firefox.profileNames = [ "default" ];
         # qtct set QT_STYLE_OVERRIDE=kvantum, which broke Plasma 6.7 QML (black desktop); Plasma themes Qt itself.
         stylix.targets.qt.enable = false;
+        # the prompt takes its palette from flake.theme, the same on the servers
+        stylix.targets.starship.enable = false;
       };
 
       # service for yubikey
@@ -204,7 +207,7 @@ in
         enable = true;
         autoEnable = true;
         # source path, not a package: the scheme itself needs no eval-time build
-        base16Scheme = "${inputs.stylix.inputs.tinted-schemes}/base16/gruvbox-dark-soft.yaml";
+        base16Scheme = theme.scheme;
         image = ../../files/gruvbox-dark-rainbow.png;
         polarity = "dark";
         cursor.package = pkgs-unstable.capitaine-cursors-themed;
