@@ -17,6 +17,9 @@ CLAUDE.md                                @LilijoySkyseeker
 .agents/                                 @LilijoySkyseeker
 .claude/                                 @LilijoySkyseeker
 .codex/                                  @LilijoySkyseeker
+.opencode/                               @LilijoySkyseeker
+opencode.json                            @LilijoySkyseeker
+opencode.jsonc                           @LilijoySkyseeker
 /agents/                                 @LilijoySkyseeker
 /modules/nixos/agent-user.nix            @LilijoySkyseeker
 /modules/nixos/agent-user-AGENTS.md      @LilijoySkyseeker
@@ -56,6 +59,12 @@ CLAUDE.md                                @LilijoySkyseeker
 /modules/nixos/nfs-homelab-mounts.nix    @LilijoySkyseeker
 /modules/services/nfs.nix                @LilijoySkyseeker
 /hosts/*/disko.nix                       @LilijoySkyseeker
+/hosts/homelab/configuration.nix         @LilijoySkyseeker
+/hosts/torrent/configuration.nix         @LilijoySkyseeker
+/hosts/thinkpad/configuration.nix        @LilijoySkyseeker
+/modules/services/immich.nix             @LilijoySkyseeker
+/modules/services/jellyfin.nix           @LilijoySkyseeker
+/modules/services/beets.nix              @LilijoySkyseeker
 /scripts/restore-drill                   @LilijoySkyseeker
 /docs/procedures/backup-restore.md       @LilijoySkyseeker
 /fleet/data/                             @LilijoySkyseeker
@@ -70,9 +79,11 @@ CLAUDE.md                                @LilijoySkyseeker
 /tailscale/                              @LilijoySkyseeker
 /hosts/vps/                              @LilijoySkyseeker
 /modules/nixos/docker-publish-guard.nix  @LilijoySkyseeker
+/modules/nixos/docker-userns-remap.nix   @LilijoySkyseeker
 /modules/services/website.nix            @LilijoySkyseeker
 /modules/services/octodns.nix            @LilijoySkyseeker
 /modules/services/minecraft.nix          @LilijoySkyseeker
+/modules/services/minecraft-geyser-config/@LilijoySkyseeker
 /modules/services/hytale.nix             @LilijoySkyseeker
 /modules/services/samba.nix              @LilijoySkyseeker
 /modules/services/factorio.nix           @LilijoySkyseeker
@@ -93,6 +104,8 @@ CLAUDE.md                                @LilijoySkyseeker
 /REVIEW.md                               @LilijoySkyseeker
 /flake.nix                               @LilijoySkyseeker
 /modules/flake/checks.nix                @LilijoySkyseeker
+/modules/flake/systems.nix               @LilijoySkyseeker
+/statix.toml                             @LilijoySkyseeker
 /modules/flake/devshell.nix              @LilijoySkyseeker
 /tests/                                  @LilijoySkyseeker
 /.githooks/                              @LilijoySkyseeker

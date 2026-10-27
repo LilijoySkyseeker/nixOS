@@ -14,7 +14,7 @@
 
 ## Consequential
 
-<!-- "yes, because ..." or "no". Yes when it deletes or exposes data, touches secrets, public exposure, the agents' boundary, instructions or skills, or the deploy machinery, or adds a new part (policy C1). -->
+<!-- "yes, because ..." or "no, because ...". Yes when it deletes or exposes data, touches secrets, public exposure, the agents' boundary, instructions or skills, or the deploy machinery, or adds a new part (policy C1). -->
 
 ## What you'd notice
 
