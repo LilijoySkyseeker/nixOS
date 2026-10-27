@@ -257,6 +257,13 @@ pkgs.testers.runNixOSTest {
         # every harness reads the same text, apart from its own section
         with open("${../modules/nixos/agent-user-AGENTS.md}") as f:
             shared = f.read()
+        # the goal leads, copied from the policies, which sit at the path it names
+        with open("${../agents/owner/policies.md}") as f:
+            policies = f.read()
+        goal = policies[policies.index("## Goal\n"):policies.index("\n## ", policies.index("## Goal\n"))].rstrip()
+        installed = machine.succeed(as_agent("cat /home/agent/.config/agents/policies.md"))
+        assert installed == policies, "installed policies differ from agents/owner/policies.md"
+        assert "`~/.config/agents/policies.md`" in md, "CLAUDE.md doesn't point at the policies"
         harnesses = {
             "Claude Code": (".claude/CLAUDE.md", ".claude/skills"),
             "Codex": (".codex/AGENTS.md", ".agents/skills"),
@@ -265,8 +272,11 @@ pkgs.testers.runNixOSTest {
         }
         for name, (instructions, skills) in harnesses.items():
             text = machine.succeed(as_agent(f"cat /home/agent/{instructions}"))
-            assert text.startswith(shared), f"{name}: doesn't start with the shared instructions"
-            assert rule in text, f"{name}: lacks the user's working rule"
+            assert text.startswith("Instructions built from nixOS `"), f"{name}: no revision line"
+            # goal, working rule, orientation, harness lines, in that order
+            parts = [goal, rule, shared, f"## In {name}"]
+            at = [text.find(p) for p in parts]
+            assert -1 not in at and at == sorted(at), f"{name}: layers missing or out of order: {at}"
             for other in harnesses:
                 assert (f"## In {other}" in text) == (other == name), f"{name}: harness section for {other}"
             # the same skills: the user's and the agent-only ones

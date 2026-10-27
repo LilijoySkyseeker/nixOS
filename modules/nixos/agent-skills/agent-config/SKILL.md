@@ -54,7 +54,9 @@ procedures into skills that load only when needed. A rule that must hold
 every time is better as a hook, a setting or a permission than as prose.
 For each line, ask whether an agent would make a mistake without it.
 
-The shared instructions every agent loads are built from
-`modules/nixos/agent-user-AGENTS.md` and the owner's
-`modules/home-manager/claude-code/user-claude.md` ("How to work with me",
-which is the owner's text: don't edit it without being asked).
+The shared instructions every agent loads are built
+(`modules/flake/agent-instructions.nix`) from the Goal section of the
+owner's `agents/owner/policies.md`, the owner's
+`modules/home-manager/claude-code/user-claude.md` ("How to work with me")
+and `modules/nixos/agent-user-AGENTS.md`. The policies and the working rule
+are the owner's text: don't edit them without being asked.

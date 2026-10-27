@@ -1,75 +1,75 @@
 # agent-user: unprivileged `agent` user on torrent for prompt-free agent work
+{ config, ... }:
+let
+  # captured before the inner module's `config` shadows the flake-parts one
+  agentInstructions = config.flake.agentInstructions;
+  inherit (config.flake) agentHarnesses;
+in
 {
+  # every agent harness: where it reads user-level instructions and skills,
+  # and the few lines only it needs; adding or dropping an agent is one entry
+  # here
+  flake.agentHarnesses = {
+    claude = {
+      instructions = ".claude/CLAUDE.md";
+      skills = ".claude/skills";
+      tail = ''
+        ## In Claude Code
+
+        - Your shell's `grep` is ugrep and `find` is bfs; both reject some
+          GNU syntax (see the `torrent-machine` skill).
+      '';
+    };
+    codex = {
+      instructions = ".codex/AGENTS.md";
+      skills = ".agents/skills";
+      tail = ''
+        ## In Codex
+
+        - You load a repo's `AGENTS.md` and `.agents/skills` only when your
+          working directory is inside it: start there (`-C <repo>`), or
+          read them yourself.
+      '';
+    };
+    # also reads ~/.claude/skills and ~/.agents/skills; same-named skills load once
+    opencode = {
+      instructions = ".config/opencode/AGENTS.md";
+      skills = ".config/opencode/skills";
+      tail = ''
+        ## In OpenCode
+
+        - Your models come through the owner's OpenRouter key
+          (`openrouter/<vendor>/<model>`, paid per token) or are OpenCode's own free
+          `opencode/*` models, some of which may train on what you send:
+          keep private material off those.
+      '';
+    };
+    antigravity = {
+      instructions = ".gemini/AGENTS.md";
+      skills = ".gemini/config/skills";
+      tail = ''
+        ## In Antigravity
+
+        - You run on a free Google account set aside for the agents, which
+          has weekly limits; a long task can use up the week's quota.
+      '';
+    };
+  };
+
   flake.modules.nixos."agent-user" =
     { lib, pkgs, ... }:
     let
       bot = "LilijoySkyseeker-agent";
-      # every agent harness: where it reads user-level instructions and
-      # skills, and the few lines only it needs; adding or dropping an agent
-      # is one entry here
-      harnesses = {
-        claude = {
-          instructions = ".claude/CLAUDE.md";
-          skills = ".claude/skills";
-          tail = ''
-            ## In Claude Code
-
-            - Your shell's `grep` is ugrep and `find` is bfs; both reject some
-              GNU syntax (see the `torrent-machine` skill).
-          '';
-        };
-        codex = {
-          instructions = ".codex/AGENTS.md";
-          skills = ".agents/skills";
-          tail = ''
-            ## In Codex
-
-            - You load a repo's `AGENTS.md` and `.agents/skills` only when your
-              working directory is inside it: start there (`-C <repo>`), or
-              read them yourself.
-          '';
-        };
-        # also reads ~/.claude/skills and ~/.agents/skills; same-named skills load once
-        opencode = {
-          instructions = ".config/opencode/AGENTS.md";
-          skills = ".config/opencode/skills";
-          tail = ''
-            ## In OpenCode
-
-            - Your models come through the owner's OpenRouter key
-              (`openrouter/<vendor>/<model>`, paid per token) or are OpenCode's own free
-              `opencode/*` models, some of which may train on what you send:
-              keep private material off those.
-          '';
-        };
-        antigravity = {
-          instructions = ".gemini/AGENTS.md";
-          skills = ".gemini/config/skills";
-          tail = ''
-            ## In Antigravity
-
-            - You run on a free Google account set aside for the agents, which
-              has weekly limits; a long task can use up the week's quota.
-          '';
-        };
-      };
-      # orientation, the harness's lines, then the user's working rule (the
-      # same file as their own user-level CLAUDE.md, so there's no copy to
-      # drift)
-      instructionsFor =
-        name: harness:
-        pkgs.writeText "agent-${name}-AGENTS.md" (
-          builtins.readFile ./agent-user-AGENTS.md
-          + "\n"
-          + harness.tail
-          + "\n"
-          + builtins.readFile ../home-manager/claude-code/user-claude.md
-        );
+      harnesses = agentHarnesses;
+      # the goal, the user's working rule (the same file as their own
+      # user-level instructions, so there's no copy to drift), the
+      # orientation, then the harness's lines
+      instructionsFor = agentInstructions.forHarness pkgs;
       # the user's skills (their own sessions link the same directory) and
       # the ones only about this sandbox
       skillDirs = [
-        ../home-manager/claude-code/skills
-        ./agent-skills
+        agentInstructions.ownerSkills
+        agentInstructions.sandboxSkills
       ];
       # web-fetch: pages and feeds past bot walls (curl, curl-impersonate,
       # then real Chromium through nodriver in a virtual display)
@@ -620,6 +620,10 @@
           "d /home/agent/.config/openrouter 0700 agent agent -"
           "d /home/agent/.gemini 0700 agent agent -"
           "d /home/agent/.gemini/config 0700 agent agent -"
+          # the owner's full policies, read where decisions are made; the
+          # instruction files point here
+          "d /home/agent/.config/agents 0755 agent agent -"
+          "L+ /home/agent/${agentInstructions.policiesPath} - - - - ${agentInstructions.policies}"
         ]
         # each harness's instructions and skill links
         ++ lib.concatLists (

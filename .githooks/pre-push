@@ -32,7 +32,7 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
-  if ! files="$(git -c core.quotePath=false diff --name-only "$range" -- hosts/ modules/ files/ flake.nix flake.lock)"; then
+  if ! files="$(git -c core.quotePath=false diff --name-only "$range" -- hosts/ modules/ files/ agents/ flake.nix flake.lock)"; then
     echo "BLOCKED: cannot diff $range; refusing to decide the build set from a failed diff." >&2
     exit 1
   fi
@@ -42,7 +42,7 @@ done
 changed_files="$(echo "$changed_files" | sed '/^$/d' | sort -u)"
 [[ -z "$changed_files" ]] && exit 0
 
-# anything outside hosts/ (modules/, files/, flake.*) affects every host
+# anything outside hosts/ (modules/, files/, agents/, flake.*) affects every host
 hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
 global=0
 if echo "$changed_files" | grep -qv '^hosts/'; then global=1; fi

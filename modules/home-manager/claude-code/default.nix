@@ -1,4 +1,9 @@
-_: {
+{ config, ... }:
+let
+  # captured before the inner module's `config` shadows the flake-parts one
+  agentInstructions = config.flake.agentInstructions;
+in
+{
   # the CLI writes ~/.claude/settings.json itself (/model, /effort), so no store
   # symlink: managed keys are merged into the mutable file on activation
   # package comes from profile-pc's systemPackages
@@ -117,6 +122,10 @@ _: {
 
       claudeDir = "${config.home.homeDirectory}/.claude";
 
+      # the goal, then the user's working rule; the agent user gets the same
+      # layers ahead of its own
+      instructions = agentInstructions.forOwner pkgs-unstable;
+
       # keys this repo owns in settings.json; anything absent stays CLI-owned
       managedSettings = {
         statusLine = {
@@ -149,11 +158,13 @@ _: {
       home = {
         file = {
           ".claude/statusline.sh".source = "${statusline}/bin/claude-statusline";
-          # user-level instructions, loaded in every project; read-only by design,
-          # the agent user gets the same file appended to its own
-          ".claude/CLAUDE.md".source = ./user-claude.md;
+          # user-level instructions, loaded in every project; read-only by design
+          ".claude/CLAUDE.md".source = instructions;
           # the same file for codex
-          ".codex/AGENTS.md".source = ./user-claude.md;
+          ".codex/AGENTS.md".source = instructions;
+          # the full policies, read where decisions are made; the instructions
+          # point here
+          ${agentInstructions.policiesPath}.source = agentInstructions.policies;
         }
         # every skill under ./skills, for claude and for codex (~/.agents/skills);
         # the agent user links the same directory

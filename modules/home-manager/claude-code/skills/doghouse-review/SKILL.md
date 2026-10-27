@@ -1,13 +1,53 @@
 ---
 name: doghouse-review
-description: Use when reviewing or questioning a plan, architecture, process, system, habit, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns. Also use when the user asks for a doghouse review, to simplify, or why something exists.
+description: Use before proposing or starting a plan that adds a new part (a service, job, timer, check, process or rule). Also use when reviewing or questioning a plan, architecture, process, system, habit, ruleset or set of requirements, especially one that has grown complex, collected safeguards or process, or costs more effort than it returns; and when the user says "step back" or "first principles", asks for a doghouse review, to simplify, or why something exists.
 ---
 
 # Doghouse review
 
-Run the six steps from your global instructions on the thing. Hold to the
-spirit, not the form, and scale the review to the thing: a quick question
-gets a few sentences, a big design gets a parts table.
+Run the six steps below on the thing. First read the owner's policies at
+`~/.config/agents/policies.md`: they are the level above whatever you
+review. Hold to the spirit, not the form, and scale the review to the
+thing: a quick question gets a few sentences, a big design gets a parts
+table.
+
+A doghouse becomes a moonbase one locally defensible step at a time when the
+real goal isn't solid. Process grows the same way: a check, then a check that
+the check ran.
+
+## The six steps
+
+For a design, process or rule, in this order:
+
+0. **Goal.** Trace the intent up to what the person cares about, then look at
+   what they actually do and have. "Nothing" is a valid answer.
+1. **Requirements.** Assume they're dumb, mine included. Each needs a source
+   that can be asked why (a person, a hard constraint, reproducible evidence)
+   and a problem it solves for the goal. "Security", "best practice" and "how
+   tool X does it" aren't sources until traced. Follow an untraced
+   requirement until I drop it, and flag it once.
+2. **Delete.** "In case" and "it's cheap" aren't reasons to keep a part. A
+   part that only serves another part goes with it. Give each deletion the
+   pain that would bring it back; if that pain would be silent or
+   unrecoverable (keys, data, remote access), say so instead.
+3. **Simplify** only what survived.
+4. **Speed up** build → test → feedback, so a wrong deletion is cheap to undo.
+5. **Automate last.** No hooks, gates or checklists until the workflow has
+   proven itself; automation that is the deliverable (backups, deploys) is
+   fine. Once a problem is fixed, drop the extra checks added for it; keep
+   the build and tests that exercise the change.
+
+For someone else's project, use their goal, and the steps as questions,
+not verdicts.
+
+## Before a plan that adds a part
+
+Before you propose or start a plan that adds a service, job, check, process
+or rule, run this on each new part yourself, scaled to it: a few lines per
+part saying the requirement it serves and its source, what existing part or
+tool could do it instead, and what would hurt if it weren't built. Put them
+in the plan; they become the PR card's line for that new part. A change you
+could describe in one sentence that adds no part skips this.
 
 What a review adds to the steps:
 
@@ -33,9 +73,8 @@ What a review adds to the steps:
 
 ## The meaning behind the steps
 
-Your global instructions carry the steps in short form, to steer everyday
-work. This is the context behind them, for when a review needs it. It
-explains; it doesn't add rules.
+The steps above are the short form. This is the context behind them, for
+when a review needs it. It explains; it doesn't add rules.
 
 **Why they exist.** My previous agent-safety process (plan-file gates, review
 stamps, a 40-rule orchestrator) was step 5 done first. My dotfiles repo went
@@ -91,4 +130,5 @@ proving it's done, but keep what still catches the failure.
 (youtu.be/AL-PQuB2wy0, 13:05–19:50), refined in chat on 2026-10-06. Steps 1–5
 are from Musk's 2021 Starbase tour with Everyday Astronaut and "the algorithm"
 in Isaacson's *Elon Musk* (2023). Quotes are theirs. Adopted 2026-10-06,
-combined 2026-10-16, split into short rule and this background 2026-10-19.
+combined 2026-10-16, split into short rule and this background 2026-10-19,
+moved whole into this skill 2026-10-27.
