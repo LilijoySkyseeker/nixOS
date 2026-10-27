@@ -1,5 +1,6 @@
 { config, ... }:
 let
+  nixosModules = config.flake.modules.nixos;
   homeManagerModules = config.flake.modules.homeManager;
 in
 {
@@ -9,6 +10,8 @@ in
       ...
     }:
     {
+      imports = [ nixosModules."login-summary" ];
+
       environment.systemPackages = with pkgs; [
       ];
 
@@ -39,6 +42,9 @@ in
         home.username = "root";
         programs.home-manager.enable = true;
         home.homeDirectory = "/root";
+        # in a directory, which each host persists (impermanence): bash replaces
+        # the file on write, and a bind-mounted file can't be replaced
+        programs.bash.historyFile = "/root/.local/state/bash/history";
       };
 
       # sops shh keypath

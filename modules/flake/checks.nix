@@ -45,6 +45,20 @@
         kdeModule = config.flake.modules.nixos.kde;
       };
 
+      server-shell = import ../../tests/server-shell.nix {
+        pkgs = config.flake.pkgsUnstable;
+        specialArgs = {
+          inherit inputs;
+          inherit (config.flake) vars;
+          pkgs-unstable = config.flake.pkgsUnstable;
+          pkgs-stable = config.flake.pkgsStable;
+        };
+        impermanenceModule = inputs.impermanence.nixosModules.impermanence;
+        homeManagerModule = inputs.home-manager.nixosModules.home-manager;
+        loginSummaryModule = config.flake.modules.nixos."login-summary";
+        toolingModule = config.flake.modules.homeManager.tooling;
+      };
+
       docker-publish-guard = import ../../tests/docker-publish-guard.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerPublishGuardModule = config.flake.modules.nixos."docker-publish-guard";
