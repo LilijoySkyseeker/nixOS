@@ -248,6 +248,7 @@ in
       "/etc/ssh/ssh_host_ed25519_key" # for sops age key gen
       "/etc/ssh/ssh_host_ed25519_key.pub"
     ];
+    users.root.directories = vars.rootShellState;
   };
 
   # ssh key root access

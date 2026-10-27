@@ -29,6 +29,15 @@ _: {
     # impermanence persistence root shared by profiles/default.nix and the
     # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
+    # root's shell state on the servers, under each host's persistence root:
+    # history (profile-server's programs.bash.historyFile), atuin, zoxide,
+    # direnv's allow list
+    rootShellState = [
+      ".local/state/bash"
+      ".local/share/atuin"
+      ".local/share/zoxide"
+      ".local/share/direnv"
+    ];
 
     # disko.nix's zpool rootFsOptions, shared by every zpool on every host
     zfsRootFsOptions = {
