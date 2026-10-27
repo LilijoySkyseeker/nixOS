@@ -6,6 +6,17 @@ import sys
 
 import yaml
 
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    # a repeated key would otherwise let the last value win unseen
+    def construct_mapping(self, node, deep=False):
+        keys = [self.construct_object(k, deep=deep) for k, _ in node.value]
+        dupes = sorted({str(k) for k in keys if keys.count(k) > 1})
+        if dupes:
+            raise yaml.constructor.ConstructorError(None, None, f"repeated keys {dupes}", node.start_mark)
+        return super().construct_mapping(node, deep=deep)
+
+
 bad = []
 for root in sys.argv[1:]:
     for folder in sorted(p for p in pathlib.Path(root).iterdir() if p.is_dir()):
@@ -19,7 +30,7 @@ for root in sys.argv[1:]:
             bad.append(f"{folder.name}: no frontmatter between --- lines")
             continue
         try:
-            meta = yaml.safe_load(parts[0][4:])
+            meta = yaml.load(parts[0][4:] + "\n", Loader=UniqueKeyLoader)
         except yaml.YAMLError as e:
             bad.append(f"{folder.name}: frontmatter isn't YAML: {e}")
             continue
@@ -29,7 +40,7 @@ for root in sys.argv[1:]:
         if meta.get("name") != folder.name:
             bad.append(f"{folder.name}: name is {meta.get('name')!r}")
         desc = meta.get("description")
-        if not isinstance(desc, str) or not 1 <= len(desc.strip()) <= 1024:
+        if not isinstance(desc, str) or not desc.strip() or len(desc) > 1024:
             n = len(desc) if isinstance(desc, str) else None
             bad.append(f"{folder.name}: description must be text of 1-1,024 characters (got {n})")
 for line in bad:
