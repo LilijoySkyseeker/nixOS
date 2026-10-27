@@ -48,7 +48,7 @@ key:
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `encrypted-root`, `secure-boot`, `hibernate`, `hibernate-only`, `reboot-notice` |
 | `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch`, `update-keys` (home-manager) |
-| `homelab` | stable | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `hytale`, `octodns`, `nfs`, `samba` |
+| `homelab` | stable, own pin (`nixpkgs-homelab`) | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `hytale`, `octodns`, `nfs`, `samba` |
 | `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 
 ### Which nixpkgs a host tracks
@@ -66,6 +66,12 @@ release. `modules/flake/hosts.nix` handles this the same way `flake.nix`
 used to — swapping `home-manager-stable` into each server's
 `specialArgs.inputs` instead of the unstable `home-manager` every other
 host gets.
+
+The exception: `homelab` builds from its own pair, `nixpkgs-homelab` and
+`home-manager-homelab` (its `pkgs-stable` is `flake.pkgsHomelab`), pinned
+to 26.05 so a stable release move leaves it behind. It holds Immich 2.x
+until Immich's 2→3 database migration runs as its own planned switch; the
+`TODO: drop when` in `flake.nix` says when the pin goes.
 
 Per-host `specialArgs` divergence is written out explicitly per host inside
 `hosts.nix`, not derived automatically — if a new host needs a different arg
@@ -284,8 +290,8 @@ Derive it from source:
   closure hash changed" alone as proof of a functional regression; diff the
   actual built output (`nix store diff-closures`, or `diff -rq` on the
   realized store paths) before concluding something broke.
-- Each host is still pinned to either `nixpkgs-stable` or
-  `nixpkgs-unstable` (see the per-host table above) — check
+- Each host is still pinned to `nixpkgs-stable`, `nixpkgs-unstable`
+  or (homelab) `nixpkgs-homelab` (see the per-host table above) — check
   `modules/flake/hosts.nix` for which `inputs.nixpkgs-*.lib.nixosSystem` a
   host uses before assuming a module option exists on it.
 - **A shared module can quietly drag in packages/services that have

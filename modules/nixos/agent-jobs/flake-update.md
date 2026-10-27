@@ -23,6 +23,10 @@ unnecessary.
    release, then read that release's notes (the "Backward Incompatibilities"
    section above all) for anything this repo's stable hosts use, and fix
    it. Never change `system.stateVersion` or `home.stateVersion`.
+   Never move `nixpkgs-homelab` or `home-manager-homelab` to a new release
+   while their `TODO: drop when` in `flake.nix` is there (step 3 still
+   updates them within their release); that move is a planned step, not
+   this job's.
 3. Run `nix flake update`. If neither the lock nor `flake.nix` changed,
    skip to step 8.
 4. Build every host in `nixosConfigurations` with

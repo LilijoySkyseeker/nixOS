@@ -75,8 +75,8 @@ Known issues and incident history per host live in each host's own
   key. No shared master password, and no plaintext ever touches disk
   outside the host decrypting it at boot.
 - Desktops track bleeding-edge `nixpkgs-unstable`. `homelab`, running
-  ZFS and long-lived game servers, is pinned to `nixpkgs-stable`
-  instead, in the same flake.
+  ZFS and long-lived game servers, is pinned to a stable release
+  instead (its own `nixpkgs-homelab` input), in the same flake.
 - `homelab` runs periodic ZFS/SMART/systemd health checks and pages a
   Discord webhook the moment something looks wrong, instead of finding
   out about a failing disk or a dead service days later.

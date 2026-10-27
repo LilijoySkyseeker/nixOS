@@ -14,6 +14,13 @@
     home-manager-stable.url = "github:nix-community/home-manager/release-26.05";
     home-manager-stable.inputs.nixpkgs.follows = "nixpkgs-stable";
 
+    # homelab's own release pin, held on 26.05 when nixpkgs-stable moves on, so
+    # Immich's 2→3 database migration runs only in a planned switch
+    # TODO: drop when the Immich 2→3 move merges (consolidation step 3, area 3 E12); deadline 2026-12-31, when 26.05 support ends.
+    nixpkgs-homelab.url = "nixpkgs/nixos-26.05";
+    home-manager-homelab.url = "github:nix-community/home-manager/release-26.05";
+    home-manager-homelab.inputs.nixpkgs.follows = "nixpkgs-homelab";
+
     stylix.url = "github:danth/stylix";
     stylix.inputs.nixpkgs.follows = "nixpkgs-unstable";
 

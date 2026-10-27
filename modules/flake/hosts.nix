@@ -5,6 +5,7 @@ let
   vars = config.flake.vars;
   pkgsUnstable = config.flake.pkgsUnstable;
   pkgsStable = config.flake.pkgsStable;
+  pkgsHomelab = config.flake.pkgsHomelab;
 in
 {
   flake.nixosConfigurations = {
@@ -80,14 +81,15 @@ in
       ];
     };
     #==================================================
-    homelab = inputs.nixpkgs-stable.lib.nixosSystem {
+    # its own release pin (nixpkgs-homelab), not nixpkgs-stable
+    homelab = inputs.nixpkgs-homelab.lib.nixosSystem {
       specialArgs = {
         pkgs-unstable = pkgsUnstable;
-        pkgs-stable = pkgsStable;
+        pkgs-stable = pkgsHomelab;
         inherit vars;
-        # use the home-manager release matching nixpkgs-stable to avoid a version mismatch
+        # use the home-manager release matching nixpkgs-homelab to avoid a version mismatch
         inputs = inputs // {
-          home-manager = inputs.home-manager-stable;
+          home-manager = inputs.home-manager-homelab;
         };
       };
       modules = [

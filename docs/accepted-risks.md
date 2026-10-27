@@ -305,7 +305,7 @@ image is for today.
 nixpkgs-stable 26.05.10478 began marking `immich-2.7.5` insecure: the 2.x
 series is end-of-life upstream and will receive no further fixes, and two
 CVEs are named against it. 3.x ships in 26.11, which homelab — pinned to
-nixpkgs-stable — is not on. Left alone this blocks homelab's evaluation
+26.05 by its own `nixpkgs-homelab` input — is not on. Left alone this blocks homelab's evaluation
 entirely, so the update could not land without an answer either way.
 
 `modules/services/immich.nix` therefore sets

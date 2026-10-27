@@ -1,12 +1,21 @@
-_: {
+{ config, lib, ... }:
+let
+  ips = config.flake.vars.tailnetIPv4;
+  # torrent and thinkpad only; other tailnet devices can't mount
+  clients = lib.concatMapStringsSep " " (ip: "${ip}(rw,sync,no_subtree_check,root_squash)") [
+    ips.torrent
+    ips.thinkpad
+  ];
+in
+{
   flake.modules.nixos.nfs = _: {
-    # nfs server: tailnet-only share of /storage and /storage-bulk for linux
-    # clients; android gets the same datasets over samba (samba.nix)
+    # nfs server: tailnet-only share of /storage and /storage-bulk for the
+    # linux PCs; android gets the same datasets over samba (samba.nix)
     services.nfs.server = {
       enable = true;
       exports = ''
-        /storage 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
-        /storage-bulk 100.64.0.0/10(rw,sync,no_subtree_check,root_squash)
+        /storage ${clients}
+        /storage-bulk ${clients}
       '';
     };
 
@@ -17,7 +26,7 @@ _: {
     };
 
     # tailnet only, never the LAN NIC (homelab is a LAN subnet router); the
-    # exports' 100.64.0.0/10 is a second layer
+    # exports' per-PC addresses are a second layer
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 2049 ];
 
     # /storage* are persistent ZFS datasets, so no environment.persistence entry
