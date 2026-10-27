@@ -47,9 +47,10 @@ let
           skillDirs
           ;
         label = name;
-        nativeBuildInputs = [ pkgs.gawk ];
-        # gawk's length() counts characters, not bytes
-        LC_ALL = "C.UTF-8";
+        nativeBuildInputs = [
+          pkgs.gawk
+          (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
+        ];
       }
       ''
         fail() { echo "instructions ($label): $*" >&2; exit 1; }
@@ -80,33 +81,12 @@ let
         [ "$lines" -le 200 ] || echo "instructions ($label): over the 200-line target" >&2
 
         for dir in $skillDirs; do
-          for skill in "$dir"/*/; do
-            skill=''${skill%/}
-            folder=''${skill##*/}
-            md=$skill/SKILL.md
-            [ -f "$md" ] || fail "skill $folder has no SKILL.md"
-            awk -v folder="$folder" '
-              function value(line) {
-                sub(/^[a-z]+:[[:space:]]*/, "", line)
-                if (line ~ /^".*"$/) line = substr(line, 2, length(line) - 2)
-                return line
-              }
-              NR == 1 { if ($0 != "---") { print folder ": no frontmatter"; bad = 1; exit } next }
-              /^---$/ { done = 1; exit }
-              /^name:/ { name = value($0) }
-              /^description:/ { desc = value($0) }
-              END {
-                if (bad) exit 1
-                if (!done) { print folder ": frontmatter not closed"; exit 1 }
-                if (name != folder) { print folder ": name is \"" name "\""; exit 1 }
-                n = length(desc)
-                if (n < 1 || n > 1024) { print folder ": description is " n " characters"; exit 1 }
-              }
-            ' "$md" >&2 || fail "skill $folder: invalid frontmatter"
+          for md in "$dir"/*/SKILL.md; do
             skillLines=$(wc -l < "$md")
-            [ "$skillLines" -le 500 ] || echo "skill $folder: $skillLines lines, over the 500-line target" >&2
+            [ "$skillLines" -le 500 ] || echo "$md: $skillLines lines, over the 500-line target" >&2
           done
         done
+        python3 ${./agent-instructions-skills.py} $skillDirs || fail "a skill's frontmatter is invalid"
       '';
 in
 {
