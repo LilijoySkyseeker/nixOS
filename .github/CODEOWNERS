@@ -1,0 +1,99 @@
+# Consequential paths, by effect (policy C1). A PR touching any of these
+# needs the owner's approval of its head commit once ruleset v2 requires
+# code-owner review. Other consequential changes (new parts, effects in
+# shared modules) are classified by the gate and the reviewer, not here.
+# Paths that don't exist yet are the new tree's (fleet/, deploy/, agents/).
+
+# Secrets, and the keys and addresses that grant authority
+/secrets/                                @LilijoySkyseeker
+/fleet/secrets/                          @LilijoySkyseeker
+/.sops.yaml                              @LilijoySkyseeker
+/modules/flake/vars.nix                  @LilijoySkyseeker
+
+# The agents' boundary, instructions and skills
+AGENTS.md                                @LilijoySkyseeker
+AGENTS.override.md                       @LilijoySkyseeker
+CLAUDE.md                                @LilijoySkyseeker
+.agents/                                 @LilijoySkyseeker
+.claude/                                 @LilijoySkyseeker
+.codex/                                  @LilijoySkyseeker
+/agents/                                 @LilijoySkyseeker
+/modules/nixos/agent-user.nix            @LilijoySkyseeker
+/modules/nixos/agent-user-AGENTS.md      @LilijoySkyseeker
+/modules/nixos/agent-setup.sh            @LilijoySkyseeker
+/modules/nixos/agent-tools.nix           @LilijoySkyseeker
+/modules/nixos/agent-tools/              @LilijoySkyseeker
+/modules/nixos/agent-skills/             @LilijoySkyseeker
+/modules/nixos/agent-jobs/               @LilijoySkyseeker
+/modules/nixos/paseo/                    @LilijoySkyseeker
+/modules/nixos/local-ai.nix              @LilijoySkyseeker
+/modules/nixos/local-ai-speech.nix       @LilijoySkyseeker
+/modules/nixos/local-ai/                 @LilijoySkyseeker
+/modules/home-manager/claude-code/       @LilijoySkyseeker
+/fleet/modules/agents/                   @LilijoySkyseeker
+/fleet/modules/local-ai/                 @LilijoySkyseeker
+/fleet/modules/build-egress.nix          @LilijoySkyseeker
+/scripts/agents-acceptance               @LilijoySkyseeker
+/docs/agents-stop.md                     @LilijoySkyseeker
+
+# Deploy machinery
+/modules/flake/deploy-revision.nix       @LilijoySkyseeker
+/modules/flake/hosts.nix                 @LilijoySkyseeker
+/modules/flake/pkgs.nix                  @LilijoySkyseeker
+/modules/nixos/pull-deploy.nix           @LilijoySkyseeker
+/modules/nixos/push-deploy.nix           @LilijoySkyseeker
+/modules/nixos/reboot-notice.nix         @LilijoySkyseeker
+/deploy/                                 @LilijoySkyseeker
+/rollout.nix                             @LilijoySkyseeker
+/docs/deploy.md                          @LilijoySkyseeker
+
+# Data
+/modules/nixos/datasets.nix              @LilijoySkyseeker
+/modules/nixos/zrepl.nix                 @LilijoySkyseeker
+/modules/nixos/zfs-*.nix                 @LilijoySkyseeker
+/modules/nixos/backup-*.nix              @LilijoySkyseeker
+/modules/nixos/health-alerts.nix         @LilijoySkyseeker
+/modules/nixos/nfs-homelab-mounts.nix    @LilijoySkyseeker
+/modules/services/nfs.nix                @LilijoySkyseeker
+/hosts/*/disko.nix                       @LilijoySkyseeker
+/scripts/restore-drill                   @LilijoySkyseeker
+/docs/procedures/backup-restore.md       @LilijoySkyseeker
+/fleet/data/                             @LilijoySkyseeker
+/fleet/modules/data/                     @LilijoySkyseeker
+/fleet/pkgs/restore*                     @LilijoySkyseeker
+/fleet/hosts/*/disko.nix                 @LilijoySkyseeker
+/fleet/modules/services/nfs.nix          @LilijoySkyseeker
+/fleet/lib/prestart-snapshot.nix         @LilijoySkyseeker
+/docs/restore.md                         @LilijoySkyseeker
+
+# Exposure: the tailnet, vps, DNS, firewall guards and public services
+/tailscale/                              @LilijoySkyseeker
+/hosts/vps/                              @LilijoySkyseeker
+/modules/nixos/docker-publish-guard.nix  @LilijoySkyseeker
+/modules/services/website.nix            @LilijoySkyseeker
+/modules/services/octodns.nix            @LilijoySkyseeker
+/modules/services/minecraft.nix          @LilijoySkyseeker
+/modules/services/hytale.nix             @LilijoySkyseeker
+/modules/services/samba.nix              @LilijoySkyseeker
+/modules/services/factorio.nix           @LilijoySkyseeker
+/docs/threat-model.md                    @LilijoySkyseeker
+/docs/exposure.md                        @LilijoySkyseeker
+/fleet/hosts/vps/                        @LilijoySkyseeker
+/fleet/modules/alerts/                   @LilijoySkyseeker
+/fleet/pkgs/fleet-notify*                @LilijoySkyseeker
+/fleet/modules/services/photo-share.nix  @LilijoySkyseeker
+/fleet/modules/services/website.nix      @LilijoySkyseeker
+/fleet/modules/services/octodns.nix      @LilijoySkyseeker
+/fleet/modules/services/minecraft.nix    @LilijoySkyseeker
+/fleet/modules/services/hytale.nix       @LilijoySkyseeker
+/fleet/modules/services/samba.nix        @LilijoySkyseeker
+
+# The enforcement itself: CI, settings, review rules, checks, tests, hooks
+/.github/                                @LilijoySkyseeker
+/REVIEW.md                               @LilijoySkyseeker
+/flake.nix                               @LilijoySkyseeker
+/modules/flake/checks.nix                @LilijoySkyseeker
+/modules/flake/devshell.nix              @LilijoySkyseeker
+/tests/                                  @LilijoySkyseeker
+/.githooks/                              @LilijoySkyseeker
+.envrc                                   @LilijoySkyseeker
