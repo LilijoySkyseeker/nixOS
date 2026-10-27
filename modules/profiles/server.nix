@@ -1,5 +1,6 @@
 { config, ... }:
 let
+  nixosModules = config.flake.modules.nixos;
   homeManagerModules = config.flake.modules.homeManager;
 in
 {
@@ -9,6 +10,8 @@ in
       ...
     }:
     {
+      imports = [ nixosModules."login-summary" ];
+
       environment.systemPackages = with pkgs; [
       ];
 
