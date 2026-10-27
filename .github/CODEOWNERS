@@ -83,7 +83,7 @@ opencode.jsonc                           @LilijoySkyseeker
 /modules/services/website.nix            @LilijoySkyseeker
 /modules/services/octodns.nix            @LilijoySkyseeker
 /modules/services/minecraft.nix          @LilijoySkyseeker
-/modules/services/minecraft-geyser-config/@LilijoySkyseeker
+/modules/services/minecraft-geyser-config/ @LilijoySkyseeker
 /modules/services/hytale.nix             @LilijoySkyseeker
 /modules/services/samba.nix              @LilijoySkyseeker
 /modules/services/factorio.nix           @LilijoySkyseeker
