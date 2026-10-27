@@ -20,6 +20,12 @@ _: {
       multimedia = 999;
       flatpak = 998;
     };
+    # the PCs' tailnet IPv4 addresses, assigned by tailscale and changed by
+    # a re-registration (services/nfs.nix exports only to these)
+    tailnetIPv4 = {
+      torrent = "100.110.203.119";
+      thinkpad = "100.95.127.26";
+    };
     # impermanence persistence root shared by profiles/default.nix and the
     # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
