@@ -200,11 +200,15 @@ follow the backup policy, not this rule.
   destroys wanted data.
 
 **S7. Other people's data gets the least look the task needs.** Nothing is
-uploaded, and findings are given in plain language.
+uploaded beyond the AI conversation the person agreed to; without their
+agreement, the job takes the no-AI path. Findings are given in plain
+language.
 - Serves: G (helping people the owner cares about).
 - Why: privacy is owed to the people the owner helps, not just to the
   owner.
-- Source: owner chose the rule.
+- Source: owner chose the rule; the consent wording chosen by the owner
+  10-27 (OQ13, area 7's challenge: the stick's agents run in the vendors'
+  clouds, so what they read reaches the vendor).
 - Challenge if: a job fails because it needed more access than this allows.
 
 ## Changes and autonomy
