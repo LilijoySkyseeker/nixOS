@@ -150,7 +150,7 @@ ones.
   `vps`), matching `flake.nixosConfigurations.<name>` in
   `modules/flake/hosts.nix`.
 - `modules/services/*.nix` files are named after the service they
-  configure (`jellyfin.nix`, `factorio.nix`), not the host that runs
+  configure (`jellyfin.nix`, `minecraft.nix`), not the host that runs
   it.
 - Custom module option namespaces use `my<CamelCase>` as above — this
   is separate from the `flake.modules.<class>.<name>` registration key,

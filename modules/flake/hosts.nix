@@ -108,7 +108,6 @@ in
         nixosModules.immich
         nixosModules.beets
         nixosModules.minecraft
-        nixosModules.factorio
         nixosModules.hytale
         nixosModules.octodns
         nixosModules.nfs

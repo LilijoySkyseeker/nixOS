@@ -196,8 +196,7 @@ Sixteen third-party Modrinth projects are resolved **by slug at every
 container start** — every reboot, and every switch touching the unit —
 at the `alpha` release channel, with
 `MODRINTH_DOWNLOAD_DEPENDENCIES = "required"` pulling further transitive
-artifacts nobody has listed. Both Factorio servers do the same through
-`UPDATE_MODS_ON_START`. The Hytale server (2026-10-14) goes further: it
+artifacts nobody has listed. The Hytale server (2026-10-14) goes further: it
 replaces its own server JAR, assets and `start.sh` from Hytale's update
 service, applied when no one is online. Only the first-install seed JAR
 is hash-pinned. Clients refuse a server whose protocol version differs,
