@@ -17,7 +17,9 @@
     # homelab's own release pin, held on 26.05 when nixpkgs-stable moves on, so
     # Immich's 2→3 database migration runs only in a planned switch
     # TODO: drop when the Immich 2→3 move merges (consolidation step 3, area 3 E12); deadline 2026-12-31, when 26.05 support ends.
-    nixpkgs-homelab.url = "nixpkgs/nixos-26.05";
+    # -small: Immich's Node 24.22.1 (Node2Shell, CVE-2026-111497, exploited) is there first
+    # TODO: drop when nixos-26.05 has nodejs_24 24.22.1 (NixOS/nixpkgs#576787): back to "nixpkgs/nixos-26.05"
+    nixpkgs-homelab.url = "nixpkgs/nixos-26.05-small";
     home-manager-homelab.url = "github:nix-community/home-manager/release-26.05";
     home-manager-homelab.inputs.nixpkgs.follows = "nixpkgs-homelab";
 
