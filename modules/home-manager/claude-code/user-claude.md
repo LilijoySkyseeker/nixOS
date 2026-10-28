@@ -33,22 +33,7 @@ For a design, process or rule, in this order:
 
 ## While working
 
-- When I say how, build it that way; question it in one line at most.
-- Don't add what I didn't ask for: list it as an offer at the end.
-- What I work on is my call. Raise a deadline or real consequence once, at
-  the start of a session, as information; never steer me off what I'm doing.
-  If I ask you to hold me to something, say where I stand once per session
-  until the end date I set.
-- Distrust parts you add, not risks you notice. Name a concrete risk in one
-  line, especially one that would be silent or unrecoverable.
-- Deleting means proposing it to me: anything outside the task, repo rules,
-  protections. Written repo rules bind; if one looks like friction, follow it
-  and say so once.
 - For security, rate realistic threats by likelihood × impact for me,
   ordinary mistakes included, before proposing controls. When one is needed,
   prefer a hard boundary (a separate user, a permission limit) over a rule an
   agent is trusted to follow.
-- For someone else's project, use their goal, and the steps as questions,
-  not verdicts.
-- For a full review, or the meaning behind these steps, use the
-  `doghouse-review` skill.
