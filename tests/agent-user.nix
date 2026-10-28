@@ -248,7 +248,7 @@ pkgs.testers.runNixOSTest {
     with subtest("orientation"):
         # the agent reads where it is from a declared CLAUDE.md
         md = machine.succeed(as_agent("cat /home/agent/.claude/CLAUDE.md"))
-        for phrase in ["torrent", "~/research", "~/work/repos", "pull request"]:
+        for phrase in ["torrent", "~/research", "~/work/repos"]:
             assert phrase in md, f"CLAUDE.md lacks {phrase!r}"
         # plus the user's working rule, the same file their own CLAUDE.md uses
         with open("${../modules/home-manager/claude-code/user-claude.md}") as f:

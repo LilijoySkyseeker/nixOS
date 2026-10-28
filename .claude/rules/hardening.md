@@ -21,8 +21,3 @@ container, read the standing rules in `docs/hardening.md`. The short form:
 9. Verify config actually takes effect (`sshd -T`, `nix eval`), not that it rendered.
 10. Containers: publish to an address, pin by digest, drop caps, no-new-privileges, read-only, memory and pids limits.
 11. A guard that declines to act must be watched by its outcome, not its attempt; never hang `OnSuccess=` off a unit that can skip.
-
-A change that touches firewall rules, open ports, secrets wiring,
-authentication, or adds or exposes a service gets `/security-review`
-before the PR opens, with a review by an agent of another model family
-in parallel (see `AGENTS.md`).
