@@ -56,6 +56,12 @@
             "dst": ["tag:vps"],
             "ip":  ["*"],
         },
+        // KDE Connect: the PCs connect back to the phone, an untagged member device
+        {
+            "src": ["tag:torrent", "tag:thinkpad"],
+            "dst": ["autogroup:member"],
+            "ip":  ["1714-1764"],
+        },
         // let members and tagged devices use homelab as an exit node
         {
             "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],

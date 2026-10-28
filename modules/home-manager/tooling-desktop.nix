@@ -1,6 +1,11 @@
-_: {
+{ config, ... }:
+let
+  ips = config.flake.vars.tailnetIPv4;
+in
+{
   flake.modules.homeManager."tooling-desktop" =
     {
+      lib,
       pkgs-stable,
       pkgs-unstable,
       config,
@@ -17,6 +22,13 @@ _: {
         enable = true;
         indicator = true;
       };
+
+      # kde connect: broadcast and mDNS don't cross tailscale0, so announce to the PCs
+      # directly; replaces IPs added in the app, the phone's app needs both by hand
+      home.activation.kdeconnectCustomDevices = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        run ${pkgs-unstable.kdePackages.kconfig}/bin/kwriteconfig6 --file kdeconnect/config \
+          --group General --key customDevices "${ips.torrent},${ips.thinkpad}"
+      '';
 
       # OBS Studio
       programs.obs-studio = {
