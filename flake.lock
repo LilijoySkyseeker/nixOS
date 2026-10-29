@@ -515,14 +515,14 @@
     "nixpkgs-homelab": {
       "locked": {
         "lastModified": 1793183032,
-        "narHash": "sha256-Wkp1okrYqlziZ1s7Gi+LKoC3DWB9PovOWsbUhgwzPVU=",
+        "narHash": "sha256-/nYLRqlw7vEj2bua2U3aAjF4Jqkd6RxpO+xACfKkldE=",
         "rev": "08d3a97586f6b6343b3b5e799980773629432610",
         "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/26.05-small/nixos-26.05.13050.08d3a97586f6/nixexprs.tar.zst"
+        "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.13050.08d3a97586f6/nixexprs.tar.zst"
       },
       "original": {
         "id": "nixpkgs",
-        "ref": "nixos-26.05-small",
+        "ref": "nixos-26.05",
         "type": "indirect"
       }
     },
