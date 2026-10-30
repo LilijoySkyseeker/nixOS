@@ -49,8 +49,7 @@ waits on a terminal.
 - The local model is free and uncapped but slower and weaker than the
   cloud models. It's the one to use for private material and for work the
   cloud models refuse, with its output checked. It hallucinated review
-  results in an earlier session (owner, 2026-10-23); keep it out of
-  review and opinion workflows.
+  results in an earlier session (owner, 2026-10-23).
 
 ## Rules
 

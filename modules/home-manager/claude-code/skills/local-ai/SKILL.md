@@ -6,7 +6,7 @@ description: Use when work should run on torrent's own GPU instead of a cloud mo
 # Local models on torrent
 
 `llama-swap` serves local models at `http://127.0.0.1:8080` to every agent
-and to the owner. It loads one model at a time on the RX 7900 XTX, starting
+and to the owner. It loads one model at a time, starting
 it on the first request (about 10–60 s) and
 killing it after 5 idle minutes.
 
@@ -17,10 +17,9 @@ shows what's loaded.
 
 ## Calling it
 
-The same models answer three APIs:
+The same models answer two APIs:
 - OpenAI chat: `/v1/chat/completions`
 - OpenAI Responses: `/v1/responses`
-- Anthropic Messages: `/v1/messages`
 
 Any API key works.
 
@@ -41,9 +40,6 @@ service's command lines (in the nixOS repo, `modules/nixos/local-ai.nix`)
 name the exact files. To add a model:
 1. Download it there (Hugging Face `resolve/main` URLs work).
 2. Add a `models` entry in that module, by PR.
-
-Keep llama-swap model downloads in `/srv/models`, not `~/work`, to avoid
-duplicate backups.
 
 The store archives only what's in use: a model a service entry or command
 names. Test candidates in `~/work/scratch`, or delete a tested model that
