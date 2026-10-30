@@ -28,18 +28,15 @@ _: {
       # second system message, which qwen's template raises on; this one renders it
       qwenTemplate = ./local-ai/qwen3.8-mid-system.jinja;
 
-      # gaming marker: survives a llama-swap restart mid-game, gone on reboot
+      # gaming marker: transcribe yields the GPU while it exists, gone on reboot
       gamingMarker = "/run/local-ai/gaming";
-      setGaming = pkgs.writeShellScript "local-ai-set-gaming" ''
-        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
-          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active
-      '';
 
       # games first: gamemode runs these as whoever plays; without them a model keeps VRAM
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
         touch ${gamingMarker} || true
         # block loads first, so nothing reloads behind the unload
-        ${setGaming} || true
+        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
+          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active || true
         ${lib.getExe pkgs.curl} -s -m 14 -X POST ${swapUrl}/api/models/unload || true
       '';
       gamingEnd = pkgs.writeShellScript "local-ai-gaming-end" ''
@@ -123,14 +120,13 @@ _: {
       crc = config.systemd.services.claude-remote-control;
     in
     {
-      # model store: the agent and lilijoy download into it, llama-swap reads it
+      # model store: the agent downloads into it, llama-swap reads it
       users.groups.models = { };
-      users.users.lilijoy.extraGroups = [ "models" ];
       systemd.tmpfiles.rules = [
         "d ${models} 2775 root models -"
         # group-writable whoever creates a file, world-readable for llama-swap's dynamic user
         "a+ ${models} - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::r-x"
-        # the gaming marker, for llama-swap and transcribe; the hooks run as whoever plays
+        # the gaming marker, for transcribe; the hooks run as whoever plays
         "d /run/local-ai 1777 root root -"
       ];
 
@@ -179,20 +175,9 @@ _: {
           PrivateDevices = lib.mkForce true;
           BindPaths = [ "-/dev/dri" ];
           DeviceAllow = [ "${gpu} rw" ];
-          # bound model loading and CPU vision memory alongside the desktop
-          MemoryMax = "80G";
           # loopback only: a parser exploit gets no route around the agent's egress rules
           IPAddressAllow = "localhost";
           IPAddressDeny = "any";
-          # a restart mid-game starts with no profile: reapply the block
-          ExecStartPost = pkgs.writeShellScript "local-ai-restore-gaming" ''
-            [ -e ${gamingMarker} ] || exit 0
-            for _ in $(${pkgs.coreutils}/bin/seq 50); do
-              ${setGaming} >/dev/null && exit 0
-              ${pkgs.coreutils}/bin/sleep 0.2
-            done
-            exit 1
-          '';
         };
       };
 
