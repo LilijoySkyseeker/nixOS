@@ -31,7 +31,6 @@ pkgs.testers.runNixOSTest {
         "$2b$10$6uKC1atpyRerzGiJpPO.EuRdbYW2bfwXkdKbNKqvGrugpC4fA1K0O";
       systemd.services.paseo-agent-config.serviceConfig.LoadCredential =
         "paseo-password-hash:/etc/paseo-test-hash";
-      virtualisation.memorySize = 4096;
       environment.systemPackages = [
         pkgs.curl
         pkgs.jq

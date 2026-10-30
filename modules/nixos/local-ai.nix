@@ -24,8 +24,8 @@ _: {
       # same card as agent-user's agentGpu: DRM numbering follows probe order
       gpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
 
-      # qwen's template raises on a system message after the first; this one
-      # renders it as a system turn
+      # for the Codex harness: its developer message after the instructions is a
+      # second system message, which qwen's template raises on; this one renders it
       qwenTemplate = ./local-ai/qwen3.8-mid-system.jinja;
 
       # gaming marker: survives a llama-swap restart mid-game, gone on reboot
@@ -35,7 +35,7 @@ _: {
           -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active
       '';
 
-      # gamemode runs these as the user who started the game
+      # games first: gamemode runs these as whoever plays; without them a model keeps VRAM
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
         touch ${gamingMarker} || true
         # block loads first, so nothing reloads behind the unload
@@ -76,6 +76,7 @@ _: {
               enabled = true;
               command = [ (lib.getExe pkgs.antigravity-cli) ];
             };
+            # serves: the owner, the local agent in Paseo; without it no remote way in
             local-codex = {
               extends = "codex";
               label = "Local";
@@ -113,7 +114,7 @@ _: {
         exec ${lib.getExe pkgs.jq} -e '.daemon.auth.password | strings | startswith("$2")' /home/agent/.paseo/config.json
       '';
 
-      # the agent's sessions write models; privilege on the units, not the user
+      # agents download models from their sessions; privilege on the units, not the user
       agentModelAccess = {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
@@ -129,19 +130,18 @@ _: {
         "d ${models} 2775 root models -"
         # group-writable whoever creates a file, world-readable for llama-swap's dynamic user
         "a+ ${models} - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::r-x"
-        # the gamemode hooks run as whoever plays
+        # the gaming marker, for llama-swap and transcribe; the hooks run as whoever plays
         "d /run/local-ai 1777 root root -"
       ];
 
       systemd.services.claude-remote-control.serviceConfig = agentModelAccess;
       systemd.services.codex-remote-control.serviceConfig = agentModelAccess;
 
+      # serves: the local agent, and agents' private or uncapped work; without it no local model
       services.llama-swap = {
         enable = true;
-        listenAddress = "127.0.0.1";
-        port = 8080;
         settings = {
-          # no stored request/response bodies: private prompts stay out of its api
+          # private prompts stay out of its api (10-23 review); the default keeps 10 MB of them
           captureBuffer = 0;
           # only llama-swap's own ui may read responses in a browser; the
           # permissive default lets any web page read loopback (firefox has
@@ -150,38 +150,38 @@ _: {
             "http://127.0.0.1:8080"
             "http://localhost:8080"
           ];
+          # serves: the desktop; without it an idle model holds ~17 GB of VRAM until a game
           globalTTL = 300;
           models = {
+            # the one local model kept (owner, 10-25)
             "qwen3.8-27b" = {
-              description = "Qwen3.8-27B, fully on the GPU, vision on the CPU";
               cmd = lib.concatStringsSep " " [
                 llamaServer
                 "--port \${PORT}"
                 "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD-Q4_K_M.gguf"
                 "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf --no-mmproj-offload"
-                "-ngl 99 -fa on -c 131072"
-                "--jinja --chat-template-file ${qwenTemplate}"
+                # all on the GPU (40 tok/s); its native 256K context doesn't fit
+                "-ngl 99 -c 131072"
+                "--chat-template-file ${qwenTemplate}"
               ];
             };
           };
           # the gamemode hook's profile: every model answers 404, so nothing loads
           profiles.gaming = {
-            description = "a game has the GPU: no model loads";
             pins = lib.genAttrs (lib.attrNames config.services.llama-swap.settings.models) (_: null);
           };
         };
       };
 
       systemd.services.llama-swap = {
-        # the module leaves all of /dev open for GPU access; narrow it to the render node
+        # agent-written models reach llama.cpp's parser: narrow the open /dev to the render node
         serviceConfig = {
           PrivateDevices = lib.mkForce true;
           BindPaths = [ "-/dev/dri" ];
           DeviceAllow = [ "${gpu} rw" ];
-          SupplementaryGroups = [ "render" ];
           # bound model loading and CPU vision memory alongside the desktop
           MemoryMax = "80G";
-          # loopback only: models come from /srv/models, never the network
+          # loopback only: a parser exploit gets no route around the agent's egress rules
           IPAddressAllow = "localhost";
           IPAddressDeny = "any";
           # a restart mid-game starts with no profile: reapply the block
@@ -196,7 +196,7 @@ _: {
         };
       };
 
-      # games have the GPU first
+      # games have the GPU first; the start hook's curls take up to 18 s (default timeout 10)
       programs.gamemode.settings.custom = {
         start = "${gamingStart}";
         end = "${gamingEnd}";
