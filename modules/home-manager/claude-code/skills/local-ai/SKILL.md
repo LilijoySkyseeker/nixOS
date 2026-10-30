@@ -36,7 +36,7 @@ language per file: `-l auto` detects it once.
 
 ## Models on disk
 
-`/srv/models/<model-id>/`, group `models`, backed up to homelab. The
+`/srv/models/<model-id>/`, backed up to homelab. The
 service's command lines (in the nixOS repo, `modules/nixos/local-ai.nix`)
 name the exact files. To add a model:
 1. Download it there (Hugging Face `resolve/main` URLs work).
