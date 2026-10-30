@@ -1,4 +1,4 @@
-# agent-setup: check the agent's place on torrent and, after asking, fix what's missing.
+# agent-setup: the owner's check of the agent's place after a reinstall; after asking, fixes what's missing.
 # run as root: `run0 agent-setup` (check and fix) or `run0 agent-setup --check` (report only)
 # plan: 2026-10-06-make-the-agent-s-place-reproducible-with-an-agent-setup-check-and-fix.md
 
@@ -42,29 +42,35 @@ item() {
   note "to fix: $fix_label"
 }
 
+# serves: the owner; without the module every later check fails confusingly
 chk_module() { id agent >/dev/null 2>&1 && systemctl cat claude-remote-control >/dev/null 2>&1; }
 
+# serves: the owner; the mount's source, in their vault; without it ~/research is empty
 chk_research() { [ -d "$research" ]; }
 fix_research() { as_user mkdir -p "$research"; }
 
+# serves: agents; their finished research reaches the owner's phone through it
 chk_mount() { as_agent sh -c 'touch ~/research/.agent-setup-probe && rm ~/research/.agent-setup-probe' 2>/dev/null; }
 fix_mount() {
   systemctl reset-failed home-agent-research.mount home-agent-research.automount 2>/dev/null || true
   systemctl restart home-agent-research.automount
 }
 
+# serves: the owner; the live wall off the LAN and tailnet, which the VM test can't see
 chk_egress() {
   iptables -C OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null &&
     ip6tables -C OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null
 }
 fix_egress() { systemctl reload firewall; }
 
+# serves: agents; PRs come from the bot, which can't merge them; without it no pushes
 chk_gh() { [ "$(as_agent gh api user -q .login 2>/dev/null)" = "$BOT" ]; }
 fix_gh() {
   note "authorize in a browser logged in as $BOT, not your own account"
   as_agent gh auth login --hostname github.com --git-protocol https --web
 }
 
+# serves: agents and the jobs; without it remote control is skipped and the jobs fail
 chk_claude() {
   [ -s "$agent_home/.claude/.credentials.json" ] &&
     jq -e '.projects["/home/agent/work"].hasTrustDialogAccepted == true' "$state" >/dev/null 2>&1
@@ -74,7 +80,8 @@ fix_claude() {
   as_agent env -C "$agent_home/work" ENABLE_CLAUDEAI_MCP_SERVERS=false claude || true
 }
 
-# remoteDialogSeen is undocumented; it's what the first consent run wrote
+# remoteDialogSeen is undocumented; it's what the first consent run wrote, and
+# without it the unattended server stops at the question
 chk_consent() { jq -e '.remoteDialogSeen == true' "$state" >/dev/null 2>&1; }
 fix_consent() {
   note "answer y to \"Enable Remote Control?\", wait for the session URL, then press Ctrl+C"
@@ -82,6 +89,7 @@ fix_consent() {
     claude remote-control --spawn same-dir --name "$NAME" || true
 }
 
+# serves: agents; Codex is the other model family for reviews (AGENTS.md)
 chk_codex_login() { as_agent codex login status >/dev/null 2>&1; }
 fix_codex_login() {
   note "sign in with your ChatGPT account at the URL shown, using the code it prints"
@@ -110,12 +118,14 @@ fix_agy() {
 }
 
 # is-active with several units passes when any one is active
+# serves: the owner, whose apps reach agents through these servers
 chk_service() { systemctl is-active --quiet claude-remote-control && systemctl is-active --quiet codex-remote-control; }
 fix_service() {
   systemctl restart claude-agent-settings codex-agent-config claude-remote-control codex-remote-control
   sleep 3
 }
 
+# serves: agents; without collaborator access the bot can't push branches
 chk_collab() {
   local repo
   for repo in $BOT_REPOS; do
@@ -123,6 +133,7 @@ chk_collab() {
   done
 }
 
+# serves: the owner; merging stays their act, though the bot can write to the repo
 chk_protection() {
   local n
   n=$(as_user gh api "repos/$OWNER/nixOS/branches/master/protection" \
@@ -149,8 +160,7 @@ item "Antigravity signed in" chk_agy "sign agy in with the Google account for th
 item "remote-control services running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""
-note "not checkable here: Trusted Devices (claude.ai → Settings → Account), and"
-note "  Codex pairing (torrent listed under Codex remote in the ChatGPT app)"
+note "not checkable here: Codex pairing (torrent listed under Codex remote in the ChatGPT app)"
 
 if [ "$failed" -eq 0 ]; then
   echo "all good"

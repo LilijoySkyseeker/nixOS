@@ -5,8 +5,8 @@
     let
       bot = "LilijoySkyseeker-agent";
       # every agent harness: where it reads user-level instructions and
-      # skills, and the few lines only it needs; adding or dropping an agent
-      # is one entry here
+      # skills, so it starts knowing where things go and the machine's
+      # quirks; adding or dropping an agent is one entry here
       harnesses = {
         claude = {
           instructions = ".claude/CLAUDE.md";
@@ -71,8 +71,8 @@
         ../home-manager/claude-code/skills
         ./agent-skills
       ];
-      # web-fetch: pages and feeds past bot walls (curl, curl-impersonate,
-      # then real Chromium through nodriver in a virtual display)
+      # web-fetch: pages and feeds past the bot walls that stop agents' research
+      # (curl, curl-impersonate, then real Chromium through nodriver in Xvfb)
       fetchPython = pkgs.python3.withPackages (ps: [
         ps.feedparser
         ps.nodriver
@@ -128,9 +128,9 @@
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
       };
-      # git identity: the bot's noreply address (its public GitHub id); gh
-      # from PATH as the credential helper, since `gh auth setup-git` writes a
-      # store path that the GC later removes
+      # git identity: agents commit and push as the bot (its noreply address),
+      # never as the owner; gh from PATH as the credential helper, since `gh
+      # auth setup-git` writes a store path that the GC later removes
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
           name = ${bot}
@@ -150,7 +150,7 @@
       gitIgnore = pkgs.writeText "agent-git-ignore" ''
         AGENTS.local.md
       '';
-      # check-and-fix for the parts that can't be declared
+      # the owner's check-and-fix, after a reinstall, for what can't be declared
       agentSetup = pkgs.writeShellApplication {
         name = "agent-setup";
         runtimeInputs = with pkgs; [
@@ -167,19 +167,22 @@
         ''
         + builtins.readFile ./agent-setup.sh;
       };
-      # torrent's RX 7900 XTX, by PCI path: DRM numbering follows probe order
+      # the GPU agents run local models on (RX 7900 XTX), by PCI path: DRM
+      # numbering follows probe order
       agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
-      # sandbox shared by every agent's units: every agent
-      # session is a child of one of them
+      # sandbox shared by every agent's units, a second wall behind the Unix
+      # user (F3): every agent session is a child of one of them
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
         User = "agent";
         Group = "agent";
         WorkingDirectory = "/home/agent/work";
+        # serves: the owner's apps; without it a crashed server stays down until boot
         Restart = "always";
         RestartSec = 30;
         Slice = "agent.slice";
         NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
+        # serves: the owner; without it agents read and plant files in the shared /tmp
         PrivateTmp = true;
         # a private /dev with only the pseudo devices, plus the GPU and KVM
         # bound in; /dev/net/tun stays out (F4), and the device cgroup
@@ -199,6 +202,7 @@
           "kvm"
           "render"
         ];
+        # serves: the owner; without it agents write shared places such as /var/tmp
         ProtectSystem = "strict";
         ReadWritePaths = [ "/home/agent" ];
         # world-writable daemon sockets: VPN, tailnet and VM control (F5)
@@ -208,11 +212,12 @@
           "-/run/libvirt"
         ];
       };
+      # serves: agents; without it systemd's PATH lacks their tools and web-fetch
       agentEnvironment = {
-        HOME = "/home/agent";
         PATH = lib.mkForce "/run/wrappers/bin:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin";
       };
-      # stop with the firewall: a stopped or failed firewall drops agent-egress
+      # stop with the firewall: a failed firewall start can leave agent-egress
+      # half-built (F9)
       agentUnitDeps = {
         wantedBy = [ "multi-user.target" ];
         wants = [ "network-online.target" ];
@@ -246,6 +251,7 @@
             # one job at a time: they share the vault reports and the nixOS
             # checkout, and two timers can fire together after downtime
             ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
+            # a hung run fails and pages instead of holding every job's lock;
             # includes waiting on the lock behind the other jobs
             TimeoutStartSec = "18h";
           };
@@ -261,7 +267,8 @@
           exec sleep infinity
         )
       '';
-      # agent-egress rules per family; IPv6 rejects all but loopback
+      # agent-egress, the hard wall keeping agents off the LAN and tailnet;
+      # IPv6 rejects all but loopback
       egress = [
         {
           cmd = "iptables";
@@ -285,7 +292,7 @@
       ];
     in
     {
-      # own group, not isNormalUser's default `users`
+      # own group, not isNormalUser's default `users`: lilijoy's, and her files
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G2
       users.groups.agent = { };
       # lilijoy opens and drops files in ~/work; the agent gains nothing from this
@@ -295,7 +302,6 @@
         group = "agent";
         # traverse only: lilijoy reaches ~/work, nothing else here
         homeMode = "711";
-        description = "Claude agent (non-sensitive work)";
         packages = with pkgs; [
           webFetch
           # the agent-only harnesses (claude and codex come with the PC profile)
@@ -325,12 +331,13 @@
         })
       ];
 
-      # no inbound ssh
+      # no inbound ssh: an agent-added key would be a shell outside the sandbox (F8)
       services.openssh.settings.DenyUsers = [ "agent" ];
 
-      # nix daemon access, not trusted-users
       environment.systemPackages = [ agentSetup ];
 
+      # nix daemon access for agents' builds (the PC profile allows only
+      # wheel), not trusted-users, which would be root
       nix.settings.allowed-users = [ "agent" ];
 
       # agent-egress: jumped from OUTPUT for uid agent and gid nixbld (every
@@ -350,22 +357,11 @@
           ''
         ) egress}
       '';
-      networking.firewall.extraStopCommands = ''
-        ${lib.concatMapStrings (
-          { cmd, ... }:
-          ''
-            ${cmd} -D OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null || true
-            ${cmd} -D OUTPUT -m owner --gid-owner nixbld -j agent-egress 2>/dev/null || true
-            ${cmd} -F agent-egress 2>/dev/null || true
-            ${cmd} -X agent-egress 2>/dev/null || true
-          ''
-        ) egress}
-      '';
 
-      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
+      # bindfs: agents' research reaches the owner's vault, Vault/Research only,
+      # agent-owned on its side, lilijoy:users on disk
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
-        # claude remote-control server: prompt-free sessions spawned in ~/work
         # merge the keys this repo owns into the agent's CLI-owned settings.json
         services.claude-agent-settings = {
           description = "Merge repo-owned keys into the agent's Claude settings";
@@ -431,6 +427,8 @@
             '';
         };
 
+        # claude remote-control server: the owner reaches agents from the
+        # Claude app, prompt-free sessions spawned in ~/work
         services.claude-remote-control = agentUnitDeps // {
           description = "Claude Code Remote Control server for the agent user";
           # skipped until the one-time `claude auth login`
@@ -584,7 +582,7 @@
           # files group-writable whoever creates them, whatever their umask
           "d /home/agent/work 2770 agent agent -"
           "a+ /home/agent/work - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::---"
-          # orientation for the agent; a store symlink, so edits go through the repo
+          # the CLIs' dirs, agent-owned: tmpfiles would make a link's parents as root
           "d /home/agent/.claude 0700 agent agent -"
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"

@@ -253,7 +253,7 @@ _: {
         after = crc.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
         environment = {
-          inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
+          inherit (crc.environment) ENABLE_CLAUDEAI_MCP_SERVERS;
           PATH = lib.mkForce crc.environment.PATH;
         };
         serviceConfig = crc.serviceConfig // {

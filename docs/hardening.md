@@ -253,8 +253,9 @@ here; it is already applied in the SSH bullet below.
   rejected, and IPv6 is rejected outright except on loopback. The
   `nixbld` jump applies to **every** user's fixed-output builds, lilijoy's
   included, so on torrent no build can fetch from a LAN or tailnet address,
-  or over IPv6 at all. Both units are `bindsTo` `firewall.service`, because a
-  stopped or failed firewall drops the chain. Interactive `run0 -u agent`
+  or over IPv6 at all. The chain stays through a firewall stop or
+  reload, and both units are `bindsTo` `firewall.service`, because a failed
+  start can leave it half-built. Interactive `run0 -u agent`
   shells get the chain but not the unit's sandbox. A uid match does not
   cover work the principal hands to a daemon or a setuid helper, so check
   that whenever the agent gains a new tool. The `codex` plugin is fine on
