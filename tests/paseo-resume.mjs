@@ -64,12 +64,9 @@ await poll(d, { read });
 assert.deepEqual(d.sent, [['a', PROMPT]]);
 await poll(d, { read });
 assert.equal(d.sent.length, 1);
-// quota still out, or a dry run: nothing sent
+// quota still out: nothing sent
 d = daemon({ agents: () => [limited('b')], usedPct: 100 });
 await poll(d, { read });
-assert.equal(d.sent.length, 0);
-d = daemon({ agents: () => [limited('c')] });
-await poll(d, { read, dryRun: true });
 assert.equal(d.sent.length, 0);
 // archived while its usage refreshed: the daemon's list drops it, and it isn't sent
 let archived = false;

@@ -67,7 +67,6 @@ _: {
             relay.enabled = false;
           };
           features.webUi.enabled = true;
-          log.file.level = "info";
           agents.providers = {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];

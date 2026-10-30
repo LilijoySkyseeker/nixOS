@@ -1,6 +1,6 @@
 // paseo-resume: continue a Paseo agent whose turn stopped on a usage limit, once a
 // fresh usage report for its account shows the quota back.
-// usage: node resume-after-limit.mjs <paseo package> [--once] [--dry-run]
+// usage: node resume-after-limit.mjs <paseo package> [--once]
 import { open, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -83,7 +83,7 @@ async function readTranscript(cwd, session) {
 const backoff = new Map();
 
 // one pass over the daemon's agents
-export async function poll(client, { dryRun = false, read = readTranscript } = {}) {
+export async function poll(client, { read = readTranscript } = {}) {
   const { entries } = await client.fetchAgents({});
   const seen = new Set();
   for (const { agent } of entries) {
@@ -102,8 +102,7 @@ export async function poll(client, { dryRun = false, read = readTranscript } = {
       const { entries: now } = await client.fetchAgents({});
       const current = now.find((e) => e.agent.id === agent.id)?.agent;
       if (!current || !(await limitHit(current, read))) continue;
-      console.log(`${agent.id} resuming${dryRun ? ' (dry run)' : ''}: ${hit.slice(0, 120)}`);
-      if (dryRun) continue;
+      console.log(`${agent.id} resuming: ${hit.slice(0, 120)}`);
       await client.sendAgentMessage(agent.id, PROMPT);
       const tries = (b?.tries ?? 0) + 1;
       backoff.set(agent.id, { tries, notBefore: Date.now() + BACKOFF_MS * 2 ** (tries - 1) });
@@ -118,14 +117,13 @@ export async function poll(client, { dryRun = false, read = readTranscript } = {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [lib, ...flags] = process.argv.slice(2);
   const once = flags.includes('--once');
-  const dryRun = flags.includes('--dry-run');
   const { connectToDaemon } = await import(`${lib}/packages/cli/dist/utils/client.js`);
   const { selectDaemonTarget } = await import(`${lib}/packages/cli/dist/utils/daemon-target.js`);
   // a failed poll (the daemon still starting) exits; systemd starts it again
   for (;;) {
     const client = await connectToDaemon({ target: selectDaemonTarget({}, process.env, true) });
     try {
-      await poll(client, { dryRun });
+      await poll(client);
     } finally {
       await client.close().catch(() => {});
     }
