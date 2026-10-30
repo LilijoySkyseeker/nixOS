@@ -24,13 +24,9 @@ _: {
       # same card as agent-user's agentGpu: DRM numbering follows probe order
       gpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
 
-      # qwen's template raises on a system message after the first, which
-      # claude code sends mid-conversation; this one renders it as a system turn
+      # qwen's template raises on a system message after the first; this one
+      # renders it as a system turn
       qwenTemplate = ./local-ai/qwen3.8-mid-system.jinja;
-
-      modelIds = [
-        "qwen3.8-27b"
-      ];
 
       # gaming marker: survives a llama-swap restart mid-game, gone on reboot
       gamingMarker = "/run/local-ai/gaming";
@@ -43,8 +39,7 @@ _: {
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
         touch ${gamingMarker} || true
         # block loads first, so nothing reloads behind the unload
-        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
-          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active || true
+        ${setGaming} || true
         ${lib.getExe pkgs.curl} -s -m 14 -X POST ${swapUrl}/api/models/unload || true
       '';
       gamingEnd = pkgs.writeShellScript "local-ai-gaming-end" ''
@@ -169,19 +164,10 @@ _: {
               ];
             };
           };
-          # one model on the GPU at a time
-          routing.router = {
-            use = "group";
-            settings.groups.gpu = {
-              swap = true;
-              exclusive = true;
-              members = modelIds;
-            };
-          };
           # the gamemode hook's profile: every model answers 404, so nothing loads
           profiles.gaming = {
             description = "a game has the GPU: no model loads";
-            pins = lib.genAttrs modelIds (_: null);
+            pins = lib.genAttrs (lib.attrNames config.services.llama-swap.settings.models) (_: null);
           };
         };
       };
@@ -232,8 +218,7 @@ _: {
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          # the local model runs only in the codex harness: drop the old claude one
-          ${lib.getExe pkgs.jq} -s '(.[0] | del(.agents.providers.local)) * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
           # loads from sops; without one the file keeps whatever it has
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
