@@ -424,6 +424,10 @@ pkgs.testers.runNixOSTest {
         passphrase_re = re.compile(
             f"{spread('Please enter passphrase for disk')}|{spread('dictionary attack lock-out mode.')}"
         )
+        # so does the PIN prompt's: a new query also shows as the serial
+        # console agent's start line after that PIN's "Bad password."
+        bad_re = re.compile(spread("Bad password."))
+        query_re = re.compile(spread("Starting password query on /dev/ttyS0."))
 
         def after_wrong_pin(asked):
             deadline = time.monotonic() + 600
@@ -432,6 +436,9 @@ pkgs.testers.runNixOSTest {
                 if passphrase_re.search(console):
                     return "passphrase"
                 if len(pin_re.findall(console)) > asked:
+                    return "pin"
+                bad = list(bad_re.finditer(console))
+                if len(bad) >= asked and query_re.search(console, bad[asked - 1].end()):
                     return "pin"
                 assert time.monotonic() < deadline, "neither another PIN prompt nor the passphrase"
                 time.sleep(0.5)
