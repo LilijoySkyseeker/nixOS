@@ -11,7 +11,6 @@ fi
 
 agent_home=/home/agent
 research=/home/lilijoy/Documents/Vault/Research
-settings=$agent_home/.claude/settings.json
 state=$agent_home/.claude.json
 
 # run0 keeps the caller's cwd, which the other user may not be able to read
@@ -54,19 +53,11 @@ fix_mount() {
   systemctl restart home-agent-research.automount
 }
 
-chk_settings() {
-  jq -e '(.deniedMcpServers | any(.serverName == "claude-code-remote"))
-    and (.permissions.deny | index("RemoteTrigger")) and .disableClaudeAiConnectors' "$settings" >/dev/null 2>&1
-}
-fix_settings() { systemctl restart claude-agent-settings; }
-
 chk_egress() {
   iptables -C OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null &&
     ip6tables -C OUTPUT -m owner --uid-owner agent -j agent-egress 2>/dev/null
 }
 fix_egress() { systemctl reload firewall; }
-
-chk_git() { [ "$(as_agent git config user.name 2>/dev/null)" = "$BOT" ]; }
 
 chk_gh() { [ "$(as_agent gh api user -q .login 2>/dev/null)" = "$BOT" ]; }
 fix_gh() {
@@ -97,12 +88,7 @@ fix_codex_login() {
   as_agent codex login --device-auth || true
 }
 
-chk_codex_config() {
-  grep -qx 'sandbox_mode = "danger-full-access"' "$agent_home/.codex/config.toml" 2>/dev/null
-}
-fix_codex_config() { systemctl restart codex-agent-config; }
-
-# one key file for every harness: opencode's config and the media skill's curl read it
+# opencode's config reads it
 openrouter_key=$agent_home/.config/openrouter/key
 chk_openrouter() { as_agent test -s "$openrouter_key"; }
 fix_openrouter() {
@@ -115,9 +101,6 @@ fix_openrouter() {
   # shellcheck disable=SC2016
   printf '%s\n' "$key" | as_agent sh -c 'umask 077; cat > "$1"' sh "$openrouter_key"
 }
-
-chk_opencode_config() { jq -e '.share == "disabled"' "$agent_home/.config/opencode/opencode.json" >/dev/null 2>&1; }
-fix_opencode_config() { systemctl restart opencode-agent-config; }
 
 # `agy models` fails until someone has signed in
 chk_agy() { as_agent agy models </dev/null >/dev/null 2>&1; }
@@ -156,16 +139,12 @@ fi
 ok "agent-user module deployed"
 item "research folder" chk_research "create $research (as lilijoy)" fix_research
 item "research mount" chk_mount "reset and restart the research automount" fix_mount
-item "agent settings merged" chk_settings "rerun claude-agent-settings" fix_settings
 item "LAN/tailnet egress blocked" chk_egress "reload the firewall" fix_egress
-item "git identity" chk_git "it's declared by the module: switch" ""
 item "gh logged in as $BOT" chk_gh "log the agent's gh in as the bot" fix_gh
 item "Claude login and workspace trust" chk_claude "run claude once in ~agent/work" fix_claude
 item "Remote Control consent" chk_consent "run claude remote-control once" fix_consent
 item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
-item "codex config merged" chk_codex_config "rerun codex-agent-config" fix_codex_config
 item "OpenRouter key in place" chk_openrouter "paste an OpenRouter key for the agents" fix_openrouter
-item "OpenCode config merged" chk_opencode_config "rerun opencode-agent-config" fix_opencode_config
 item "Antigravity signed in" chk_agy "sign agy in with the Google account for the agents" fix_agy
 item "remote-control services running" chk_service "restart the agent services" fix_service
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""

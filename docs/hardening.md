@@ -266,8 +266,7 @@ here; it is already applied in the SSH bullet below.
   child of its own unit, and `agy`'s own background daemon would need a
   systemd user manager, which `agent` doesn't get (no linger). Through
   them the agent also holds the user's OpenRouter API key
-  (`~agent/.config/openrouter/key`, 0600, read by OpenCode and by
-  `openrouter-curl` for image, video and music generation) and a Google
+  (`~agent/.config/openrouter/key`, 0600, read by OpenCode) and a Google
   login, both written by `agent-setup`. The OpenRouter key should carry a
   credit limit, since anything running as `agent` can spend it. OpenCode's session sharing, which publishes a
   session as a public opencode.ai link, is off (`share = "disabled"`).

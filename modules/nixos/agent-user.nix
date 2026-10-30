@@ -128,15 +128,6 @@
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
       };
-      # cloud media and model calls with the owner's OpenRouter key
-      openrouterCurl = pkgs.writeShellApplication {
-        name = "openrouter-curl";
-        runtimeInputs = [
-          pkgs.coreutils
-          pkgs.curl
-        ];
-        text = builtins.readFile ./agent-tools/openrouter-curl.sh;
-      };
       # git identity: the bot's noreply address (its public GitHub id); gh
       # from PATH as the credential helper, since `gh auth setup-git` writes a
       # store path that the GC later removes
@@ -145,9 +136,6 @@
           name = ${bot}
           email = 338765425+${bot}@users.noreply.github.com
         [credential "https://github.com"]
-          helper =
-          helper = !gh auth git-credential
-        [credential "https://gist.github.com"]
           helper =
           helper = !gh auth git-credential
       '';
@@ -238,26 +226,13 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # how each harness runs an unattended job: its environment, the login
-      # it needs, and its command reading the prompt on stdin
-      jobHarnesses = {
-        claude = {
-          environment = claudeEnvironment;
-          login = "/home/agent/.claude/.credentials.json";
-          command = "${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
-        };
-        codex = {
-          environment = agentEnvironment;
-          login = "/home/agent/.codex/auth.json";
-          command = "${pkgs.codex}/bin/codex exec --skip-git-repo-check -C /home/agent/work -";
-        };
-      };
-      # an unattended run in the agent sandbox; the prompt is a file in
-      # ./agent-jobs, so a job changes only through a reviewed PR
-      agentJobWith = harness: description: prompt: {
+      # an unattended Claude run in the agent sandbox, reading the prompt on
+      # stdin; the prompt is a file in ./agent-jobs, so a job changes only
+      # through a reviewed PR
+      agentJob = description: prompt: {
         inherit description;
         inherit (agentUnitDeps) wants bindsTo after;
-        inherit (harness) environment;
+        environment = claudeEnvironment;
         serviceConfig =
           builtins.removeAttrs agentSandbox [
             "Restart"
@@ -267,16 +242,14 @@
             Type = "oneshot";
             StandardInput = "file:${prompt}";
             # fail, not skip, so a logged-out agent pages as a failed unit
-            ExecStartPre = "${pkgs.coreutils}/bin/test -e ${harness.login}";
+            ExecStartPre = "${pkgs.coreutils}/bin/test -e /home/agent/.claude/.credentials.json";
             # one job at a time: they share the vault reports and the nixOS
             # checkout, and two timers can fire together after downtime
-            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${harness.command}";
+            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
             # includes waiting on the lock behind the other jobs
             TimeoutStartSec = "18h";
           };
       };
-      # the scheduled jobs' default harness (see them below)
-      agentJob = agentJobWith jobHarnesses.claude;
       # codex app-server is the remote-control host; the managed daemon
       # (`codex remote-control start`) refuses a nix-packaged CLI
       codexRemote = pkgs.writeShellScript "codex-remote-control" ''
@@ -324,10 +297,7 @@
         homeMode = "711";
         description = "Claude agent (non-sensitive work)";
         packages = with pkgs; [
-          git
-          gh
           webFetch
-          openrouterCurl
           # the agent-only harnesses (claude and codex come with the PC profile)
           opencode
           antigravity-cli
@@ -421,9 +391,6 @@
                     pr = "";
                     sessionUrl = false;
                   };
-                  # no codex plugin: the agents call each other's own CLIs
-                  # (other-agents skill); off where it's still installed
-                  enabledPlugins."codex@openai-codex" = false;
                   # keep session transcripts ~forever (default deletes after 30 days; 0 is rejected)
                   cleanupPeriodDays = 36500;
                   # the built-in twins: routines and messages into the user's sessions
@@ -537,8 +504,7 @@
                   share = "disabled";
                   # nix owns the binary
                   update = "disable";
-                  # the key agent-setup writes, shared with openrouter-curl;
-                  # 2.0.32 ignores it in the newer `providers.*.settings` form
+                  # the key agent-setup writes; 2.0.32 ignores it in the newer `providers.*.settings` form
                   provider.openrouter.options.apiKey = "{file:/home/agent/.config/openrouter/key}";
                 }
               );
