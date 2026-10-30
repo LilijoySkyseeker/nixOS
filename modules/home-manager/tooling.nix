@@ -23,10 +23,6 @@ _: {
         lock = "f023";
         gear = "f013";
         hourglass = "f252";
-        python = "e73c";
-        rust = "e7a8";
-        go = "e627";
-        node = "e718";
       };
     in
     {
@@ -105,8 +101,12 @@ _: {
           ''
             set -o vi
 
-            # grc: colourise ping, df, ps, ...
-            GRC_ALIASES=true . ${pkgs.grc}/etc/profile.d/grc.sh
+            # grc colours output for commands that have no colour of their own;
+            # not grc's full alias list, which also wraps journalctl, ip, diff,
+            # head, tail and docker and loses their own colours, pager or tty
+            for c in blkid df dig du findmnt free id lsblk lsof lspci mount netstat ping ps ss traceroute traceroute6; do
+              alias "$c=${pkgs.grc}/bin/grc -es $c"
+            done
           ''
           # ble.sh attaches after every other integration has set up its hooks
           (lib.mkOrder 3000 ''
@@ -169,10 +169,6 @@ _: {
             "$jobs"
             "$direnv"
             "$nix_shell"
-            "$python"
-            "$rust"
-            "$golang"
-            "$nodejs"
             "$time"
             "[─╮](bright-black)"
             "$line_break"
@@ -274,26 +270,6 @@ _: {
             symbol = "${g.nixos} ";
             style = "fg:black bg:bright-blue";
             format = "[${g.left}](fg:bright-blue)[ $symbol$state( \\($name\\)) ]($style)";
-          };
-          python = {
-            symbol = "${g.python} ";
-            style = "fg:black bg:bright-blue";
-            format = "[${g.left}](fg:bright-blue)[ $symbol$version( \\($virtualenv\\)) ]($style)";
-          };
-          rust = {
-            symbol = "${g.rust} ";
-            style = "fg:black bg:red";
-            format = "[${g.left}](fg:red)[ $symbol$version ]($style)";
-          };
-          golang = {
-            symbol = "${g.go} ";
-            style = "fg:black bg:cyan";
-            format = "[${g.left}](fg:cyan)[ $symbol$version ]($style)";
-          };
-          nodejs = {
-            symbol = "${g.node} ";
-            style = "fg:black bg:green";
-            format = "[${g.left}](fg:green)[ $symbol$version ]($style)";
           };
           time = {
             disabled = false;
