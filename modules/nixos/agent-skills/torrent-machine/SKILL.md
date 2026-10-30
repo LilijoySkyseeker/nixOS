@@ -5,36 +5,18 @@ description: Facts and limits of torrent, the machine agents run on. Use before 
 
 # torrent: the machine you run on
 
-You run as the Unix user `agent` on torrent, the owner's NixOS desktop, in
-systemd units with a sandbox. The user, its units and the egress firewall
-are the boundary; the agents' own sandboxes are off (no permission prompts).
-
 ## Hardware (as of 2026-10-17)
 
-- CPU: AMD Ryzen 7 9800X3D, 8 cores / 16 threads, up to 5.27 GHz, 96 MiB L3
-- RAM: 96 GB, plus a 16 GiB swap partition
 - GPU: AMD Radeon RX 7900 XTX (24 GB VRAM, RDNA3 gfx1100), plus the CPU's
   iGPU. You get the 7900 XTX's render node in `/dev/dri` (Vulkan, VA-API)
   and `/dev/kfd` (ROCm). The display nodes (`card*`) and the iGPU are
   visible but refused, so a Vulkan program may print a harmless error about
   `renderD129`.
-- Disk: one 4 TB Samsung 990 PRO NVMe, a single ZFS pool (`zroot`) shared
-  with the owner's home and `/nix`, about 80-90% full
-- Board: Gigabyte X870 AORUS ELITE WIFI7 ICE; Linux 6.18, NixOS unstable
 
 ## Resources and caps
 
-Use the machine's full resources without asking: builds, tests and jobs in
-parallel and as large as the work needs. The limits are hard, so trying
-can't hurt the desktop.
-
-- Every agent session shares one `agent.slice`: 64 GiB of memory, 4096
-  tasks, a lower CPU weight (it only matters when the CPU is contended).
 - Nix builds run in the nix daemon, outside that cap, with 16 jobs and the
   `kvm` and `nixos-test` features, so NixOS VM tests run.
-- Disk is the one shared limit. Clean up caches, downloads and build
-  outputs you no longer need. `zfs list` doesn't work in the sandbox; use
-  `df`.
 
 ## The GPU is the owner's desktop card
 
@@ -59,10 +41,6 @@ leaves as you, through the same egress firewall.
 
 - No route to the LAN or the tailnet (the egress firewall rejects them),
   and no IPv6 egress.
-- torrent's DNS blocks some sites (some people-search brokers resolve to
-  nothing or to 127.0.0.1). Don't route around the resolver.
-- Localhost works: local services (the model server, Paseo) are reachable
-  on 127.0.0.1.
 
 ## Tools and quirks
 
