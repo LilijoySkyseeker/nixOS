@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const POLL_MS = 5 * 60_000;
-// after a resume that hits the limit again: wait 30 min, then 60, 120, ...
+// a resume that hits the limit again (a per-model window the summary skips): wait 30 min, then 60, 120, ...
 const BACKOFF_MS = 30 * 60_000;
 // enough of a transcript to reach its last turn
 const TAIL_BYTES = 256 * 1024;
@@ -59,7 +59,7 @@ export function quotaBack(reports) {
   );
 }
 
-// claude code keeps a session at ~/.claude/projects/<cwd, non-alphanumerics as ->/<id>.jsonl
+// claude code keeps a session at ~/.claude/projects/<cwd, non-alphanumerics as ->/<id>.jsonl, hashed past 200 characters, so the other dirs are searched
 async function readTranscript(cwd, session) {
   const projects = join(homedir(), '.claude', 'projects');
   const guess = cwd.replace(/[^a-zA-Z0-9]/g, '-');

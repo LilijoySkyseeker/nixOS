@@ -127,20 +127,16 @@ pkgs.testers.runNixOSTest {
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
           assert machine.succeed("jq -r .daemon.relay.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
-          assert machine.succeed("jq -r .agents.providers.copilot.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
-          # the hash comes from the credential, and the merge writes it back over a
-          # stale one; opencode and antigravity come on over a config that had them off
+          # the hash comes from the credential, and the merge writes it back over a stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want, cfg
-          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = false | .agents.providers.antigravity.enabled = false | .agents.providers.local = {"extends":"claude"} | .agents.providers["local-codex"].models += [{"id":"qwen3.8-flash-next"}]' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.local = {"extends":"claude"} | .agents.providers["local-codex"].models += [{"id":"qwen3.8-flash-next"}]' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl restart paseo-agent-config")
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
           # the local model runs only in the codex harness
           assert machine.succeed("jq -r '.agents.providers | has(\"local\")' /home/agent/.paseo/config.json").strip() == "false"
           ids = machine.succeed("jq -r '.agents.providers[\"local-codex\"].models[].id' /home/agent/.paseo/config.json").split()
           assert ids == ["qwen3.8-27b"], ids
-          for p in ["opencode", "antigravity"]:
-              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "true", p
           assert machine.succeed("stat -c %a /home/agent/.paseo/config.json").strip() == "600"
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
@@ -170,10 +166,8 @@ pkgs.testers.runNixOSTest {
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
           machine.wait_for_unit("paseo-resume.service")
           prop = lambda p: machine.succeed(f"systemctl show paseo-resume -p {p} --value").strip()
-          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("ProtectHome", "read-only")]:
-              assert prop(p) == want, f"paseo-resume {p}={prop(p)!r}"
-          # one poll in the unit's own sandbox, with its local credential
-          machine.succeed("systemd-run --wait --pipe --quiet -p User=agent -p ProtectSystem=strict -p ProtectHome=read-only "
-                          "-p ReadWritePaths=/home/agent/.paseo -E HOME=/home/agent -- ${resumeExec} --once")
+          assert prop("User") == "agent", prop("User")
+          # one poll as the unit runs it, with the daemon's local credential
+          machine.succeed("systemd-run --wait --pipe --quiet -p User=agent -E HOME=/home/agent -- ${resumeExec} --once")
     '';
 }

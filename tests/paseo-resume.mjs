@@ -1,4 +1,4 @@
-// The watcher on recorded provider messages and a fake daemon, offline.
+// The watcher on recorded provider messages and a fake daemon, offline: catches a missed or false limit (906537b).
 import assert from 'node:assert/strict';
 const { limitHit, quotaBack, poll, PROMPT } = await import(process.argv[2]);
 const limitText = "You've hit your session limit · resets 2:40pm (America/Los_Angeles)";

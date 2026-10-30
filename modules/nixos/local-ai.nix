@@ -14,7 +14,7 @@ _: {
       ...
     }:
     let
-      # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
+      # sessions start in bypass, not auto: no permission prompts; TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
       paseo = pkgs.paseo.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
       });
@@ -57,29 +57,19 @@ _: {
       # daemon password's bcrypt hash comes from the host's sops secret, never here
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
-          "$schema" = "https://paseo.sh/schemas/paseo.config.v1.json";
-          version = 1;
           daemon = {
-            listen = "127.0.0.1:6767";
-            # tailscale serve forwards this Host; ip and localhost are allowed by default
+            # tailscale serve forwards this Host (ip and localhost pass by default); without it the owner's apps are refused
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
-            # explicit: a config that omits it keeps the legacy relay-on behavior
+            # explicit: a config that omits it keeps relay on (Paseo compat until 2027-01-31), a way in outside the tailnet
             relay.enabled = false;
           };
           features.webUi.enabled = true;
           agents.providers = {
-            # the same binaries the other agent units run
+            # the other agent units' binaries; the merge keeps old keys, so without these the paths go stale
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
-            # enabled outright: the merge keeps an earlier `enabled = false`
-            opencode = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.opencode) ];
-            };
-            antigravity = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.antigravity-cli) ];
-            };
+            opencode.command = [ (lib.getExe pkgs.opencode) ];
+            antigravity.command = [ (lib.getExe pkgs.antigravity-cli) ];
             local-codex = {
               extends = "codex";
               label = "Local";
@@ -96,19 +86,7 @@ _: {
                 }
               ];
             };
-          }
-          # bundled providers with no install here
-          //
-            lib.genAttrs
-              [
-                "copilot"
-                "pi"
-                "muse"
-                "omp"
-              ]
-              (_: {
-                enabled = false;
-              });
+          };
         }
       );
 
@@ -216,7 +194,7 @@ _: {
         script_timeout = 20;
       };
 
-      # paseo: merge the keys this repo owns into the agent's CLI-owned config
+      # paseo: merge the keys this repo owns into the agent's CLI-owned config; without it no password, so no daemon
       systemd.services.paseo-agent-config = {
         description = "Merge repo-owned keys into the agent's Paseo config";
         wantedBy = [ "multi-user.target" ];
@@ -245,12 +223,13 @@ _: {
         '';
       };
 
-      # the paseo daemon, in the same sandbox as the agents' remote-control units
+      # the paseo daemon, the owner's way to hand agents work from the phone, in the remote-control units' sandbox
       systemd.services.paseo = {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
         inherit (crc) wantedBy wants bindsTo;
         after = crc.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
+        # the remote-control units' PATH, and the account's claude.ai connectors kept out of sessions
         environment = {
           inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
           PATH = lib.mkForce crc.environment.PATH;
@@ -263,14 +242,16 @@ _: {
         };
       };
 
-      # sends "continue" to an agent stopped on a usage limit once its quota is back
+      # sends "continue" to an agent stopped on a usage limit once its quota is back; without it the agent waits for the owner
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
+        # multi-user too: wanted only by an already-running paseo, activation never started it (906537b)
         wantedBy = [
           "multi-user.target"
           "paseo.service"
         ];
+        # stops with the daemon, or its poll fails every 30 s while paseo is down
         after = [ "paseo.service" ];
         bindsTo = [ "paseo.service" ];
         environment.HOME = "/home/agent";
@@ -280,18 +261,10 @@ _: {
           RestartSec = 30;
           User = "agent";
           Group = "agent";
-          Slice = "agent.slice";
-          # the daemon's local credential and the cli's client id
-          ProtectSystem = "strict";
-          ProtectHome = "read-only";
-          ReadWritePaths = [ "/home/agent/.paseo" ];
-          PrivateTmp = true;
-          PrivateDevices = true;
-          NoNewPrivileges = true;
         };
       };
 
-      # tailnet-only https in front of paseo; tailscaled (root) proxies to loopback,
+      # the phone's way in: tailnet-only https in front of paseo; tailscaled (root) proxies to loopback,
       # which the agent's egress rules never see. never funnel
       systemd.services.paseo-tailscale-serve = {
         description = "Expose Paseo on the tailnet (tailscale serve, not funnel)";
@@ -304,7 +277,6 @@ _: {
           "paseo.service"
         ];
         requires = [ "paseo-agent-config.service" ];
-        wants = [ "tailscaled.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";

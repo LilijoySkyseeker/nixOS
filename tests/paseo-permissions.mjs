@@ -1,4 +1,4 @@
-// Exercise the packaged adapters offline, including restored default modes.
+// Exercise the packaged adapters offline, including restored default modes: the patch's port after a Paseo bump.
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 const base = pathToFileURL(`${process.argv[2]}/lib/paseo/packages/server/dist/server/server/agent/`);
