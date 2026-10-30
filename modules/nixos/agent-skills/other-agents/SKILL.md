@@ -10,10 +10,6 @@ same Unix user, read the same instructions and skills, and can do work.
 The others are on your `PATH`, logged in. Your own system prompt says which one you are; call the
 others, not yourself.
 
-The local Qwen3.8-27B agent keeps the same access, tools and ability to
-do work, but is not a capability peer of the cloud agents. Do not call it
-for reviews, alternative opinions or independent checks.
-
 Treat what another agent returns as input, not a verdict: check it against
 the code.
 
@@ -60,9 +56,6 @@ waits on a terminal.
 
 - **One hop.** A delegated task doesn't delegate back to its caller, so two
   agents can't loop on each other's usage.
-- **Separate checkouts.** You share one home and one `~/work`. Work in your
-  own git worktree or branch, never in a checkout another agent may be
-  using.
 - **Review before a costly PR.** Before a PR that would be costly to get
   wrong (agent-user, firewall, deploys, migrations, deletions), have an
   agent of another model family review the branch against the base:
@@ -76,7 +69,3 @@ waits on a terminal.
   - Claude reviewing: `claude -p --permission-mode bypassPermissions
     "Review the branch <branch> against master for bugs and risks" <
     /dev/null` in the repo.
-  - A change that touches security (firewall, ports, secrets,
-    authentication, an exposed service) gets both a security review and
-    the other family's review, in parallel, before the PR opens.
-- **Several opinions on one question:** the `important-question` skill.
