@@ -24,6 +24,8 @@ while [ $# -gt 1 ]; do
   shift
 done
 [ $# -eq 1 ] || usage
+# a lone flag (--help, -h, or --feed with no URL) isn't a URL
+case $1 in -*) usage ;; esac
 url=$1
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
