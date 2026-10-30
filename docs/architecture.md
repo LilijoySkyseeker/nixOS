@@ -48,7 +48,7 @@ key:
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `encrypted-root`, `secure-boot`, `hibernate`, `hibernate-only`, `reboot-notice` |
 | `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch`, `update-keys` (home-manager) |
-| `homelab` | stable, own pin (`nixpkgs-homelab`) | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `factorio`, `hytale`, `octodns`, `nfs`, `samba` |
+| `homelab` | stable, own pin (`nixpkgs-homelab`) | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `hytale`, `octodns`, `nfs`, `samba` |
 | `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 
 ### Which nixpkgs a host tracks
@@ -130,7 +130,7 @@ not the boundary itself:
   surface inside their registration.
 - **`modules/services/`** (was top-level `services/`) — one-off NixOS
   service configs for things a specific host runs (jellyfin, immich,
-  beets, factorio, minecraft, hytale, octodns, nfs, samba), each
+  beets, minecraft, hytale, octodns, nfs, samba), each
   registering as `flake.modules.nixos.<name>` and listed per-host in
   `modules/flake/hosts.nix`. No options surface. Reach for
   `modules/services/` over an inline host-config block once the config is

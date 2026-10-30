@@ -76,13 +76,6 @@ _: {
             value = vpsPublicIp;
           }
         ];
-        factorio = [
-          {
-            type = "A";
-            ttl = 300;
-            value = vpsPublicIp;
-          }
-        ];
         # no SRV: Hytale clients don't look them up (server manual, "Future
         # Additions"), so the port stays the default 5520
         hytale = [
@@ -90,19 +83,6 @@ _: {
             type = "A";
             ttl = 300;
             value = vpsPublicIp;
-          }
-        ];
-        # SRV so players connect by hostname without ":port" (factorio >= 1.1.67)
-        "_factorio._udp.factorio" = [
-          {
-            type = "SRV";
-            ttl = 300;
-            value = {
-              priority = 0;
-              weight = 0;
-              port = 34197;
-              target = "factorio.${domainNoDot}.";
-            };
           }
         ];
       };

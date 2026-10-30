@@ -39,7 +39,7 @@ in
       ];
 
       # deny non-owner access to server state; mode only since the owning uid
-      # comes from the image (same as factorio.nix)
+      # comes from the image
       systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
 
       # docker userns-remap ownership migration; 1000 is itzg's baked-in uid

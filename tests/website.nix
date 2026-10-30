@@ -69,8 +69,6 @@ pkgs.testers.runNixOSTest {
         lib.mkForce "http://www.skyseekerlabs.net";
       services.caddy.virtualHosts."minecraft.skyseekerlabs.net".hostName =
         lib.mkForce "http://minecraft.skyseekerlabs.net";
-      services.caddy.virtualHosts."factorio.skyseekerlabs.net".hostName =
-        lib.mkForce "http://factorio.skyseekerlabs.net";
       services.caddy.virtualHosts."hytale.skyseekerlabs.net".hostName =
         lib.mkForce "http://hytale.skyseekerlabs.net";
 
@@ -148,7 +146,7 @@ pkgs.testers.runNixOSTest {
         assert "location: https://skyseekerlabs.net/projects/?x=1" in r.lower(), r
 
     with subtest("a game server's address in a browser goes to its oops page"):
-        for game in ["minecraft", "factorio", "hytale"]:
+        for game in ["minecraft", "hytale"]:
             r = get("/", host=f"{game}.skyseekerlabs.net")
             assert " 302" in r.splitlines()[0], r
             assert f"location: https://skyseekerlabs.net/oops/{game}/" in r.lower(), r

@@ -134,8 +134,8 @@ here; it is already applied in the SSH bullet below.
     ownership (Docker never adjusts that itself), VM-verified in
     `tests/docker-userns-remap.nix`. Wired into homelab, build-verified,
     **not deployed** — enabling it is disruptive, not a quiet flip:
-    it forces a full `dockerd` restart (not live-reloadable) and both
-    game containers re-pull their images on first activation, since
+    it forces a full `dockerd` restart (not live-reloadable) and the
+    Minecraft container re-pulls its image on first activation, since
     Docker's storage path changes per remap user. (`F-P4-07`)
 
 ### Observability

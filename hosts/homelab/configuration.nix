@@ -69,11 +69,6 @@
         protocol = "udp";
         comment = "minecraft: geyser bedrock listener";
       }
-      {
-        port = 34197;
-        protocol = "udp";
-        comment = "factorio";
-      }
     ];
   };
 
@@ -81,7 +76,7 @@
   virtualisation.oci-containers.backend = "docker";
 
   # container uid 0 != host uid 0; per-path uid migrations live in
-  # modules/services/{factorio,minecraft}.nix next to their paths
+  # modules/services/minecraft.nix next to its path
   myDockerUserns.enable = true;
 
   # update microcode
@@ -585,7 +580,7 @@
       "/var/lib/nixos" # to stop complaiing about uid and guid on reboot
       "/var/lib/tailscale" # node identity/state; authKeyFile is single-use
       "/var/lib/health-alerts" # alert dedup stamps
-      "/var/lib/docker" # container images/layers, avoids re-pulling minecraft/factorio images every boot
+      "/var/lib/docker" # container images/layers, avoids re-pulling the game server images every boot
       # no zrepl entry: its cursors, holds and bookmarks live in ZFS
       "/var/lib/restic-backups-backblazeWeekly" # last-success marker for staleness alerting
       "/var/lib/restore-drill" # restore-drill success marker, same staleness pattern
