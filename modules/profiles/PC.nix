@@ -61,6 +61,7 @@ in
         signal-desktop
         picard # music metadata tool
         calibre
+        readest # ebook reader; syncs with the phone and the Kindle (KOReader plugin)
 
         # closed source
         spotify

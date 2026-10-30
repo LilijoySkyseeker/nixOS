@@ -10,11 +10,14 @@ The Brother MFC-L2740DW on torrent prints and scans reliably.
 
 ## State
 
-Three fixes exist in the repo and have never been running on torrent
-(nothing was deployed between 2026-08-27 and the deploy-schedules PR):
+torrent runs all of it since the 10-11 deploy schedules. Checked
+2026-10-26 (agent-maintenance): the queue exists and is the default
+(`lpstat -p -d`). nixpkgs now adds `ensurePrinters` in `cups.service`'s
+`postStart` and has no `ensure-printers` unit, so the repo's retry and
+network-online ordering for that unit applied to nothing (systemd
+showed it as `bad-setting`) and were removed. If the queue goes missing
+after a boot, that race is back: the fix would go on `cups.service`.
 
-- `ensure-printers` gets `After=/Wants=network-online.target` and
-  restarts on failure, so it no longer fails on every boot.
 - Scanning uses Brother's closed-source `brscan4` driver (ADF duplex up
   to 9600 dpi), recognised by the real device before it was configured.
 - One scanner outage on 2026-09-16 was device-side; a power-cycle fixed it.
@@ -31,7 +34,5 @@ under `docs/plans/in-progress/`, deleted 2026-10-06.
 
 ## Next
 
-After torrent switches to the deploy-schedules change and reboots:
-check `systemctl status ensure-printers`, print a page, and scan a
-two-sided sheet through the ADF. Then decide whether the remaining
-glitches justify pinning the scanner.
+The owner prints a page and scans a two-sided sheet through the ADF, then
+decides whether the remaining glitches justify pinning the scanner.

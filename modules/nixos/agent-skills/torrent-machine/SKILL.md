@@ -70,8 +70,9 @@ leaves as you, through the same egress firewall.
   `newuidmap`). Unprivileged bubblewrap works and sees the GPU, so run
   upstream binaries or pip wheels in a `bwrap` or `buildFHSEnv` sandbox.
 - **direnv:** your shell doesn't load it. In a repo with an `.envrc`, run
-  `direnv allow` once, then `direnv exec <repo> <command>`. In the nixOS
-  repo that also wires up its git hooks.
+  `direnv allow` once, then `direnv exec <repo> <command>`. The nixOS
+  repo's clones and worktrees are already allowed, and there it also wires
+  up the git hooks (commit through `direnv exec . git commit`).
 - **Missing tools:** `nix shell nixpkgs#<pkg>` (for example `pciutils` for
   `lspci`, `sox`, `imagemagick`). `xvfb-run` is only inside `web-fetch`.
 - **Playwright:** there is no `/opt/pw-browsers`; launch with

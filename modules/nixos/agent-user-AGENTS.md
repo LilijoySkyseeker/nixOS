@@ -18,9 +18,6 @@ agent's work.
 
 - No permission prompts: the Unix user, its systemd units and the egress
   firewall are the boundary, not the agents' own sandboxes.
-- Within the agent account's existing OS boundaries, completing my requested
-  task authorizes the necessary local file edits, deletions, commands and cleanup.
-  Do not ask separately because an operation deletes or overwrites something.
 - By design you have no root, no secrets, no access to the owner's home,
   and no route to their LAN or tailnet. If a task needs root, a secret or
   a LAN host, say exactly what to run and why; the owner does it.
@@ -56,14 +53,10 @@ agent's work.
 - Keep notes in that `AGENTS.local.md` (git ignores it everywhere), never in
   a tool's built-in memory. Cross-project memory only when the owner asks.
 - Use the tool-neutral names: `AGENTS.md`, `AGENTS.local.md`. Never create
-  a `CLAUDE.md` or run `/init`. Conventions for instructions, skills and
-  settings: the `agent-config` skill.
+  a `CLAUDE.md` or run `/init`.
 
 ## Git and publishing
 
-- Your changes reach the owner as pull requests from your GitHub account.
-  You can't push to `master` of the `nixOS` repo; the owner reviews and
-  merges.
 - Open a PR as a draft while any of its work is still pending (a review,
   a test, an answer from the owner), and mark it ready only when nothing
   but the owner's review is left. The owner merges ready PRs.
@@ -86,19 +79,6 @@ agent's work.
   branch (in `repos/external/`, or a fork the owner made and gave you push
   access to), and tell the owner exactly what to post and where.
 
-## Tools
-
-- `web-research` skill: `web-fetch` for bot walls and feeds, paper routes.
-  The owner authorizes getting past bot walls when you read for their
-  work; the line is access control (no paywall or login bypass).
-- `other-agents` skill: calling the other agents for a second opinion,
-  review or handoff; review by another model family before a costly PR.
-- `local-ai` skill: the local model server and the local tools on the GPU.
-- `torrent-machine` skill: hardware, caps, VMs, network, shell quirks.
-- Scheduled jobs (flake update, maintenance, security watch) run
-  unattended from the nixOS repo's `modules/nixos/agent-jobs/` and report
-  in `~/research/Fleet/`. A new job is a PR there.
-
 ## Working with the owner
 
 - A problem isn't solved until the fix is declarative and reproducible as
@@ -109,9 +89,6 @@ agent's work.
 - When you put a decision to the owner, restate it in full every time: the
   problem, a concrete example, each option with its trade-offs, and your
   recommendation. Don't point back to "3a above".
-- A temporary workaround (a patch, an override, a stopgap waiting on an
-  upstream fix) gets a `# TODO: drop when <condition>` comment with a link,
-  so the weekly jobs remove it when the condition is met.
 - When the environment gets in your way (a missing tool, a sandbox or
   permission denial, a blocked network call, a hook or CLI misbehaving,
   this file being wrong or missing a fact), say so in one line in your

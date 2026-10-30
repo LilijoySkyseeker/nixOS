@@ -10,10 +10,6 @@ Conventions actually in use in this repo, not aspirational ones. See
 
 ## Formatting
 
-`nixfmt` is the formatter of record: 2-space indent, trailing commas,
-`with pkgs; [ ... ]` package lists. The pre-commit hook runs
-`nixfmt --check`, `statix` and `deadnix` on every staged `.nix` file.
-
 Separate, clearly commented top-level statements (`systemd.foo = …;`,
 `systemd.bar = …;`) beat one deeply nested block, which is why
 `statix.toml` turns off `repeated_keys`. Don't restructure code just to
@@ -21,51 +17,7 @@ silence a purely stylistic finding. The user on the immich module: "as
 long as things are organized and have the correct comment info next to
 them they are fine."
 
-## Module registration: `flake.modules.<class>.<name>`
-
-Every `.nix` file under `modules/` self-registers into
-`flake.modules.nixos.<name>` or `flake.modules.homeManager.<name>` —
-see `docs/architecture.md` for the mechanics. Two separate conventions
-live inside that one registration pattern:
-
-### Custom options modules: the `my<Name>` convention
-
-Many `modules/nixos/` files (`datasets.nix`,
-`health-alerts.nix`, `pull-deploy.nix`, `push-deploy.nix`, `zrepl.nix`,
-among others) define a real NixOS options surface, not just plain
-config. These follow one consistent shape:
-
-```nix
-{
-  flake.modules.nixos."push-deploy" =
-    { config, lib, ... }:
-    let
-      cfg = config.myPushDeploy;
-    in
-    {
-      options.myPushDeploy = {
-        enable = lib.mkEnableOption "...";
-        # ...other options via lib.mkOption
-      };
-
-      config = lib.mkIf cfg.enable {
-        # ...
-      };
-    };
-}
-```
-
-- Option namespace is `my<CamelCaseModuleName>` (e.g. `myPushDeploy`,
-  `myPullDeploy`) — deliberately prefixed so it can't collide with an
-  upstream NixOS/home-manager option of the same shape. This is
-  unrelated to the `flake.modules.nixos.<name>` registration key —
-  the registration key is how the module gets pulled into a host; the
-  `my<Name>` option namespace is how that module exposes its own
-  settings once included.
-- Always gated behind `enable` via `lib.mkIf cfg.enable`, even when a
-  host is the module's only consumer — keeps the module inert by
-  default and the enable/disable surface explicit at the host/profile
-  level instead of buried in the module.
+## Custom options modules: the `my<Name>` convention
 
 Reach for this pattern only when the config is genuinely parameterized
 (multiple hosts want it with different settings, or it needs an
@@ -73,85 +25,10 @@ enable/disable toggle). If a host is the config's only consumer and
 there's nothing to parameterize, a plain `modules/*/*.nix` file
 is simpler — see `docs/architecture.md`'s module-organization section.
 
-Everything else — `modules/services/*.nix`, `modules/profiles/*.nix`,
-`modules/home-manager/*.nix`, and most of `modules/nixos/` (`kde.nix`,
-`wooting.nix`, etc.) — registers into `flake.modules.*` but is a plain
-config attrset inside that registration, no custom options surface.
-That's the default; don't add an options layer without a reason.
-
-### Registration key vs. filename
-
-The `flake.modules.nixos.<name>`/`flake.modules.homeManager.<name>`
-key is what other files and `modules/flake/hosts.nix` actually
-reference — it does not have to match the filename, and several don't:
-`modules/profiles/PC.nix` registers as `"profile-pc"`,
-`modules/profiles/default.nix` as `"profile-default"`,
-`modules/profiles/server.nix` as `"profile-server"`,
-`modules/nixos/nfs-homelab-mounts.nix` as `"nfs-homelab-mounts"`. When
-a new module's registration key would diverge from its filename in a
-non-obvious way, say so directly, in the file or in the owning
-folder's README — a reader who greps by filename and finds nothing
-shouldn't have to reverse-engineer the key from the file's contents.
-See `docs/architecture.md`'s "Navigating: what does host X actually run?"
-for how this is used in practice.
-
-## Why context: the commit message, not comments
-
-Non-obvious rationale — a workaround, a surprising constraint, a
-tradeoff, an incident the config is defending against — belongs in the
-commit message (and the PR description for the bigger picture), not an
-inline comment. `git blame` on the line leads straight to it. Split a
-change into several commits if different parts need different reasons.
-
-A comment may carry the *constraint* when the code would look wrong
-without it (`# must come after the recursive acl rule or the next boot
-wipes it`), in one or two lines. Not the history: no "originally",
-"found in review", incident narrative, alternatives considered, or plan
-ids.
-
-Older code carries `# plan: <date>-<slug>.md#D2` citations into the
-archived plans under `docs/plans/`. They still resolve; don't add new
-ones.
-
 ## Inline comments
 
-- Lowercase start, no terminal period, terse fragments over full
-  sentences: `# DigitalOcean's only world facing interface`,
-  `# zram instead to prevent secrets leakage`.
-- Comment sits directly above the code it explains, no blank line
-  between them; a blank line separates it from the previous unrelated
-  block. Short annotations on a single value may trail on the same
-  line instead (`sourcePort = 19132; # minecraft: geyser (bedrock
-  edition)`, `51820 # wireguard`).
-- Name the actual actor/constraint causing the behavior rather than
-  describing generically: `# DigitalOcean's hypervisor virtual switch
-  needs cloud-init to run and "register"/arm the droplet's network
-  before it'll pass any traffic for that NIC`.
-- A single-line comment can act as a section banner introducing a
-  block of related settings, often `# tool: purpose` when the
-  tool/subsystem isn't already obvious from the surrounding attribute
-  names: `# minecraft: cap new-connection attempts per source IP`.
-- Multi-line embedded shell scripts get one comment per branch,
-  phrased as what triggers it and naming the calling tool:
-  `# nixos-rebuild's pre-activation sanity check`.
-- Inline `# TODO:` marks known-incomplete config on the same line as
-  the affected declaration.
 - A temporary workaround (a patch, an override, a stopgap until an
   upstream fix reaches a channel) says when it goes:
   `# TODO: drop when NixOS/nixpkgs#576063 is in nixos-unstable`. The
   weekly agent jobs `git grep "TODO: drop when"` and remove the ones whose
   condition is met.
-- See `hosts/vps/configuration.nix` for a dense example of all of the
-  above in one file.
-
-## Naming
-
-- Host names are the literal hostname (`thinkpad`, `torrent`, `homelab`,
-  `vps`), matching `flake.nixosConfigurations.<name>` in
-  `modules/flake/hosts.nix`.
-- `modules/services/*.nix` files are named after the service they
-  configure (`jellyfin.nix`, `minecraft.nix`), not the host that runs
-  it.
-- Custom module option namespaces use `my<CamelCase>` as above — this
-  is separate from the `flake.modules.<class>.<name>` registration key,
-  which may or may not match the filename (see above).
