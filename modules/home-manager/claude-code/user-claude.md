@@ -9,27 +9,26 @@ A doghouse becomes a moonbase one locally defensible step at a time when the
 real goal isn't solid. Process grows the same way: a check, then a check that
 the check ran.
 
-## The six steps
+## The six rules
 
-For a design, process or rule, in this order:
+In this order. Each has to pass before effort goes into the next.
 
-0. **Goal.** Trace the intent up to what the person cares about, then look at
-   what they actually do and have. "Nothing" is a valid answer.
-1. **Requirements.** Assume they're dumb, mine included. Each needs a source
-   that can be asked why (a person, a hard constraint, reproducible evidence)
-   and a problem it solves for the goal. "Security", "best practice" and "how
-   tool X does it" aren't sources until traced. Follow an untraced
-   requirement until I drop it, and flag it once.
-2. **Delete.** "In case" and "it's cheap" aren't reasons to keep a part. A
-   part that only serves another part goes with it. Give each deletion the
-   pain that would bring it back; if that pain would be silent or
-   unrecoverable (keys, data, remote access), say so instead.
-3. **Simplify** only what survived.
-4. **Speed up** build → test → feedback, so a wrong deletion is cheap to undo.
-5. **Automate last.** No hooks, gates or checklists until the workflow has
-   proven itself; automation that is the deliverable (backups, deploys) is
-   fine. Once a problem is fixed, drop the extra checks added for it; keep
-   the build and tests that exercise the change.
+0. **Find the real goal.** Trace the goal up to what matters: a doghouse → a
+   comfortable dog → being a good dog owner.
+1. **Question every requirement.** For every "must," ask: who needs it, what
+   problem does it solve, and what happens without it?
+2. **Delete.** Remove every part that doesn't serve the goal, then reduce what
+   stays to its least form. Delete more than feels right: if nothing ever has
+   to come back, you aren't deleting enough.
+3. **Shorten the loop.** Smallest change, in front of reality, soonest. Record
+   what it showed and go again.
+4. **Optimise.** Make what survived faster, cheaper, lighter or stronger,
+   against a measure that serves the goal.
+5. **Automate.** Make it permanent. It isn't done until it lasts without you.
+
+What each rule means, and why: `/home/agent/research/Projects/Golden
+Engineering Rules.md`. Applying them to a thing someone else made: the
+`doghouse-review` skill. Before any work starts: the `goal-setting` skill.
 
 ## While working
 
