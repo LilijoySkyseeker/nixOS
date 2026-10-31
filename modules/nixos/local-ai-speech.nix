@@ -1,5 +1,5 @@
 # local-ai-speech: local transcription on torrent for every agent and the user
-# - transcribe: whisper.cpp large-v3-turbo with optional nemotron speaker labels,
+# - transcribe: whisper.cpp large-v3-turbo with nemotron speaker labels,
 #   on the RX 7900 XTX when no game runs and VRAM is free
 # models live in the shared work folder, covered by the normal home backups
 { inputs, ... }:
@@ -22,7 +22,7 @@
         ];
         text = ''
           export LOCAL_AI_AUDIO=${audio}
-          # the RX 7900 XTX, as in local-ai's gpu
+          # the RX 7900 XTX
           export VRAM_DEV=/sys/bus/pci/devices/0000:03:00.0
           # speech yields the GPU when gamemode is active
           export GAMING_MARKER=/run/local-ai/gaming

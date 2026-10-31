@@ -11,6 +11,7 @@ _: {
       config,
       lib,
       pkgs,
+      agentUnit,
       ...
     }:
     let
@@ -21,23 +22,12 @@ _: {
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
       swapUrl = "http://127.0.0.1:${toString config.services.llama-swap.port}";
-      # same card as agent-user's agentGpu: DRM numbering follows probe order
-      gpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
 
-      # qwen's template raises on a system message after the first, which
-      # claude code sends mid-conversation; this one renders it as a system turn
+      # qwen's template raises on a system message after the first; this one
+      # renders it as a system turn
       qwenTemplate = ./local-ai/qwen3.8-mid-system.jinja;
 
-      modelIds = [
-        "qwen3.8-27b"
-      ];
-
-      # gaming marker: survives a llama-swap restart mid-game, gone on reboot
       gamingMarker = "/run/local-ai/gaming";
-      setGaming = pkgs.writeShellScript "local-ai-set-gaming" ''
-        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
-          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active
-      '';
 
       # gamemode runs these as the user who started the game
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
@@ -72,15 +62,6 @@ _: {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
-            # enabled outright: the merge keeps an earlier `enabled = false`
-            opencode = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.opencode) ];
-            };
-            antigravity = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.antigravity-cli) ];
-            };
             local-codex = {
               extends = "codex";
               label = "Local";
@@ -103,6 +84,8 @@ _: {
             lib.genAttrs
               [
                 "copilot"
+                "opencode"
+                "antigravity"
                 "pi"
                 "muse"
                 "omp"
@@ -123,90 +106,46 @@ _: {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
       };
-      # paseo copies this unit's sandbox
-      crc = config.systemd.services.claude-remote-control;
     in
     {
-      # model store: the agent and lilijoy download into it, llama-swap reads it
+      # model store: the agent downloads into it, llama-swap reads it
       users.groups.models = { };
-      users.users.lilijoy.extraGroups = [ "models" ];
       systemd.tmpfiles.rules = [
-        "d ${models} 2775 root models -"
-        # group-writable whoever creates a file, world-readable for llama-swap's dynamic user
-        "a+ ${models} - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::r-x"
+        "d ${models} 0775 root models -"
         # the gamemode hooks run as whoever plays
         "d /run/local-ai 1777 root root -"
       ];
 
-      systemd.services.claude-remote-control.serviceConfig = agentModelAccess;
-      systemd.services.codex-remote-control.serviceConfig = agentModelAccess;
-
       services.llama-swap = {
         enable = true;
-        listenAddress = "127.0.0.1";
-        port = 8080;
         settings = {
           # no stored request/response bodies: private prompts stay out of its api
           captureBuffer = 0;
-          # only llama-swap's own ui may read responses in a browser; the
-          # permissive default lets any web page read loopback (firefox has
-          # no private network access check)
-          security.cors.allowedOrigins = [
-            "http://127.0.0.1:8080"
-            "http://localhost:8080"
-          ];
           globalTTL = 300;
           models = {
             "qwen3.8-27b" = {
-              description = "Qwen3.8-27B, fully on the GPU, vision on the CPU";
               cmd = lib.concatStringsSep " " [
                 llamaServer
                 "--port \${PORT}"
                 "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD-Q4_K_M.gguf"
-                "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf --no-mmproj-offload"
-                "-ngl 99 -fa on -c 131072"
-                "--jinja --chat-template-file ${qwenTemplate}"
+                "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf"
+                "-ngl 99 -c 131072"
+                "--chat-template-file ${qwenTemplate}"
               ];
-            };
-          };
-          # one model on the GPU at a time
-          routing.router = {
-            use = "group";
-            settings.groups.gpu = {
-              swap = true;
-              exclusive = true;
-              members = modelIds;
             };
           };
           # the gamemode hook's profile: every model answers 404, so nothing loads
           profiles.gaming = {
-            description = "a game has the GPU: no model loads";
-            pins = lib.genAttrs modelIds (_: null);
+            pins = lib.genAttrs (lib.attrNames config.services.llama-swap.settings.models) (_: null);
           };
         };
       };
 
       systemd.services.llama-swap = {
-        # the module leaves all of /dev open for GPU access; narrow it to the render node
         serviceConfig = {
-          PrivateDevices = lib.mkForce true;
-          BindPaths = [ "-/dev/dri" ];
-          DeviceAllow = [ "${gpu} rw" ];
-          SupplementaryGroups = [ "render" ];
-          # bound model loading and CPU vision memory alongside the desktop
-          MemoryMax = "80G";
           # loopback only: models come from /srv/models, never the network
           IPAddressAllow = "localhost";
           IPAddressDeny = "any";
-          # a restart mid-game starts with no profile: reapply the block
-          ExecStartPost = pkgs.writeShellScript "local-ai-restore-gaming" ''
-            [ -e ${gamingMarker} ] || exit 0
-            for _ in $(${pkgs.coreutils}/bin/seq 50); do
-              ${setGaming} >/dev/null && exit 0
-              ${pkgs.coreutils}/bin/sleep 0.2
-            done
-            exit 1
-          '';
         };
       };
 
@@ -214,7 +153,6 @@ _: {
       programs.gamemode.settings.custom = {
         start = "${gamingStart}";
         end = "${gamingEnd}";
-        script_timeout = 20;
       };
 
       # paseo: merge the keys this repo owns into the agent's CLI-owned config
@@ -232,8 +170,7 @@ _: {
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          # the local model runs only in the codex harness: drop the old claude one
-          ${lib.getExe pkgs.jq} -s '(.[0] | del(.agents.providers.local)) * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
           # loads from sops; without one the file keeps whatever it has
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
@@ -246,22 +183,27 @@ _: {
         '';
       };
 
-      # the paseo daemon, in the same sandbox as the agents' remote-control units
+      # the paseo daemon, in the same sandbox as the agents' units
       systemd.services.paseo = {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
-        inherit (crc) wantedBy wants bindsTo;
-        after = crc.after ++ [ "paseo-agent-config.service" ];
+        inherit (agentUnit)
+          wantedBy
+          wants
+          bindsTo
+          environment
+          ;
+        after = agentUnit.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
-        environment = {
-          inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
-          PATH = lib.mkForce crc.environment.PATH;
-        };
-        serviceConfig = crc.serviceConfig // {
-          # without a password paseo grants owner rights to any client, and a
-          # web page's websocket to loopback needs no cors: no password, no daemon
-          ExecCondition = "${paseoHasPassword}";
-          ExecStart = "${lib.getExe paseo} daemon run";
-        };
+        serviceConfig = lib.mkMerge [
+          agentUnit.serviceConfig
+          agentModelAccess
+          {
+            # without a password paseo grants owner rights to any client, and a
+            # web page's websocket to loopback needs no cors: no password, no daemon
+            ExecCondition = "${paseoHasPassword}";
+            ExecStart = "${lib.getExe paseo} daemon run";
+          }
+        ];
       };
 
       # sends "continue" to an agent stopped on a usage limit once its quota is back

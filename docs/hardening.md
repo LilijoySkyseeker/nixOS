@@ -240,9 +240,8 @@ here; it is already applied in the SSH bullet below.
 - **The `agent` user (torrent only, `modules/nixos/agent-user.nix`).** An
   untrusted local principal: a normal user in its own `agent` group with
   no extra groups, `nix.settings.allowed-users` but never `trusted-users`,
-  `DenyUsers agent` in sshd, and sandboxed `claude-remote-control` and
-  `codex-remote-control` units (one shared `agent.slice` memory and task
-  cap) that run agent sessions with no permission prompts. Their private
+  `DenyUsers agent` in sshd, and sandboxed units (one shared `agent.slice`
+  memory cap) that run agent sessions with no permission prompts. Their private
   `/dev` carries only the pseudo devices plus, through `DeviceAllow`, the
   RX 7900 XTX's render node, `/dev/kfd` and `/dev/kvm`: the GPU's display
   nodes and the iGPU are visible but refused by the device cgroup, and
@@ -253,8 +252,9 @@ here; it is already applied in the SSH bullet below.
   rejected, and IPv6 is rejected outright except on loopback. The
   `nixbld` jump applies to **every** user's fixed-output builds, lilijoy's
   included, so on torrent no build can fetch from a LAN or tailnet address,
-  or over IPv6 at all. Both units are `bindsTo` `firewall.service`, because a
-  stopped or failed firewall drops the chain. Interactive `run0 -u agent`
+  or over IPv6 at all. The chain stays through a firewall stop or
+  reload, and the units are `bindsTo` `firewall.service`, because a failed
+  start can leave it half-built. Interactive `run0 -u agent`
   shells get the chain but not the unit's sandbox. A uid match does not
   cover work the principal hands to a daemon or a setuid helper, so check
   that whenever the agent gains a new tool. The `codex` plugin is fine on
@@ -262,15 +262,6 @@ here; it is already applied in the SSH bullet below.
   and unit, and reaches OpenAI over public egress. It does mean the agent
   holds a login to the user's ChatGPT account (`~agent/.codex/auth.json`,
   written by `agent-setup`), as it already holds their Claude one.
-  OpenCode and Antigravity (`agy`) are the same: Paseo runs each as a
-  child of its own unit, and `agy`'s own background daemon would need a
-  systemd user manager, which `agent` doesn't get (no linger). Through
-  them the agent also holds the user's OpenRouter API key
-  (`~agent/.config/openrouter/key`, 0600, read by OpenCode and by
-  `openrouter-curl` for image, video and music generation) and a Google
-  login, both written by `agent-setup`. The OpenRouter key should carry a
-  credit limit, since anything running as `agent` can spend it. OpenCode's session sharing, which publishes a
-  session as a public opencode.ai link, is off (`share = "disabled"`).
   `~agent/work` is shared the other way: lilijoy is in group `agent`, the
   home is `711` and `work` is `2770` with a default ACL. That grants the
   agent nothing. What it does open is the agent writing files that
@@ -281,20 +272,17 @@ here; it is already applied in the SSH bullet below.
   `~/Projects/agenticsandbox/`.)
 - **`local-ai` on torrent (`modules/nixos/local-ai.nix`).** Every service
   listens on loopback only, and the agent can reach all of them.
-  - **`llama-swap`:** a DynamicUser with the module's hardening, plus a
-    private `/dev` holding only the RX 7900 XTX render node, an `IPAddress`
-    allowlist of localhost and a `MemoryMax`. Its API has no auth, so any
+  - **`llama-swap`:** a DynamicUser with the module's hardening, plus an
+    `IPAddress` allowlist of localhost. Its API has no auth, so any
     local process can load or unload models or switch its `gaming`
     profile.
-  - **`paseo`:** runs as `agent` in a copy of `claude-remote-control`'s
-    sandbox and is published to the tailnet by `tailscale serve`, never
+  - **`paseo`:** runs as `agent` in the agents' unit sandbox and is published to the tailnet by `tailscale serve`, never
     Funnel. tailscaled proxies as root to loopback, so the agent's egress
     chain never sees the traffic. Paseo's own password is the only
     application-level gate. Its relay is pinned off (`daemon.relay.enabled
     = false`), because a config that omits the key keeps the legacy
     relay-on behavior.
-  - **`/srv/models`:** group `models` with a default ACL. The agent and
-    lilijoy write to it and `llama-swap` reads it, so a malicious model
+  - **`/srv/models`:** group `models`. The agent writes to it and `llama-swap` reads it, so a malicious model
     file reaches llama.cpp's GGUF parser as an unprivileged user with the
     GPU.
 - **Local transcription (`modules/nixos/local-ai-speech.nix`).** Runs as

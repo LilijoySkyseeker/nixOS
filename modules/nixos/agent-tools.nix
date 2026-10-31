@@ -12,7 +12,6 @@ _: {
         file
         unzip
         perl
-        bc
         binutils # strings
         xxd
       ];
