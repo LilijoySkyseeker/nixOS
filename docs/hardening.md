@@ -273,9 +273,8 @@ here; it is already applied in the SSH bullet below.
   `~/Projects/agenticsandbox/`.)
 - **`local-ai` on torrent (`modules/nixos/local-ai.nix`).** Every service
   listens on loopback only, and the agent can reach all of them.
-  - **`llama-swap`:** a DynamicUser with the module's hardening, plus a
-    private `/dev` holding only the RX 7900 XTX render node, an `IPAddress`
-    allowlist of localhost and a `MemoryMax`. Its API has no auth, so any
+  - **`llama-swap`:** a DynamicUser with the module's hardening, plus an
+    `IPAddress` allowlist of localhost. Its API has no auth, so any
     local process can load or unload models or switch its `gaming`
     profile.
   - **`paseo`:** runs as `agent` in the agents' unit sandbox and is published to the tailnet by `tailscale serve`, never
@@ -284,8 +283,7 @@ here; it is already applied in the SSH bullet below.
     application-level gate. Its relay is pinned off (`daemon.relay.enabled
     = false`), because a config that omits the key keeps the legacy
     relay-on behavior.
-  - **`/srv/models`:** group `models` with a default ACL. The agent and
-    lilijoy write to it and `llama-swap` reads it, so a malicious model
+  - **`/srv/models`:** group `models`. The agent writes to it and `llama-swap` reads it, so a malicious model
     file reaches llama.cpp's GGUF parser as an unprivileged user with the
     GPU.
 - **Local transcription (`modules/nixos/local-ai-speech.nix`).** Runs as
