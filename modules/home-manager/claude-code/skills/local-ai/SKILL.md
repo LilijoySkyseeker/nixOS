@@ -37,10 +37,9 @@ curl -s 127.0.0.1:8080/v1/chat/completions -H 'content-type: application/json' \
 
 `transcribe FILE` prints `[hh:mm:ss] speaker_N: text` lines. Whisper
 large-v3-turbo handles speech recognition in every supported language;
-Nemotron optionally adds speaker labels. Use `--no-speakers` for a plain
-timestamped transcript, `-l auto` to detect the language or `-l de`,
+Nemotron adds speaker labels. Use `-l auto` to detect the language or `-l de`,
 `-l ja`, etc. to select it. One language per file: `-l auto` detects it
-once. `-o DIR` keeps the transcript and JSON. Any format ffmpeg reads,
+once. Any format ffmpeg reads,
 video included.
 
 Transcription uses the GPU directly, outside llama-swap, when no game runs
