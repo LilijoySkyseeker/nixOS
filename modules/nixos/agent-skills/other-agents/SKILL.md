@@ -5,14 +5,10 @@ description: The other agents installed on torrent and how to call them non-inte
 
 # The other agents
 
-Claude Code, Codex, OpenCode, Antigravity and the local model run as the
+Claude Code, Codex and the local model run as the
 same Unix user, read the same instructions and skills, and can do work.
 The others are on your `PATH`, logged in. Your own system prompt says which one you are; call the
 others, not yourself.
-
-The local Qwen3.8-27B agent keeps the same access, tools and ability to
-do work, but is not a capability peer of the cloud agents. Do not call it
-for reviews, alternative opinions or independent checks.
 
 Treat what another agent returns as input, not a verdict: check it against
 the code.
@@ -26,20 +22,8 @@ waits on a terminal.
 |---|---|
 | Claude (Anthropic) | `claude -p --permission-mode bypassPermissions "<task>" < /dev/null` |
 | Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (for web search, `codex --search exec ...`: it's a top-level flag) |
-| OpenCode, any OpenRouter model | `opencode run --standalone -m openrouter/<vendor>/<model> "<task>" < /dev/null` |
-| Antigravity (Google Gemini) | `agy --dangerously-skip-permissions -p "<task>" < /dev/null` (`-p` takes the next word as the prompt) |
 | Local model (Codex harness) | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
 
-- OpenCode reaches most open-weight and frontier models through the
-  owner's OpenRouter key, paid per token, so pick the model for the task:
-  `opencode models --standalone | grep '^openrouter/'` lists them. Without
-  `-m` it picks one itself. The `opencode/*` models are free, but some
-  may train on what you send. `--standalone` uses a private server
-  instead of OpenCode's background service.
-- Antigravity runs Gemini on a free Google account set aside for the
-  agents, which has weekly limits; `agy models` lists what it gets. It
-  isn't logged in yet (2026-10-26): it stops at "You are not logged into
-  Antigravity", so use Codex or OpenCode for another family until then.
 - Codex on the owner's Plus plan can run out partway through a long
   review ("You've hit your usage limit ... try again at <time>") and still
   exit 0. Check the output for "usage limit" before trusting a Codex
@@ -53,16 +37,12 @@ waits on a terminal.
 - The local model is free and uncapped but slower and weaker than the
   cloud models. It's the one to use for private material and for work the
   cloud models refuse, with its output checked. It hallucinated review
-  results in an earlier session (owner, 2026-10-23); keep it out of
-  review and opinion workflows.
+  results in an earlier session (owner, 2026-10-23).
 
 ## Rules
 
 - **One hop.** A delegated task doesn't delegate back to its caller, so two
   agents can't loop on each other's usage.
-- **Separate checkouts.** You share one home and one `~/work`. Work in your
-  own git worktree or branch, never in a checkout another agent may be
-  using.
 - **Review before a costly PR.** Before a PR that would be costly to get
   wrong (agent-user, firewall, deploys, migrations, deletions), have an
   agent of another model family review the branch against the base:
@@ -76,7 +56,3 @@ waits on a terminal.
   - Claude reviewing: `claude -p --permission-mode bypassPermissions
     "Review the branch <branch> against master for bugs and risks" <
     /dev/null` in the repo.
-  - A change that touches security (firewall, ports, secrets,
-    authentication, an exposed service) gets both a security review and
-    the other family's review, in parallel, before the PR opens.
-- **Several opinions on one question:** the `important-question` skill.
