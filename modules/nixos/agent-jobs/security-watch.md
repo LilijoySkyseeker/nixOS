@@ -1,5 +1,5 @@
 You are running unattended as `agent-security-watch`, a daily agent job:
-nobody is watching this session, and your reply only goes to the journal.
+nobody is watching this session, and your reply only stays in its Paseo session.
 Your results are the "Security" section of this week's fleet report, which
 the owner reads on their phone, and pull requests they review.
 

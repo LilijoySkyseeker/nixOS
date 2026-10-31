@@ -23,6 +23,8 @@ pkgs.testers.runNixOSTest {
       users.users.lilijoy.isNormalUser = true;
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
+      # mirror torrent: the agent jobs' schedules use it
+      time.timeZone = "America/Los_Angeles";
       # no tailnet in the VM
       systemd.services.paseo-tailscale-serve.wantedBy = lib.mkForce [ ];
       # stands in for torrent's sops secret: bcrypt of "vm-secret"
@@ -70,6 +72,7 @@ pkgs.testers.runNixOSTest {
       with subtest("paseo: agent sandbox"):
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
+          assert machine.succeed("jq -r .daemon.mcp.injectIntoAgents /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
           # stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
@@ -80,9 +83,20 @@ pkgs.testers.runNixOSTest {
           for p in ["opencode", "antigravity"]:
               assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "false", p
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
-          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
+          # every agent session and scheduled job runs in this unit
+          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes"),
+                          ("PrivateTmp", "yes"), ("ProtectSystem", "strict")]:
               assert prop(p) == want, f"paseo {p}={prop(p)!r}"
+          assert "/home/agent" in prop("ReadWritePaths"), prop("ReadWritePaths")
+          for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
+              assert sock in prop("InaccessiblePaths"), f"{sock} not inaccessible: {prop('InaccessiblePaths')!r}"
           assert "firewall.service" in prop("BindsTo"), prop("BindsTo")
+          assert "firewall.service" in prop("After"), prop("After")
+          allow, binds = prop("DeviceAllow"), prop("BindPaths")
+          for dev in ["/dev/kvm", "/dev/kfd", "/dev/dri/by-path/"]:
+              assert dev in allow, f"{dev} not allowed: {allow!r}"
+          assert "/dev/dri" in binds and "/dev/kvm" in binds, binds
+          assert "tun" not in allow + binds, "tun exposed"
           # no password (the hash removed): the daemon declines to start
           machine.succeed("systemctl stop paseo")
           machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
@@ -99,5 +113,27 @@ pkgs.testers.runNixOSTest {
 
       with subtest("paseo-resume: decides on recorded limit messages"):
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
+
+      with subtest("agent-schedules: the jobs declared in the daemon, kept in step"):
+          paseo = "runuser -u agent -- env HOME=/home/agent /etc/profiles/per-user/agent/bin/paseo"
+          names = lambda: machine.succeed(f"{paseo} schedule ls --json | jq -r '[.[].name] | sort | join(\" \")'").strip()
+          by_id = lambda n: machine.succeed(f"{paseo} schedule ls --json | jq -r --arg n {n} 'map(select(.name == $n))[0].id'").strip()
+          # inspect, not ls: ls flattens cadence to a string and has no prompt
+          field = lambda n, q: machine.succeed(f"{paseo} schedule inspect {by_id(n)} --json | jq -r '{q}'").strip()
+          want = "job:flake-update job:maintenance job:security-watch"
+          machine.succeed("systemctl restart agent-schedules")
+          assert names() == want, names()
+          # a stray job, a hand-edited prompt; an untouched cadence keeps its next run
+          machine.succeed(f"{paseo} schedule create --name job:old --cron '0 1 * * *' --provider claude --cwd /home/agent/work old")
+          machine.succeed(f"{paseo} schedule update {by_id('job:maintenance')} --prompt drift --cwd /tmp")
+          next_run = field("job:security-watch", ".nextRunAt")
+          machine.succeed("systemctl restart agent-schedules")
+          assert names() == want, names()
+          prompt = field("job:maintenance", '.prompt | split("\\n")[0]')
+          assert "agent-maintenance" in prompt, prompt
+          assert field("job:maintenance", ".target.config.cwd") == "/home/agent/work"
+          assert field("job:security-watch", ".nextRunAt") == next_run
+          tz = field("job:flake-update", ".cadence.timezone")
+          assert tz == "America/Los_Angeles", tz
     '';
 }

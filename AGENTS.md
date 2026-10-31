@@ -35,9 +35,8 @@ sets `core.hooksPath` so the git hooks run.
   a security review before the PR opens (Claude's `/security-review`,
   or your own pass against `docs/hardening.md`), and in parallel a
   review of the branch against `master` by an agent of another model
-  family, through its own CLI: from Claude, `codex review --base master`;
-  from Codex, `claude -p` asked to review it (the `other-agents` skill has
-  the commands). `docs/hardening.md` has the standing rules.
+  family, started with `paseo run` (the `other-agents` skill).
+  `docs/hardening.md` has the standing rules.
 
 ## Git and PRs
 

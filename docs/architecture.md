@@ -360,8 +360,8 @@ Two things worth knowing before touching anything nearby:
 
 ## Updates & deploy
 
-Inputs change only through a PR: the agent's weekly `agent-flake-update`
-job (torrent, Mon 00:15) runs `nix flake update` on a branch, builds every
+Inputs change only through a PR: the agent's weekly `job:flake-update`
+(a Paseo schedule on torrent, Mon 00:15) runs `nix flake update` on a branch, builds every
 host and opens the PR, and the user merges. No host updates inputs itself.
 
 Hosts then deploy a **revision**, never a checkout. Every host records the
