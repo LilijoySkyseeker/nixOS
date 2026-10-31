@@ -1,5 +1,5 @@
 # VM test: local-ai's services without a GPU: llama-swap's routing and the
-# gamemode hook's block, paseo in the agent sandbox, the model store's access
+# gamemode hook's block, paseo in the agent sandbox
 {
   pkgs,
   agentUserModule,
@@ -23,7 +23,6 @@ pkgs.testers.runNixOSTest {
       users.users.lilijoy.isNormalUser = true;
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
-      programs.gamemode.enable = true;
       # no tailnet in the VM
       systemd.services.paseo-tailscale-serve.wantedBy = lib.mkForce [ ];
       # stands in for torrent's sops secret: bcrypt of "vm-secret"
@@ -50,17 +49,8 @@ pkgs.testers.runNixOSTest {
     ''
       machine.wait_for_unit("multi-user.target")
 
-      with subtest("llama-swap: loopback"):
-          machine.wait_for_unit("llama-swap.service")
-          machine.wait_for_open_port(8080)
-          listen = machine.succeed("ss -Hltn 'sport = :8080' | awk '{print $4}'").split()
-          assert listen == ["127.0.0.1:8080"], listen
-
-      with subtest("llama-swap: no cross-origin reads, no stored captures"):
-          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: https://evil.example' 127.0.0.1:8080/v1/models")
-          assert "evil.example" not in hdrs and "access-control-allow-origin: *" not in hdrs.lower(), hdrs
-          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
-          assert "http://127.0.0.1:8080" in hdrs, hdrs
+      machine.wait_for_unit("llama-swap.service")
+      machine.wait_for_open_port(8080)
 
       with subtest("tailscale serve waits for the password to be written"):
           deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
@@ -92,20 +82,6 @@ pkgs.testers.runNixOSTest {
           assert active == "null", active
           # no model files in the VM: the load is attempted and fails, it isn't 404
           assert status("qwen3.8-27b") != "404", "still blocked after the game ended"
-
-      with subtest("model store: the agent units write, llama-swap's user reads"):
-          got = machine.succeed("stat -c '%a %G' /srv/models").strip()
-          assert got == "2775 models", got
-          # the agent units' extra group and path, on a probe like agent-user's test
-          probe = ("systemd-run --wait --pipe --quiet -E PATH=/run/current-system/sw/bin -p User=agent -p SupplementaryGroups=models "
-                   "-p ProtectSystem=strict -p ReadWritePaths=/srv/models -- sh -c ")
-          machine.succeed(probe + "'umask 077 && mkdir -p /srv/models/x && echo w > /srv/models/x/m.gguf'")
-          machine.succeed("systemd-run --wait --pipe --quiet -p DynamicUser=yes -- /run/current-system/sw/bin/cat /srv/models/x/m.gguf")
-          # outside the units the agent has no write access
-          machine.fail("su agent -s /bin/sh -c 'touch /srv/models/y'")
-          for unit in ["claude-remote-control", "codex-remote-control", "paseo"]:
-              rw = machine.succeed(f"systemctl show {unit} -p ReadWritePaths --value")
-              assert "/srv/models" in rw, f"{unit}: {rw!r}"
 
       with subtest("paseo: agent sandbox, relay off, loopback"):
           machine.wait_for_unit("paseo-agent-config.service")

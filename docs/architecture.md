@@ -180,7 +180,7 @@ watcher starts with `multi-user.target`, including activation while Paseo is
 already running, and is also wanted by Paseo for daemon restarts.
 
 `local-ai-speech` installs `transcribe`: Whisper large-v3-turbo for every
-language, with optional Nemotron speaker labels. Its models live under
+language, with Nemotron speaker labels. Its models live under
 `~/Agent/projects/local-ai/models/audio`, covered by home backups; see
 [provisioning](procedures/local-speech.md). It yields the GPU while gaming.
 Flash-Next, PaddleOCR and local text-to-speech are retired. The model-store

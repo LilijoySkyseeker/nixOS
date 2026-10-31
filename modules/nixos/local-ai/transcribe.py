@@ -24,11 +24,9 @@ RATE = 16000
 def gpu_free():
     # desktop and games first: the GPU only when no game runs and VRAM is free
     if os.path.exists(GAMING_MARKER):
-        return False, "a game is running"
+        return False
     read = lambda f: int(open(f"{VRAM_DEV}/{f}").read())
-    if read("mem_info_vram_total") - read("mem_info_vram_used") < 3 << 30:
-        return False, "under 3 GiB of VRAM free (a local model is loaded?)"
-    return True, ""
+    return read("mem_info_vram_total") - read("mem_info_vram_used") >= 3 << 30
 
 
 def run(cmd, log):
@@ -52,14 +50,13 @@ def diarize(work, backend, log):
     return audiocpp(backend, log, *args)
 
 
-def recognize(wav, out, backend, log, speakers, lang, extra=()):
+def recognize(wav, out, backend, log, lang, extra=()):
     cmd = ["whisper-cli", "-m", f"{AUDIO}/ggml-large-v3-turbo-q8_0.bin", "-l", lang,
            "-t", str(os.cpu_count()), "-np", "-oj", "-of", out, "-f", wav,
            # skip music and silence, where whisper otherwise invents text
-           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin", *extra]
-    if speakers:
-        # one segment per word, so each word goes to the speaker talking then
-        cmd += ["-ml", "1", "-sow"]
+           "--vad", "-vm", f"{AUDIO}/ggml-silero-v6.2.0.bin",
+           # one segment per word, so each word goes to the speaker talking then
+           "-ml", "1", "-sow", *extra]
     if backend == "cpu":
         cmd.append("-ng")
     if not run(cmd, log):
@@ -85,7 +82,7 @@ def looping(segs):
     return sorted(hit)
 
 
-def repair(work, segs, backend, log, speakers, lang):
+def repair(work, segs, backend, log, lang):
     """Re-transcribe each looping stretch without carried-over context (-mc 0).
     That setting ends most loops but drops more words on clean speech, so it
     runs only where the first pass looped (sweep, 2026-10-25)."""
@@ -97,7 +94,6 @@ def repair(work, segs, backend, log, speakers, lang):
             spans[-1][1] = i
         else:
             spans.append([i, i])
-    fixed = 0
     for first, last in reversed(spans):
         # from the end of the segment before to the start of the one after
         a = segs[first - 1][1] if first else 0.0
@@ -107,37 +103,23 @@ def repair(work, segs, backend, log, speakers, lang):
             dst.setparams(src.getparams())
             src.setpos(int(a * RATE))
             dst.writeframes(src.readframes(int((b - a) * RATE)))
-        got = recognize(clip, f"{work}/clip", backend, log, speakers, lang, ["-mc", "0"])
+        got = recognize(clip, f"{work}/clip", backend, log, lang, ["-mc", "0"])
         if got is None:
             continue
         new = [(x + a, y + a, t) for x, y, t in got[0]]
         # keep the second pass only if it loops less than the first
         if len(looping(new)) < len(looping(segs[first:last + 1])):
             segs[first:last + 1] = new
-            fixed += 1
-    if spans:
-        print(f"transcribe: {len(spans)} looping stretches, {fixed} re-transcribed", file=sys.stderr)
-    if fixed:
-        # so the exported w.json matches the transcript
-        out = json.load(open(f"{work}/w.json"))
-        ts = lambda t: f"{int(t) // 3600:02d}:{int(t) % 3600 // 60:02d}:{t % 60:06.3f}".replace(".", ",")
-        out["transcription"] = [{"timestamps": {"from": ts(x), "to": ts(y)},
-                                 "offsets": {"from": round(x * 1000), "to": round(y * 1000)}, "text": t}
-                                for x, y, t in segs]
-        json.dump(out, open(f"{work}/w.json", "w"), ensure_ascii=False, indent=2)
     return segs
 
 
-def whisper(work, backend, log, speakers, lang):
-    got = recognize(f"{work}/in.wav", f"{work}/w", backend, log, speakers, lang)
+def whisper(work, backend, log, lang):
+    got = recognize(f"{work}/in.wav", f"{work}/w", backend, log, lang)
     if got is None:
         return None
     segs, detected = got
-    print(f"transcribe: language {detected}", file=sys.stderr)
     # the repair clips keep the file's language rather than detecting their own
-    segs = repair(work, segs, backend, log, speakers, detected if lang == "auto" else lang)
-    if not speakers:
-        return [f"{stamp(a)} {t.strip()}" for a, _, t in segs]
+    segs = repair(work, segs, backend, log, detected if lang == "auto" else lang)
     if not diarize(work, backend, log):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
@@ -171,40 +153,19 @@ def main():
         "Any audio or video file ffmpeg reads.")
     p.add_argument("file")
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
-    p.add_argument("--no-speakers", action="store_true", help="skip speaker labels")
-    p.add_argument("--cpu", action="store_true", help="force the CPU (speaker labels then run at about 1/3 real time)")
-    p.add_argument("-o", "--out", help="also write transcript.txt, whisper's w.json and the speaker turns (diar.json) to this directory")
     a = p.parse_args()
-    if not os.access(a.file, os.R_OK):
-        sys.exit(f"transcribe: can't read {a.file}")
 
     work = tempfile.mkdtemp(prefix="transcribe.")
     try:
         log = f"{work}/log"
         subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", a.file, "-vn",
                         "-ac", "1", "-ar", str(RATE), "-f", "wav", f"{work}/in.wav"], check=True)
-        backend = "cpu"
-        if not a.cpu:
-            ok, why = gpu_free()
-            backend = "vulkan" if ok else "cpu"
-            if not ok:
-                print(f"transcribe: {why}, using the CPU (slower)", file=sys.stderr)
+        backend = "vulkan" if gpu_free() else "cpu"
         # assign speakers after recognition, so diarization does not gate speech
-        go = lambda b: whisper(work, b, log, not a.no_speakers, a.lang or "en")
-        lines = go(backend)
-        if lines is None and backend == "vulkan":
-            print("transcribe: the GPU run failed, retrying on the CPU", file=sys.stderr)
-            lines = go("cpu")
+        lines = whisper(work, backend, log, a.lang or "en")
         if lines is None:
             sys.exit(open(log).read())
-        text = "\n".join(lines) + "\n"
-        sys.stdout.write(text)
-        if a.out:
-            os.makedirs(a.out, exist_ok=True)
-            open(f"{a.out}/transcript.txt", "w").write(text)
-            for f in ("diar.json", "w.json"):
-                if os.path.exists(f"{work}/{f}"):
-                    shutil.copy(f"{work}/{f}", a.out)
+        sys.stdout.write("\n".join(lines) + "\n")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
