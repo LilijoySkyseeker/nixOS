@@ -60,4 +60,8 @@ assert.deepEqual(d.sent, [['a', PROMPT]]);
 d = daemon({ agents: () => [limited('b')], usedPct: 100 });
 await poll(d, { read });
 assert.equal(d.sent.length, 0);
+// one agent that fails to check doesn't stop the others
+d = daemon({ agents: () => [limited('bad'), limited('e')] });
+await poll(d, { read: async (cwd, id) => { if (id === 'bad') throw Error('gone'); return read(); } });
+assert.deepEqual(d.sent, [['e', PROMPT]]);
 console.log('paseo-resume decisions ok');

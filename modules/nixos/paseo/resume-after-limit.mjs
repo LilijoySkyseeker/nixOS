@@ -75,15 +75,19 @@ async function readTranscript(cwd, session) {
 export async function poll(client, { read = readTranscript } = {}) {
   const { entries } = await client.fetchAgents({});
   for (const { agent } of entries) {
-    const hit = await limitHit(agent, read);
-    if (!hit) continue;
-    const { reports } = await client.listUsageReports({ agentId: agent.id, forceRefresh: true });
-    if (!quotaBack(reports)) {
-      console.log(`${agent.id} waiting: ${hit.slice(0, 120)}`);
-      continue;
+    try {
+      const hit = await limitHit(agent, read);
+      if (!hit) continue;
+      const { reports } = await client.listUsageReports({ agentId: agent.id, forceRefresh: true });
+      if (!quotaBack(reports)) {
+        console.log(`${agent.id} waiting: ${hit.slice(0, 120)}`);
+        continue;
+      }
+      console.log(`${agent.id} resuming: ${hit.slice(0, 120)}`);
+      await client.sendAgentMessage(agent.id, PROMPT);
+    } catch (err) {
+      console.error(`${agent.id} skipped: ${err?.message ?? err}`);
     }
-    console.log(`${agent.id} resuming: ${hit.slice(0, 120)}`);
-    await client.sendAgentMessage(agent.id, PROMPT);
   }
 }
 
