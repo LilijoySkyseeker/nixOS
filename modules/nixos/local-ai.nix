@@ -132,13 +132,6 @@ _: {
         settings = {
           # no stored request/response bodies: private prompts stay out of its api
           captureBuffer = 0;
-          # only llama-swap's own ui may read responses in a browser; the
-          # permissive default lets any web page read loopback (firefox has
-          # no private network access check)
-          security.cors.allowedOrigins = [
-            "http://127.0.0.1:8080"
-            "http://localhost:8080"
-          ];
           globalTTL = 300;
           models = {
             "qwen3.8-27b" = {
