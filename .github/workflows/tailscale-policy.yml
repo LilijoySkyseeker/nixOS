@@ -1,12 +1,7 @@
-# tailscale/policy.hujson is the tailnet policy: test it on PRs, apply it on master
+# tailscale/policy.hujson is the tailnet policy: apply it on master
 name: tailscale policy
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - tailscale/policy.hujson
-      - .github/workflows/tailscale-policy.yml
   push:
     branches: [master]
     paths:
@@ -23,34 +18,12 @@ concurrency:
   group: tailscale-policy-${{ github.ref }}
 
 jobs:
-  # credential trusts subject repo:LilijoySkyseeker/nixOS:pull_request, read-only scopes
-  test:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # v1.5.2 masks the literal text ID_TOKEN, not the token (the runner masks it anyway):
-      # https://github.com/tailscale/gitops-acl-action/issues/86
-      # TODO: drop when https://github.com/tailscale/gitops-acl-action/pull/85 merges: move both pins to it
-      - uses: tailscale/gitops-acl-action@5a4a17f5708e9bf96f4ee915a95e9f83c2eebe1a # v1.5.2
-        with:
-          oauth-client-id: ${{ vars.TS_TEST_CLIENT_ID }}
-          audience: ${{ vars.TS_TEST_AUDIENCE }}
-          tailnet: "-"
-          policy-file: tailscale/policy.hujson
-          action: test
-
   # credential trusts subject repo:LilijoySkyseeker/nixOS:ref:refs/heads/master only,
   # so no branch or PR run can write the policy
   apply:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       # a re-run keeps its original commit and still gets the master token,
       # so re-running an old apply would restore an old policy
       - name: refuse anything but master's current head

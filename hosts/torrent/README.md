@@ -62,10 +62,8 @@ fixed-output builds on this host can't fetch from LAN/tailnet addresses or
 over IPv6 either. After a reinstall, or to check it's healthy, run
 **`run0 agent-setup`**: it checks every piece the module can't declare (the
 logins, the first-run consent, the GitHub side) and walks you through only
-what's missing. `--check` only reports. The original one-time steps are Task 6 of
-`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`;
-mechanics in [`docs/hardening.md`](../../docs/hardening.md) ("The `agent`
-user").
+what's missing. `--check` only reports. Mechanics in
+[`docs/hardening.md`](../../docs/hardening.md) ("The `agent` user").
 
 Its `~/work` is shared with you at **`~/Agent`** (you're in group `agent`;
 setgid plus a default ACL keep everything group-writable). Open, edit and
