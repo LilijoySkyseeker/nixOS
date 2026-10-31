@@ -30,7 +30,10 @@ noticed; the risk is worth naming, the part deserves suspicion.
 it for, what does it solve? Then one row per part, including the parts the
 plan adds: what it serves, who asked for it (a name), the pain its absence
 would cause (one you've seen or can point to, not one you can imagine), and
-your proposal: keep, delete, or reduce to its least form. A part that only
+your proposal: keep, delete, or reduce to its least form. Every part is
+deleted by default; it keeps its place only with a name behind it and a pain
+you've seen or can point to. "In case", "cheap", "small" and "harmless"
+aren't reasons. A part that only
 serves a deleted part goes with it. Deletions are proposals; you never delete
 anything yourself. Name losses that would be silent or unrecoverable (keys,
 data, the way back in) instead of proposing them. "Nothing to delete" needs
