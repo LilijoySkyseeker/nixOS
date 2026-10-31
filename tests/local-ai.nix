@@ -52,6 +52,12 @@ pkgs.testers.runNixOSTest {
       machine.wait_for_unit("llama-swap.service")
       machine.wait_for_open_port(8080)
 
+      with subtest("llama-swap: no cross-origin reads, no stored captures"):
+          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: https://evil.example' 127.0.0.1:8080/v1/models")
+          assert "evil.example" not in hdrs and "access-control-allow-origin: *" not in hdrs.lower(), hdrs
+          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
+          assert "http://127.0.0.1:8080" in hdrs, hdrs
+
       with subtest("tailscale serve waits for the password to be written"):
           deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
           assert deps.count("paseo-agent-config.service") == 2, deps
