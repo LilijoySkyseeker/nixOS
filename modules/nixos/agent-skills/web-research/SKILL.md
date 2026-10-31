@@ -31,9 +31,10 @@ and the Unpaywall, OpenAlex and Crossref APIs.
 
 The owner authorizes getting past bot walls whenever you read for their
 work, with any tool that does it (`nix shell` the ones you need). The line
-is access control: don't get around paywalls or logins, don't use
-CAPTCHA-solving services or proxy networks, and keep to the pace of a person
-reading.
+is access control: don't get around paywalls or logins. Solve a CAPTCHA
+yourself if you can (the checkbox, or a puzzle with a local model), but don't
+send it to a solving service, don't use proxy networks, and keep to the pace
+of a person reading.
 
 A wall `web-fetch` can't pass goes in `~/work/ENVIRONMENT.md` (date, agent,
 URL, the error per tier, what you did instead). Known hard walls:
