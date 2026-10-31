@@ -5,63 +5,24 @@
     let
       bot = "LilijoySkyseeker-agent";
       # every agent harness: where it reads user-level instructions and
-      # skills, so it starts knowing where things go and the machine's
-      # quirks; adding or dropping an agent is one entry here
+      # skills; adding or dropping an agent is one entry here
       harnesses = {
         claude = {
           instructions = ".claude/CLAUDE.md";
           skills = ".claude/skills";
-          tail = ''
-            ## In Claude Code
-
-            - Your shell's `grep` is ugrep and `find` is bfs; both reject some
-              GNU syntax (see the `torrent-machine` skill).
-          '';
         };
         codex = {
           instructions = ".codex/AGENTS.md";
           skills = ".agents/skills";
-          tail = ''
-            ## In Codex
-
-            - You load a repo's `AGENTS.md` and `.agents/skills` only when your
-              working directory is inside it: start there (`-C <repo>`), or
-              read them yourself.
-          '';
-        };
-        # also reads ~/.claude/skills and ~/.agents/skills; same-named skills load once
-        opencode = {
-          instructions = ".config/opencode/AGENTS.md";
-          skills = ".config/opencode/skills";
-          tail = ''
-            ## In OpenCode
-
-            - Your models come through the owner's OpenRouter key
-              (`openrouter/<vendor>/<model>`, paid per token) or are OpenCode's own free
-              `opencode/*` models, some of which may train on what you send:
-              keep private material off those.
-          '';
-        };
-        antigravity = {
-          instructions = ".gemini/AGENTS.md";
-          skills = ".gemini/config/skills";
-          tail = ''
-            ## In Antigravity
-
-            - You run on a free Google account set aside for the agents, which
-              has weekly limits; a long task can use up the week's quota.
-          '';
         };
       };
-      # orientation, the harness's lines, then the user's working rule (the
+      # orientation, then the user's working rule (the
       # same file as their own user-level CLAUDE.md, so there's no copy to
       # drift)
       instructionsFor =
-        name: harness:
+        name:
         pkgs.writeText "agent-${name}-AGENTS.md" (
           builtins.readFile ./agent-user-AGENTS.md
-          + "\n"
-          + harness.tail
           + "\n"
           + builtins.readFile ../home-manager/claude-code/user-claude.md
         );
@@ -71,8 +32,8 @@
         ../home-manager/claude-code/skills
         ./agent-skills
       ];
-      # web-fetch: pages and feeds past the bot walls that stop agents' research
-      # (curl, curl-impersonate, then real Chromium through nodriver in Xvfb)
+      # web-fetch: pages and feeds past bot walls (curl, curl-impersonate,
+      # then real Chromium through nodriver in a virtual display)
       fetchPython = pkgs.python3.withPackages (ps: [
         ps.feedparser
         ps.nodriver
@@ -128,9 +89,9 @@
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
       };
-      # git identity: agents commit and push as the bot (its noreply address),
-      # never as the owner; gh from PATH as the credential helper, since `gh
-      # auth setup-git` writes a store path that the GC later removes
+      # git identity: the bot's noreply address (its public GitHub id); gh
+      # from PATH as the credential helper, since `gh auth setup-git` writes a
+      # store path that the GC later removes
       gitIdentity = pkgs.writeText "agent-git-identity" ''
         [user]
           name = ${bot}
@@ -150,7 +111,7 @@
       gitIgnore = pkgs.writeText "agent-git-ignore" ''
         AGENTS.local.md
       '';
-      # the owner's check-and-fix, after a reinstall, for what can't be declared
+      # check-and-fix for the parts that can't be declared
       agentSetup = pkgs.writeShellApplication {
         name = "agent-setup";
         runtimeInputs = with pkgs; [
@@ -163,26 +124,22 @@
           BOT=${bot}
           OWNER=LilijoySkyseeker
           BOT_REPOS="nixOS project-elysian"
-          NAME=torrent-agent
         ''
         + builtins.readFile ./agent-setup.sh;
       };
-      # the GPU agents run local models on (RX 7900 XTX), by PCI path: DRM
-      # numbering follows probe order
+      # torrent's RX 7900 XTX, by PCI path: DRM numbering follows probe order
       agentGpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
-      # sandbox shared by every agent's units, a second wall behind the Unix
-      # user (F3): every agent session is a child of one of them
+      # sandbox shared by every agent's units: every agent
+      # session is a child of one of them
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F3
       agentSandbox = {
         User = "agent";
         Group = "agent";
         WorkingDirectory = "/home/agent/work";
-        # serves: the owner's apps; without it a crashed server stays down until boot
         Restart = "always";
         RestartSec = 30;
         Slice = "agent.slice";
         NoNewPrivileges = true; # no setuid helpers (qemu-bridge-helper, F4)
-        # serves: the owner; without it agents read and plant files in the shared /tmp
         PrivateTmp = true;
         # a private /dev with only the pseudo devices, plus the GPU and KVM
         # bound in; /dev/net/tun stays out (F4), and the device cgroup
@@ -202,7 +159,6 @@
           "kvm"
           "render"
         ];
-        # serves: the owner; without it agents write shared places such as /var/tmp
         ProtectSystem = "strict";
         ReadWritePaths = [ "/home/agent" ];
         # world-writable daemon sockets: VPN, tailnet and VM control (F5)
@@ -212,12 +168,11 @@
           "-/run/libvirt"
         ];
       };
-      # serves: agents; without it systemd's PATH lacks their tools and web-fetch
       agentEnvironment = {
         PATH = lib.mkForce "/run/wrappers/bin:/etc/profiles/per-user/agent/bin:/run/current-system/sw/bin";
       };
       # stop with the firewall: a failed firewall start can leave agent-egress
-      # half-built (F9)
+      # half-built
       agentUnitDeps = {
         wantedBy = [ "multi-user.target" ];
         wants = [ "network-online.target" ];
@@ -231,9 +186,8 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # an unattended Claude run in the agent sandbox, reading the prompt on
-      # stdin; the prompt is a file in ./agent-jobs, so a job changes only
-      # through a reviewed PR
+      # an unattended run in the agent sandbox; the prompt is a file in
+      # ./agent-jobs, so a job changes only through a reviewed PR
       agentJob = description: prompt: {
         inherit description;
         inherit (agentUnitDeps) wants bindsTo after;
@@ -246,29 +200,12 @@
           // {
             Type = "oneshot";
             StandardInput = "file:${prompt}";
-            # fail, not skip, so a logged-out agent pages as a failed unit
-            ExecStartPre = "${pkgs.coreutils}/bin/test -e /home/agent/.claude/.credentials.json";
             # one job at a time: they share the vault reports and the nixOS
             # checkout, and two timers can fire together after downtime
             ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
-            # a hung run fails and pages instead of holding every job's lock;
-            # includes waiting on the lock behind the other jobs
-            TimeoutStartSec = "18h";
           };
       };
-      # codex app-server is the remote-control host; the managed daemon
-      # (`codex remote-control start`) refuses a nix-packaged CLI
-      codexRemote = pkgs.writeShellScript "codex-remote-control" ''
-        exec ${pkgs.codex}/bin/codex app-server < <(
-          printf '%s\n' \
-            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"codex-remote-control","version":"1"},"capabilities":{"experimentalApi":true}}}' \
-            '{"jsonrpc":"2.0","method":"initialized"}' \
-            '{"jsonrpc":"2.0","id":2,"method":"remoteControl/enable","params":{"ephemeral":true}}'
-          exec sleep infinity
-        )
-      '';
-      # agent-egress, the hard wall keeping agents off the LAN and tailnet;
-      # IPv6 rejects all but loopback
+      # agent-egress rules per family; IPv6 rejects all but loopback
       egress = [
         {
           cmd = "iptables";
@@ -292,7 +229,13 @@
       ];
     in
     {
-      # own group, not isNormalUser's default `users`: lilijoy's, and her files
+      # the agents' unit sandbox, which Paseo's unit (local-ai) runs in
+      _module.args.agentUnit = agentUnitDeps // {
+        environment = claudeEnvironment;
+        serviceConfig = agentSandbox;
+      };
+
+      # own group, not isNormalUser's default `users`
       # plan: 2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#G2
       users.groups.agent = { };
       # lilijoy opens and drops files in ~/work; the agent gains nothing from this
@@ -302,42 +245,17 @@
         group = "agent";
         # traverse only: lilijoy reaches ~/work, nothing else here
         homeMode = "711";
-        packages = with pkgs; [
+        packages = [
           webFetch
-          # the agent-only harnesses (claude and codex come with the PC profile)
-          opencode
-          antigravity-cli
         ];
       };
 
-      # opencode runs on the bun it's built with, and bun 1.4.2 bundles the
-      # brotli out-of-bounds write and trusts the eMudhra intermediates
-      # (GHSA-663w-cv8g-jj2p, GHSA-26q8-h657-pf84); only the build's bun changes,
-      # so the node_modules hash stays
-      # TODO: drop when NixOS/nixpkgs#577354 (bun 1.4.4) is in nixos-unstable
-      nixpkgs.overlays = [
-        (_: prev: {
-          opencode = prev.opencode.overrideAttrs (old: {
-            nativeBuildInputs = lib.remove prev.bun old.nativeBuildInputs ++ [
-              (prev.bun.overrideAttrs {
-                version = "1.4.4";
-                src = prev.fetchurl {
-                  url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip";
-                  hash = "sha256-4ERutVmVdy65iUvrrppr42jZhai5Jx7hJEhvmUbu3XY=";
-                };
-              })
-            ];
-          });
-        })
-      ];
-
-      # no inbound ssh: an agent-added key would be a shell outside the sandbox (F8)
+      # no inbound ssh
       services.openssh.settings.DenyUsers = [ "agent" ];
 
+      # nix daemon access, not trusted-users
       environment.systemPackages = [ agentSetup ];
 
-      # nix daemon access for agents' builds (the PC profile allows only
-      # wheel), not trusted-users, which would be root
       nix.settings.allowed-users = [ "agent" ];
 
       # agent-egress: jumped from OUTPUT for uid agent and gid nixbld (every
@@ -358,15 +276,13 @@
         ) egress}
       '';
 
-      # bindfs: agents' research reaches the owner's vault, Vault/Research only,
-      # agent-owned on its side, lilijoy:users on disk
+      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
         # merge the keys this repo owns into the agent's CLI-owned settings.json
         services.claude-agent-settings = {
           description = "Merge repo-owned keys into the agent's Claude settings";
           wantedBy = [ "multi-user.target" ];
-          before = [ "claude-remote-control.service" ];
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
@@ -400,21 +316,8 @@
                   skipDangerousModePermissionPrompt = true;
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
-                  # unattended sessions wait out a usage limit instead of stalling
-                  autoContinueAtUsageLimit = true;
                   # notes go in AGENTS.local.md, where every agent reads them
                   autoMemoryEnabled = false;
-                  # only skills that can't work here: no browser pane, desktop,
-                  # docs connector or cloud routines (RemoteTrigger is denied),
-                  # and /init writes the CLAUDE.md the agents must not have
-                  skillOverrides = {
-                    "built-in-browser" = "off";
-                    "chrome-browser" = "off";
-                    "computer-use" = "off";
-                    docs = "off";
-                    schedule = "off";
-                    init = "off";
-                  };
                 }
               );
             in
@@ -427,23 +330,10 @@
             '';
         };
 
-        # claude remote-control server: the owner reaches agents from the
-        # Claude app, prompt-free sessions spawned in ~/work
-        services.claude-remote-control = agentUnitDeps // {
-          description = "Claude Code Remote Control server for the agent user";
-          # skipped until the one-time `claude auth login`
-          unitConfig.ConditionPathExists = "/home/agent/.claude/.credentials.json";
-          environment = claudeEnvironment;
-          serviceConfig = agentSandbox // {
-            ExecStart = "${pkgs.claude-code}/bin/claude remote-control --spawn same-dir --name torrent-agent --permission-mode bypassPermissions";
-          };
-        };
-
         # merge the keys this repo owns into the agent's CLI-owned config.toml
         services.codex-agent-config = {
           description = "Merge repo-owned keys into the agent's Codex config";
           wantedBy = [ "multi-user.target" ];
-          before = [ "codex-remote-control.service" ];
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
@@ -478,54 +368,6 @@
               chmod 600 "$f.tmp"
               mv "$f.tmp" "$f"
             '';
-        };
-
-        # merge the keys this repo owns into the agent's opencode.json
-        services.opencode-agent-config = {
-          description = "Merge repo-owned keys into the agent's OpenCode config";
-          wantedBy = [ "multi-user.target" ];
-          before = [ "paseo.service" ];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            User = "agent";
-            Group = "agent";
-          };
-          script =
-            let
-              managed = pkgs.writeText "agent-opencode-config.json" (
-                builtins.toJSON {
-                  "$schema" = "https://opencode.ai/config.json";
-                  # no prompts, as the other harnesses; the Unix user is the boundary
-                  permission = "allow";
-                  # a share is a public opencode.ai link to the session
-                  share = "disabled";
-                  # nix owns the binary
-                  update = "disable";
-                  # the key agent-setup writes; 2.0.32 ignores it in the newer `providers.*.settings` form
-                  provider.openrouter.options.apiKey = "{file:/home/agent/.config/openrouter/key}";
-                }
-              );
-            in
-            ''
-              f=/home/agent/.config/opencode/opencode.json
-              mkdir -p /home/agent/.config/opencode
-              [ -s "$f" ] || echo '{}' > "$f"
-              ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$f" ${managed} > "$f.tmp"
-              mv "$f.tmp" "$f"
-            '';
-        };
-
-        services.codex-remote-control = agentUnitDeps // {
-          description = "Codex remote control host for the agent user";
-          # skipped until the one-time `codex login` (pairing: agent-setup)
-          unitConfig.ConditionPathExists = "/home/agent/.codex/auth.json";
-          environment = agentEnvironment;
-          serviceConfig = agentSandbox // {
-            ExecStart = codexRemote;
-            # the app-server's JSON-RPC replies and notifications
-            StandardOutput = "null";
-          };
         };
 
         # scheduled jobs: Claude, by the owner's choice (more Claude usage),
@@ -573,7 +415,6 @@
         # desktop down with it
         slices.agent.sliceConfig = {
           MemoryMax = "64G";
-          TasksMax = 4096;
           CPUWeight = 50;
         };
 
@@ -582,7 +423,7 @@
           # files group-writable whoever creates them, whatever their umask
           "d /home/agent/work 2770 agent agent -"
           "a+ /home/agent/work - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::---"
-          # the CLIs' dirs, agent-owned: tmpfiles would make a link's parents as root
+          # orientation for the agent; a store symlink, so edits go through the repo
           "d /home/agent/.claude 0700 agent agent -"
           "d /home/agent/.config 0700 agent agent -"
           "d /home/agent/.config/git 0700 agent agent -"
@@ -593,20 +434,13 @@
           "d /home/agent/.codex 0700 agent agent -"
           # codex's user skill directory lives under it
           "d /home/agent/.agents 0755 agent agent -"
-          # parents of opencode's and antigravity's files, which tmpfiles
-          # would otherwise create as root
-          "d /home/agent/.config/opencode 0700 agent agent -"
-          # the owner's OpenRouter key, written by agent-setup
-          "d /home/agent/.config/openrouter 0700 agent agent -"
-          "d /home/agent/.gemini 0700 agent agent -"
-          "d /home/agent/.gemini/config 0700 agent agent -"
         ]
         # each harness's instructions and skill links
         ++ lib.concatLists (
           lib.mapAttrsToList (
             name: harness:
             [
-              "L+ /home/agent/${harness.instructions} - - - - ${instructionsFor name harness}"
+              "L+ /home/agent/${harness.instructions} - - - - ${instructionsFor name}"
               "d /home/agent/${harness.skills} 0755 agent agent -"
             ]
             ++ lib.concatMap (

@@ -25,14 +25,12 @@ half-done as the fleet moves on.
    - open PRs and issues in `LilijoySkyseeker/nixOS`: agent PRs waiting on
      the owner for over two weeks, PRs that conflict with `master`, "Left
      open" items in merged PRs from the past month that nobody picked up;
-   - handoff notes in `docs/plans/*.md` (not the archive subfolders) for
-     work that has since merged or stalled, and docs that no longer match
-     the code they describe.
+   - docs that no longer match the code they describe.
 3. **Sort** each item into one of three:
    - **Fix it:** the fix is in this repo and clear: a missing tool, a unit
      setting, a fact wrong in the agents' shared instructions
      (`modules/nixos/agent-user-AGENTS.md`), a met `drop when`, a stale
-     handoff note or doc. Make the change.
+     doc. Make the change.
    - **Needs the owner:** an account or API key the agents should own, a
      secret, root, a LAN host, a PR to review or rebase, or a decision.
      Write down exactly what is needed and why.
@@ -65,8 +63,7 @@ half-done as the fleet moves on.
      the owner", with their last commit date, for the owner to decide.
 6. **Report.** In this week's fleet report,
    `~/research/Fleet/Weekly/YYYY-MM-DD.md`, dated by this week's Monday
-   (`date -d "$(( ($(date +%u) + 6) % 7 )) days ago" +%F`; create it if
-   it's missing):
+   (create it if it's missing):
    - write the `## Maintenance` section: the PR or issue, one line per
      item you fixed or that needs the owner, and the branches and
      worktrees you removed;
@@ -82,6 +79,3 @@ half-done as the fleet moves on.
    upstream with their conditions, and what the agents are waiting on
    (`TODO.md`, friction entries that wait). Keep both short enough to read
    on a phone.
-
-The repo's `AGENTS.md` applies in full: never switch or deploy, never touch
-`secrets/`.

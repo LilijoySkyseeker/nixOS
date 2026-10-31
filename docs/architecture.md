@@ -157,7 +157,7 @@ One host is still structurally unusual, same as before the migration:
   another host.
 
 `torrent` also carries a second, untrusted principal: `agent-user` adds an
-`agent` Unix user that runs `claude remote-control` with no permission
+`agent` Unix user that runs agents with no permission
 prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
 mechanics are in `docs/hardening.md` ("The `agent` user"); the design
 record lives outside the repo, in `~/Projects/agenticsandbox/`.

@@ -1,4 +1,4 @@
-# VM test: agent-user's boundary, asserted from the agent's side, so no change opens it unseen
+# VM test: agent-user's boundary, asserted from the agent's side
 { pkgs, agentUserModule }:
 pkgs.testers.runNixOSTest {
   name = "agent-user";
@@ -173,9 +173,8 @@ pkgs.testers.runNixOSTest {
         rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN after a firewall reload")
 
-        # both agents' remote-control units and the scheduled jobs: same
-        # sandbox, one shared cap
-        for unit in ["claude-remote-control", "codex-remote-control", "agent-flake-update", "agent-security-watch", "agent-maintenance"]:
+        # the scheduled jobs: same sandbox, one shared cap
+        for unit in ["agent-flake-update", "agent-security-watch", "agent-maintenance"]:
             def sprop(p):
                 return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
             for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
@@ -187,8 +186,7 @@ pkgs.testers.runNixOSTest {
                 check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
             check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
             check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
-            if unit.startswith("agent-"):
-                check("flock /home/agent/.agent-jobs.lock" in sprop("ExecStart"), f"{unit}: not under the shared job lock")
+            check("flock /home/agent/.agent-jobs.lock" in sprop("ExecStart"), f"{unit}: not under the shared job lock")
         for timer in ["agent-weekly.timer", "agent-security-watch.timer"]:
             state = machine.succeed(f"systemctl is-active {timer} || true").strip()
             check(state == "active", f"{timer}: {state!r}")
@@ -213,7 +211,7 @@ pkgs.testers.runNixOSTest {
             result = machine.succeed(f"systemctl show {j} -p Result --value").strip()
             check(result == "exit-code", f"{j}: Result={result!r}, expected a failure")
         # GPU and KVM: bound in and allowed; tun and display nodes refused
-        for unit in ["claude-remote-control", "codex-remote-control"]:
+        for unit in ["agent-flake-update", "agent-security-watch", "agent-maintenance"]:
             allow = machine.succeed(f"systemctl show {unit} -p DeviceAllow --value")
             for dev in ["/dev/kvm", "/dev/kfd", "/dev/dri/by-path/"]:
                 check(dev in allow, f"{unit}: {dev} not allowed: {allow!r}")
@@ -249,35 +247,20 @@ pkgs.testers.runNixOSTest {
         # the user's working rule, the same file their own CLAUDE.md uses
         with open("${../modules/home-manager/claude-code/user-claude.md}") as f:
             rule = f.read()
-        # every harness reads the same text, apart from its own section
+        # every harness reads the same text
         with open("${../modules/nixos/agent-user-AGENTS.md}") as f:
             shared = f.read()
         harnesses = {
             "Claude Code": (".claude/CLAUDE.md", ".claude/skills"),
             "Codex": (".codex/AGENTS.md", ".agents/skills"),
-            "OpenCode": (".config/opencode/AGENTS.md", ".config/opencode/skills"),
-            "Antigravity": (".gemini/AGENTS.md", ".gemini/config/skills"),
         }
         for name, (instructions, skills) in harnesses.items():
             text = machine.succeed(as_agent(f"cat /home/agent/{instructions}"))
             assert text.startswith(shared), f"{name}: doesn't start with the shared instructions"
             assert rule in text, f"{name}: lacks the user's working rule"
-            for other in harnesses:
-                assert (f"## In {other}" in text) == (other == name), f"{name}: harness section for {other}"
             # the same skills: the user's and the agent-only ones
             for skill in ["doghouse-review", "torrent-machine", "other-agents"]:
                 machine.succeed(as_agent(f"test -f /home/agent/{skills}/{skill}/SKILL.md"))
-        # their parents belong to the agent, or the harnesses can't write there
-        for d in [".config/opencode", ".config/openrouter", ".gemini", ".gemini/config"]:
-            assert machine.succeed(f"stat -c %U /home/agent/{d}").strip() == "agent", d
-        assert machine.succeed("stat -c %a /home/agent/.config/openrouter").strip() == "700"
-        # opencode's repo-owned keys
-        machine.wait_for_unit("opencode-agent-config.service")
-        oc = machine.succeed("cat /home/agent/.config/opencode/opencode.json")
-        assert machine.succeed("jq -r .share /home/agent/.config/opencode/opencode.json").strip() == "disabled", oc
-        key_ref = machine.succeed("jq -r .provider.openrouter.options.apiKey /home/agent/.config/opencode/opencode.json").strip()
-        assert key_ref == "{file:/home/agent/.config/openrouter/key}", oc
-        machine.succeed(as_agent("command -v opencode && command -v agy"))
         # bot-wall fetcher on the agent's PATH (no network in the VM to run it)
         machine.succeed(as_agent("command -v web-fetch"))
         rc, out = machine.execute(as_agent("web-fetch 2>&1"))
@@ -335,22 +318,5 @@ pkgs.testers.runNixOSTest {
         for missing in ["✗ gh logged in as LilijoySkyseeker-agent", "✗ Claude login and workspace trust"]:
             assert missing in out, f"missing {missing!r} in:\n{out}"
         machine.fail("test -e /home/agent/.config/gh/hosts.yml")
-
-    with subtest("remote control service"):
-        def prop(p):
-            return machine.succeed(f"systemctl show claude-remote-control -p {p} --value").strip()
-        # before the one-time login there's no credential: skipped, not crash-looping
-        assert prop("ConditionResult") == "no", f"ConditionResult: {prop('ConditionResult')!r}"
-        assert prop("ActiveState") != "failed", f"ActiveState: {prop('ActiveState')!r}"
-        env = prop("Environment")
-        assert "ENABLE_CLAUDEAI_MCP_SERVERS=false" in env, f"Environment: {env!r}"
-        # codex: skipped until its one-time login, same as claude
-        def cprop(p):
-            return machine.succeed(f"systemctl show codex-remote-control -p {p} --value").strip()
-        assert cprop("ConditionResult") == "no", f"codex ConditionResult: {cprop('ConditionResult')!r}"
-        assert cprop("ActiveState") != "failed", f"codex ActiveState: {cprop('ActiveState')!r}"
-        script = machine.succeed("cat " + cprop("ExecStart").split("path=")[1].split(" ")[0])
-        for want in ["app-server", "remoteControl/enable"]:
-            assert want in script, f"missing {want!r} in codex wrapper"
   '';
 }
