@@ -40,11 +40,8 @@ thinkpad it has no `@blank` snapshots to preserve.
 
 ## Agent user
 
-This host (only) runs `agent-user`: an `agent` Unix user whose
-`claude-remote-control` and `codex-remote-control` services run Claude
-Code and Codex sessions with no permission prompts, reachable from the
-Claude and ChatGPT apps. Claude also runs unattended jobs in the same
-sandbox. Every Monday at 00:15, `agent-weekly.timer` runs two of them, one
+This host (only) runs `agent-user`: an `agent` Unix user.
+Claude runs unattended jobs in its sandbox. Every Monday at 00:15, `agent-weekly.timer` runs two of them, one
 after the other: `agent-flake-update` (flake inputs, the stable hosts'
 move to each new NixOS release, and dropping workarounds the update makes
 unnecessary, as a PR), then `agent-maintenance` (the agents' friction log
@@ -61,7 +58,7 @@ with `run0 systemctl start agent-weekly.target`), and follow it with
 fixed-output builds on this host can't fetch from LAN/tailnet addresses or
 over IPv6 either. After a reinstall, or to check it's healthy, run
 **`run0 agent-setup`**: it checks every piece the module can't declare (the
-logins, the first-run consent, the GitHub side) and walks you through only
+logins, the GitHub side) and walks you through only
 what's missing. `--check` only reports. The original one-time steps are Task 6 of
 `2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`;
 mechanics in [`docs/hardening.md`](../../docs/hardening.md) ("The `agent`

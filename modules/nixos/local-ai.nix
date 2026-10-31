@@ -11,6 +11,7 @@ _: {
       config,
       lib,
       pkgs,
+      agentUnit,
       ...
     }:
     let
@@ -72,15 +73,6 @@ _: {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
-            # enabled outright: the merge keeps an earlier `enabled = false`
-            opencode = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.opencode) ];
-            };
-            antigravity = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.antigravity-cli) ];
-            };
             local-codex = {
               extends = "codex";
               label = "Local";
@@ -103,6 +95,8 @@ _: {
             lib.genAttrs
               [
                 "copilot"
+                "opencode"
+                "antigravity"
                 "pi"
                 "muse"
                 "omp"
@@ -123,8 +117,6 @@ _: {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
       };
-      # paseo copies this unit's sandbox
-      crc = config.systemd.services.claude-remote-control;
     in
     {
       # model store: the agent and lilijoy download into it, llama-swap reads it
@@ -137,9 +129,6 @@ _: {
         # the gamemode hooks run as whoever plays
         "d /run/local-ai 1777 root root -"
       ];
-
-      systemd.services.claude-remote-control.serviceConfig = agentModelAccess;
-      systemd.services.codex-remote-control.serviceConfig = agentModelAccess;
 
       services.llama-swap = {
         enable = true;
@@ -246,22 +235,27 @@ _: {
         '';
       };
 
-      # the paseo daemon, in the same sandbox as the agents' remote-control units
+      # the paseo daemon, in the same sandbox as the agents' units
       systemd.services.paseo = {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
-        inherit (crc) wantedBy wants bindsTo;
-        after = crc.after ++ [ "paseo-agent-config.service" ];
+        inherit (agentUnit)
+          wantedBy
+          wants
+          bindsTo
+          environment
+          ;
+        after = agentUnit.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
-        environment = {
-          inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
-          PATH = lib.mkForce crc.environment.PATH;
-        };
-        serviceConfig = crc.serviceConfig // {
-          # without a password paseo grants owner rights to any client, and a
-          # web page's websocket to loopback needs no cors: no password, no daemon
-          ExecCondition = "${paseoHasPassword}";
-          ExecStart = "${lib.getExe paseo} daemon run";
-        };
+        serviceConfig = lib.mkMerge [
+          agentUnit.serviceConfig
+          agentModelAccess
+          {
+            # without a password paseo grants owner rights to any client, and a
+            # web page's websocket to loopback needs no cors: no password, no daemon
+            ExecCondition = "${paseoHasPassword}";
+            ExecStart = "${lib.getExe paseo} daemon run";
+          }
+        ];
       };
 
       # sends "continue" to an agent stopped on a usage limit once its quota is back
