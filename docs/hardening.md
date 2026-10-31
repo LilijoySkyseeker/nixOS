@@ -277,8 +277,7 @@ here; it is already applied in the SSH bullet below.
   lilijoy's tools then execute, so lilijoy only reads, edits and drops
   files there. Git's ownership check refuses agent-owned repos for
   lilijoy, so never add a `safe.directory` for that path.
-  (`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md#F2`,
-  `#F9`; the design record lives outside the repo, in
+  (The design record lives outside the repo, in
   `~/Projects/agenticsandbox/`.)
 - **`local-ai` on torrent (`modules/nixos/local-ai.nix`).** Every service
   listens on loopback only, and the agent can reach all of them.
