@@ -59,8 +59,7 @@ which is why this runs every day.
      upstream PR; you'll recheck it tomorrow.
 6. **Report** under `## Security` in this week's fleet report,
    `~/research/Fleet/Weekly/YYYY-MM-DD.md`, dated by this week's Monday
-   (`date -d "$(( ($(date +%u) + 6) % 7 )) days ago" +%F`; create it, with
-   a `# Fleet report YYYY-MM-DD` title, if it's missing). Add one entry
+   (create it, with a `# Fleet report YYYY-MM-DD` title, if it's missing). Add one entry
    per run, headed with today's date, newest first:
    - a quiet day is one line: "nothing new that touches the fleet", and
      the sources checked;
@@ -70,6 +69,4 @@ which is why this runs every day.
 
 You can't see the fleet's own logs: the agent has no route to the hosts,
 by the owner's choice. If you need host logs or state to judge something,
-say so in your entry and in `~/work/ENVIRONMENT.md`. The repo's
-`AGENTS.md` applies in full: never switch or deploy, never touch
-`secrets/`.
+say so in your entry and in `~/work/ENVIRONMENT.md`.

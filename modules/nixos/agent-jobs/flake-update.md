@@ -51,12 +51,8 @@ unnecessary.
    the workarounds dropped, how far you verified (the `verify-a-change`
    skill's rungs), and what you couldn't fix.
 8. **Report.** Create this week's fleet report at
-   `~/research/Fleet/Weekly/YYYY-MM-DD.md`, dated by this week's Monday
-   (`date -d "$(( ($(date +%u) + 6) % 7 )) days ago" +%F`), so every job writes to
-   one file all week. The folders may not
+   `~/research/Fleet/Weekly/YYYY-MM-DD.md`, dated by this week's Monday,
+   so every job writes to one file all week. The folders may not
    exist yet. Give it a `# Fleet report YYYY-MM-DD` title if it's new, and write its
    `## Updates` section: the PR link, the moves that matter, workarounds
    dropped, anything failing. A quiet week is one line.
-
-The repo's `AGENTS.md` applies in full: never switch or deploy, never touch
-`secrets/`. Log environment failures to `~/work/ENVIRONMENT.md` as usual.

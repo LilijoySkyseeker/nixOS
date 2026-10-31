@@ -89,14 +89,14 @@ pkgs.testers.runNixOSTest {
           assert machine.succeed("jq -r .daemon.relay.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
           assert machine.succeed("jq -r .agents.providers.copilot.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
-          # stale one; opencode and antigravity come on over a config that had them off
+          # stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want, cfg
-          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = false | .agents.providers.antigravity.enabled = false' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = true | .agents.providers.antigravity.enabled = true' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl restart paseo-agent-config")
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
           for p in ["opencode", "antigravity"]:
-              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "true", p
+              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "false", p
           assert machine.succeed("stat -c %a /home/agent/.paseo/config.json").strip() == "600"
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
