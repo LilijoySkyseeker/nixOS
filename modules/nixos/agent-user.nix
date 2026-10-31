@@ -293,9 +293,6 @@
             let
               managed = pkgs.writeText "agent-claude-settings.json" (
                 builtins.toJSON {
-                  # account-level session and routine tools (cloud work with the
-                  # user's GitHub App and connectors)
-                  deniedMcpServers = [ { serverName = "claude-code-remote"; } ];
                   disableClaudeAiConnectors = true;
                   # no AI attribution in commits or PRs, as in the user's own settings
                   attribution = {
@@ -310,10 +307,6 @@
                     "RemoteTrigger"
                     "SendMessage"
                   ];
-                  # always bypass: the app can't offer it, and its "auto" pick is refused
-                  permissions.defaultMode = "bypassPermissions";
-                  permissions.disableAutoMode = "disable";
-                  skipDangerousModePermissionPrompt = true;
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
                   # notes go in AGENTS.local.md, where every agent reads them

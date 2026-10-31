@@ -269,7 +269,6 @@ pkgs.testers.runNixOSTest {
         # cloud work with the user's GitHub App and connectors
         machine.wait_for_unit("claude-agent-settings.service")
         cfg = machine.succeed("cat /home/agent/.claude/settings.json")
-        assert '"claude-code-remote"' in cfg, f"remote tools not denied: {cfg!r}"
         assert '"disableClaudeAiConnectors": true' in cfg, f"connectors not off: {cfg!r}"
         # the built-in twins: routines (cloud, with the user's authority) and
         # cross-session messages into the user's sessions
@@ -284,7 +283,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")
         machine.succeed("systemctl restart claude-agent-settings")
         cfg = machine.succeed("cat /home/agent/.claude/settings.json")
-        assert '"theme": "dark"' in cfg and '"claude-code-remote"' in cfg, f"merge clobbered: {cfg!r}"
+        assert '"theme": "dark"' in cfg and '"disableClaudeAiConnectors": true' in cfg, f"merge clobbered: {cfg!r}"
 
     with subtest("codex config"):
         machine.wait_for_unit("codex-agent-config.service")
