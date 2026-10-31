@@ -13,6 +13,11 @@ CHALLENGE = (
     "please wait",
     "verifying",
     "temporarily unavailable",
+    "prove your humanity",
+    "not a bot",
+    "client challenge",
+    "checking you",
+    "checking your",
 )
 
 
