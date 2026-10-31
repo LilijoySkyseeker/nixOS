@@ -12,13 +12,13 @@ _: {
       settingsFile = "${config.xdg.configHome}/Paseo/desktop-settings.json";
       managed = pkgs-unstable.writeText "paseo-desktop-settings.json" (
         builtins.toJSON {
-          # no daemon of its own (the app defaults to one): its agents would run as the owner, outside the sandbox
+          # no daemon of its own: agents run in the agent user's paseo daemon
           settings.daemon.manageBuiltInDaemon = false;
         }
       );
     in
     {
-      # the owner's desktop client for the agents' paseo daemon on torrent
+      # client for the agents' paseo daemon on torrent
       home.packages = [ pkgs-unstable.paseo-desktop ];
 
       # every write goes through `run` to keep dry-run side-effect free

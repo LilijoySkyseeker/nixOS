@@ -14,7 +14,7 @@ _: {
       ...
     }:
     let
-      # sessions start in bypass, not auto: no permission prompts; TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
+      # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
       paseo = pkgs.paseo.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
       });
@@ -58,18 +58,25 @@ _: {
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
           daemon = {
-            # tailscale serve forwards this Host (ip and localhost pass by default); without it the owner's apps are refused
+            # tailscale serve forwards this Host; ip and localhost are allowed by default
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
-            # explicit: a config that omits it keeps relay on (Paseo compat until 2027-01-31), a way in outside the tailnet
+            # explicit: a config that omits it keeps the legacy relay-on behavior
             relay.enabled = false;
           };
           features.webUi.enabled = true;
           agents.providers = {
-            # the other agent units' binaries; the merge keeps old keys, so without these the paths go stale
+            # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
-            opencode.command = [ (lib.getExe pkgs.opencode) ];
-            antigravity.command = [ (lib.getExe pkgs.antigravity-cli) ];
+            # enabled outright: the merge keeps an earlier `enabled = false`
+            opencode = {
+              enabled = true;
+              command = [ (lib.getExe pkgs.opencode) ];
+            };
+            antigravity = {
+              enabled = true;
+              command = [ (lib.getExe pkgs.antigravity-cli) ];
+            };
             local-codex = {
               extends = "codex";
               label = "Local";
@@ -194,16 +201,13 @@ _: {
         script_timeout = 20;
       };
 
-      # paseo: merge the keys this repo owns into the agent's CLI-owned config; without it no password, so no daemon
+      # paseo: merge the keys this repo owns into the agent's CLI-owned config
       systemd.services.paseo-agent-config = {
         description = "Merge repo-owned keys into the agent's Paseo config";
-        wantedBy = [ "multi-user.target" ];
-        before = [ "paseo.service" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
           User = "agent";
-          Group = "agent";
         };
         script = ''
           f=/home/agent/.paseo/config.json
@@ -212,24 +216,20 @@ _: {
           # the local model runs only in the codex harness: drop the old claude one
           ${lib.getExe pkgs.jq} -s '(.[0] | del(.agents.providers.local)) * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
-          # loads from sops; without one the file keeps whatever it has
+          # loads from sops
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
-          if [ -r "$hash" ]; then
-            ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
-            mv "$f.tmp2" "$f.tmp"
-          fi
-          chmod 600 "$f.tmp"
+          ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
+          mv "$f.tmp2" "$f.tmp"
           mv "$f.tmp" "$f"
         '';
       };
 
-      # the paseo daemon, the owner's way to hand agents work from the phone, in the remote-control units' sandbox
+      # the paseo daemon, in the same sandbox as the agents' remote-control units
       systemd.services.paseo = {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
         inherit (crc) wantedBy wants bindsTo;
         after = crc.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
-        # the remote-control units' PATH, and the account's claude.ai connectors kept out of sessions
         environment = {
           inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
           PATH = lib.mkForce crc.environment.PATH;
@@ -242,41 +242,29 @@ _: {
         };
       };
 
-      # sends "continue" to an agent stopped on a usage limit once its quota is back; without it the agent waits for the owner
+      # sends "continue" to an agent stopped on a usage limit once its quota is back
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
-        # multi-user too: wanted only by an already-running paseo, activation never started it (906537b)
-        wantedBy = [
-          "multi-user.target"
-          "paseo.service"
-        ];
-        # stops with the daemon, or its poll fails every 30 s while paseo is down
-        after = [ "paseo.service" ];
-        bindsTo = [ "paseo.service" ];
-        environment.HOME = "/home/agent";
+        wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
           Restart = "always";
           RestartSec = 30;
           User = "agent";
-          Group = "agent";
         };
       };
 
-      # the phone's way in: tailnet-only https in front of paseo; tailscaled (root) proxies to loopback,
+      # tailnet-only https in front of paseo; tailscaled (root) proxies to loopback,
       # which the agent's egress rules never see. never funnel
       systemd.services.paseo-tailscale-serve = {
         description = "Expose Paseo on the tailnet (tailscale serve, not funnel)";
         # after the config step has written the password, or the condition below
         # fails on a first boot and nothing retries it
         after = [
-          "tailscaled.service"
           "tailscaled-autoconnect.service"
           "paseo-agent-config.service"
-          "paseo.service"
         ];
-        requires = [ "paseo-agent-config.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";
