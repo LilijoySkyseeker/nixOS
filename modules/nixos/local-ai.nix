@@ -63,7 +63,7 @@ _: {
             # explicit: a config that omits it keeps the legacy relay-on behavior
             relay.enabled = false;
           };
-          features.webUi.enabled = true;
+          features.webUi.enabled = false;
           agents.providers = {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
