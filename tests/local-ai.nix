@@ -111,6 +111,15 @@ pkgs.testers.runNixOSTest {
           authed = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer vm-secret' 127.0.0.1:6767/api/agents").strip()
           assert authed != "401", f"authenticated /api/agents: {authed}"
 
+      with subtest("paseo-resume: rides out a daemon restart without failing"):
+          # a switch restarts both at once; the resumer must wait for the socket
+          machine.succeed("systemctl restart paseo paseo-resume")
+          machine.wait_for_open_port(6767, timeout=120)
+          machine.sleep(10)
+          n = machine.succeed("systemctl show -P NRestarts paseo-resume").strip()
+          assert n == "0", f"paseo-resume restarted {n} times"
+          machine.succeed("systemctl is-active paseo-resume")
+
       with subtest("paseo-resume: decides on recorded limit messages"):
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
 
