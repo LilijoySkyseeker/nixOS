@@ -22,6 +22,8 @@ _: {
           ./paseo/default-permissions.patch
           # TODO: drop when getpaseo/paseo#7193 is in the packaged Paseo
           ./paseo/usage-limit-resume.patch
+          # a limit-fallback profile (Claude API credits) while a provider is at its limit
+          ./paseo/limit-fallback.patch
         ];
       });
       claudeApiCredits = pkgs.writeShellApplication {

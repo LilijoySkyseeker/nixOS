@@ -1,0 +1,876 @@
+From 5b0156cc3c5cdf8278a898b550651fcd56911276 Mon Sep 17 00:00:00 2001
+From: agent <agent@torrent>
+Date: Sun, 1 Nov 2026 13:03:19 -0800
+Subject: [PATCH] feat: continue a Claude chat on a limit-fallback profile
+
+A profile with limitFallback: true (extending its base provider) is used
+while the base is at a usage limit: the limit callout offers to move the
+chat there in place and continue; new chats start there; chats move back
+when the limit resets. Auto-resume after a limit is on unless a chat opts out.
+---
+ .../app/src/composer/usage-limit-callout.tsx  |  47 +++++-
+ packages/app/src/i18n/resources/ar.ts         |   3 +
+ packages/app/src/i18n/resources/en.ts         |   3 +
+ packages/app/src/i18n/resources/es.ts         |   3 +
+ packages/app/src/i18n/resources/fr.ts         |   3 +
+ packages/app/src/i18n/resources/ja.ts         |   3 +
+ packages/app/src/i18n/resources/ko.ts         |   3 +
+ packages/app/src/i18n/resources/pt-BR.ts      |   3 +
+ packages/app/src/i18n/resources/ru.ts         |   3 +
+ packages/app/src/i18n/resources/zh-CN.ts      |   3 +
+ packages/client/src/daemon-client.ts          |  22 +++
+ packages/protocol/src/agent-usage-limit.ts    |   7 +
+ packages/protocol/src/messages.ts             |  15 ++
+ packages/protocol/src/provider-config.ts      |   2 +
+ .../src/server/agent/agent-manager.test.ts    |  82 ++++++++++
+ .../server/src/server/agent/agent-manager.ts  | 143 +++++++++++++++++-
+ .../src/server/agent/provider-registry.ts     |   5 +
+ .../server/agent/provider-snapshot-manager.ts |   3 +-
+ .../server/agent/usage-limit-resume.test.ts   |   5 +-
+ .../src/server/agent/usage-limit-resume.ts    |   7 +-
+ .../authorization/operation-permissions.ts    |   2 +
+ packages/server/src/server/session.ts         |   3 +
+ .../agent-config/agent-config-session.ts      |  20 +++
+ .../server/src/server/websocket-server.ts     |   1 +
+ 24 files changed, 373 insertions(+), 18 deletions(-)
+
+diff --git a/packages/app/src/composer/usage-limit-callout.tsx b/packages/app/src/composer/usage-limit-callout.tsx
+index 7b6b19756..a8dcaf0cb 100644
+--- a/packages/app/src/composer/usage-limit-callout.tsx
++++ b/packages/app/src/composer/usage-limit-callout.tsx
+@@ -1,9 +1,10 @@
+ import { useMutation } from "@tanstack/react-query";
+-import { Text, View } from "react-native";
++import { Pressable, Text, View } from "react-native";
+ import { useTranslation } from "react-i18next";
+ import { StyleSheet } from "react-native-unistyles";
+ import {
+   AUTO_RESUME_USAGE_LIMIT_LABEL,
++  autoResumesUsageLimit,
+   usageLimitResumeAt,
+ } from "@getpaseo/protocol/agent-usage-limit";
+ import { Switch } from "@/components/ui/switch";
+@@ -26,10 +27,12 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+   const limit = useSessionStore((state) =>
+     agentId ? state.sessions[serverId]?.agents.get(agentId)?.usageLimit : undefined,
+   );
++  const fallbackSupported = useSessionStore(
++    (state) => state.sessions[serverId]?.serverInfo?.features?.limitFallback === true,
++  );
+   const enabled = useSessionStore((state) =>
+     agentId
+-      ? state.sessions[serverId]?.agents.get(agentId)?.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] ===
+-        "true"
++      ? autoResumesUsageLimit(state.sessions[serverId]?.agents.get(agentId)?.labels)
+       : false,
+   );
+   const mutation = useMutation({
+@@ -40,7 +43,13 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+       });
+     },
+   });
+-  if (!supported || (!limit && !enabled)) return null;
++  const fallback = useMutation({
++    mutationFn: async () => {
++      if (!client || !agentId) throw new Error("Agent is unavailable");
++      await client.continueOnLimitFallback(agentId);
++    },
++  });
++  if (!supported || !limit) return null;
+ 
+   const resumeAt = limit ? usageLimitResumeAt(limit) : null;
+   const missingReset = Boolean(limit && resumeAt === null);
+@@ -88,6 +97,28 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+           onValueChange={mutation.mutate}
+         />
+       </View>
++      {fallbackSupported ? (
++        <Pressable
++          testID="usage-limit-continue-fallback"
++          accessibilityRole="button"
++          style={styles.button}
++          disabled={!isConnected || fallback.isPending}
++          onPress={() => fallback.mutate()}
++        >
++          <Text style={styles.buttonText}>
++            {fallback.isPending
++              ? t("agentPanel.usageLimit.switching")
++              : t("agentPanel.usageLimit.continueOnFallback")}
++          </Text>
++        </Pressable>
++      ) : null}
++      {fallback.isError ? (
++        <Text style={styles.error}>
++          {fallback.error instanceof Error
++            ? fallback.error.message
++            : t("agentPanel.usageLimit.switchFailed")}
++        </Text>
++      ) : null}
+       {mutation.isError ? (
+         <Text style={styles.error}>{t("agentPanel.usageLimit.saveFailed")}</Text>
+       ) : null}
+@@ -111,4 +142,12 @@ const styles = StyleSheet.create((theme) => ({
+   hidden: { opacity: 0 },
+   saving: { position: "absolute", top: 0, left: 0, right: 0 },
+   error: { color: theme.colors.statusDanger, fontSize: theme.fontSize.sm },
++  button: {
++    alignSelf: "flex-start",
++    paddingVertical: theme.spacing[1.5],
++    paddingHorizontal: theme.spacing[3],
++    borderRadius: theme.borderRadius.md,
++    backgroundColor: theme.colors.accent,
++  },
++  buttonText: { color: theme.colors.accentForeground, fontSize: theme.fontSize.sm },
+ }));
+diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
+index a8607ae1a..0619be68a 100644
+--- a/packages/app/src/i18n/resources/ar.ts
++++ b/packages/app/src/i18n/resources/ar.ts
+@@ -251,6 +251,9 @@ export const ar: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "تعذّر حفظ هذا الإعداد. حاول مرة أخرى.",
+       label: "المتابعة بعد إعادة تعيين حد الاستخدام",
+       enabled: "مفعّل لهذه المحادثة. أبقِ المضيف قيد التشغيل.",
+diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
+index addc11c96..efe0665d8 100644
+--- a/packages/app/src/i18n/resources/en.ts
++++ b/packages/app/src/i18n/resources/en.ts
+@@ -247,6 +247,9 @@ export const en = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Could not save this setting. Try again.",
+       label: "Resume after usage limit",
+       enabled: "Enabled for this chat. Keep the host running.",
+diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
+index d386e147b..a50feb535 100644
+--- a/packages/app/src/i18n/resources/es.ts
++++ b/packages/app/src/i18n/resources/es.ts
+@@ -253,6 +253,9 @@ export const es: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "No se pudo guardar este ajuste. Inténtalo de nuevo.",
+       label: "Continuar al restablecerse el límite",
+       enabled: "Activado para este chat. Mantén el servidor en ejecución.",
+diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
+index 44ade0ab9..49b02c4a4 100644
+--- a/packages/app/src/i18n/resources/fr.ts
++++ b/packages/app/src/i18n/resources/fr.ts
+@@ -254,6 +254,9 @@ export const fr: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Impossible d’enregistrer ce réglage. Réessayez.",
+       label: "Reprendre après la limite d’utilisation",
+       enabled: "Activé pour cette conversation. Gardez l’hôte en marche.",
+diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
+index b6c3b56b8..4cffead39 100644
+--- a/packages/app/src/i18n/resources/ja.ts
++++ b/packages/app/src/i18n/resources/ja.ts
+@@ -253,6 +253,9 @@ export const ja: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "設定を保存できませんでした。もう一度お試しください。",
+       label: "利用制限の解除後に再開",
+       enabled: "このチャットで有効です。ホストを起動したままにしてください。",
+diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
+index 71f8afb8e..c419c3d98 100644
+--- a/packages/app/src/i18n/resources/ko.ts
++++ b/packages/app/src/i18n/resources/ko.ts
+@@ -251,6 +251,9 @@ export const ko: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "설정을 저장하지 못했습니다. 다시 시도해 주세요.",
+       label: "사용량 제한 해제 후 계속",
+       enabled: "이 채팅에서 활성화되었습니다. 호스트를 켜 두세요.",
+diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
+index 40d3315c9..910da3fb5 100644
+--- a/packages/app/src/i18n/resources/pt-BR.ts
++++ b/packages/app/src/i18n/resources/pt-BR.ts
+@@ -252,6 +252,9 @@ export const ptBR: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Não foi possível salvar esta configuração. Tente novamente.",
+       label: "Continuar após a redefinição do limite",
+       enabled: "Ativado para este chat. Mantenha o servidor em execução.",
+diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
+index 86de08856..ccbd07a18 100644
+--- a/packages/app/src/i18n/resources/ru.ts
++++ b/packages/app/src/i18n/resources/ru.ts
+@@ -253,6 +253,9 @@ export const ru: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Не удалось сохранить настройку. Попробуйте ещё раз.",
+       label: "Продолжать после сброса лимита",
+       enabled: "Включено для этого чата. Сервер должен оставаться запущенным.",
+diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
+index 26ca1fc13..9b472e4df 100644
+--- a/packages/app/src/i18n/resources/zh-CN.ts
++++ b/packages/app/src/i18n/resources/zh-CN.ts
+@@ -251,6 +251,9 @@ export const zhCN: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switching: "Switching…",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "无法保存此设置，请重试。",
+       label: "用量限制重置后继续",
+       enabled: "已为此聊天启用。请保持主机运行。",
+diff --git a/packages/client/src/daemon-client.ts b/packages/client/src/daemon-client.ts
+index e0e4d9ddc..8c974f338 100644
+--- a/packages/client/src/daemon-client.ts
++++ b/packages/client/src/daemon-client.ts
+@@ -3653,6 +3653,28 @@ export class DaemonClient {
+     }
+   }
+ 
++  async continueOnLimitFallback(agentId: string): Promise<void> {
++    const requestId = this.createRequestId();
++    const message = SessionInboundMessageSchema.parse({
++      type: "continue_on_limit_fallback_request",
++      agentId,
++      requestId,
++    });
++    const payload = await this.sendRequest({
++      requestId,
++      message,
++      options: { skipQueue: true },
++      select: (msg) => {
++        if (msg.type !== "continue_on_limit_fallback_response") return null;
++        if (msg.payload.requestId !== requestId) return null;
++        return msg.payload;
++      },
++    });
++    if (!payload.accepted) {
++      throw new Error(payload.error ?? "continueOnLimitFallback rejected");
++    }
++  }
++
+   async setAgentFeature(agentId: string, featureId: string, value: unknown): Promise<void> {
+     const requestId = this.createRequestId();
+     const message = SessionInboundMessageSchema.parse({
+diff --git a/packages/protocol/src/agent-usage-limit.ts b/packages/protocol/src/agent-usage-limit.ts
+index 1853b788c..3f9ebd47d 100644
+--- a/packages/protocol/src/agent-usage-limit.ts
++++ b/packages/protocol/src/agent-usage-limit.ts
+@@ -2,6 +2,8 @@ import { z } from "zod";
+ 
+ export const AUTO_RESUME_USAGE_LIMIT_LABEL = "paseo.auto-resume-usage-limit";
+ export const USAGE_LIMIT_RESUME_DELAY_MS = 60_000;
++// On an agent moved to a limit-fallback profile: when to move it back (ISO), or "unknown".
++export const LIMIT_FALLBACK_LABEL = "paseo.limit-fallback";
+ 
+ export const AgentUsageLimitSchema = z.object({
+   resetsAt: z.string().nullable(),
+@@ -9,6 +11,11 @@ export const AgentUsageLimitSchema = z.object({
+ 
+ export type AgentUsageLimit = z.infer<typeof AgentUsageLimitSchema>;
+ 
++// On unless a chat opts out: an unattended chat should pick up where it stopped.
++export function autoResumesUsageLimit(labels: Record<string, string> | undefined): boolean {
++  return labels?.[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "false";
++}
++
+ export function usageLimitResumeAt(limit: AgentUsageLimit): number | null {
+   if (limit.resetsAt === null) return null;
+   const resetsAt = Date.parse(limit.resetsAt);
+diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
+index 870d5d19e..929ffa598 100644
+--- a/packages/protocol/src/messages.ts
++++ b/packages/protocol/src/messages.ts
+@@ -1955,6 +1955,18 @@ export const SetAgentModelRequestMessageSchema = z.object({
+   requestId: z.string(),
+ });
+ 
++// Move a chat stopped at its usage limit to its provider's limit-fallback profile, and continue it.
++export const ContinueOnLimitFallbackRequestMessageSchema = z.object({
++  type: z.literal("continue_on_limit_fallback_request"),
++  agentId: z.string(),
++  requestId: z.string(),
++});
++
++export const ContinueOnLimitFallbackResponseMessageSchema = z.object({
++  type: z.literal("continue_on_limit_fallback_response"),
++  payload: AgentActionResponsePayloadSchema,
++});
++
+ export const SetAgentModelResponseMessageSchema = z.object({
+   type: z.literal("set_agent_model_response"),
+   payload: AgentActionResponsePayloadSchema,
+@@ -3297,6 +3309,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
+   AgentForkContextRequestMessageSchema,
+   SetAgentModeRequestMessageSchema,
+   SetAgentModelRequestMessageSchema,
++  ContinueOnLimitFallbackRequestMessageSchema,
+   SetAgentThinkingRequestMessageSchema,
+   SetAgentFeatureRequestMessageSchema,
+   AgentConfigApplyRequestMessageSchema,
+@@ -3590,6 +3603,7 @@ export const ServerInfoStatusPayloadSchema = z
+         providersSnapshot: z.boolean().optional(),
+         usageSources: z.boolean().optional(),
+         usageLimitResume: z.boolean().optional(),
++        limitFallback: z.boolean().optional(),
+         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
+         providersSnapshotCwd: z.boolean().optional(),
+         // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
+@@ -6968,6 +6982,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
+   WriteProjectConfigResponseMessageSchema,
+   SetAgentModeResponseMessageSchema,
+   SetAgentModelResponseMessageSchema,
++  ContinueOnLimitFallbackResponseMessageSchema,
+   SetAgentThinkingResponseMessageSchema,
+   SetAgentFeatureResponseMessageSchema,
+   AgentConfigApplyResponseMessageSchema,
+diff --git a/packages/protocol/src/provider-config.ts b/packages/protocol/src/provider-config.ts
+index c94f8ca96..2b5ca7bbd 100644
+--- a/packages/protocol/src/provider-config.ts
++++ b/packages/protocol/src/provider-config.ts
+@@ -50,6 +50,8 @@ export const ProviderProfileModelSchema = z.object({
+ 
+ export const ProviderOverrideSchema = z.object({
+   extends: z.string().optional(),
++  // Start and continue this profile's chats while its base provider is at a usage limit.
++  limitFallback: z.boolean().optional(),
+   label: z.string().optional(),
+   description: z.string().optional(),
+   command: z.array(z.string().min(1)).min(1).optional(),
+diff --git a/packages/server/src/server/agent/agent-manager.test.ts b/packages/server/src/server/agent/agent-manager.test.ts
+index 44e38a344..195856419 100644
+--- a/packages/server/src/server/agent/agent-manager.test.ts
++++ b/packages/server/src/server/agent/agent-manager.test.ts
+@@ -11892,3 +11892,85 @@ test.each([false, true])(
+     }
+   },
+ );
++
++function createLimitFallbackManager() {
++  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
++  const storage = new AgentStorage(join(workdir, "agents"), logger);
++  const subscription = new TestAgentClient("claude");
++  const credits = new TestAgentClient("claude-api-credits");
++  const manager = new AgentManager({
++    clients: { claude: subscription, "claude-api-credits": credits, codex: new TestAgentClient() },
++    providerDefinitions: {
++      claude: { enabled: true },
++      "claude-api-credits": { enabled: true, derivedFromProviderId: "claude", limitFallback: true },
++      codex: { enabled: true },
++    },
++    registry: storage,
++    logger,
++  });
++  const limitClaudeUntil = (resetsAt: string) =>
++    (manager as unknown as { recordProviderLimit(p: string, l: { resetsAt: string }): void })
++      .recordProviderLimit("claude", { resetsAt });
++  return { workdir, manager, credits, limitClaudeUntil };
++}
++
++test("switchAgentProvider moves an idle agent between profiles of one provider in place", async () => {
++  const { workdir, manager, credits } = createLimitFallbackManager();
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  const until = "2026-11-02T00:00:00.000Z";
++
++  const moved = await manager.switchAgentProvider(agent.id, "claude-api-credits", {
++    fallbackUntil: until,
++  });
++  expect(moved.id).toBe(agent.id);
++  expect(moved.provider).toBe("claude-api-credits");
++  expect(moved.labels["paseo.limit-fallback"]).toBe(until);
++  expect(credits.resumeOverrides).toHaveLength(1);
++
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBe(until);
++
++  await manager.switchAgentProvider(agent.id, "claude");
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBeUndefined();
++});
++
++test("switchAgentProvider refuses a provider that is not a profile of the same base", async () => {
++  const { workdir, manager } = createLimitFallbackManager();
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  await expect(manager.switchAgentProvider(agent.id, "codex")).rejects.toThrow(
++    "unrelated provider",
++  );
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++});
++
++test("new chats start on the limit fallback until the limit resets, then move back", async () => {
++  const { workdir, manager, limitClaudeUntil } = createLimitFallbackManager();
++  const resetsAt = new Date(Date.now() + 60 * 60_000).toISOString();
++  limitClaudeUntil(resetsAt);
++
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  expect(agent.provider).toBe("claude-api-credits");
++  expect(agent.labels["paseo.limit-fallback"]).toBe(resetsAt);
++
++  await manager.restoreDueLimitFallbacks(Date.parse(resetsAt) - 1);
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude-api-credits");
++
++  await manager.restoreDueLimitFallbacks(Date.parse(resetsAt) + 1);
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBeUndefined();
++});
++
++test("chats are not moved to the fallback once the limit has passed", async () => {
++  const { workdir, manager, limitClaudeUntil } = createLimitFallbackManager();
++  limitClaudeUntil(new Date(Date.now() - 1000).toISOString());
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  expect(agent.provider).toBe("claude");
++});
+diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
+index 37164e74f..7e85e734b 100644
+--- a/packages/server/src/server/agent/agent-manager.ts
++++ b/packages/server/src/server/agent/agent-manager.ts
+@@ -1,5 +1,7 @@
+ import {
+   AUTO_RESUME_USAGE_LIMIT_LABEL,
++  LIMIT_FALLBACK_LABEL,
++  autoResumesUsageLimit,
+   usageLimitResumeAt,
+   type AgentUsageLimit,
+ } from "@getpaseo/protocol/agent-usage-limit";
+@@ -308,6 +310,7 @@ interface AgentManagerRescueTimeouts {
+ interface ProviderEnabledFlag {
+   enabled: boolean;
+   derivedFromProviderId?: string | null;
++  limitFallback?: boolean;
+   applyToolPolicy?: (
+     config: AgentSessionConfig,
+     toolPolicy: ToolPolicy | undefined,
+@@ -773,6 +776,8 @@ export class AgentManager {
+   private readonly clients = new Map<AgentProvider, AgentClient>();
+   private readonly providerEnabled = new Map<AgentProvider, boolean>();
+   private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
++  // Host-wide: a subscription limit applies to every chat on that provider.
++  private readonly providerLimitedUntil = new Map<AgentProvider, number>();
+   private readonly agents = new Map<string, LiveManagedAgent>();
+   private readonly timelineStore = new InMemoryAgentTimelineStore();
+   private readonly providerSubagents = new ProviderSubagentStore();
+@@ -1324,6 +1329,14 @@ export class AgentManager {
+       options = { ...options, env: request.env };
+     }
+     await this.deleteAgentState(resolvedAgentId);
++    const fallback = config.internal ? null : this.activeLimitFallback(config.provider);
++    if (fallback) {
++      config = { ...config, provider: fallback.provider };
++      options = {
++        ...options,
++        labels: { ...options.labels, [LIMIT_FALLBACK_LABEL]: fallback.until },
++      };
++    }
+     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+       config,
+       resolvedAgentId,
+@@ -1583,7 +1596,7 @@ export class AgentManager {
+   private async reloadAgentSessionInternal(
+     agentId: string,
+     overrides?: Partial<AgentSessionConfig>,
+-    options?: { rehydrateFromDisk?: boolean },
++    options?: { rehydrateFromDisk?: boolean; provider?: AgentProvider },
+   ): Promise<ManagedAgent> {
+     this.assertAcceptingAgentRegistrations();
+     let existing = this.requireSessionAgent(agentId);
+@@ -1596,8 +1609,9 @@ export class AgentManager {
+     const preservedLastUsage = existing.lastUsage;
+     const preservedLastError = existing.lastError;
+     const preservedAttention = existing.attention;
+-    const handle = existing.persistence;
+-    const provider = handle?.provider ?? existing.provider;
++    // A provider switch resumes the same native session under another profile.
++    const provider = options?.provider ?? existing.persistence?.provider ?? existing.provider;
++    const handle = existing.persistence ? { ...existing.persistence, provider } : null;
+     const client = this.requireClient(provider);
+     const refreshConfig = {
+       ...existing.config,
+@@ -2462,6 +2476,120 @@ export class AgentManager {
+     }
+   }
+ 
++  /**
++   * Move an idle agent to another profile of the same provider (e.g. a Claude
++   * subscription profile and an API-key profile), keeping its ID, native session
++   * and timeline. The label marks a temporary move, undone when the limit resets.
++   */
++  async switchAgentProvider(
++    agentId: string,
++    provider: AgentProvider,
++    options?: { fallbackUntil?: string },
++  ): Promise<ManagedAgent> {
++    this.usageLimitResumeAttempts.get(agentId)?.abort();
++    return this.trackAgentRegistrationOperation(
++      this.runLifecycleMutation(agentId, async () => {
++        const existing = this.requireSessionAgent(agentId);
++        if (existing.provider === provider) return existing;
++        if (this.hasInFlightRun(agentId) || existing.pendingPermissions.size > 0) {
++          throw new Error("Stop the agent before switching its provider");
++        }
++        if (!existing.persistence) {
++          throw new Error("The agent has no saved session to resume");
++        }
++        if (this.providerBase(existing.provider) !== this.providerBase(provider)) {
++          throw new Error(`Cannot switch '${existing.provider}' to unrelated provider '${provider}'`);
++        }
++        if (this.providerDefinitions.get(provider)?.enabled === false) {
++          throw new Error(`Provider '${provider}' is disabled`);
++        }
++        await this.reloadAgentSessionInternal(agentId, undefined, { provider });
++        const agent = this.requireSessionAgent(agentId);
++        const labels = { ...agent.labels };
++        if (options?.fallbackUntil) labels[LIMIT_FALLBACK_LABEL] = options.fallbackUntil;
++        else delete labels[LIMIT_FALLBACK_LABEL];
++        agent.labels = labels;
++        // The limit belonged to the old profile; its scheduled resume no longer applies.
++        agent.usageLimit = undefined;
++        agent.lastError = undefined;
++        this.touchUpdatedAt(agent);
++        await this.persistSnapshot(agent);
++        this.emitState(agent, { persist: false });
++        return { ...agent };
++      }),
++    );
++  }
++
++  /** Move a chat stopped at its provider's usage limit to the fallback profile and continue it. */
++  async continueOnLimitFallback(agentId: string): Promise<void> {
++    const existing = this.requireSessionAgent(agentId);
++    const fallback = this.limitFallbackFor(existing.provider);
++    if (!fallback) throw new Error(`No limit fallback is configured for '${existing.provider}'`);
++    const until =
++      existing.usageLimit?.resetsAt ??
++      this.activeLimitFallback(existing.provider)?.until ??
++      "unknown";
++    await this.switchAgentProvider(agentId, fallback, { fallbackUntil: until });
++    void this.runAgent(
++      agentId,
++      "Continue the interrupted task from where you stopped, respecting the existing instructions. If the task is already complete, do not start new work.",
++      { clientMessageId: randomUUID() },
++    ).catch((error) => {
++      this.logger.warn({ err: error, agentId }, "Failed to continue on limit fallback");
++    });
++  }
++
++  /** Move idle fallback chats back once their base provider's limit has reset. */
++  async restoreDueLimitFallbacks(now = Date.now()): Promise<void> {
++    for (const agent of this.agents.values()) {
++      const until = agent.labels[LIMIT_FALLBACK_LABEL];
++      if (until === undefined) continue;
++      const base = this.providerBase(agent.provider);
++      const due =
++        until === "unknown" ? this.activeLimitFallback(base) === null : Date.parse(until) <= now;
++      if (!due || this.hasInFlightRun(agent.id) || agent.pendingPermissions.size > 0) continue;
++      try {
++        await this.switchAgentProvider(agent.id, base);
++      } catch (error) {
++        this.logger.warn({ err: error, agentId: agent.id }, "Failed to restore from limit fallback");
++      }
++    }
++  }
++
++  private recordProviderLimit(provider: AgentProvider, limit: AgentUsageLimit | undefined): void {
++    const resetsAt = limit?.resetsAt ? Date.parse(limit.resetsAt) : NaN;
++    if (!Number.isFinite(resetsAt)) return;
++    this.providerLimitedUntil.set(
++      provider,
++      Math.max(resetsAt, this.providerLimitedUntil.get(provider) ?? 0),
++    );
++  }
++
++  private limitFallbackFor(provider: AgentProvider): AgentProvider | null {
++    for (const [id, definition] of this.providerDefinitions) {
++      if (definition.limitFallback && definition.enabled && definition.derivedFromProviderId === provider) {
++        return id;
++      }
++    }
++    return null;
++  }
++
++  /** The fallback profile to use now, and when the limit on `provider` ends. */
++  private activeLimitFallback(provider: AgentProvider): { provider: AgentProvider; until: string } | null {
++    const until = this.providerLimitedUntil.get(provider);
++    if (until === undefined) return null;
++    if (until <= Date.now()) {
++      this.providerLimitedUntil.delete(provider);
++      return null;
++    }
++    const fallback = this.limitFallbackFor(provider);
++    return fallback ? { provider: fallback, until: new Date(until).toISOString() } : null;
++  }
++
++  private providerBase(provider: AgentProvider): AgentProvider {
++    return this.providerDefinitions.get(provider)?.derivedFromProviderId ?? provider;
++  }
++
+   async resumeAfterUsageLimit({ agentId, expected }: ResumeAfterUsageLimitInput): Promise<void> {
+     if (this.usageLimitResumeAttempts.has(agentId)) return;
+     const attempt = new AbortController();
+@@ -2478,7 +2606,7 @@ export class AgentManager {
+         const labels = existing ? existing.labels : record.labels;
+         const limit = existing ? existing.usageLimit : record.usageLimit;
+         if (
+-          labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true" ||
++          !autoResumesUsageLimit(labels) ||
+           limit?.resetsAt !== expected.resetsAt ||
+           resumeAt === null ||
+           resumeAt > Date.now() ||
+@@ -2521,7 +2649,7 @@ export class AgentManager {
+       !signal.aborted &&
+       this.acceptingAgentRegistrations &&
+       agent &&
+-      agent.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] === "true" &&
++      autoResumesUsageLimit(agent.labels) &&
+       !this.hasInFlightRun(agentId) &&
+       agent.pendingPermissions.size === 0 &&
+       agent.lastUserMessageAt === lastUserMessageAt,
+@@ -4802,7 +4930,10 @@ export class AgentManager {
+       agent.lifecycle = "error";
+     }
+     agent.lastError = event.error;
+-    if (!options?.fromHistory) agent.usageLimit = event.usageLimit;
++    if (!options?.fromHistory) {
++      agent.usageLimit = event.usageLimit;
++      this.recordProviderLimit(agent.provider, event.usageLimit);
++    }
+     await this.appendSystemErrorTimelineMessage(
+       agent,
+       event.provider,
+diff --git a/packages/server/src/server/agent/provider-registry.ts b/packages/server/src/server/agent/provider-registry.ts
+index 9f85e4d37..a8e91e3e2 100644
+--- a/packages/server/src/server/agent/provider-registry.ts
++++ b/packages/server/src/server/agent/provider-registry.ts
+@@ -76,6 +76,8 @@ export interface ProviderDefinition extends AgentProviderDefinition {
+    * generic ACP providers (which only extend the literal "acp" sentinel).
+    */
+   derivedFromProviderId: string | null;
++  /** Used in place of its base provider while that is at a usage limit. */
++  limitFallback: boolean;
+   supportsExactMcpPreapproval: boolean;
+   applyToolPolicy: (
+     config: AgentSessionConfig,
+@@ -140,6 +142,7 @@ interface ResolvedProvider {
+   profileModelsAreAdditive: boolean;
+   enabled: boolean;
+   derivedFromProviderId: string | null;
++  limitFallback?: boolean;
+   providerOptions?: ProviderOptions;
+   createBaseClient: (logger: Logger) => AgentClient;
+   contract: ProviderContract;
+@@ -648,6 +651,7 @@ function createRegistryEntry(
+     configuration,
+     enabled: resolved.enabled,
+     derivedFromProviderId: resolved.derivedFromProviderId,
++    limitFallback: resolved.limitFallback === true,
+     supportsExactMcpPreapproval: resolved.contract.supportsExactMcpPreapproval,
+     applyToolPolicy: (config, toolPolicy) => {
+       if (toolPolicy && !resolved.contract.supportsExactMcpPreapproval) {
+@@ -888,6 +892,7 @@ function addDerivedProviders(
+       profileModelsAreAdditive: false,
+       enabled: override.enabled !== false,
+       derivedFromProviderId: baseProviderId,
++      limitFallback: override.limitFallback === true,
+       providerOptions,
+       createBaseClient: (logger) =>
+         baseFactory(logger, mergedRuntimeSettings, {
+diff --git a/packages/server/src/server/agent/provider-snapshot-manager.ts b/packages/server/src/server/agent/provider-snapshot-manager.ts
+index b10a4f8e0..3e4f5a777 100644
+--- a/packages/server/src/server/agent/provider-snapshot-manager.ts
++++ b/packages/server/src/server/agent/provider-snapshot-manager.ts
+@@ -185,7 +185,7 @@ export interface AgentManagerProviderState {
+   providerDefinitions: Partial<
+     Record<
+       AgentProvider,
+-      Pick<ProviderDefinition, "enabled" | "derivedFromProviderId" | "applyToolPolicy">
++      Pick<ProviderDefinition, "enabled" | "derivedFromProviderId" | "limitFallback" | "applyToolPolicy">
+     >
+   >;
+   clients: Partial<Record<AgentProvider, AgentClient>>;
+@@ -370,6 +370,7 @@ export class ProviderSnapshotManager {
+       providerDefinitions[provider] = {
+         enabled: definition.enabled,
+         derivedFromProviderId: definition.derivedFromProviderId,
++        limitFallback: definition.limitFallback,
+         applyToolPolicy: definition.applyToolPolicy,
+       };
+       if (definition.enabled) {
+diff --git a/packages/server/src/server/agent/usage-limit-resume.test.ts b/packages/server/src/server/agent/usage-limit-resume.test.ts
+index 833d870f6..a30bd38b8 100644
+--- a/packages/server/src/server/agent/usage-limit-resume.test.ts
++++ b/packages/server/src/server/agent/usage-limit-resume.test.ts
+@@ -167,12 +167,9 @@ function resumedMessages({ manager, agentId }: UsageLimitFixture) {
+     );
+ }
+ 
+-test("opt-in is required; concurrent scans resume once in the same provider session", async () => {
++test("resume is on by default; concurrent scans resume once in the same provider session", async () => {
+   const fixture = await setup();
+   const service = fixture.createService();
+-  await service.tick();
+-  expect(resumedMessages(fixture)).toHaveLength(0);
+-  await fixture.enable();
+   await Promise.all([service.tick(), service.tick()]);
+   await expect
+     .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
+diff --git a/packages/server/src/server/agent/usage-limit-resume.ts b/packages/server/src/server/agent/usage-limit-resume.ts
+index 964858dcd..494fa6e33 100644
+--- a/packages/server/src/server/agent/usage-limit-resume.ts
++++ b/packages/server/src/server/agent/usage-limit-resume.ts
+@@ -1,5 +1,5 @@
+ import {
+-  AUTO_RESUME_USAGE_LIMIT_LABEL,
++  autoResumesUsageLimit,
+   usageLimitResumeAt,
+ } from "@getpaseo/protocol/agent-usage-limit";
+ import type { Logger } from "pino";
+@@ -8,7 +8,7 @@ import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
+ 
+ interface UsageLimitResumeOptions {
+   agentStorage: Pick<AgentStorage, "list">;
+-  agentManager: Pick<AgentManager, "resumeAfterUsageLimit">;
++  agentManager: Pick<AgentManager, "resumeAfterUsageLimit" | "restoreDueLimitFallbacks">;
+   canResumeWorkspace: (record: StoredAgentRecord) => Promise<boolean>;
+   logger: Logger;
+ }
+@@ -44,9 +44,10 @@ export class UsageLimitResumeService {
+   }
+ 
+   private async resumeDueAgents(): Promise<void> {
++    await this.options.agentManager.restoreDueLimitFallbacks();
+     for (const record of await this.options.agentStorage.list()) {
+       if (record.archivedAt || record.internal || !record.usageLimit) continue;
+-      if (record.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true") continue;
++      if (!autoResumesUsageLimit(record.labels)) continue;
+       const resumeAt = usageLimitResumeAt(record.usageLimit);
+       if (resumeAt === null || resumeAt > Date.now()) continue;
+       try {
+diff --git a/packages/server/src/server/authorization/operation-permissions.ts b/packages/server/src/server/authorization/operation-permissions.ts
+index e7e77bc0d..828586dd8 100644
+--- a/packages/server/src/server/authorization/operation-permissions.ts
++++ b/packages/server/src/server/authorization/operation-permissions.ts
+@@ -172,6 +172,7 @@ const INBOUND_PERMISSION = {
+   set_agent_feature_request: "workspace.write",
+   set_agent_mode_request: "workspace.write",
+   set_agent_model_request: "workspace.write",
++  continue_on_limit_fallback_request: "workspace.write",
+   set_agent_thinking_request: "workspace.write",
+   set_daemon_config_request: "daemon.manage",
+   set_voice_mode: "workspace.write",
+@@ -397,6 +398,7 @@ const OUTBOUND_PERMISSION = {
+   set_agent_feature_response: "workspace.write",
+   set_agent_mode_response: "workspace.write",
+   set_agent_model_response: "workspace.write",
++  continue_on_limit_fallback_response: "workspace.write",
+   set_agent_thinking_response: "workspace.write",
+   set_daemon_config_response: "daemon.manage",
+   set_voice_mode_response: "workspace.write",
+diff --git a/packages/server/src/server/session.ts b/packages/server/src/server/session.ts
+index 08d3f0eef..670cda30b 100644
+--- a/packages/server/src/server/session.ts
++++ b/packages/server/src/server/session.ts
+@@ -1020,6 +1020,7 @@ export class Session {
+         setMode: async (agentId, modeId) =>
+           (await setAgentModeCommand({ agentManager }, { agentId, modeId })).notice,
+         setModel: (agentId, modelId) => agentManager.setAgentModel(agentId, modelId),
++        continueOnLimitFallback: (agentId) => agentManager.continueOnLimitFallback(agentId),
+         setFeature: (agentId, featureId, value) =>
+           agentManager.setAgentFeature(agentId, featureId, value),
+         setThinking: (agentId, thinkingOptionId) =>
+@@ -2796,6 +2797,8 @@ export class Session {
+         return this.agentConfigSession.handleSetAgentModeRequest(msg);
+       case "set_agent_model_request":
+         return this.agentConfigSession.handleSetAgentModelRequest(msg);
++      case "continue_on_limit_fallback_request":
++        return this.agentConfigSession.handleContinueOnLimitFallbackRequest(msg);
+       case "set_agent_feature_request":
+         return this.agentConfigSession.handleSetAgentFeatureRequest(msg);
+       case "set_agent_thinking_request":
+diff --git a/packages/server/src/server/session/agent-config/agent-config-session.ts b/packages/server/src/server/session/agent-config/agent-config-session.ts
+index 8cf239419..9bc497c36 100644
+--- a/packages/server/src/server/session/agent-config/agent-config-session.ts
++++ b/packages/server/src/server/session/agent-config/agent-config-session.ts
+@@ -28,6 +28,7 @@ export interface AgentConfigOperations {
+   ensureLoaded(agentId: string): Promise<void>;
+   setMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null>;
+   setModel(agentId: string, modelId: string | null): Promise<void>;
++  continueOnLimitFallback(agentId: string): Promise<void>;
+   setFeature(agentId: string, featureId: string, value: unknown): Promise<void>;
+   setThinking(
+     agentId: string,
+@@ -102,6 +103,25 @@ export class AgentConfigSession {
+     });
+   }
+ 
++  handleContinueOnLimitFallbackRequest(
++    msg: Extract<SessionInboundMessage, { type: "continue_on_limit_fallback_request" }>,
++  ): Promise<void> {
++    const { agentId, requestId } = msg;
++    return this.applyConfigChange({
++      agentId,
++      requestId,
++      logLabel: "continue_on_limit_fallback_request",
++      logFields: { agentId, requestId },
++      failureText: "Failed to continue on the limit fallback",
++      run: async () => {
++        await this.operations.continueOnLimitFallback(agentId);
++        return undefined;
++      },
++      emitResponse: (payload) =>
++        this.host.emit({ type: "continue_on_limit_fallback_response", payload }),
++    });
++  }
++
+   handleSetAgentFeatureRequest(
+     msg: Extract<SessionInboundMessage, { type: "set_agent_feature_request" }>,
+   ): Promise<void> {
+diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
+index ee94979f0..9a118c2c9 100644
+--- a/packages/server/src/server/websocket-server.ts
++++ b/packages/server/src/server/websocket-server.ts
+@@ -1792,6 +1792,7 @@ export class VoiceAssistantWebSocketServer {
+       features: {
+         usageSources: true,
+         usageLimitResume: true,
++        limitFallback: true,
+         ownedSubscriptions: true,
+         agentRequestReceipts: true,
+         workspaceRequestReceipts: true,
+-- 
+2.56.0
+
