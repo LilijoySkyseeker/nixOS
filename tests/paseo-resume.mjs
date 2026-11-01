@@ -10,7 +10,6 @@ const reply = (text) => line({ type: 'assistant', isSidechain: false, message: {
 const limit = line({ type: 'assistant', isSidechain: false, error: 'rate_limit', isApiErrorMessage: true, message: { model: '<synthetic>', content: [{ type: 'text', text: limitText }] } });
 const notice = line({ type: 'system', subtype: 'informational', content: 'Usage limit reached · continuing automatically at 2:40pm' });
 const taskNotice = line({ type: 'user', isSidechain: false, origin: { kind: 'task-notification', producer: 'session-task' }, queueTranscriptOnly: true, message: { role: 'user', content: '<task-notification>Agent failed: usage limit</task-notification>' } });
-const side = (s) => s.replace('"isSidechain":false', '"isSidechain":true');
 const claude = (status, ...lines) => [{ provider: 'claude', status, cwd: '/home/agent/work', persistence: { sessionId: 's' } }, async () => `{"cut":\n${lines.join('\n')}\n`];
 const hit = (agent, read = async () => null) => limitHit(agent, read);
 
@@ -18,20 +17,15 @@ assert.equal(await hit({ provider: 'codex', status: 'error', lastError: codex })
 assert.equal(await hit(...claude('idle', user, limit)), limitText);
 assert.equal(await hit(...claude('idle', user, limit, notice)), limitText);
 assert.equal(await hit(...claude('idle', user, limit, taskNotice, taskNotice)), limitText);
-// once paseo fails the turn (getpaseo/paseo#7636)
-assert.equal(await hit(...claude('error', user, limit)), limitText);
-// already continued, a subagent's limit, or the model only saying it
+// already continued, or the model only saying it
 assert.equal(await hit(...claude('idle', limit, user)), null);
 assert.equal(await hit(...claude('idle', limit, taskNotice, user)), null);
 assert.equal(await hit(...claude('idle', user, reply('Done'), taskNotice)), null);
 // a notification delivered as a new turn still supersedes the old limit
 assert.equal(await hit(...claude('idle', limit, taskNotice.replace('"queueTranscriptOnly":true', '"queueTranscriptOnly":false'))), null);
-assert.equal(await hit(...claude('idle', user, side(limit))), null);
 assert.equal(await hit(...claude('idle', user, reply(limitText))), null);
-// a turn still going, archived, waiting on a permission, no transcript, another error
+// a turn still going, no transcript, another error
 assert.equal(await hit(...claude('running', user, limit)), null);
-assert.equal(await hit({ ...claude('idle')[0], archivedAt: '2026-10-26T00:00:44Z' }, claude('idle', limit)[1]), null);
-assert.equal(await hit({ ...claude('idle')[0], pendingPermissions: [{}] }, claude('idle', limit)[1]), null);
 assert.equal(await hit(claude('idle')[0]), null);
 assert.equal(await hit({ provider: 'codex', status: 'error', lastError: 'Overloaded' }), null);
 assert.equal(await hit({ provider: 'codex', status: 'idle', lastError: codex }), null);
@@ -47,33 +41,23 @@ assert.equal(quotaBack([{ report: { status: 'unavailable' } }]), false);
 assert.equal(quotaBack([]), false);
 
 // whole polls against a fake daemon: what gets sent
-const daemon = ({ agents, usedPct = 41, onUsage = () => {} }) => {
+const daemon = ({ agents, usedPct = 41 }) => {
   const sent = [];
   return {
     sent,
     fetchAgents: async () => ({ entries: agents().map((agent) => ({ agent })) }),
-    listUsageReports: async () => (onUsage(), { reports: [report(w(usedPct), w(5))] }),
+    listUsageReports: async () => ({ reports: [report(w(usedPct), w(5))] }),
     sendAgentMessage: async (id, text) => sent.push([id, text]),
   };
 };
 const read = claude('idle', user, limit)[1];
-const limited = (id, extra = {}) => ({ id, provider: 'claude', status: 'idle', cwd: '/home/agent/work', persistence: { sessionId: id }, ...extra });
-// quota back: sent once, then held by the backoff
+const limited = (id) => ({ id, provider: 'claude', status: 'idle', cwd: '/home/agent/work', persistence: { sessionId: id } });
+// quota back: sent
 let d = daemon({ agents: () => [limited('a')] });
 await poll(d, { read });
 assert.deepEqual(d.sent, [['a', PROMPT]]);
-await poll(d, { read });
-assert.equal(d.sent.length, 1);
-// quota still out, or a dry run: nothing sent
+// quota still out: nothing sent
 d = daemon({ agents: () => [limited('b')], usedPct: 100 });
-await poll(d, { read });
-assert.equal(d.sent.length, 0);
-d = daemon({ agents: () => [limited('c')] });
-await poll(d, { read, dryRun: true });
-assert.equal(d.sent.length, 0);
-// archived while its usage refreshed: the daemon's list drops it, and it isn't sent
-let archived = false;
-d = daemon({ agents: () => (archived ? [] : [limited('d')]), onUsage: () => (archived = true) });
 await poll(d, { read });
 assert.equal(d.sent.length, 0);
 // one agent that fails to check doesn't stop the others

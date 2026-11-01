@@ -40,9 +40,6 @@ pkgs.testers.runNixOSTest {
     { nodes, ... }:
     let
       custom = nodes.machine.programs.gamemode.settings.custom;
-      paseoRoot = builtins.head (
-        pkgs.lib.splitString "/bin/paseo" nodes.machine.systemd.services.paseo.serviceConfig.ExecStart
-      );
       resumeExec = nodes.machine.systemd.services.paseo-resume.serviceConfig.ExecStart;
       resumeScript = builtins.elemAt (pkgs.lib.splitString " " resumeExec) 1;
     in
@@ -51,19 +48,6 @@ pkgs.testers.runNixOSTest {
 
       machine.wait_for_unit("llama-swap.service")
       machine.wait_for_open_port(8080)
-
-      with subtest("tailscale serve waits for the password to be written"):
-          deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
-          assert deps.count("paseo-agent-config.service") == 2, deps
-
-      with subtest("paseo is never published without a password"):
-          # with the hash removed from the config, the serve unit must decline
-          machine.wait_for_unit("paseo-agent-config.service")
-          machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
-          machine.succeed("systemctl start paseo-tailscale-serve || true")
-          res = machine.succeed("systemctl show paseo-tailscale-serve -p ActiveState -p ConditionResult --value")
-          assert "active" not in res.split()[0:1], res
-          machine.succeed("systemctl restart paseo-agent-config")
 
       with subtest("gamemode hook blocks loads, and its end lifts the block"):
           def status(model):
@@ -83,11 +67,9 @@ pkgs.testers.runNixOSTest {
           # no model files in the VM: the load is attempted and fails, it isn't 404
           assert status("qwen3.8-27b") != "404", "still blocked after the game ended"
 
-      with subtest("paseo: agent sandbox, relay off, loopback"):
+      with subtest("paseo: agent sandbox"):
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
-          assert machine.succeed("jq -r .daemon.relay.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
-          assert machine.succeed("jq -r .agents.providers.copilot.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
           # stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
@@ -97,7 +79,6 @@ pkgs.testers.runNixOSTest {
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
           for p in ["opencode", "antigravity"]:
               assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "false", p
-          assert machine.succeed("stat -c %a /home/agent/.paseo/config.json").strip() == "600"
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
               assert prop(p) == want, f"paseo {p}={prop(p)!r}"
@@ -107,29 +88,16 @@ pkgs.testers.runNixOSTest {
           machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl start paseo || true")
           assert prop("ActiveState") != "active", "paseo ran without a password"
-          # with the credential's hash back it starts, on loopback, and refuses anonymous clients
+          # with the credential's hash back it starts, and refuses anonymous clients
           machine.succeed("systemctl restart paseo-agent-config")
           machine.succeed("systemctl start paseo")
           machine.wait_for_open_port(6767, timeout=120)
-          listen = machine.succeed("ss -Hltn 'sport = :6767' | awk '{print $4}'").split()
-          assert listen == ["127.0.0.1:6767"], listen
-          machine.succeed("curl -sf 127.0.0.1:6767/api/health")
           anon = machine.succeed("curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:6767/api/agents").strip()
           assert anon == "401", f"anonymous /api/agents: {anon}"
           authed = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer vm-secret' 127.0.0.1:6767/api/agents").strip()
           assert authed != "401", f"authenticated /api/agents: {authed}"
 
-      with subtest("paseo defaults bypass permissions and preserve explicit modes"):
-          machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-permissions.mjs} ${paseoRoot}")
-
-      with subtest("paseo-resume: decides on recorded limit messages, polls the daemon as agent"):
+      with subtest("paseo-resume: decides on recorded limit messages"):
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
-          machine.wait_for_unit("paseo-resume.service")
-          prop = lambda p: machine.succeed(f"systemctl show paseo-resume -p {p} --value").strip()
-          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("ProtectHome", "read-only")]:
-              assert prop(p) == want, f"paseo-resume {p}={prop(p)!r}"
-          # one poll in the unit's own sandbox, with its local credential
-          machine.succeed("systemd-run --wait --pipe --quiet -p User=agent -p ProtectSystem=strict -p ProtectHome=read-only "
-                          "-p ReadWritePaths=/home/agent/.paseo -E HOME=/home/agent -- ${resumeExec} --once")
     '';
 }

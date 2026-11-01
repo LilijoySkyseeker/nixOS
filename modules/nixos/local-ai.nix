@@ -47,17 +47,13 @@ _: {
       # daemon password's bcrypt hash comes from the host's sops secret, never here
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
-          "$schema" = "https://paseo.sh/schemas/paseo.config.v1.json";
-          version = 1;
           daemon = {
-            listen = "127.0.0.1:6767";
             # tailscale serve forwards this Host; ip and localhost are allowed by default
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
             # explicit: a config that omits it keeps the legacy relay-on behavior
             relay.enabled = false;
           };
-          features.webUi.enabled = true;
-          log.file.level = "info";
+          features.webUi.enabled = false;
           agents.providers = {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
@@ -79,16 +75,13 @@ _: {
               ];
             };
           }
-          # bundled providers with no install here
+          # providers removed from torrent: the merge keeps old keys, so their
+          # live `enabled = true` must be overwritten
           //
             lib.genAttrs
               [
-                "copilot"
                 "opencode"
                 "antigravity"
-                "pi"
-                "muse"
-                "omp"
               ]
               (_: {
                 enabled = false;
@@ -158,13 +151,10 @@ _: {
       # paseo: merge the keys this repo owns into the agent's CLI-owned config
       systemd.services.paseo-agent-config = {
         description = "Merge repo-owned keys into the agent's Paseo config";
-        wantedBy = [ "multi-user.target" ];
-        before = [ "paseo.service" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
           User = "agent";
-          Group = "agent";
         };
         script = ''
           f=/home/agent/.paseo/config.json
@@ -172,13 +162,10 @@ _: {
           [ -s "$f" ] || echo '{}' > "$f"
           ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
-          # loads from sops; without one the file keeps whatever it has
+          # loads from sops
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
-          if [ -r "$hash" ]; then
-            ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
-            mv "$f.tmp2" "$f.tmp"
-          fi
-          chmod 600 "$f.tmp"
+          ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
+          mv "$f.tmp2" "$f.tmp"
           mv "$f.tmp" "$f"
         '';
       };
@@ -210,27 +197,12 @@ _: {
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
-        wantedBy = [
-          "multi-user.target"
-          "paseo.service"
-        ];
-        after = [ "paseo.service" ];
-        bindsTo = [ "paseo.service" ];
-        environment.HOME = "/home/agent";
+        wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
           Restart = "always";
           RestartSec = 30;
           User = "agent";
-          Group = "agent";
-          Slice = "agent.slice";
-          # the daemon's local credential and the cli's client id
-          ProtectSystem = "strict";
-          ProtectHome = "read-only";
-          ReadWritePaths = [ "/home/agent/.paseo" ];
-          PrivateTmp = true;
-          PrivateDevices = true;
-          NoNewPrivileges = true;
         };
       };
 
@@ -241,13 +213,9 @@ _: {
         # after the config step has written the password, or the condition below
         # fails on a first boot and nothing retries it
         after = [
-          "tailscaled.service"
           "tailscaled-autoconnect.service"
           "paseo-agent-config.service"
-          "paseo.service"
         ];
-        requires = [ "paseo-agent-config.service" ];
-        wants = [ "tailscaled.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";
