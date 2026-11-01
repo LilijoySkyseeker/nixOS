@@ -177,7 +177,8 @@ access to work, but is excluded from reviews and independent second opinions.
 those stopped on a usage limit once their account quota is available. Claude's
 transcript-only background-task notices do not clear a preceding limit. The
 watcher starts with `multi-user.target`, including activation while Paseo is
-already running.
+already running. It starts after `paseo.service` and waits up to a minute for
+the daemon's socket, so a switch that restarts Paseo doesn't fail on it.
 
 `local-ai-speech` installs `transcribe`: Whisper large-v3-turbo for every
 language, with Nemotron speaker labels. Its models live under

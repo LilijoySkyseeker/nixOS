@@ -294,7 +294,9 @@ _: {
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
+        # multi-user.target, so activation starts it while paseo is already running
         wantedBy = [ "multi-user.target" ];
+        after = [ "paseo.service" ];
         serviceConfig = {
           ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
           Restart = "always";
