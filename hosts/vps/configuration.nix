@@ -22,9 +22,6 @@ let
     ) || store_path=""
 
     reject() {
-      # the stderr line only reaches the ssh *client*; the logger line
-      # lands in this host's own journal
-      ${pkgs.util-linux}/bin/logger -t vps-deploy -p auth.warning "rejected command: $cmd" || true
       echo "vps-deploy: rejected command: $cmd" >&2
       exit 1
     }
@@ -114,9 +111,6 @@ in
     ./disko.nix
   ];
 
-  # Set your time zone.
-  time.timeZone = "America/Los_Angeles";
-
   # Define your hostname.
   networking.hostName = "vps";
 
@@ -133,10 +127,9 @@ in
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
-      cloud_init_modules = [ "seed_random" ];
+      cloud_init_modules = [ ];
       cloud_config_modules = [ ];
       cloud_final_modules = [ ];
-      preserve_hostname = true;
     };
   };
   # upstream cloud-init's 05_logging.cfg verbatim (the NixOS module omits it):
@@ -189,7 +182,6 @@ in
 
   # DigitalOcean only supports GRUB, not systemdboot
   boot.loader.systemd-boot.enable = lib.mkForce false;
-  boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
   boot.loader.grub = {
     enable = true;
     efiSupport = false;
@@ -205,32 +197,12 @@ in
     options = [
       "size=2G"
       "mode=0755"
-      "noexec"
-      "nosuid"
-      "nodev"
     ];
-    neededForBoot = true;
   };
-  # exec-capable: cloud-init execs DigitalOcean's vendor-data boothook from
-  # here (root is noexec), and without it the droplet's network never arms
-  fileSystems."/var/lib/cloud" = {
-    device = "none";
-    fsType = "tmpfs";
-    options = [
-      "size=64M"
-      "mode=0755"
-      "nosuid"
-      "nodev"
-    ];
-    neededForBoot = true;
-  };
-  fileSystems."/nix".neededForBoot = true;
   fileSystems."/persist".neededForBoot = true;
 
   # persisteted file and dirs between imepmatence wipes
   environment.persistence."/persist" = {
-    enable = true;
-    hideMounts = true;
     directories = [
       "/var/log"
       "/var/lib/nixos" # avoids uid/gid complaints on reboot
@@ -271,8 +243,6 @@ in
     polkit.addRule(function(action, subject) {
       if (action.id == "org.freedesktop.systemd1.manage-units" &&
           subject.user == "vps-deploy") {
-        // silent auto-grants leave no journal line otherwise
-        polkit.log("vps-deploy manage-units grant: " + action.id);
         return polkit.Result.YES;
       }
     });
@@ -288,20 +258,8 @@ in
     enable = true;
     # force port 22 closed
     openFirewall = false;
-    allowSFTP = false;
     settings.KbdInteractiveAuthentication = false;
     settings.PasswordAuthentication = false;
-    extraConfig = ''
-      PermitRootLogin = prohibit-password
-      AllowTcpForwarding no
-      X11Forwarding no
-      AllowAgentForwarding no
-      AllowStreamLocalForwarding no
-      AuthenticationMethods publickey
-      PermitTunnel no
-      ClientAliveInterval 60
-      ClientAliveCountMax 5
-    '';
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -320,7 +278,6 @@ in
   # networkd reads PrivateKeyFile only at link setup and a key-only rotation
   # changes no unit file, so restart it explicitly
   sops.secrets.vps_wireguard_private_key.restartUnits = [ "systemd-networkd.service" ];
-  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "systemd-networkd.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;
@@ -329,7 +286,6 @@ in
       {
         # homelab
         publicKey = "d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=";
-        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         allowedIPs = [ "10.100.0.2/32" ];
       }
     ];
@@ -349,11 +305,6 @@ in
         destination = "10.100.0.2:19132";
         proto = "udp";
         sourcePort = 19132; # minecraft: geyser (bedrock edition)
-      }
-      {
-        destination = "10.100.0.2:5520";
-        proto = "udp";
-        sourcePort = 5520; # hytale (QUIC)
       }
       {
         destination = "10.100.0.2:80";
@@ -389,29 +340,11 @@ in
       -m hashlimit --hashlimit-above 1000/second --hashlimit-burst 500 \
       --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
 
-    # hytale: cap packet rate per source IP; the retired factorio rule's
-    # figure, not measured
-    iptables -t raw -A vps-ratelimit -p udp --dport 5520 \
-      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
-      --hashlimit-mode srcip --hashlimit-name hytale-flood -j DROP
-
     # website: cap new HTTP(S) connections per source IP
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
       --hashlimit-mode srcip --hashlimit-name http-new -j DROP
   '';
-
-  # tear down the raw-table chain; the firewall's stop path only flushes
-  # nat/filter. every line guarded: runs under `set -e`, and a half-aborted
-  # stop is worse than a skipped rule
-  networking.firewall.extraStopCommands = ''
-    iptables -t raw -D PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null || true
-    iptables -t raw -F vps-ratelimit 2>/dev/null || true
-    iptables -t raw -X vps-ratelimit 2>/dev/null || true
-  '';
-
-  # this box never needs to forward IPv6
-  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
 
   # default 90s start timeout kills tailscaled-autoconnect before tailscale is Running on a slow boot
   systemd.services.tailscaled-autoconnect.serviceConfig.TimeoutStartSec = "300s";
@@ -421,10 +354,6 @@ in
     owner = "health-check";
     group = "health-check";
   };
-
-  # small disk: half the fleet's journal cap
-  # stable spelling; replaces the profile's 2G line rather than adding to it
-  services.journald.extraConfig = lib.mkForce "SystemMaxUse=1G";
 
   myHealthAlerts = {
     enable = true;
