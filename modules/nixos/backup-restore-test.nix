@@ -28,6 +28,16 @@ _: {
       '';
 
       serviceBase = {
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        RestrictNamespaces = true;
+        PrivateTmp = true;
+
         Type = "oneshot";
         StateDirectory = "backup-restore-test";
       };

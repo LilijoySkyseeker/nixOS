@@ -32,8 +32,7 @@ _: {
       egressRules =
         cmd: ranges:
         lib.concatMapStringsSep "\n" (
-          r:
-          "${cmd} -t mangle -A ${egressChain} -i ${cfg.bridgeInterface} -m conntrack --ctstate NEW -d ${r} -j DROP"
+          r: "${cmd} -t mangle -A ${egressChain} -i docker0 -m conntrack --ctstate NEW -d ${r} -j DROP"
         ) ranges;
       egressHook = cmd: ranges: ''
         ${cmd} -t mangle -N ${egressChain} 2>/dev/null || true

@@ -110,12 +110,20 @@ in
             User = "root";
             StateDirectory = "push-deploy";
             NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            PrivateTmp = true;
+            ReadWritePaths = [
+              "/root/.ssh" # known_hosts (StrictHostKeyChecking=accept-new)
+              "/root/.cache" # nix's own eval/build scratch
+            ];
           };
         };
 
         # the staleness marker exists from activation, so health-alerts
         # doesn't page "missing" before the first run
         systemd.tmpfiles.rules = [
+          "d /root/.cache 0700 root root -"
+          "d /root/.ssh 0700 root root -"
           "d /var/lib/push-deploy 0755 root root -"
           "f /var/lib/push-deploy/deployed-${cfg.hostAttr} 0644 root root -"
         ];
