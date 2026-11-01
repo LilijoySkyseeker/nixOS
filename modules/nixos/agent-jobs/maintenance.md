@@ -42,8 +42,8 @@ half-done as the fleet moves on.
    - If anything landed in "Fix it", make a fresh worktree of
      `origin/master` on branch `maintenance` (if an open PR from it exists,
      redo the work on it and force-push: the branch belongs to this job
-     alone), commit one fix per commit with its why in the body
-     (Conventional Commits), push, and open or update one PR. Its
+     alone), commit one fix per commit with its why in the body,
+     push, and open or update one PR. Its
      description has a line for each item, with "Needs the owner" at the
      top.
    - If only "Needs the owner" has items, open or update one issue titled

@@ -25,19 +25,6 @@ in
         bind ${wgAddress}
         redir https://${domain}/oops/${game}/ 302
       '';
-
-      # the site loads nothing from third parties
-      securityHeaders = ''
-        header {
-          Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-          X-Content-Type-Options nosniff
-          Referrer-Policy strict-origin-when-cross-origin
-          Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
-          # no includeSubDomains: the game hostnames aren't HTTPS
-          Strict-Transport-Security "max-age=86400"
-          -Server
-        }
-      '';
     in
     {
       # caddy: the public site, ACME through the vps's 80/443 DNAT
@@ -59,7 +46,6 @@ in
         virtualHosts.${domain}.extraConfig = ''
           bind ${wgAddress}
           encode zstd gzip
-          ${securityHeaders}
           # written by website-status, read by the page's status stickers
           handle /status.json {
             root * ${statusDir}
@@ -81,7 +67,6 @@ in
           redir https://${domain}{uri} permanent
         '';
         virtualHosts."minecraft.${domain}".extraConfig = gameOops "minecraft";
-        virtualHosts."hytale.${domain}".extraConfig = gameOops "hytale";
       };
       # the bind address only exists once wg0 is up
       systemd.services.caddy = {
@@ -244,17 +229,6 @@ in
           StateDirectory = "website-status";
           # caddy serves status.json from here
           StateDirectoryMode = "0755";
-          NoNewPrivileges = true;
-          PrivateTmp = true;
-          PrivateNetwork = true;
-          ProtectSystem = "strict";
-          ReadWritePaths = [ statusDir ];
-          ProtectHome = true;
-          ProtectKernelModules = true;
-          ProtectKernelTunables = true;
-          ProtectKernelLogs = true;
-          ProtectControlGroups = true;
-          RestrictNamespaces = true;
         };
       };
       systemd.timers.website-status = {

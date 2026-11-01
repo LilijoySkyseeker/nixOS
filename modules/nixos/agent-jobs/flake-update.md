@@ -44,8 +44,7 @@ unnecessary.
 6. For each host, compare the closures against the current `master` build
    (`nix store diff-closures`). Note the bumps that matter (kernel, desktop,
    services the host runs) and anything removed.
-7. Commit with Conventional Commits (`chore(flake): ...`; a release move is
-   its own commit, `feat(flake): move stable hosts to NixOS YY.MM`), push,
+7. Commit (a release move is its own commit), push,
    and open or update the PR. The description says what moved, the
    notable per-host changes, the release-note items that touch this repo,
    the workarounds dropped, how far you verified (the `verify-a-change`
