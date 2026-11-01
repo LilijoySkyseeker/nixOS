@@ -2,8 +2,7 @@
 set -euo pipefail
 
 # Installs or reinstalls a host via nixos-anywhere, breaking the
-# sops/tailscale chicken-and-egg described in
-# docs/procedures/remote-access.md: pre-generates the host's SSH host
+# sops/tailscale chicken-and-egg: pre-generates the host's SSH host
 # key, enrolls its age key in .sops.yaml, and re-encrypts secrets
 # before the box ever boots, so sops-nix can decrypt on first boot.
 #

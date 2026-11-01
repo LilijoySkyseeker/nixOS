@@ -29,7 +29,7 @@ in
           # root on homelab could plant setuid binaries/device nodes here
           "nosuid" # no setuid/setgid on execution from the share
           "nodev" # no device nodes honoured from the share
-          "noexec" # plan: 2026-09-03-add-noexec-to-the-homelab-nfs-share-mounts.md#D1
+          "noexec"
         ];
       in
       {

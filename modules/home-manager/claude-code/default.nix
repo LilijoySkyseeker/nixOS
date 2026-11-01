@@ -126,7 +126,7 @@ _: {
         };
         # tips shown next to the spinner
         spinnerTipsEnabled = false;
-        # no AI attribution in commits or PRs (docs/GIT_WORKFLOW.md); sub-keys
+        # no AI attribution in commits or PRs; sub-keys
         # rather than `attribution = false` so older CLI versions read it too
         attribution = {
           commit = "";

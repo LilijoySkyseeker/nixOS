@@ -1,31 +1,5 @@
 # thinkpad
 
-Primary laptop.
-
-## Hardware
-
-- Chasis: ThinkPad P1 Gen 3, Lenovo
-- CPU: Core i7-10750H 6x, Intel
-- GPU: Quadro T1000 4GB Max-Q, NVIDIA
-- RAM: 64 GB (2x32GB) DDR4 3200
-- SSD1: 500 GB M.2, Samsung 970 EVO Plus (NixOS)
-- SSD2: 256 GB M.2, INTEL SSDPEKKW256G8L (Windows 11)
-- Display: 15" 1080p 60Hz
-
-## Backups
-
-Snapshots and replication are handled by zrepl — see
-[`docs/backups.md`](../../docs/backups.md).
-
-**This host now runs `sshd`, which it did not before.** It exists solely to
-carry zrepl's `ssh+stdinserver` transport, because homelab *pulls* from
-this host rather than being pushed to. It is locked down accordingly:
-tailnet-only (`openFirewall = false` plus a `tailscale0` firewall rule),
-`PermitRootLogin = "forced-commands-only"`, and the only key in root's
-`authorized_keys` is a forced command pinned to
-`zrepl stdinserver homelab`. Don't add unrestricted root keys here without
-reconsidering that posture.
-
 ## Disk encryption and boot
 
 The Samsung SSD (`disko.nix`, `vars.mkEncryptedRootSsd`) is an ESP and one
@@ -107,21 +81,3 @@ recovery key once after an update changes systemd-boot, or when Windows is
 started another way (F12 straight to Windows Boot Manager). Windows RE
 lives on the Intel disk's Recovery partition and must stay enabled
 (`reagentc /info`): `manage-bde -on` fails without it.
-
-`files/windows/dual-boot.ps1` sets Windows to match NixOS: hardware clock
-in UTC, Fast Startup off, hibernate in place of sleep with a full
-hibernation file, nothing on idle until a 60-minute hibernate, and
-PowerToys Awake to pause that timer.
-
-## Power
-
-No sleep: lid closed, critical battery and 60 minutes idle all hibernate
-(`myHibernateOnly`, safe on ZFS through `myHibernate`). Nothing happens
-before that: no dimming, no screen off, no auto-lock, so lock by hand
-(Meta+L) when leaving it. The battery applet's "Manually block sleep and
-screen locking" switch pauses the idle timer for long jobs. So does any
-app holding an inhibitor (the battery applet lists them): the Claude
-desktop app's remote-device feature takes a 5-minute keep-awake every
-25 to 45 minutes, so idle hibernate never fires while it runs. Resuming isn't
-a restart, so a pull-deploy's update waits for one; a notification says
-when (`myRebootNotice`).

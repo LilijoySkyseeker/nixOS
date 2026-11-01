@@ -1,10 +1,8 @@
 # myDatasets: the per-service ZFS dataset registry.
 #
-# design: docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md
-#
 # one entry, keyed by full dataset name, generates the disko entry, the ZFS
 # properties (via myZfsDatasetProperties) and, unless already persisted, the
-# environment.persistence entry. `tier` has no default on purpose (ADR-0001)
+# environment.persistence entry. `tier` has no default on purpose
 _: {
   flake.modules.nixos."datasets" =
     {
@@ -16,7 +14,7 @@ _: {
     let
       cfg = config.myDatasets;
 
-      # com.sun:auto-snapshot follows from the tier alone (ADR-0001's table);
+      # com.sun:auto-snapshot follows from the tier alone;
       # other per-dataset properties stay plain myZfsDatasetProperties entries
       tierAutoSnapshot = {
         offsite = "true";
@@ -51,7 +49,7 @@ _: {
                 "volatile"
               ];
               description = ''
-                Protection tier -- see docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md.
+                Protection tier.
                 No default on purpose: an eval-time error is safer than a
                 dataset silently getting a policy nobody chose.
               '';
@@ -113,7 +111,7 @@ _: {
         };
         description = ''
           Per-service ZFS dataset registry -- one entry per dataset,
-          keyed by its full name. See docs/adr/0001-zfs-policy-tiers-and-the-mydatasets-registry.md.
+          keyed by its full name.
         '';
       };
 

@@ -45,7 +45,7 @@ pkgs.testers.runNixOSTest {
         ).strip()
 
     with subtest("the sandbox is actually applied to the unit"):
-        # docs/hardening.md's sandboxing stack; dropping it must fail here
+        # dropping it must fail here
         for prop, want in [
             ("NoNewPrivileges", "yes"),
             ("ProtectSystem", "strict"),

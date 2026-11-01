@@ -44,7 +44,7 @@ _: {
             Seeded via systemd.tmpfiles.rules (`f+`, re-asserted every boot)
             rather than a one-time write. That matters on an impermanence
             host: homelab's `/` and thinkpad's `/` and `/home` are rolled
-            back to `@blank` on boot (docs/backups.md), so a plain write
+            back to `@blank` on boot, so a plain write
             would vanish before ever being snapshotted. tmpfiles re-creates
             it after the rollback, before zrepl's next 5m snapshot.
           '';
