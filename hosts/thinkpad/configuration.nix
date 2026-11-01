@@ -1,6 +1,4 @@
 {
-  pkgs-unstable,
-  pkgs-stable,
   config,
   vars,
   ...
@@ -20,16 +18,6 @@
     operation = "boot";
     requireACPower = true;
   };
-
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-    ])
-    ++ (with pkgs-stable; [
-    ]);
-
-  # state change settings/buttons (lid, idle, sleep key: myHibernateOnly below)
-  services.logind.settings.Login.HandlePowerKey = "poweroff";
 
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;

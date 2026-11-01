@@ -15,23 +15,13 @@
 
       options.mySecureBoot = {
         enable = lib.mkEnableOption "UEFI Secure Boot with lanzaboote, signing with the machine's own keys (enrolled alongside Microsoft's)";
-
-        pkiBundle = lib.mkOption {
-          type = lib.types.str;
-          default = "/var/lib/sbctl";
-          description = ''
-            Where sbctl keeps the Secure Boot keys. Generated here on first
-            boot. Put it on a filesystem that is neither snapshotted nor
-            replicated (docs/hardening.md rule 3).
-          '';
-        };
       };
 
       config = lib.mkIf cfg.enable {
         boot.loader.systemd-boot.enable = lib.mkForce false;
         boot.lanzaboote = {
           enable = true;
-          inherit (cfg) pkiBundle;
+          pkiBundle = "/var/lib/sbctl";
           # keys are made on first boot; until then generations install unsigned
           autoGenerateKeys.enable = true;
           configurationLimit = lib.mkDefault 10;

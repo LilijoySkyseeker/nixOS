@@ -47,7 +47,7 @@ key:
 | Host | nixpkgs | Modules pulled in |
 |---|---|---|
 | `thinkpad` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `encrypted-root`, `secure-boot`, `hibernate`, `hibernate-only`, `reboot-notice` |
-| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch`, `update-keys` (home-manager) |
+| `torrent` | unstable | `profile-pc`, `kde`, `pull-deploy`, `nfs-homelab-mounts`, `agent-user`, `zrepl`, `zfs-space-guard`, `zfs-dataset-properties`, `health-alerts`, `backup-canary`, `brother-mfc-l2740dw`, `local-ai`, `audio-switch` (home-manager) |
 | `homelab` | stable, own pin (`nixpkgs-homelab`) | `profile-default`, `profile-server`, `pull-deploy`, `health-alerts`, `push-deploy`, `zrepl`, `docker-publish-guard`, `docker-userns-remap`, `zfs-dataset-properties`, `datasets`, `backup-canary`, `backup-restore-test`, `jellyfin`, `immich`, `beets`, `minecraft`, `hytale`, `octodns`, `nfs`, `samba` |
 | `vps` | stable | `profile-default`, `profile-server`, `health-alerts` |
 

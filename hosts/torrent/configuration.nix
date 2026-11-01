@@ -1,6 +1,4 @@
 {
-  pkgs-unstable,
-  pkgs-stable,
   config,
   vars,
   ...
@@ -19,24 +17,11 @@
     operation = "boot";
   };
 
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-      # closed source
-      bambu-studio
-    ])
-    ++ (with pkgs-stable; [
-    ]);
-
   # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
   boot.extraModulePackages = with config.boot.kernelPackages; [
     r8125
   ];
   boot.kernelModules = [ "r8125" ];
-  nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
-
-  # cpu power management
-  powerManagement.cpuFreqGovernor = "performance";
 
   # arm the board's hardware watchdog (sp5100_tco, /dev/watchdog0): a full
   # hang resets the machine in ~30s instead of sitting frozen until power-cycled

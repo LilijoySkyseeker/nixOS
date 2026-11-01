@@ -34,27 +34,15 @@ in
           btop
           wget
           eza
-          tldr
           bat
-          glow # markdown reader
           zoxide
           git
-          lazygit
-          neovim
-          nixfmt
           rsync
           sops # secrets management
           smartmontools
-          trippy # ping+traceroute tool
           psmisc # fuser, killall, pstree
           ffmpeg
-          flac
-          bitwarden-cli
-          topgrade
           tmux
-
-          zfs-prune-snapshots # TEMP, zfs needs module
-
         ]
         # shared with the devshell (modules/flake/debug-tools.nix); always unstable,
         # even on stable-pinned homelab, so debug tools match fleet-wide
@@ -70,11 +58,7 @@ in
           // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
         })
         {
-          sudo = {
-            enable = false;
-            execWheelOnly = true;
-            package = pkgs-unstable.sudo.override { withInsults = true; };
-          };
+          sudo.enable = false;
         }
       ];
 
@@ -132,23 +116,14 @@ in
         notifications = {
           systembus-notify.enable = true;
           wall.enable = true;
-          x11.enable = true;
         };
       };
-
-      # allow cross compilation
-      boot.binfmt.emulatedSystems = [
-        "aarch64-linux"
-      ];
 
       # allow unfree
       nixpkgs.config.allowUnfree = true;
 
       # enable a firmware regardless of licence
       hardware.enableAllFirmware = true;
-
-      # make sure <nixpkgs> sources from the flake
-      nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable}" ];
 
       # home-manager
       home-manager = {
@@ -201,9 +176,6 @@ in
       # remove all defualt packages
       environment.defaultPackages = lib.mkForce [ ];
 
-      # firewall
-      networking.firewall.enable = true;
-
       # Enable Flake Support
       nix.settings.experimental-features = [
         "nix-command"
@@ -235,9 +207,6 @@ in
 
       # Select internationalisation properties.
       i18n.defaultLocale = "en_US.UTF-8";
-      i18n.supportedLocales = [
-        "all"
-      ];
       i18n.extraLocaleSettings = {
         LC_MEASUREMENT = "en_GB.UTF-8"; # metric units
       };

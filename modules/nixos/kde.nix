@@ -1,6 +1,6 @@
 _: {
   flake.modules.nixos.kde =
-    { pkgs-stable, pkgs-unstable, ... }:
+    { pkgs-stable, ... }:
     {
       # KDE Plasma
       services.xserver.enable = true;
@@ -9,16 +9,9 @@ _: {
       services.desktopManager.plasma6.enable = true;
 
       # System installed pkgs
-      environment.systemPackages =
-        (with pkgs-unstable; [
-          xdg-desktop-portal
-          kdePackages.xdg-desktop-portal-kde
-        ])
-        ++ (with pkgs-stable; [
-          kdePackages.filelight # kde disk usage
-          qalculate-qt
-          kile
-        ]);
+      environment.systemPackages = with pkgs-stable; [
+        qalculate-qt
+      ];
 
       # kde partition manager
       programs.partition-manager.enable = true;

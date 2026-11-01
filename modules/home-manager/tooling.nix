@@ -2,7 +2,6 @@ _: {
   flake.modules.homeManager.tooling =
     {
       pkgs,
-      pkgs-stable,
       config,
       lib,
       options,
@@ -37,22 +36,18 @@ _: {
       # fzf
       programs.fzf = {
         enable = true;
-        enableFishIntegration = true;
       }
       # not declared on the home-manager release tracking nixpkgs-stable
       // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "enableNushellIntegration" ] options) {
         enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
       }
-      # atuin owns Ctrl-R in bash; fish keeps fzf's
+      # atuin owns Ctrl-R in bash
       // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "historyWidget" "bash" ] options) {
         historyWidget.bash.command = "";
       };
 
       # zoxide
-      programs.zoxide = {
-        enable = true;
-        enableFishIntegration = true;
-      };
+      programs.zoxide.enable = true;
 
       # BTOP
       programs.btop = {
@@ -153,7 +148,6 @@ _: {
       # starship: two-line rainbow powerline prompt, modelled on fish's tide
       programs.starship = {
         enable = true;
-        enableFishIntegration = false;
         settings = {
           add_newline = true;
           format = lib.concatStrings [
@@ -287,7 +281,6 @@ _: {
       # atuin: searchable shell history on Ctrl-R, local only (no account, no sync)
       programs.atuin = {
         enable = true;
-        enableFishIntegration = false;
         # up arrow stays ble.sh's history search
         flags = [ "--disable-up-arrow" ];
         settings.update_check = false;
@@ -298,37 +291,6 @@ _: {
         enable = true;
         nix-direnv.enable = true;
         config.global.hide_env_diff = true;
-      };
-
-      # fish: kept as a fallback shell until it's removed
-      programs.fish = {
-        enable = true;
-        interactiveShellInit = ''
-          set fish_greeting # Disable greeting
-          tide configure --auto --style=Rainbow --prompt_colors='16 colors' --show_time='24-hour format' --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character and frame' --prompt_connection=Dotted --powerline_right_prompt_frame=Yes --prompt_spacing=Sparse --icons='Many icons' --transient=No
-          set -g fish_key_bindings fish_vi_key_bindings
-          clear
-        '';
-        plugins = [
-          {
-            name = "grc";
-            src = pkgs-stable.fishPlugins.grc.src;
-          }
-          {
-            name = "tide";
-            src = pkgs-stable.fishPlugins.tide.src;
-          }
-        ];
-        functions = {
-          __fish_command_not_found_handler.body = ''
-            comma $argv[1]
-          '';
-
-        };
-        inherit shellAliases;
-        shellAbbrs = {
-          rsync = "rsync --verbose --recursive --progress --human-readable";
-        };
       };
 
       # bat
@@ -343,7 +305,6 @@ _: {
       programs.eza = {
         enable = true;
         enableBashIntegration = false;
-        enableFishIntegration = false;
       };
     };
 }

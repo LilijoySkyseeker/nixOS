@@ -26,20 +26,14 @@ in
 
       # System installed pkgs
       environment.systemPackages = with pkgs-unstable; [
-        grc # Text colors
         ripgrep
-        gitFull
         gh # GitHub CLI
         # the codex CLI, which claude calls directly (`codex exec`, `codex review`)
         codex
         nodejs
-        gjs # for kdeconnect
-        restic # backups
         fd
         nixos-anywhere
         ssh-to-age
-        rclone
-        distrobox
         caligula # cli burning tool
         scrcpy
         vipsdisp # big image viewer
@@ -69,40 +63,20 @@ in
         chatgpt
         inputs.llm-agents.packages.${pkgs-unstable.stdenv.hostPlatform.system}.claude-desktop
 
-        # temp copy from stable
         feishin
         prismlauncher
         vesktop
         discord
         kdePackages.kdenlive
-        wl-clipboard # for waydroid
         quickemu
         qbittorrent
 
       ];
 
-      # networking
-      networking.networkmanager = {
-        enable = true;
-        insertNameservers = [
-          "8.8.8.8"
-          "1.1.1.1"
-        ];
-      };
-
-      # Waydroid
-      virtualisation.waydroid.enable = true;
-
       # Appimage
       programs.appimage = {
         enable = true;
         binfmt = true;
-      };
-
-      # distrobox and other docker
-      virtualisation.podman = {
-        enable = true;
-        dockerCompat = true;
       };
 
       #qmk, allow udev rules
@@ -119,19 +93,8 @@ in
       users.groups.flatpak.gid = vars.gids.flatpak;
       services.flatpak = {
         enable = true;
-        uninstallUnmanaged = false;
         packages = [
           "info.beyondallreason.bar"
-          # hytale's official linux launcher, not on flathub. first-install seed
-          # only: the launcher updates itself and the game, so this never needs a bump
-          rec {
-            appId = "com.hypixel.HytaleLauncher";
-            sha256 = "sha256-JXbjLsxYaj1eMAlCa9NZV//ll3LFkXx0tmqSgaaYbn0=";
-            bundle = "${pkgs-unstable.fetchurl {
-              url = "https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-2026.10.21-3c04223.flatpak";
-              hash = sha256;
-            }}";
-          }
         ];
       };
 
@@ -155,11 +118,6 @@ in
           stateVersion = "23.11";
           username = "lilijoy";
           homeDirectory = "/home/lilijoy";
-
-          # session environment variables
-          sessionVariables = {
-            SSH_AUTH_SOCK = "/home/<user>/.bitwarden-ssh-agent.sock"; # bitwarden ssh-agent
-          };
         };
         programs.home-manager.enable = true;
 
@@ -196,7 +154,6 @@ in
 
       # nh, nix helper
       environment.variables = {
-        FLAKE = "/home/lilijoy/dotfiles";
         NH_FLAKE = "/home/lilijoy/dotfiles";
       };
 
@@ -257,22 +214,16 @@ in
 
       # Enable bluetooth
       hardware.bluetooth.enable = true;
-      hardware.bluetooth.powerOnBoot = true;
 
       # Enable CUPS to print documents.
       # base only; the brother queue and scanning live in
       # nixosModules."brother-mfc-l2740dw", torrent only (unfree blob, roaming laptop)
-      services.printing = {
-        enable = true;
-        drivers = [ ];
-      };
+      services.printing.enable = true;
 
       # no avahi/mDNS: opens udp 5353 host-wide on a roaming laptop; the printer
       # has a static address, so don't re-add it for printing
 
       # Enable sound with pipewire.
-      services.pulseaudio.enable = false;
-      services.pulseaudio.support32Bit = true;
       security.rtkit.enable = true;
       services.pipewire = {
         enable = true;
@@ -292,7 +243,6 @@ in
         extraGroups = [
           "networkmanager"
           "wheel"
-          "docker"
         ];
       };
 
@@ -301,7 +251,6 @@ in
       programs.steam = {
         enable = true;
       };
-      hardware.steam-hardware.enable = true;
 
       # feral gamemode
       programs.gamemode = {
