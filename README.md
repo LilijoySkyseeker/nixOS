@@ -5,15 +5,6 @@ A flake-based NixOS/home-manager configuration for four machines
 repo. Covers disko partitioning, sops-nix secrets, impermanence,
 home-manager, and a distributed multi-host flake setup.
 
-## Hosts
-
-| Host | Role | Purpose |
-|---|---|---|
-| `thinkpad` | Desktop | Secondary laptop. |
-| `torrent` | Desktop | Primary desktop. |
-| `homelab` | Server | Home server: media (Jellyfin), photo/video backup (Immich, tailnet-only), game servers, NFS, DNS automation, backups. |
-| `vps` | Server | Public-facing edge: forwards the game ports to homelab over WireGuard, rate-limited per source IP. |
-
 ## Interesting stuff
 
 - Root on `homelab` is wiped on every boot. Every piece of state that
