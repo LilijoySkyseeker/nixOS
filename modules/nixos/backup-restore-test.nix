@@ -131,7 +131,7 @@ _: {
                     fail=1
                   # security: force mountpoint/canmount on the clone rather than
                   # trust a possibly hostile received stream (second layer to
-                  # the receive-side fix, F-P6-03)
+                  # the receive-side fix)
                   elif ! zfs clone -o mountpoint=legacy -o canmount=on "$snap" "$scratch"; then
                     echo "backup-restore-test: zfs clone failed for $snap"
                     fail=1

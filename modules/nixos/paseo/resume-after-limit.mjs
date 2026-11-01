@@ -95,14 +95,24 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [lib] = process.argv.slice(2);
   const { connectToDaemon } = await import(`${lib}/packages/cli/dist/utils/client.js`);
   const { selectDaemonTarget } = await import(`${lib}/packages/cli/dist/utils/daemon-target.js`);
-  // a failed poll (the daemon still starting) exits; systemd starts it again
+  // paseo.service is up before its socket is: retry a failed connect here, so the
+  // unit doesn't fail during a switch; any other error exits and systemd restarts it
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   for (;;) {
-    const client = await connectToDaemon({ target: selectDaemonTarget({}, process.env, true) });
+    let client;
+    for (let tries = 1; !client; tries++) {
+      try {
+        client = await connectToDaemon({ target: selectDaemonTarget({}, process.env, true) });
+      } catch (err) {
+        if (err?.code !== 'DAEMON_NOT_RUNNING' || tries >= 12) throw err;
+        await sleep(5_000);
+      }
+    }
     try {
       await poll(client);
     } finally {
       await client.close().catch(() => {});
     }
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    await sleep(POLL_MS);
   }
 }

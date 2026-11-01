@@ -95,7 +95,7 @@
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
 
-      # rest of docs/hardening.md's SSH baseline; in `settings`, not
+      # in `settings`, not
       # `extraConfig`: sshd_config is first-directive-wins and `settings`
       # renders first. trailing values are the OpenSSH 10.4p1 defaults
       AuthenticationMethods = "publickey"; # default: any

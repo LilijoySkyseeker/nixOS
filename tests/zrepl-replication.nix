@@ -182,7 +182,7 @@ pkgs.testers.runNixOSTest {
         assert content == "canary-payload", f"payload mismatch: {content!r}"
         puller.succeed("zfs destroy backup/restore-scratch")
 
-    with subtest("the receiver ignores properties a hostile sender sends (F-P6-03)"):
+    with subtest("the receiver ignores properties a hostile sender sends"):
         # The sender alone decides whether properties travel, so a source
         # whose root is compromised turns send.properties on in its own
         # zrepl.yml and the puller has no say. Simulated faithfully: poison

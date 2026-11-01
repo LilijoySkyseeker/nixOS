@@ -22,7 +22,7 @@
           description = ''
             Where sbctl keeps the Secure Boot keys. Generated here on first
             boot. Put it on a filesystem that is neither snapshotted nor
-            replicated (docs/hardening.md rule 3).
+            replicated.
           '';
         };
       };

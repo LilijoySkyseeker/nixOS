@@ -286,11 +286,10 @@ lives in one file.
   `docker info --format '{{.SecurityOptions}}'` (or another
   `docker info`/`docker inspect` field) instead — dockerd's own
   live-effective-config view, which doesn't care where the config came
-  from. (`2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`, G8.)
+  from.
 - **`nix build ... | tee log.txt` can report exit 0 while the real
   command failed.** The pipeline's exit status is `tee`'s, always 0 —
-  the exact same `if cmd | tail` trap `docs/audits/2026-08-26/RESUME.md`'s
-  "Rules and traps" already names for `tail`, just with `tee`. Bit
+  the exact same `if cmd | tail` trap, just with `tee`. Bit
   hardest right after adding a brand-new test/module file: the actual
   error was "Path '...' is not tracked by Git" (flakes only see
   git-tracked files), silently swallowed by the pipe. Redirect with `>`

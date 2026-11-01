@@ -5,8 +5,7 @@ paths:
 
 # Nix conventions
 
-Conventions actually in use in this repo, not aspirational ones. See
-`docs/architecture.md` for the dendritic module-organization boundary.
+Conventions actually in use in this repo, not aspirational ones.
 
 ## Formatting
 
@@ -23,7 +22,7 @@ Reach for this pattern only when the config is genuinely parameterized
 (multiple hosts want it with different settings, or it needs an
 enable/disable toggle). If a host is the config's only consumer and
 there's nothing to parameterize, a plain `modules/*/*.nix` file
-is simpler — see `docs/architecture.md`'s module-organization section.
+is simpler.
 
 ## Inline comments
 

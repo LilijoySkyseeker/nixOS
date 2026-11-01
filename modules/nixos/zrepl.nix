@@ -58,7 +58,7 @@ _: {
       # placeholder.encryption is required: zrepl's "unspecified" default
       # fails every receive that creates a placeholder, and configcheck
       # doesn't catch it
-      # security (F-P6-03): the source controls the send stream, so pin props
+      # security: the source controls the send stream, so pin props
       # a hostile stream could set (e.g. mountpoint=/etc, canmount=on, shares);
       # -o and -x are exclusive per property, so each is in one list only
       mkRecv = {
