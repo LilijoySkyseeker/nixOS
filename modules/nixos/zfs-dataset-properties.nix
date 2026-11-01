@@ -26,9 +26,7 @@ _: {
 
           One shared mechanism for every current and future host, so a
           property like this doesn't quietly drift out of sync between
-          hosts the way a one-off `zfs set` run by hand would --
-          `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`
-          D1 is why this module exists.
+          hosts the way a one-off `zfs set` run by hand would.
 
           `zfs set` is idempotent, so reapplying every activation is
           always safe. Note some properties only take full effect, for

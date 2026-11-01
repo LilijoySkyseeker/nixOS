@@ -15,7 +15,7 @@
 #   * received data appearing at `root_fs/<full source path>`, and still
 #     holding the payload when recovered the way backup-restore.md prescribes
 #   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
-#     unguarded grid rule would condemn (see docs/backups.md "Gotchas")
+#     unguarded grid rule would condemn
 #   * a `snap` job snapshotting on its own, with no puller involved
 #   * `zrepl-protect-blank` making `@blank` genuinely undestroyable on the
 #     source, which `protectRegexes` cannot do -- that is the puller's
@@ -210,7 +210,7 @@ pkgs.testers.runNixOSTest {
         sourcehost.succeed("sleep 20")
         sourcehost.succeed("zfs list -t snapshot -o name -H | grep -q 'tank/data@blank'")
 
-    with subtest("zrepl-protect-blank makes @blank undestroyable locally (F-P6-04)"):
+    with subtest("zrepl-protect-blank makes @blank undestroyable locally"):
         # protectRegexes above is the puller's *pruning policy*, and a
         # policy is not a control: Sender.DestroySnapshots evaluates no
         # keep rules, and a source job has no Pruning field at all, so a
@@ -239,7 +239,7 @@ pkgs.testers.runNixOSTest {
         ).strip()
         assert status == "0", f"second run should succeed, got {status}"
 
-    with subtest("the receiver ignores properties a hostile sender sends (F-P6-03)"):
+    with subtest("the receiver ignores properties a hostile sender sends"):
         # The sender alone decides whether properties travel, so a source
         # whose root is compromised turns send.properties on in its own
         # zrepl.yml and the puller has no say. Simulated faithfully: poison
