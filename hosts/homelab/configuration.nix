@@ -11,34 +11,10 @@
     ./disko.nix
   ];
 
-  # System installed pkgs
-  environment.systemPackages = with pkgs-stable; [
-    zfs
-    restic
-    backblaze-b2
-    btop
-  ];
-
   boot = {
-    # disable staggered hdd spin up
-    extraModprobeConfig = ''
-      options libahci ignore_sss=1
-    '';
-
     # force BOT instead of UAS for the TerraMaster enclosure's ASMedia bridge
     # (174c:55aa), which silently corrupts in-flight data under UAS load
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
-  };
-
-  # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC
-  services.networkd-dispatcher = {
-    enable = true;
-    rules."50-tailscale" = {
-      onState = [ "routable" ];
-      script = ''
-        ${lib.getExe pkgs-stable.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
-      '';
-    };
   };
 
   # docker settings
@@ -78,27 +54,6 @@
   # container uid 0 != host uid 0; per-path uid migrations live in
   # modules/services/minecraft.nix next to its path
   myDockerUserns.enable = true;
-
-  # update microcode
-  hardware.cpu.intel.updateMicrocode = true;
-
-  # GPU hardware acceleration for Jellyfin
-  hardware.graphics = {
-    enable = true;
-    extraPackages = with pkgs-stable; [
-      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
-      vpl-gpu-rt
-    ];
-  };
-  services.xserver.videoDrivers = [ "nvidia" ];
-  hardware.nvidia = {
-    # nvidiaPackages.stable (production) dropped Pascal support upstream
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
-    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
-    open = false;
-    modesetting.enable = true;
-    nvidiaSettings = false; # headless, no GUI settings app needed
-  };
 
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
@@ -321,15 +276,8 @@
     preserveLegacySnapshots = false;
   };
 
-  # cpu power management
-  powerManagement.cpuFreqGovernor = "performance";
-
   # disable emergencymode
   systemd.enableEmergencyMode = false;
-
-  # lock down users
-  users.mutableUsers = false;
-  #users.users.root.hashedPassword = "!";
 
   # Define your hostname.
   networking.hostName = "homelab";
@@ -449,24 +397,8 @@
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
     enable = true;
-    allowSFTP = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
-    settings.KbdInteractiveAuthentication = false;
-    # must be a structured option: sshd is first-directive-wins and the
-    # module renders its own default before extraConfig
-    settings.PasswordAuthentication = false;
-    extraConfig = ''
-      PermitRootLogin = prohibit-password
-      AllowTcpForwarding no
-      X11Forwarding no
-      AllowAgentForwarding no
-      AllowStreamLocalForwarding no
-      AuthenticationMethods publickey
-      PermitTunnel no
-      ClientAliveInterval 60
-      ClientAliveCountMax 5
-    '';
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -476,22 +408,8 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
-  };
+  services.zfs.autoScrub.enable = true;
   networking.hostId = "e0019fd8";
-
-  # tailscale: advertise the LAN subnet and act as an exit node
-  # overrides the fleet's "client" default (also sets ip forwarding); without
-  # it the advertise flags below silently stop working
-  services.tailscale.useRoutingFeatures = lib.mkForce "both";
-  services.tailscale.extraUpFlags = lib.mkAfter [
-    "--advertise-routes=192.168.1.0/24"
-    "--advertise-exit-node"
-  ];
 
   # wireguard: dial out to the vps as our public endpoint from behind CGNAT
   # wireguard-wg0 is a RemainAfterExit oneshot that reads the key once, so a

@@ -12,35 +12,12 @@ in
         OPS=${config.sops.placeholder.minecraft_username}
       '';
 
-      # networking: tailnet and wg0 (vps's DNAT'd game ports) only; the LAN NIC
-      # has a public IPv6. INPUT rules don't constrain docker publishes:
-      # myDockerPublishGuard on homelab enforces this list -- change both together
-      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
-        25565
-      ];
-      networking.firewall.interfaces.tailscale0.allowedUDPPorts = [
-        25565
-        19132 # Geyser Bedrock listener
-      ];
-      networking.firewall.interfaces.wg0.allowedTCPPorts = [
-        25565
-      ];
-      networking.firewall.interfaces.wg0.allowedUDPPorts = [
-        25565
-        19132 # Geyser Bedrock listener
-      ];
-
       # persistence
       environment.persistence.${vars.persistRoot}.directories = [
         {
           directory = "/srv/minecraft/vanilla-plus";
-          #     inherit user group;
         }
       ];
-
-      # deny non-owner access to server state; mode only since the owning uid
-      # comes from the image
-      systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
 
       # docker userns-remap ownership migration; 1000 is itzg's baked-in uid
       myDockerUserns.migrations = [
@@ -103,8 +80,6 @@ in
             vmp-fabric
           '';
           ENABLE_WHITELIST = "TRUE";
-          # not published anyway; guards a future port addition (weak default password)
-          ENABLE_RCON = "FALSE";
         };
         environmentFiles = [ config.sops.templates."minecraft-whitelist".path ];
         volumes = [

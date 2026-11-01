@@ -22,27 +22,13 @@ _: {
 
       services.samba = {
         enable = true;
-        # scoped to tailscale0 below; openFirewall would open every interface
-        openFirewall = false;
         # no NetBIOS: android connects by tailnet hostname/IP; keeps 137-139 closed
         nmbd.enable = false;
         winbindd.enable = false; # no AD/domain integration
 
         settings = {
           global = {
-            security = "user";
             "server min protocol" = "SMB3";
-            "map to guest" = "never";
-            "invalid users" = [ "root" ];
-            "log level" = "1";
-            # second layer on top of the tailscale0 firewall scoping below
-            "hosts allow" = "100.64.0.0/10";
-            "hosts deny" = "0.0.0.0/0";
-            # defense-in-depth against a compromised tailnet peer or a
-            # protocol downgrade, on top of WireGuard
-            "server signing" = "mandatory";
-            "smb encrypt" = "mandatory";
-            "ntlm auth" = "ntlmv2-only";
             # no printer sharing; shrinks RPC attack surface
             "load printers" = false;
             "printing" = "bsd";
@@ -56,10 +42,6 @@ _: {
             "force group" = "multimedia";
             "create mask" = "0660";
             "directory mask" = "0770";
-            browseable = true;
-            # symlinks must not let a client escape the share
-            "wide links" = false;
-            "follow symlinks" = false;
           };
           "storage-bulk" = {
             path = "/storage-bulk";
@@ -68,9 +50,6 @@ _: {
             "force group" = "multimedia";
             "create mask" = "0660";
             "directory mask" = "0770";
-            browseable = true;
-            "wide links" = false;
-            "follow symlinks" = false;
           };
         };
       };
@@ -86,30 +65,6 @@ _: {
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          # only reads a secret and calls two binaries, so full hardening
-          # (unlike samba-smbd)
-          NoNewPrivileges = true;
-          PrivateTmp = true;
-          ProtectSystem = "strict";
-          ProtectHome = true;
-          ProtectKernelTunables = true;
-          ProtectKernelModules = true;
-          ProtectKernelLogs = true;
-          ProtectClock = true;
-          ProtectControlGroups = true;
-          RestrictRealtime = true;
-          RestrictSUIDSGID = true;
-          LockPersonality = true;
-          MemoryDenyWriteExecute = true;
-          RestrictNamespaces = true;
-          SystemCallArchitectures = "native";
-          # the only paths this script writes to
-          ReadWritePaths = [
-            "/var/lib/samba"
-            "/var/cache/samba"
-            "/var/log/samba"
-            "/var/lock/samba"
-          ];
         };
         script = ''
           pw=$(cat ${lib.escapeShellArg config.sops.secrets.homelab_samba_android_smb_password.path})
@@ -120,11 +75,6 @@ _: {
           fi
         '';
       };
-      systemd.services.samba-smbd = {
-        after = [ "samba-user-provision.service" ];
-        wants = [ "samba-user-provision.service" ];
-      };
-
       # smbd must run as root (setuids to the authenticated user per operation);
       # no ProtectSystem=strict: a missed /var/*/samba path silently breaks
       # auth or logging
