@@ -26,7 +26,6 @@ _: {
     {
       imports = [ inputs.plasma-manager.homeModules.plasma-manager ];
 
-      # KDE global shortcuts: one key per audio output (torrent's desk)
       # Hyper+F1-F3 (doio.vil's HYPR()), not F13-F15: XKB evdev maps those
       # to XF86 Launch5/Tools/Launch6, so an "F13" binding never matches
       programs.plasma.enable = true;

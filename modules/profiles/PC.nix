@@ -15,7 +15,7 @@ in
     }:
     {
       imports = [
-        nixosModules."virtual-machines" # (also needs home manager config)
+        nixosModules."virtual-machines"
         nixosModules.tooling
         nixosModules."agent-tools"
         nixosModules."profile-default"
@@ -24,19 +24,17 @@ in
         inputs.nvf.nixosModules.default
       ];
 
-      # System installed pkgs
       environment.systemPackages = with pkgs-unstable; [
         ripgrep
-        gh # GitHub CLI
-        # the codex CLI, which claude calls directly (`codex exec`, `codex review`)
+        gh
         codex
         nodejs
         fd
         nixos-anywhere
         ssh-to-age
-        caligula # cli burning tool
+        caligula
         scrcpy
-        vipsdisp # big image viewer
+        vipsdisp
         yt-dlp
         android-tools
 
@@ -53,11 +51,10 @@ in
         vial
         ungoogled-chromium
         signal-desktop
-        picard # music metadata tool
+        picard
         calibre
-        readest # ebook reader; syncs with the phone and the Kindle (KOReader plugin)
+        readest
 
-        # closed source
         spotify
         claude-code
         chatgpt
@@ -68,19 +65,17 @@ in
         vesktop
         discord
         kdePackages.kdenlive
-        wl-clipboard # for waydroid
+        wl-clipboard
         quickemu
         qbittorrent
 
       ];
 
-      # Appimage
       programs.appimage = {
         enable = true;
         binfmt = true;
       };
 
-      #qmk, allow udev rules
       hardware.keyboard.qmk.enable = true;
 
       # kde: keyboard > keyboard > key bindings > function keys > "use
@@ -88,7 +83,6 @@ in
       # kde/kxkbrc-specific, so applies at login and on any tty too
       services.xserver.xkb.options = "terminate:ctrl_alt_bksp,fkeys:basic_13-24";
 
-      #flatpak
       # gid pinned off its default (999): nfs-homelab-mounts.nix needs 999 for
       # "multimedia" to match homelab's NFS /storage group
       users.groups.flatpak.gid = vars.gids.flatpak;
@@ -99,14 +93,10 @@ in
         ];
       };
 
-      # udev rules
       services.udev.packages = [
         pkgs-unstable.vial
       ];
-      # no 8bitdo hidraw rules: controller access comes from uaccess
-      # (50-qmk/60-steam-input rules), not the `input` group
 
-      # home-manager
       home-manager.users.lilijoy = {
         imports = [
           homeManagerModules.tooling
@@ -127,13 +117,10 @@ in
         stylix.targets.qt.enable = false;
       };
 
-      # service for yubikey
       services.pcscd.enable = true;
 
-      # restrict nix package manager to @wheel
       nix.settings.allowed-users = [ "@wheel" ];
 
-      # sops config
       # host age identity on the root fs (/home isn't mounted at early activation);
       # generateKey creates it on first boot, then add its pubkey to .sops.yaml
       # no sshKeyPaths to ~/.ssh: unreadable at boot (sops-nix#167); `sops` CLI ignores it
@@ -153,12 +140,10 @@ in
         '';
       };
 
-      # nh, nix helper
       environment.variables = {
         NH_FLAKE = "/home/lilijoy/dotfiles";
       };
 
-      # Stylix
       stylix = {
         enable = true;
         autoEnable = true;
@@ -185,7 +170,6 @@ in
         };
       };
 
-      # Kde Connect
       programs.kdeconnect = {
         enable = true;
       };
@@ -213,18 +197,13 @@ in
         };
       };
 
-      # Enable bluetooth
       hardware.bluetooth.enable = true;
 
-      # Enable CUPS to print documents.
-      # base only; the brother queue and scanning live in
-      # nixosModules."brother-mfc-l2740dw", torrent only (unfree blob, roaming laptop)
       services.printing.enable = true;
 
       # no avahi/mDNS: opens udp 5353 host-wide on a roaming laptop; the printer
       # has a static address, so don't re-add it for printing
 
-      # Enable sound with pipewire.
       security.rtkit.enable = true;
       services.pipewire = {
         enable = true;
@@ -233,7 +212,6 @@ in
         pulse.enable = true;
       };
 
-      # Define a user account. Don't forget to set a password with ‘passwd’.
       users.users.lilijoy = {
         isNormalUser = true;
         # no initialPassword: the repo is public, so any value is published;
@@ -247,13 +225,11 @@ in
         ];
       };
 
-      # steam
       # no remotePlay.openFirewall (host-wide ports); if wanted, scope to an interface
       programs.steam = {
         enable = true;
       };
 
-      # feral gamemode
       programs.gamemode = {
         enable = true;
         settings = {
@@ -296,7 +272,6 @@ in
         };
       };
 
-      # Mullvad vpn
       services.mullvad-vpn = {
         enable = true;
         gui.enable = true;

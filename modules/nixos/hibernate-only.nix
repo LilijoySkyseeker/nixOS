@@ -10,7 +10,6 @@
     let
       cfg = config.myHibernateOnly;
 
-      # one KDE power profile (AC, battery, low battery)
       profile = {
         autoSuspend = {
           action = "hibernate";
@@ -41,7 +40,6 @@
           }
         ];
 
-        # no sleep at all: KDE hides the Sleep button once systemd refuses it
         systemd.sleep.settings.Sleep = {
           AllowSuspend = false;
           AllowHybridSleep = false;

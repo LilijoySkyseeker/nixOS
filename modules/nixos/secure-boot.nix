@@ -22,14 +22,13 @@
         boot.lanzaboote = {
           enable = true;
           pkiBundle = "/var/lib/sbctl";
-          # keys are made on first boot; until then generations install unsigned
           autoGenerateKeys.enable = true;
           configurationLimit = lib.mkDefault 10;
         };
 
         environment.systemPackages = [
           pkgs.sbctl
-          pkgs.efibootmgr # firmware BootOrder, which Windows resets to put itself first
+          pkgs.efibootmgr
         ];
       };
     };

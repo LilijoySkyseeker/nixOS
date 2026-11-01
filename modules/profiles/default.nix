@@ -38,9 +38,9 @@ in
           zoxide
           git
           rsync
-          sops # secrets management
+          sops
           smartmontools
-          psmisc # fuser, killall, pstree
+          psmisc
           ffmpeg
           tmux
         ]
@@ -62,10 +62,8 @@ in
         }
       ];
 
-      # 26.11 change for zfs security
       boot.zfs.forceImportRoot = false;
 
-      # tailscale
       # authKeyFile logs in on boot; per-host non-reusable key, pre-tagged tag:<hostname>
       services.tailscale = {
         enable = true;
@@ -105,10 +103,8 @@ in
         else
           { extraConfig = "SystemMaxUse=2G"; };
 
-      # firmware updates
       services.fwupd.enable = true;
 
-      # SMART disk health tool
       services.smartd = {
         enable = true;
         autodetect = true;
@@ -118,15 +114,11 @@ in
         };
       };
 
-      # allow unfree
       nixpkgs.config.allowUnfree = true;
 
-      # enable a firmware regardless of licence
       hardware.enableAllFirmware = true;
 
-      # home-manager
       home-manager = {
-        # also pass inputs to home-manager modules
         extraSpecialArgs = {
           inherit
             inputs
@@ -137,26 +129,22 @@ in
         };
         useGlobalPkgs = true;
         useUserPackages = true;
-        backupFileExtension = "backup"; # Force backup conflicted files
+        backupFileExtension = "backup";
         overwriteBackup = true;
       };
 
-      # comma and cache
       programs.nix-index-database.comma.enable = true;
 
-      # neovim
       programs.neovim = {
         enable = true;
         defaultEditor = lib.mkForce true;
       };
 
-      # sops-nix support, secret managment
       sops = {
         defaultSopsFile = ../../secrets/secrets.yaml;
         defaultSopsFormat = "yaml";
       };
 
-      # auto gc with nh
       programs.nh = {
         enable = true;
         clean = {
@@ -166,28 +154,22 @@ in
         };
       };
 
-      # file system trim for ssd
       services.fstrim.enable = true;
 
-      # comma handles unknown commands instead (home-manager tooling.nix)
       programs.command-not-found.enable = false;
 
-      # remove all defualt packages
       environment.defaultPackages = lib.mkForce [ ];
 
-      # Enable Flake Support
       nix.settings.experimental-features = [
         "nix-command"
         "flakes"
       ];
 
-      # direnv
       programs.direnv = {
         enable = true;
         nix-direnv.enable = true;
       };
 
-      # Bootloader.
       boot.loader.systemd-boot = {
         enable = true;
         editor = false;
@@ -196,7 +178,6 @@ in
 
       boot.tmp.useTmpfs = true;
 
-      # Enable networking
       networking.networkmanager.enable = true;
       networking.nameservers = [
         "8.8.8.8"
@@ -204,13 +185,11 @@ in
       ];
       services.resolved.enable = true;
 
-      # Select internationalisation properties.
       i18n.defaultLocale = "en_US.UTF-8";
       i18n.extraLocaleSettings = {
-        LC_MEASUREMENT = "en_GB.UTF-8"; # metric units
+        LC_MEASUREMENT = "en_GB.UTF-8";
       };
 
-      # x86_64
       nixpkgs.hostPlatform = "x86_64-linux";
 
       # State Version for first install, don't touch

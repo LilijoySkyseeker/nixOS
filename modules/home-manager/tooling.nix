@@ -13,10 +13,9 @@ _: {
         et = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
         etl = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
       };
-      # nerd font glyphs for the prompt, by codepoint
       g = lib.mapAttrs (_: cp: builtins.fromJSON ''"\u${cp}"'') {
-        right = "e0b0"; # powerline arrow pointing right
-        left = "e0b2"; # powerline arrow pointing left
+        right = "e0b0";
+        left = "e0b2";
         nixos = "f313";
         branch = "f418";
         lock = "f023";
@@ -26,14 +25,12 @@ _: {
     in
     {
 
-      # Git
       programs.git = {
         enable = true;
         # sops template rendered here by profiles/PC.nix / profiles/server.nix
         includes = [ { path = "${config.home.homeDirectory}/.config/git/identity"; } ];
       };
 
-      # fzf
       programs.fzf = {
         enable = true;
       }
@@ -46,10 +43,8 @@ _: {
         historyWidget.bash.command = "";
       };
 
-      # zoxide
       programs.zoxide.enable = true;
 
-      # BTOP
       programs.btop = {
         enable = true;
         settings = {
@@ -61,7 +56,6 @@ _: {
         };
       };
 
-      # bash: the interactive shell
       programs.bash = {
         enable = true;
         inherit shellAliases;
@@ -110,7 +104,6 @@ _: {
         ];
       };
 
-      # ble.sh settings
       xdg.configFile."blesh/init.sh".text = ''
         bleopt history_share=1
         bind 'set completion-ignore-case on'
@@ -120,19 +113,16 @@ _: {
         function blerc/vim-mode-hook {
           # no "-- INSERT --" line; the cursor shape shows the mode
           bleopt keymap_vi_mode_show=
-          # cursor shape per vi mode: block in normal, bar in insert
           ble-bind -m vi_nmap --cursor 2
           ble-bind -m vi_imap --cursor 5
           ble-bind -m vi_omap --cursor 4
           ble-bind -m vi_xmap --cursor 2
           ble-bind -m vi_cmap --cursor 0
-          # up/down search history for what's already typed, like fish
           ble-bind -m vi_imap -f up 'history-substring-search-backward hide-status:immediate-accept:point=end:empty=history-move'
           ble-bind -m vi_imap -f down 'history-substring-search-forward hide-status:immediate-accept:point=end:empty=history-move'
         }
         blehook/eval-after-load keymap_vi blerc/vim-mode-hook
 
-        # enter runs a complete command even when it spans lines (a paste); otherwise adds a line
         function ble/widget/blerc/accept-if-complete {
           ble-edit/content/update-syntax
           if ble/syntax:bash/is-complete; then
@@ -145,7 +135,6 @@ _: {
         ble-bind -m vi_imap -f 'C-m' blerc/accept-if-complete
       '';
 
-      # starship: two-line rainbow powerline prompt, modelled on fish's tide
       programs.starship = {
         enable = true;
         settings = {
@@ -248,7 +237,6 @@ _: {
             style = "fg:black bg:green";
             format = "[${g.left}](fg:green)[ $symbol( $number) ]($style)";
           };
-          # just the ▼ while loaded and allowed, like tide
           direnv = {
             disabled = false;
             symbol = "▼";
@@ -278,7 +266,6 @@ _: {
         };
       };
 
-      # atuin: searchable shell history on Ctrl-R, local only (no account, no sync)
       programs.atuin = {
         enable = true;
         # up arrow stays ble.sh's history search
@@ -286,14 +273,12 @@ _: {
         settings.update_check = false;
       };
 
-      # direnv: load a repo's .envrc dev shell on cd
       programs.direnv = {
         enable = true;
         nix-direnv.enable = true;
         config.global.hide_env_diff = true;
       };
 
-      # bat
       programs.bat = {
         enable = true;
         config = {
@@ -301,7 +286,6 @@ _: {
         };
       };
 
-      # eza
       programs.eza = {
         enable = true;
         enableBashIntegration = false;

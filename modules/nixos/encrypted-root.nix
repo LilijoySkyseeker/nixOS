@@ -19,8 +19,6 @@ _: {
           # token type in crypttab, or tpm2-measure-pcr, would limit it to the
           # named ones
 
-          # refuse to install onto a disk without this root's LUKS container (a
-          # host not yet reinstalled, or the wrong machine): it couldn't boot
           system.preSwitchChecks.encryptedRoot = ''
             if [ ! -e ${device} ]; then
               echo "myEncryptedRoot: ${device} isn't on this machine; refusing to install a system that can't find its root" >&2
