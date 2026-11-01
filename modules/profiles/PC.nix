@@ -68,6 +68,7 @@ in
         vesktop
         discord
         kdePackages.kdenlive
+        wl-clipboard # for waydroid
         quickemu
         qbittorrent
 

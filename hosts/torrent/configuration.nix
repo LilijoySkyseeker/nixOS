@@ -17,12 +17,6 @@
     operation = "boot";
   };
 
-  # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
-  boot.extraModulePackages = with config.boot.kernelPackages; [
-    r8125
-  ];
-  boot.kernelModules = [ "r8125" ];
-
   # arm the board's hardware watchdog (sp5100_tco, /dev/watchdog0): a full
   # hang resets the machine in ~30s instead of sitting frozen until power-cycled
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
