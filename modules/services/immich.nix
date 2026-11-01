@@ -37,26 +37,9 @@ in
         host = "0.0.0.0";
         # on jellyfin's zdata/storage/storage dataset (zrepl + restic backed)
         mediaLocation = "/storage/immich";
-        # video transcoding only (not ML); backend is picked in immich's admin UI.
-        # explicit rw: a bare path means DeviceAllow's wider rwm
-        accelerationDevices = [
-          "/dev/dri/renderD128 rw" # Nvidia GTX 1050 Mobile (NVENC)
-          "/dev/dri/renderD129 rw" # Intel HD 630 (QSV/VAAPI fallback)
-        ];
       };
 
-      # GPU access for immich-server only: render group on the unit, not the
-      # user (shared with the ML worker, which parses untrusted media), and
-      # accelerationDevices lands on both units, so force the ML unit back off
       systemd = {
-        services = {
-          immich-server.serviceConfig.SupplementaryGroups = [ "render" ];
-          immich-machine-learning.serviceConfig = {
-            PrivateDevices = lib.mkForce true;
-            DeviceAllow = lib.mkForce [ ];
-          };
-        };
-
         # upstream's `e` rule never creates a non-default mediaLocation
         tmpfiles.settings.immich.${config.services.immich.mediaLocation}.d = {
           user = config.services.immich.user;
@@ -71,18 +54,10 @@ in
         # SECURITY-LOAD-BEARING: the recursive multimedia grant on /storage
         # re-applies every boot and would leak into the 0700 mediaLocation; the
         # `A` below re-locks it each time (plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#F5)
-        #
-        # torrent/thinkpad (multimedia gid via NFS) get read-only library/:
-        # immich tracks paths/checksums in its db, so external writes desync it
         tmpfiles.rules = lib.mkAfter [
           "a+ /storage - - - - user:immich:--x"
-          # rwX: no execute bit on regular files (the library grant below is X-conditional)
+          # rwX: no execute bit on regular files
           "A ${config.services.immich.mediaLocation} - - - - user:immich:rwX"
-          # r-X: traverse and list into library/; sibling dirs stay unreadable
-          "a+ ${config.services.immich.mediaLocation} - - - - group:multimedia:r-X"
-          # second walk of library/ is deliberate: scoping the re-lock to the
-          # other subdirs by name would miss any new one immich adds
-          "A+ ${config.services.immich.mediaLocation}/library - - - - group:multimedia:r-X"
         ];
       };
 

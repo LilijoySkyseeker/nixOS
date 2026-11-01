@@ -82,25 +82,6 @@
   # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
-  # GPU hardware acceleration for Jellyfin
-  hardware.graphics = {
-    enable = true;
-    extraPackages = with pkgs-stable; [
-      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
-      vpl-gpu-rt
-    ];
-  };
-  services.xserver.videoDrivers = [ "nvidia" ];
-  hardware.nvidia = {
-    # nvidiaPackages.stable (production) dropped Pascal support upstream
-    # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
-    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
-    open = false;
-    modesetting.enable = true;
-    nvidiaSettings = false; # headless, no GUI settings app needed
-  };
-
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
