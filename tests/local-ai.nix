@@ -72,6 +72,7 @@ pkgs.testers.runNixOSTest {
       with subtest("paseo: agent sandbox"):
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
+          machine.succeed("runuser -u agent -- env HOME=/home/agent ${pkgs.python3}/bin/python ${./paseo-local-codex.py}")
           assert machine.succeed("jq -r .daemon.mcp.injectIntoAgents /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
           # stale one
