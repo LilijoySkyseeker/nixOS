@@ -19,12 +19,6 @@ in
       '';
     };
 
-    # NFSv4-only: single port (2049), no rpcbind/mountd/statd/lockd
-    services.nfs.settings.nfsd = {
-      vers3 = false;
-      vers4 = true;
-    };
-
     # tailnet only, never the LAN NIC; the
     # exports' per-PC addresses are a second layer
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 2049 ];

@@ -25,10 +25,6 @@ in
         gid = vars.gids.multimedia;
         members = [ "jellyfin" ];
       };
-      # no tmpfiles rules for jellyfin's dirs: upstream creates them at 0700
-      # (jellyfinDirs.conf); raw rules here land in 00-nixos.conf, sort first
-      # and would loosen that
-
       # tailnet only: homelab's LAN NIC has a public IPv6 address, so no host-wide rule
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
 
