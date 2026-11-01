@@ -34,9 +34,7 @@ sets `core.hooksPath` so the git hooks run.
   a security review before the PR opens (Claude's `/security-review`),
   and in parallel a
   review of the branch against `master` by an agent of another model
-  family, through its own CLI: from Claude, `codex review --base master`;
-  from Codex, `claude -p` asked to review it (the `other-agents` skill has
-  the commands).
+  family, started with `paseo run` (the `other-agents` skill).
 
 ## Git and PRs
 
