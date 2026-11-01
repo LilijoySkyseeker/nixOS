@@ -318,6 +318,17 @@
                   ];
                   # notes go in AGENTS.local.md, where every agent reads them
                   autoMemoryEnabled = false;
+                  # claude.ai skills that can't work here: no browser pane, desktop,
+                  # docs connector or cloud routines, and /init writes the CLAUDE.md
+                  # the agents must not have
+                  skillOverrides = {
+                    "built-in-browser" = "off";
+                    "chrome-browser" = "off";
+                    "computer-use" = "off";
+                    docs = "off";
+                    schedule = "off";
+                    init = "off";
+                  };
                 }
               );
             in
