@@ -35,6 +35,8 @@ in
           wget
           eza
           bat
+          tldr
+          glow
           zoxide
           git
           rsync
@@ -42,6 +44,7 @@ in
           smartmontools
           psmisc
           ffmpeg
+          flac
           tmux
         ]
         # shared with the devshell (modules/flake/debug-tools.nix); always unstable,

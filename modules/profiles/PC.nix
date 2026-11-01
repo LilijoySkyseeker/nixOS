@@ -29,7 +29,6 @@ in
         gh
         codex
         nodejs
-        fd
         nixos-anywhere
         ssh-to-age
         caligula

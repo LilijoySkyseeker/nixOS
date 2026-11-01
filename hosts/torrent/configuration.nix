@@ -1,4 +1,5 @@
 {
+  pkgs-unstable,
   config,
   vars,
   ...
@@ -16,6 +17,10 @@
     autoReboot = false;
     operation = "boot";
   };
+
+  environment.systemPackages = [ pkgs-unstable.bambu-studio ];
+
+  powerManagement.cpuFreqGovernor = "performance";
 
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
 
