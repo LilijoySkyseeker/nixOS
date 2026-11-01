@@ -11,20 +11,7 @@
     ./disko.nix
   ];
 
-  # System installed pkgs
-  environment.systemPackages = with pkgs-stable; [
-    zfs
-    restic
-    backblaze-b2
-    btop
-  ];
-
   boot = {
-    # disable staggered hdd spin up
-    extraModprobeConfig = ''
-      options libahci ignore_sss=1
-    '';
-
     # force BOT instead of UAS for the TerraMaster enclosure's ASMedia bridge
     # (174c:55aa), which silently corrupts in-flight data under UAS load
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
@@ -68,20 +55,8 @@
   # modules/services/minecraft.nix next to its path
   myDockerUserns.enable = true;
 
-  # update microcode
-  hardware.cpu.intel.updateMicrocode = true;
-
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
-
-  # networking
-  networking.networkmanager = {
-    enable = true;
-    insertNameservers = [
-      "8.8.8.8"
-      "1.1.1.1"
-    ];
-  };
 
   # directory permissions
   # don't lock down /srv itself (0770 root breaks traversal for its non-root
@@ -292,15 +267,8 @@
     preserveLegacySnapshots = false;
   };
 
-  # cpu power management
-  powerManagement.cpuFreqGovernor = "performance";
-
   # disable emergencymode
   systemd.enableEmergencyMode = false;
-
-  # lock down users
-  users.mutableUsers = false;
-  #users.users.root.hashedPassword = "!";
 
   # Define your hostname.
   networking.hostName = "homelab";
@@ -420,24 +388,8 @@
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
     enable = true;
-    allowSFTP = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
-    settings.KbdInteractiveAuthentication = false;
-    # must be a structured option: sshd is first-directive-wins and the
-    # module renders its own default before extraConfig
-    settings.PasswordAuthentication = false;
-    extraConfig = ''
-      PermitRootLogin = prohibit-password
-      AllowTcpForwarding no
-      X11Forwarding no
-      AllowAgentForwarding no
-      AllowStreamLocalForwarding no
-      AuthenticationMethods publickey
-      PermitTunnel no
-      ClientAliveInterval 60
-      ClientAliveCountMax 5
-    '';
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -447,12 +399,7 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
-  };
+  services.zfs.autoScrub.enable = true;
   networking.hostId = "e0019fd8";
 
   # wireguard: dial out to the vps as our public endpoint from behind CGNAT
