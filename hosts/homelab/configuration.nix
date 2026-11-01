@@ -30,17 +30,6 @@
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
   };
 
-  # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC
-  services.networkd-dispatcher = {
-    enable = true;
-    rules."50-tailscale" = {
-      onState = [ "routable" ];
-      script = ''
-        ${lib.getExe pkgs-stable.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
-      '';
-    };
-  };
-
   # docker settings
   # SECURITY: the LAN NIC has a public IPv6 and myDockerPublishGuard is
   # IPv4-only; do not set `ipv6 = true` or restore userland-proxy without
@@ -465,15 +454,6 @@
     trim.enable = true;
   };
   networking.hostId = "e0019fd8";
-
-  # tailscale: advertise the LAN subnet and act as an exit node
-  # overrides the fleet's "client" default (also sets ip forwarding); without
-  # it the advertise flags below silently stop working
-  services.tailscale.useRoutingFeatures = lib.mkForce "both";
-  services.tailscale.extraUpFlags = lib.mkAfter [
-    "--advertise-routes=192.168.1.0/24"
-    "--advertise-exit-node"
-  ];
 
   # wireguard: dial out to the vps as our public endpoint from behind CGNAT
   # wireguard-wg0 is a RemainAfterExit oneshot that reads the key once, so a

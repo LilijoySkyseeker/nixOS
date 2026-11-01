@@ -25,7 +25,7 @@ in
       vers4 = true;
     };
 
-    # tailnet only, never the LAN NIC (homelab is a LAN subnet router); the
+    # tailnet only, never the LAN NIC; the
     # exports' per-PC addresses are a second layer
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 2049 ];
 
