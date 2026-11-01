@@ -31,8 +31,8 @@ _: {
         runtimeInputs = [ pkgs.coreutils ];
         text = builtins.readFile ./paseo/claude-api-credits.sh;
       };
-      paseoClaudeBilling = pkgs.writeShellScriptBin "paseo-claude-billing" ''
-        exec ${lib.getExe pkgs.nodejs} ${./paseo/claude-billing.mjs} ${paseo}/lib/paseo "$@"
+      paseoContinueOnCredits = pkgs.writeShellScriptBin "paseo-continue-on-credits" ''
+        exec ${lib.getExe pkgs.nodejs} ${./paseo/continue-on-credits.mjs} ${paseo}/lib/paseo "$@"
       '';
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
@@ -78,6 +78,14 @@ _: {
               extends = "claude";
               label = "Claude — API credits";
               description = "Use the included Console credits, separately from subscription usage";
+              # Paseo patch limit-fallback.patch: used while the subscription is at
+              # its limit, and its spend tracked against the plan's monthly credit
+              limitFallback = true;
+              creditBudget = {
+                monthlyUsd = 100;
+                # credits renew a day after the plan's billing date (owner, 2026-11-01)
+                cycleDay = 2;
+              };
               # Read only in the child process: no key in the Nix store or
               # Paseo's configuration, and no fallback to subscription login.
               command = [
@@ -323,7 +331,7 @@ _: {
       # agents start subagents with `paseo run`
       users.users.agent.packages = [
         paseo
-        paseoClaudeBilling
+        paseoContinueOnCredits
       ];
 
       # the scheduled jobs live in the daemon, so each run shows in the app;

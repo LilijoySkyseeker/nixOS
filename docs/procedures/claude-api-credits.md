@@ -39,40 +39,36 @@ The owner's first test key expires after 30 days (created 2026-11-01). Replace
 or renew it in the Console and sops before expiry if keeping this option.
 Never move the test key out of `/run` into the project or a repository.
 
-## Continue an existing conversation
+## When the subscription hits its limit
 
-Run as `agent`, or ask an agent to do this for the selected chat:
+Paseo carries two patches for this (`modules/nixos/paseo/*.patch`, applied to
+the daemon and the desktop app; the store mobile app shows none of the UI):
+
+- `usage-limit-resume.patch` is upstream getpaseo/paseo#7193. Claude Code
+  reports a refused turn with the exact reset time; the chat continues by
+  itself a minute after it, unless its auto-resume switch is turned off.
+- `limit-fallback.patch`: the profile above is marked `limitFallback`. A
+  limited chat's callout offers **Continue on API credits**, which moves that
+  same chat (same ID, conversation and folder) to the profile and continues
+  it. Until the reset, new Claude chats start on the profile. At the reset,
+  chats moved or started this way return to the subscription on their own.
+  Chats deliberately started on **Claude — API credits** stay there.
+- Spend: the profile's `creditBudget` makes the daemon record each turn's
+  estimated cost in `~/.paseo/credit-ledger.jsonl` (as `agent`). The context
+  meter of an API chat shows its spend and the cycle's total against $100.
+  The Console's Billing page is authoritative. A chat moved from the
+  subscription after a daemon restart may count its earlier subscription
+  turns once, since the ledger only knows totals it has seen.
+
+From the phone, or as an agent, the same move as the button:
 
 ```bash
-paseo-claude-billing <Paseo-chat-ID-or-unique-prefix> api
+paseo-continue-on-credits <Paseo-chat-ID-or-unique-prefix>
 ```
 
-The command archives the original Paseo view, imports the **same Claude session
-ID and working directory** under the API profile, reloads its history, and
-preserves the model, thinking level, permission mode and title. It prints the
-Paseo chat ID to open. Send `continue` there. No model request is sent by the
-switch command itself.
-
-After subscription usage resets:
-
-```bash
-paseo-claude-billing <API-chat-ID> subscription
-```
-
-This closes the API view and restores the subscription view with the messages
-written during API use. The two views share one Claude transcript: never run
-both at once. The helper refuses running chats, pending permission requests,
-unarchived child agents, and another open view of the same transcript. Finish
-or detach child work first. It re-checks the chat just before closing it. If
-the handover fails, it restores the original view; if even that fails, it
-prints the `paseo import` command that brings the conversation back. The
-transcript on disk is never touched. A model the API key can't use fails the
-handover and restores the original.
-
-A new API-backed conversation can also be started by choosing **Claude — API
-credits** in Paseo. Ordinary **Claude** keeps subscription authentication.
-The API profile refuses to start if its key is missing or empty; an exhausted
-or invalid key does not switch back to subscription billing.
+An exhausted or invalid key never switches back to subscription billing: the
+API profile refuses to start without its key, and Anthropic answers an
+exhausted balance with "Your credit balance is too low".
 
 ## Verification on 2026-11-01
 
@@ -86,3 +82,9 @@ Returning to the original subscription view restored the API-side reply in its
 history. Normal Claude still reported claude.ai authentication; the API wrapper
 reported API-key authentication. A successful subscription response after reset
 and permanent sops-backed deployment remain pending.
+
+The patched daemon, on a separate Paseo home, against the same real limit:
+the limit event recorded the reset (16:00 PT); **Continue on API credits**
+moved the limited chat in place and it recalled a word from its
+subscription-side turn; a new Claude chat started on the API profile.
+The automatic return at the reset is checked separately.
