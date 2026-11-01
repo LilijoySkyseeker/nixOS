@@ -123,7 +123,6 @@ in
         443
       ];
 
-      # website-deploy: build main's newest commit and swap it in
       # its own user, so evaluating the site's flake can't read anything root-only
       users.users.website = {
         isSystemUser = true;
@@ -207,7 +206,6 @@ in
         };
       };
 
-      # website-status: the numbers behind the status stickers
       systemd.services.website-status = {
         description = "Write the site's status.json";
         path = with pkgs-stable; [ coreutils ];

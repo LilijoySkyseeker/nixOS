@@ -1,7 +1,6 @@
 { config, lib, ... }:
 let
   ips = config.flake.vars.tailnetIPv4;
-  # torrent and thinkpad only; other tailnet devices can't mount
   clients = lib.concatMapStringsSep " " (ip: "${ip}(rw,sync,no_subtree_check,root_squash)") [
     ips.torrent
     ips.thinkpad
@@ -9,8 +8,6 @@ let
 in
 {
   flake.modules.nixos.nfs = _: {
-    # nfs server: tailnet-only share of /storage and /storage-bulk for the
-    # linux PCs; android gets the same datasets over samba (samba.nix)
     services.nfs.server = {
       enable = true;
       exports = ''

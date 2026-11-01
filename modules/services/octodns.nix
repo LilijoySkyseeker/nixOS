@@ -8,12 +8,9 @@ _: {
       ...
     }:
     let
-      # zone data and octoDNS config are both rendered from these, no checked-in YAML
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # public: the game servers and the website;
-      # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [
           {
@@ -21,7 +18,6 @@ _: {
             ttl = 300;
             value = vpsPublicIp;
           }
-          # Google Workspace mail, single-MX form
           {
             type = "MX";
             ttl = 300;
@@ -30,7 +26,6 @@ _: {
               exchange = "smtp.google.com.";
             };
           }
-          # SPF and the site-verification token as one TXT with two values
           {
             type = "TXT";
             ttl = 300;
@@ -49,7 +44,6 @@ _: {
             value = "v=DKIM1\\;k=rsa\\;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsonrfzXTCC2+UEvz952v6fJgq6V/dUzIzORTEogwWdoBQHotImyklUGvhGhimwx49P4jDd+IezTeA7spO+EZpepXPidYPrDyzOnqtYyjgCM6z4SrD4RFGIcmtAIcVxYw8uy0LQ/L1L4JHxNf83LGQSRQpGo5HFwbwvAPsVCsE+t4CjFCIbWOlZuvHIuOLApKjrmYT2OBiu6jScKZvAiFTB98c9zJe7Arsws7SrSC41O0S5P/4v6bLCMq524TGiuVWPAJnvrJYJqXzj8nWfkqkZ5tVe/KeJi32pCGevfh1eGXU+IThT27Wcgl6QferAtYs10U/KiVMNRUV/Zeu+4IXwIDAQAB";
           }
         ];
-        # DMARC, monitor-only (`p=none`)
         "_dmarc" = [
           {
             type = "TXT";
@@ -57,7 +51,6 @@ _: {
             value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
-        # the website lives at the apex; www redirects there
         www = [
           {
             type = "CNAME";
