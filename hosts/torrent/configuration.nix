@@ -117,6 +117,14 @@
   systemd.services.paseo-agent-config.serviceConfig.LoadCredential =
     "paseo-password-hash:${config.sops.secrets.paseo_password_hash.path}";
 
+  # Scoped to the linked Console organization; only the API-credit profile
+  # uses it. Every agent runs as `agent` and can read it: the credit cap,
+  # no auto-reload and the key's expiry are the limit on misuse.
+  sops.secrets.claude_api_key = {
+    sopsFile = ../../secrets/torrent.yaml;
+    owner = "agent";
+  };
+
   # failed-unit / stuck-switch alerts to Discord; one fleet-wide webhook,
   # shared on purpose (write-only sink, worst case is forged alerts)
   sops.secrets.discord_webhook = {

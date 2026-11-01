@@ -83,6 +83,23 @@
         # yield the byte-identical derivation the pushed flake builds in the VM
         nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
+
+      # node unit tests of the Paseo billing handover; no VM
+      paseo-claude-billing =
+        let
+          pkgs = config.flake.pkgsUnstable;
+          src = pkgs.lib.fileset.toSource {
+            root = ../..;
+            fileset = pkgs.lib.fileset.unions [
+              ../../modules/nixos/paseo/claude-billing.mjs
+              ../../tests/paseo-claude-billing.mjs
+            ];
+          };
+        in
+        pkgs.runCommand "paseo-claude-billing" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+          node --test ${src}/tests/paseo-claude-billing.mjs
+          touch $out
+        '';
     };
   };
 }
