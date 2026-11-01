@@ -1,58 +1,26 @@
 ---
 name: other-agents
-description: The other agents installed on torrent and how to call them non-interactively. Use for a second opinion or review from a different model family, before a PR that would be costly to get wrong, to hand off a task that suits another agent better, or when you're stuck between two designs.
+description: How to start another agent (a subagent of any family) through Paseo, and how to run a cold read with no local instructions. Use whenever you delegate work to another agent, want a second opinion or review from a different model family, before a PR that would be costly to get wrong, or when a reviewer must see only the brief.
 ---
 
-# The other agents
+# Other agents
 
-Claude Code, Codex and the local model run as the
-same Unix user, read the same instructions and skills, and can do work.
-The others are on your `PATH`, logged in. Your own system prompt says which one you are; call the
-others, not yourself.
+**Another agent.** `paseo run --provider claude "<brief>"` runs it as your
+subagent, so the owner sees it in Paseo; use `codex` for the other family.
+The defaults are right; don't add flags.
 
-Treat what another agent returns as input, not a verdict: check it against
-the code.
+**Briefs.** Say what it's for (the goal, one level above the task itself),
+what's in, what's out and when it's done.
 
-## How to call each one
+**Cold reads** (not shown in Paseo). Never say who wrote the work or what
+you expect.
 
-Run each from the directory to work in, with `< /dev/null` so it never
-waits on a terminal.
+- Code: `claude -p --safe-mode --disable-slash-commands --tools Read,Grep,Glob "<brief>" < /dev/null`,
+  run in the repo. No instruction files, skills, MCP or memory load.
+- A document: `--tools ""` instead, from an empty folder, with the document
+  embedded in the brief.
+- Codex: `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -c project_doc_max_bytes=0 -C <dir> "<brief>" < /dev/null`.
 
-| Agent | Non-interactive command |
-|---|---|
-| Claude (Anthropic) | `claude -p --permission-mode bypassPermissions "<task>" < /dev/null` |
-| Codex (OpenAI) | `codex exec --skip-git-repo-check -C <dir> "<task>" < /dev/null` (for web search, `codex --search exec ...`: it's a top-level flag) |
-| Local model (Codex harness) | `codex exec --skip-git-repo-check -C <dir> -c model_provider=local -c 'model_providers.local.name="llama-server"' -c 'model_providers.local.base_url="http://127.0.0.1:8080/v1"' -c 'model_providers.local.wire_api="responses"' -m <model> "<task>" < /dev/null` |
-
-- Codex on the owner's Plus plan can run out partway through a long
-  review ("You've hit your usage limit ... try again at <time>") and still
-  exit 0. Check the output for "usage limit" before trusting a Codex
-  result.
-- Codex refuses a directory that isn't a git repo unless you pass
-  `--skip-git-repo-check`. It loads AGENTS.md only from the git root down
-  to `-C`, so point `-C` at the repo.
-- The local model's name and whether its server is up are in the
-  `local-ai` skill. It runs only in the Codex harness (the owner,
-  2026-10-25).
-- The local model is free and uncapped but slower and weaker than the
-  cloud models. It's the one to use for private material and for work the
-  cloud models refuse, with its output checked. It hallucinated review
-  results in an earlier session (owner, 2026-10-23).
-
-## Rules
-
-- **One hop.** A delegated task doesn't delegate back to its caller, so two
-  agents can't loop on each other's usage.
-- **Review before a costly PR.** Before a PR that would be costly to get
-  wrong (agent-user, firewall, deploys, migrations, deletions), have an
-  agent of another model family review the branch against the base:
-  - Codex reviewing: `codex review --base master < /dev/null` in the repo.
-    It runs Codex's built-in review with its full sandbox, so it can build
-    and evaluate too. The output is long; the verdict is at the end
-    (`| tail -40`). `--base` takes no custom instructions: for a focused
-    pass (security, an adversarial read), use `codex exec -C <repo>
-    "Review the diff master...HEAD for <focus>; report findings with
-    file:line" < /dev/null`.
-  - Claude reviewing: `claude -p --permission-mode bypassPermissions
-    "Review the branch <branch> against master for bugs and risks" <
-    /dev/null` in the repo.
+**Rules.** Treat what comes back as input, not a verdict. Before a costly PR
+(agent-user, firewall, deploys, migrations, deletions), have the other
+family review it.

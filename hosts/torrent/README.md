@@ -41,18 +41,20 @@ thinkpad it has no `@blank` snapshots to preserve.
 ## Agent user
 
 This host (only) runs `agent-user`: an `agent` Unix user.
-Claude runs unattended jobs in its sandbox. Every Monday at 00:15, `agent-weekly.timer` runs two of them, one
-after the other: `agent-flake-update` (flake inputs, the stable hosts'
-move to each new NixOS release, and dropping workarounds the update makes
-unnecessary, as a PR), then `agent-maintenance` (the agents' friction log
-and to-dos, workarounds waiting on upstream, and forgotten PRs or notes,
-as a PR or issue). Every day at 06:00, `agent-security-watch` checks the
-security news against the fleet and opens fix PRs. Their results land in `Vault/Research/Fleet/`: one report per
-week in `Weekly/`, and `Status.md`, the standing picture. The prompts are
-in `modules/nixos/agent-jobs/`. Run one now with
-`run0 systemctl start agent-flake-update` (or both weekly jobs in order
-with `run0 systemctl start agent-weekly.target`), and follow it with
-`journalctl -fu agent-flake-update`. It sees only `~/Documents/Vault/Research` (bindfs-mounted at
+Claude runs unattended jobs in its sandbox, as Paseo schedules, so every run shows in the Paseo app (Schedules). Every Monday at
+00:15, `job:flake-update` (flake inputs, the stable hosts' move to each new
+NixOS release, and dropping workarounds the update makes unnecessary, as a
+PR), then at 03:00 `job:maintenance` (the agents' friction log and to-dos,
+workarounds waiting on upstream, and forgotten PRs or notes, as a PR or
+issue). Every day at 06:00, `job:security-watch` checks the security news
+against the fleet and opens fix PRs. Their results land in
+`Vault/Research/Fleet/`: one report per week in `Weekly/`, and `Status.md`,
+the standing picture. The times are `agentJobs` in
+`modules/nixos/local-ai.nix` and the prompts are in
+`modules/nixos/agent-jobs/`; the `agent-schedules` unit declares them in the
+daemon again whenever they change. Run one now from the app (Schedules →
+Run), and pause one there too: a rebuild keeps a pause but puts back an
+edited prompt or time. The agent sees only `~/Documents/Vault/Research` (bindfs-mounted at
 `/home/agent/research`) and can't reach the LAN or tailnet. Its
 `agent-egress` chain is also jumped for `gid nixbld`, so **your own**
 fixed-output builds on this host can't fetch from LAN/tailnet addresses or
