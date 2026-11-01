@@ -4,12 +4,10 @@ let
 in
 {
   flake.modules.nixos."profile-server" = _: {
-    # nh, nix helper
     programs.nh = {
       flake = "/etc/nixos";
     };
 
-    # home-manager
     home-manager.users.root = {
       imports = [
         homeManagerModules.tooling
@@ -18,7 +16,6 @@ in
       home.stateVersion = "23.11";
     };
 
-    # disable laptop lid power
     services.logind.settings.Login.HandleLidSwitch = "ignore";
   };
 }

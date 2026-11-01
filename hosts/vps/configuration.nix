@@ -6,15 +6,12 @@
   ...
 }:
 let
-  # DigitalOcean's only world facing interface
   externalInterface = "ens3";
 
-  # reciever for homelab's vps deployer/updater
   vpsDeployDispatcher = pkgs.writeShellScript "vps-deploy-dispatcher" ''
     set -eu
     cmd=$SSH_ORIGINAL_COMMAND
 
-    # restrict the name half of the Nix store path to this system's own closures
     store_path=$(
       printf '%s\n' "$cmd" \
         | ${pkgs.gnugrep}/bin/grep -oE '/nix/store/[0-9a-z]{32}-nixos-system-vps-[0-9A-Za-z._-]+' \
@@ -51,7 +48,6 @@ let
         ;;
     esac
 
-    # nixos-rebuild's `nix-env --set` step, points profile at new generation
     case "$cmd" in
       *"nix-env -p /nix/var/nix/profiles/system --set"*)
         require_store_path
@@ -59,7 +55,6 @@ let
         ;;
     esac
 
-    # nixos-rebuild's switch-to-configuration invocation
     case "$cmd" in
       *"switch-to-configuration switch"*)
         require_store_path
@@ -111,7 +106,6 @@ in
     ./disko.nix
   ];
 
-  # Define your hostname.
   networking.hostName = "vps";
 
   # DigitalOcean's hypervisor virtual switch needs cloud-init to run and "register"/arm the droplet's network before it'll pass any traffic for that NIC
@@ -190,7 +184,6 @@ in
   # zram instead to prevent secrets leakage
   zramSwap.enable = true;
 
-  # impermanence: root is tmpfs and wiped every boot
   fileSystems."/" = {
     device = "none";
     fsType = "tmpfs";
@@ -201,7 +194,6 @@ in
   };
   fileSystems."/persist".neededForBoot = true;
 
-  # persisteted file and dirs between imepmatence wipes
   environment.persistence."/persist" = {
     directories = [
       "/var/log"
@@ -222,17 +214,14 @@ in
     ];
   };
 
-  # ssh key root access
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
 
-  # updater user
   users.users.vps-deploy = {
     isSystemUser = true;
     group = "vps-deploy";
     # needed for sshd
     shell = "${pkgs.bash}/bin/bash";
     openssh.authorizedKeys.keys = [
-      # homelab -> vps push-deploy key
       "command=\"${vpsDeployDispatcher}\",restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlJbrWrcdGkWtpXnBZgAJ0gHHR1G36SSmdeoLHzqPGn homelab-vps-deploy"
     ];
   };
@@ -256,7 +245,6 @@ in
   nix.settings.auto-optimise-store = true;
   services.openssh = {
     enable = true;
-    # force port 22 closed
     openFirewall = false;
     settings.KbdInteractiveAuthentication = false;
     settings.PasswordAuthentication = false;
@@ -268,13 +256,11 @@ in
     ];
   };
 
-  # tailscale allow
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
   # the module's LOG rule has no rate limit and can outrun journald under a scan
   networking.firewall.logRefusedConnections = false;
 
-  # wireguard tunnel
   # networkd reads PrivateKeyFile only at link setup and a key-only rotation
   # changes no unit file, so restart it explicitly
   sops.secrets.vps_wireguard_private_key.restartUnits = [ "systemd-networkd.service" ];
@@ -284,14 +270,12 @@ in
     privateKeyFile = config.sops.secrets.vps_wireguard_private_key.path;
     peers = [
       {
-        # homelab
         publicKey = "d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=";
         allowedIPs = [ "10.100.0.2/32" ];
       }
     ];
   };
 
-  # game server forwarding
   networking.nat = {
     enable = true;
     inherit externalInterface;
@@ -304,7 +288,7 @@ in
       {
         destination = "10.100.0.2:19132";
         proto = "udp";
-        sourcePort = 19132; # minecraft: geyser (bedrock edition)
+        sourcePort = 19132;
       }
       {
         destination = "10.100.0.2:80";
@@ -314,7 +298,7 @@ in
       {
         destination = "10.100.0.2:443";
         proto = "tcp";
-        sourcePort = 443; # website
+        sourcePort = 443;
       }
     ];
   };
@@ -325,22 +309,18 @@ in
     iptables -t nat -C POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1 2>/dev/null \
       || iptables -t nat -A POSTROUTING -o wg0 -j SNAT --to-source 10.100.0.1
 
-    # per-source-IP rate limiting on forwarded game ports
     iptables -t raw -N vps-ratelimit 2>/dev/null || iptables -t raw -F vps-ratelimit
     iptables -t raw -C PREROUTING -i ${externalInterface} -j vps-ratelimit 2>/dev/null \
       || iptables -t raw -I PREROUTING -i ${externalInterface} -j vps-ratelimit
 
-    # minecraft: cap new-connection attempts per source IP
     iptables -t raw -A vps-ratelimit -p tcp --dport 25565 --syn \
       -m hashlimit --hashlimit-above 15/minute --hashlimit-burst 10 \
       --hashlimit-mode srcip --hashlimit-name mc-new -j DROP
 
-    # minecraft (geyser/bedrock): cap packet rate per source IP
     iptables -t raw -A vps-ratelimit -p udp --dport 19132 \
       -m hashlimit --hashlimit-above 1000/second --hashlimit-burst 500 \
       --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
 
-    # website: cap new HTTP(S) connections per source IP
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
       --hashlimit-mode srcip --hashlimit-name http-new -j DROP
@@ -349,7 +329,6 @@ in
   # default 90s start timeout kills tailscaled-autoconnect before tailscale is Running on a slow boot
   systemd.services.tailscaled-autoconnect.serviceConfig.TimeoutStartSec = "300s";
 
-  # failed-unit / stuck-switch alerts to Discord, no ZFS/SMART on this box
   sops.secrets.discord_webhook = {
     owner = "health-check";
     group = "health-check";
@@ -370,9 +349,8 @@ in
   # this box has no real block devices for smartd to monitor
   services.smartd.enable = lib.mkForce false;
 
-  # firewall
   networking.firewall.allowedUDPPorts = [
-    51820 # wireguard
+    51820
   ];
 
 }
