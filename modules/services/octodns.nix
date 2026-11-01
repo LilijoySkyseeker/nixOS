@@ -8,8 +8,6 @@ _: {
       ...
     }:
     let
-      enable = true;
-
       # zone data and octoDNS config are both rendered from these, no checked-in YAML
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
@@ -115,62 +113,59 @@ _: {
       octodnsEnv = pkgs-unstable.python3.withPackages (_: [ pkgs-unstable.octodns-providers.cloudflare ]);
     in
     {
-      config = lib.mkIf enable {
-        users.users.octodns = {
-          isSystemUser = true;
-          group = "octodns";
-        };
-        users.groups.octodns = { };
+      users.users.octodns = {
+        isSystemUser = true;
+        group = "octodns";
+      };
+      users.groups.octodns = { };
 
-        sops.secrets.cloudflare_octodns_token = {
-          owner = "octodns";
-          group = "octodns";
-        };
-        sops.templates."octodns-env" = {
-          owner = "octodns";
-          group = "octodns";
-          content = ''
-            CLOUDFLARE_TOKEN=${config.sops.placeholder.cloudflare_octodns_token}
-          '';
-        };
+      sops.secrets.cloudflare_octodns_token = {
+        owner = "octodns";
+        group = "octodns";
+      };
+      sops.templates."octodns-env" = {
+        owner = "octodns";
+        group = "octodns";
+        content = ''
+          CLOUDFLARE_TOKEN=${config.sops.placeholder.cloudflare_octodns_token}
+        '';
+      };
 
-        systemd.services.octodns-sync = {
-          description = "octoDNS: sync declared DNS records to Cloudflare";
-          serviceConfig = {
-            Type = "oneshot";
-            User = "octodns";
-            Group = "octodns";
-            EnvironmentFile = config.sops.templates."octodns-env".path;
-            ExecStart = "${octodnsEnv}/bin/octodns-sync --config-file=${octodnsConfig} --doit";
-            NoNewPrivileges = true;
-            ProtectSystem = "strict";
-            ProtectHome = true;
-            ProtectKernelModules = true;
-            ProtectKernelTunables = true;
-            ProtectKernelLogs = true;
-            ProtectClock = true;
-            ProtectControlGroups = true;
-            RestrictNamespaces = true;
-            PrivateTmp = true;
-            # this unit holds the token controlling the whole zone
-            PrivateDevices = true;
-            CapabilityBoundingSet = "";
-            RestrictRealtime = true;
-            RestrictSUIDSGID = true;
-            LockPersonality = true;
-            MemoryDenyWriteExecute = true;
-            SystemCallArchitectures = "native";
-          };
+      systemd.services.octodns-sync = {
+        description = "octoDNS: sync declared DNS records to Cloudflare";
+        serviceConfig = {
+          Type = "oneshot";
+          User = "octodns";
+          Group = "octodns";
+          EnvironmentFile = config.sops.templates."octodns-env".path;
+          ExecStart = "${octodnsEnv}/bin/octodns-sync --config-file=${octodnsConfig} --doit";
+          NoNewPrivileges = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectKernelLogs = true;
+          ProtectClock = true;
+          ProtectControlGroups = true;
+          RestrictNamespaces = true;
+          PrivateTmp = true;
+          # this unit holds the token controlling the whole zone
+          PrivateDevices = true;
+          CapabilityBoundingSet = "";
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          LockPersonality = true;
+          MemoryDenyWriteExecute = true;
+          SystemCallArchitectures = "native";
         };
+      };
 
-        systemd.timers.octodns-sync = {
-          description = "Run octodns-sync periodically";
-          wantedBy = [ "timers.target" ];
-          timerConfig = {
-            OnBootSec = "5m";
-            OnUnitActiveSec = "1h";
-            Persistent = true;
-          };
+      systemd.timers.octodns-sync = {
+        description = "Run octodns-sync periodically";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "5m";
+          OnUnitActiveSec = "1h";
         };
       };
     };
