@@ -9,7 +9,6 @@ in
       ...
     }:
     {
-      # jellyfin
       services.jellyfin = {
         enable = true;
         group = "multimedia";
@@ -28,7 +27,6 @@ in
       # tailnet only: homelab's LAN NIC has a public IPv6 address, so no host-wide rule
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 8096 ];
 
-      # persistence
       environment.persistence.${vars.persistRoot}.directories = with config.services.jellyfin; [
         {
           directory = configDir;

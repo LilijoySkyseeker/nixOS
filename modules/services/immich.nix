@@ -6,7 +6,6 @@ in
   flake.modules.nixos.immich =
     { config, lib, ... }:
     {
-      # immich: self-hosted photo/video backup, tailnet-only
 
       # version-exact so a bump re-breaks the build instead of silently
       # inheriting the exemption
