@@ -69,8 +69,7 @@ in
       # authKeyFile logs in on boot; per-host non-reusable key, pre-tagged tag:<hostname>
       services.tailscale = {
         enable = true;
-        # "client", not "both": "both" forces ip forwarding on; only homelab routes
-        # (it opts back in with mkForce). the module sets those sysctls at
+        # "client", not "both": "both" forces ip forwarding on. the module sets those sysctls at
         # mkOverride 97, so a plain boot.kernel.sysctl loses -- change this instead
         useRoutingFeatures = "client";
         authKeyFile = config.sops.secrets."tailscale_authkey_${config.networking.hostName}".path;

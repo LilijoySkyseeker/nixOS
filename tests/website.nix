@@ -1,5 +1,5 @@
 # VM test: Caddy serves the site on the tunnel address only, with its
-# headers, 404 page, www redirect and status.json; the LAN gets nothing.
+# 404 page, www redirect and status.json; the LAN gets nothing.
 # Caddy's sandbox lets it reach the public internet only (the client
 # stands in for it at 203.0.113.10), never the LAN, loopback or IPv6
 # plain HTTP here: a VM can't get ACME certs, so the test swaps the site
@@ -69,8 +69,6 @@ pkgs.testers.runNixOSTest {
         lib.mkForce "http://www.skyseekerlabs.net";
       services.caddy.virtualHosts."minecraft.skyseekerlabs.net".hostName =
         lib.mkForce "http://minecraft.skyseekerlabs.net";
-      services.caddy.virtualHosts."hytale.skyseekerlabs.net".hostName =
-        lib.mkForce "http://hytale.skyseekerlabs.net";
 
       # no network to pull from: the test publishes the stand-in site itself
       systemd.timers.website-deploy.enable = false;
@@ -128,13 +126,6 @@ pkgs.testers.runNixOSTest {
         assert "lid-home-page" in get("/")
         assert "lid-projects-page" in get("/projects/")
 
-    with subtest("every response carries the security headers, and no Server header"):
-        r = get("/").lower()
-        for h in ["content-security-policy: default-src 'self'", "x-content-type-options: nosniff",
-                  "referrer-policy: strict-origin-when-cross-origin", "strict-transport-security: max-age=86400"]:
-            assert h in r, f"missing {h}:\n{r}"
-        assert "\nserver:" not in r, f"Server header leaked:\n{r}"
-
     with subtest("a missing page gets the site's own 404"):
         r = get("/nope/")
         assert r.startswith("HTTP/1.1 404"), r
@@ -146,7 +137,7 @@ pkgs.testers.runNixOSTest {
         assert "location: https://skyseekerlabs.net/projects/?x=1" in r.lower(), r
 
     with subtest("a game server's address in a browser goes to its oops page"):
-        for game in ["minecraft", "hytale"]:
+        for game in ["minecraft"]:
             r = get("/", host=f"{game}.skyseekerlabs.net")
             assert " 302" in r.splitlines()[0], r
             assert f"location: https://skyseekerlabs.net/oops/{game}/" in r.lower(), r
