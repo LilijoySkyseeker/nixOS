@@ -42,7 +42,6 @@
           pkgs-stable = config.flake.pkgsStable;
         };
         profilePcModule = config.flake.modules.nixos."profile-pc";
-        kdeModule = config.flake.modules.nixos.kde;
       };
 
       docker-publish-guard = import ../../tests/docker-publish-guard.nix {

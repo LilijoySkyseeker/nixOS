@@ -20,7 +20,6 @@ in
       modules = [
         ../../hosts/thinkpad/configuration.nix
         nixosModules."profile-pc"
-        nixosModules.kde
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
@@ -46,7 +45,6 @@ in
       modules = [
         ../../hosts/torrent/configuration.nix
         nixosModules."profile-pc"
-        nixosModules.kde
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         # torrent only, not profile-pc
@@ -92,7 +90,6 @@ in
       };
       modules = [
         ../../hosts/homelab/configuration.nix
-        nixosModules."profile-default"
         nixosModules."profile-server"
         nixosModules."pull-deploy"
         nixosModules."health-alerts"
@@ -127,7 +124,6 @@ in
       };
       modules = [
         ../../hosts/vps/configuration.nix
-        nixosModules."profile-default"
         nixosModules."profile-server"
         nixosModules."health-alerts"
       ];
