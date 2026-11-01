@@ -1,14 +1,12 @@
 { vars, config, ... }:
 {
-  # disko
   disko.devices =
     let
       rootSsd = vars.mkZfsRootSsd;
-      zfsProps = vars.zfsProps config; # see vars.nix
+      zfsProps = vars.zfsProps config;
     in
     {
       disk = {
-        # Root pool disks
         nvme-a = rootSsd 1 "nvme-Samsung_SSD_990_PRO_4TB_S7KGNU0XA02842B" "16G";
       };
       zpool = {
@@ -21,7 +19,7 @@
             "local" = {
               type = "zfs_fs";
               options = {
-                mountpoint = "none"; # top dir is options.mountpoint
+                mountpoint = "none";
                 "com.sun:auto-snapshot" = "false";
               }
               // zfsProps "zroot" "local";

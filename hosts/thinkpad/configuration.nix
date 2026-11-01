@@ -1,6 +1,4 @@
 {
-  pkgs-unstable,
-  pkgs-stable,
   config,
   vars,
   ...
@@ -21,26 +19,13 @@
     requireACPower = true;
   };
 
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-    ])
-    ++ (with pkgs-stable; [
-    ]);
-
-  # state change settings/buttons (lid, idle, sleep key: myHibernateOnly below)
-  services.logind.settings.Login.HandlePowerKey = "poweroff";
-
-  # update microcode
   hardware.cpu.intel.updateMicrocode = true;
 
-  # keyboard
   services.keyd = {
     enable = true;
     keyboards.default.ids = [ "0001:0001" ];
     keyboards.default.settings = {
       main = {
-        # mods
         capslock = "overload(control, esc)";
         esc = "overload(capslock, esc)";
         leftalt = "layer(navigation)";
@@ -57,7 +42,6 @@
     };
   };
 
-  # Define your hostname.
   networking.hostName = "thinkpad";
 
   # Fix Clickpad Bug and Intel CPU freq stuck fix
@@ -66,7 +50,6 @@
     "intel_pstate=active"
   ];
 
-  # zfs support
   boot.supportedFilesystems = [ "zfs" ];
   services.zfs = {
     autoScrub.enable = true;
@@ -75,17 +58,11 @@
   networking.hostId = "5f763495";
   fileSystems."/nix".neededForBoot = true;
 
-  # encrypted root (disko.nix): unlocked by TPM2 + PIN, either YubiKey
-  # (FIDO2) or the recovery passphrase; enrollment is in README.md
   myEncryptedRoot.enable = true;
 
-  # Secure Boot, keys on zroot/local/secureboot; boot menu also lists Windows
-  # (its boot files copied onto this ESP, see README.md)
   mySecureBoot.enable = true;
   boot.loader.timeout = 2;
 
-  # hibernate in place of sleep (lid, 60 min idle, critical battery), to the
-  # swap LV in disko.nix
   myHibernate = {
     enable = true;
     resumeDevice = "/dev/mapper/vg-swap";
@@ -96,10 +73,8 @@
     lockOnResume = false;
   };
 
-  # tells the desktop when a pull-deploy is waiting for a restart
   myRebootNotice.enable = true;
 
-  # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
 
   # zfs snapshots served to homelab's zrepl puller (passive side, as torrent).
@@ -141,7 +116,6 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # emergency space reclaim: `systemctl start zfs-emergency-prune.service`
   myZfsSpaceGuard = {
     enable = true;
     datasets = [
@@ -168,9 +142,6 @@
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkSmart = false;
-    # after weeks off, the Persistent timer fires one catch-up batch;
-    # cooldownHours keeps it to one
-    #
     # a pull-deploy that stops running. 720h, not torrent's 504: a laptop
     # goes dark for weeks and requireACPower legitimately skips battery
     # Thursdays

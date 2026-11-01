@@ -21,7 +21,6 @@ _: {
           installed=$(readlink -f /nix/var/nix/profiles/system)
           seen="''${XDG_STATE_HOME:-$HOME/.local/state}/reboot-notice"
 
-          # nothing waiting: the installed system is running, kernel included
           if [[ $installed == "$current" ]]; then
             same=1
             for part in kernel initrd kernel-modules; do
@@ -29,7 +28,6 @@ _: {
             done
             [[ $same == 1 ]] && exit 0
           fi
-          # already shown for this update
           [[ -f $seen && $(cat "$seen") == "$installed" ]] && exit 0
 
           notify-send --app-name="System update" --icon=system-reboot \

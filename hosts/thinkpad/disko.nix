@@ -1,11 +1,9 @@
 { vars, config, ... }:
 {
-  # disko
   disko.devices =
     let
-      zfsProps = vars.zfsProps config; # see vars.nix
+      zfsProps = vars.zfsProps config;
     in
-    # ESP, then LUKS2 holding LVM: a RAM-sized swap LV (hibernation) and zroot
     vars.mkEncryptedRootSsd "nvme-Samsung_SSD_970_EVO_Plus_500GB_S58SNS0R706072M" "64G"
     // {
       zpool = {
@@ -18,7 +16,7 @@
             "local" = {
               type = "zfs_fs";
               options = {
-                mountpoint = "none"; # top dir is options.mountpoint
+                mountpoint = "none";
               }
               // zfsProps "zroot" "local";
             };
