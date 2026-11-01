@@ -227,6 +227,14 @@ pkgs.testers.runNixOSTest {
         # notes live in AGENTS.local.md, not in Claude's own memory
         mem = machine.succeed("jq -c .autoMemoryEnabled /home/agent/.claude/settings.json").strip()
         assert mem == "false", f"autoMemoryEnabled={mem!r}"
+        # the rm check's prompt, which bypass mode keeps, is answered with allow
+        # in bypass mode only
+        hook = machine.succeed("jq -r '.hooks.PermissionRequest[0] | .matcher + \" \" + .hooks[0].type + \" \" + .hooks[0].command' /home/agent/.claude/settings.json").split()
+        assert hook[:2] == ["Bash|Monitor", "command"], f"PermissionRequest hook: {hook!r}"
+        out = machine.succeed(f"echo '{{\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"Bash\"}}' | {hook[2]} | jq -c .").strip()
+        assert out == '{"hookSpecificOutput":{"decision":{"behavior":"allow"},"hookEventName":"PermissionRequest"}}', f"bypass: {out!r}"
+        out = machine.succeed(f"echo '{{\"permission_mode\":\"default\",\"tool_name\":\"Bash\"}}' | {hook[2]}").strip()
+        assert out == "", f"default mode got an answer: {out!r}"
         # a CLI-owned key survives the merge
         # as_agent() single-quotes its command, so write the CLI key as root
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")

@@ -270,6 +270,21 @@
           };
           script =
             let
+              # answers a permission prompt with allow, in bypass mode only;
+              # other modes keep their prompts
+              allowPermission = pkgs.writeShellScript "claude-allow-in-bypass" ''
+                ${lib.getExe pkgs.jq} -e '.permission_mode == "bypassPermissions"' > /dev/null || exit 0
+                echo ${
+                  lib.escapeShellArg (
+                    builtins.toJSON {
+                      hookSpecificOutput = {
+                        hookEventName = "PermissionRequest";
+                        decision.behavior = "allow";
+                      };
+                    }
+                  )
+                }
+              '';
               managed = pkgs.writeText "agent-claude-settings.json" (
                 builtins.toJSON {
                   disableClaudeAiConnectors = true;
@@ -288,6 +303,19 @@
                   ];
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
+                  # bypass mode still asks before an rm it can't rule out as
+                  # dangerous; in Paseo that prompt stalls unattended work
+                  hooks.PermissionRequest = [
+                    {
+                      matcher = "Bash|Monitor";
+                      hooks = [
+                        {
+                          type = "command";
+                          command = "${allowPermission}";
+                        }
+                      ];
+                    }
+                  ];
                   # notes go in AGENTS.local.md, where every agent reads them
                   autoMemoryEnabled = false;
                 }
