@@ -54,10 +54,18 @@ in
         # SECURITY-LOAD-BEARING: the recursive multimedia grant on /storage
         # re-applies every boot and would leak into the 0700 mediaLocation; the
         # `A` below re-locks it each time
+        #
+        # torrent/thinkpad (multimedia gid via NFS) get read-only library/:
+        # immich tracks paths/checksums in its db, so external writes desync it
         tmpfiles.rules = lib.mkAfter [
           "a+ /storage - - - - user:immich:--x"
-          # rwX: no execute bit on regular files
+          # rwX: no execute bit on regular files (the library grant below is X-conditional)
           "A ${config.services.immich.mediaLocation} - - - - user:immich:rwX"
+          # r-X: traverse and list into library/; sibling dirs stay unreadable
+          "a+ ${config.services.immich.mediaLocation} - - - - group:multimedia:r-X"
+          # second walk of library/ is deliberate: scoping the re-lock to the
+          # other subdirs by name would miss any new one immich adds
+          "A+ ${config.services.immich.mediaLocation}/library - - - - group:multimedia:r-X"
         ];
       };
 

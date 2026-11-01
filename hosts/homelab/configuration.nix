@@ -58,6 +58,15 @@
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
+  # networking
+  networking.networkmanager = {
+    enable = true;
+    insertNameservers = [
+      "8.8.8.8"
+      "1.1.1.1"
+    ];
+  };
+
   # directory permissions
   # don't lock down /srv itself (0770 root breaks traversal for its non-root
   # services); its secrets are protected at the leaves, in each service module
