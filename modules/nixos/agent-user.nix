@@ -185,25 +185,6 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # an unattended run in the agent sandbox; the prompt is a file in
-      # ./agent-jobs, so a job changes only through a reviewed PR
-      agentJob = description: prompt: {
-        inherit description;
-        inherit (agentUnitDeps) wants bindsTo after;
-        environment = claudeEnvironment;
-        serviceConfig =
-          builtins.removeAttrs agentSandbox [
-            "Restart"
-            "RestartSec"
-          ]
-          // {
-            Type = "oneshot";
-            StandardInput = "file:${prompt}";
-            # one job at a time: they share the vault reports and the nixOS
-            # checkout, and two timers can fire together after downtime
-            ExecStart = "${pkgs.util-linux}/bin/flock /home/agent/.agent-jobs.lock ${pkgs.claude-code}/bin/claude -p --permission-mode bypassPermissions";
-          };
-      };
       # agent-egress rules per family; IPv6 rejects all but loopback
       egress = [
         {
@@ -289,6 +270,21 @@
           };
           script =
             let
+              # answers a permission prompt with allow, in bypass mode only;
+              # other modes keep their prompts
+              allowPermission = pkgs.writeShellScript "claude-allow-in-bypass" ''
+                ${lib.getExe pkgs.jq} -e '.permission_mode == "bypassPermissions"' > /dev/null || exit 0
+                echo ${
+                  lib.escapeShellArg (
+                    builtins.toJSON {
+                      hookSpecificOutput = {
+                        hookEventName = "PermissionRequest";
+                        decision.behavior = "allow";
+                      };
+                    }
+                  )
+                }
+              '';
               managed = pkgs.writeText "agent-claude-settings.json" (
                 builtins.toJSON {
                   disableClaudeAiConnectors = true;
@@ -307,6 +303,19 @@
                   ];
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
+                  # bypass mode still asks before an rm it can't rule out as
+                  # dangerous; in Paseo that prompt stalls unattended work
+                  hooks.PermissionRequest = [
+                    {
+                      matcher = "Bash|Monitor";
+                      hooks = [
+                        {
+                          type = "command";
+                          command = "${allowPermission}";
+                        }
+                      ];
+                    }
+                  ];
                   # notes go in AGENTS.local.md, where every agent reads them
                   autoMemoryEnabled = false;
                 }
@@ -339,6 +348,10 @@
                   # the Unix user and its units are the boundary
                   sandbox_mode = "danger-full-access";
                   approval_policy = "never";
+                  # Codex is the cross-family reviewer: Sol for the Plus quota,
+                  # high because correctness comes first
+                  model = "gpt-6.1-sol";
+                  model_reasoning_effort = "high";
                   # notes go in AGENTS.local.md, where every agent reads them
                   features.memories = false;
                 }
@@ -361,47 +374,6 @@
             '';
         };
 
-        # scheduled jobs: Claude, by the owner's choice (more Claude usage),
-        # one after another; each can also be started by hand
-        services.agent-flake-update = agentJob "Weekly flake update and stable release move, as a PR" ./agent-jobs/flake-update.md;
-        services.agent-security-watch = agentJob "Daily security research for the fleet, as a report and PRs" ./agent-jobs/security-watch.md;
-        services.agent-maintenance =
-          agentJob "Weekly maintenance: friction, to-dos, workarounds, forgotten work" ./agent-jobs/maintenance.md
-          // {
-            # last: sees the flake update's result and friction, and writes
-            # the fleet status page
-            after = agentUnitDeps.after ++ [ "agent-flake-update.service" ];
-          };
-        targets.agent-weekly = {
-          description = "The agents' weekly scheduled jobs";
-          # a target stays active otherwise, and the timer's next firing
-          # would then start nothing
-          unitConfig.StopWhenUnneeded = true;
-          wants = [
-            "agent-flake-update.service"
-            "agent-maintenance.service"
-          ];
-        };
-        # Monday just past midnight: the owner's weekly Claude usage resets
-        # Sunday at 17:00, so the jobs spend the start of the week's limit;
-        # Persistent catches up on a run missed while torrent was off
-        timers.agent-weekly = {
-          wantedBy = [ "timers.target" ];
-          timerConfig = {
-            OnCalendar = "Mon 00:15";
-            Persistent = true;
-            Unit = "agent-weekly.target";
-          };
-        };
-        # security incidents move in hours (#140), so this one runs daily
-        timers.agent-security-watch = {
-          wantedBy = [ "timers.target" ];
-          timerConfig = {
-            OnCalendar = "06:00";
-            Persistent = true;
-          };
-        };
-
         # one cap for every agent's sessions: a runaway agent can't take the
         # desktop down with it
         slices.agent.sliceConfig = {
@@ -414,6 +386,10 @@
           # files group-writable whoever creates them, whatever their umask
           "d /home/agent/work 2770 agent agent -"
           "a+ /home/agent/work - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::---"
+          # cold reads: Codex with no instructions, skills or config, only its own
+          # login (see other-agents); it refuses a CODEX_HOME that doesn't exist
+          "d /home/agent/.cold 0700 agent agent -"
+          "d /home/agent/.cold/.codex 0700 agent agent -"
           # orientation for the agent; a store symlink, so edits go through the repo
           "d /home/agent/.claude 0700 agent agent -"
           "d /home/agent/.config 0700 agent agent -"

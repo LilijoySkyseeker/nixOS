@@ -3,8 +3,7 @@
 #
 # The fleet's restore tooling, doubling as its fire drill -- one artifact
 # for both, so running the drill periodically exercises exactly what a
-# real recovery would run (plan:
-# 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md).
+# real recovery would run.
 # Executes everything over `ssh root@homelab` (override with
 # RESTORE_DRILL_HOST), where zbackup and the restic wrapper live.
 #
@@ -42,7 +41,6 @@ success_marker=/var/lib/restore-drill/last-drill-success
 
 # mux socket in XDG_RUNTIME_DIR (0700), never /tmp: a predictable path in
 # a world-writable dir invites another uid to squat a fake mux master
-# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F5
 rh() {
   ssh -o BatchMode=yes -o ConnectTimeout=8 \
     -o ControlMaster=auto -o ControlPath="${XDG_RUNTIME_DIR:-$HOME/.ssh}/restore-drill-%C" \
@@ -52,7 +50,6 @@ rh() {
 # every data value spliced into a remote command string goes through this:
 # restic archive paths are arbitrary bytes named by whatever wrote the
 # backed-up file, and the remote shell is root's
-# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F2
 q() { printf '%q' "$1"; }
 
 fail=0
@@ -142,7 +139,6 @@ do_file() {
   # explicit mountpoint/canmount/readonly: a bare clone inherits
   # mountpoint=none from zbackup and is unusable; forcing all three
   # also never trusts properties that arrived in a send stream
-  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G2
   rh "zfs clone -o readonly=on -o canmount=on -o mountpoint='$clone_mnt' $(q "$snap") '$clone_ds'" \
     || { mark file FAIL "clone failed"; return; }
   local qdest qglob
@@ -219,7 +215,6 @@ do_dataset() {
   # -HAX adds perms/owners/times/hardlinks/ACLs/xattrs -- the real-world
   # metadata this drill exists to check -- and it compares the sockets
   # and fifos a live-system snapshot carries, which diff cannot
-  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G4
   diffs=$(rh "rsync -naHAXx --checksum --delete --itemize-changes '$scratch_mnt/ds-src/' '$scratch_mnt/ds-recv/'") \
     || { mark dataset FAIL "verify rsync failed"; return; }
   t1=$(date +%s)
@@ -243,7 +238,6 @@ do_stream() {
   echo "==> [stream] $snap over ssh to a byte counter (proves the cross-host pull path short of zfs recv)"
   expect=$(rh "zfs send -c -nvP $(q "$snap") 2>&1" | awk '/^size/ {print $2}')
   # remote-derived value headed for bash arithmetic: integers only
-  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F4
   [[ $expect =~ ^[0-9]+$ ]] || expect=''
   t0=$(date +%s)
   # the drill deliberately pulls the whole stream across the wire -- that
@@ -261,7 +255,6 @@ do_stream() {
 
 # --- rollback: drill-only lifecycle proof (a real rollback is one bare
 # deliberate `zfs rollback -r` on the affected host) ------------------------
-# plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#D1
 do_rollback() {
   scratch_setup ''
   echo "==> [rollback] snapshot/mutate/rollback lifecycle on a scratch dataset"
@@ -316,7 +309,6 @@ do_restic() {
     | jq -c --unbuffered 'select(.type==\"file\" and .size > 0 and .size < 1048576)' | head -n1")
   # the SIGPIPE'd ls above dies holding its repo lock; unlock removes
   # only stale locks, so this is cleanup, not force
-  # plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G8
   rh "$restic_wrapper unlock >/dev/null 2>&1" || true
   [ -n "$pick" ] || { mark restic FAIL "no small file found to restore"; return; }
   include=$(jq -r .path <<<"$pick")

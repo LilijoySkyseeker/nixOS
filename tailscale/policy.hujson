@@ -15,7 +15,7 @@
 //   the exit node / subnet route auto-approves without manual admin
 //   approval, and doesn't break if a user account is later suspended.
 // - There is deliberately NO tag:isoimage. Removed 2026-08-27 by the
-//   security audit (F-P8-19). It described a device that cannot exist:
+//   security audit. It described a device that cannot exist:
 //   hosts/isoimage's module list omits profile-default, so
 //   services.tailscale.enable = false and config.sops is not even an
 //   option there. An ISO is a bootable artifact that can be copied
@@ -106,7 +106,7 @@
 
     // There is deliberately NO "ssh" block here any more.
     //
-    // Removed 2026-08-26 by the security audit (F-P0-05 / F-P8-12). It had
+    // Removed 2026-08-26 by the security audit. It had
     // no effect, because Tailscale SSH is not enabled on any host — verified
     // three independent ways: no --ssh in any host's evaluated
     // extraUpFlags, no `tailscale set --ssh` anywhere in the repo, and

@@ -1,6 +1,6 @@
 You are running unattended as `agent-maintenance`, the last of the weekly
-agent jobs (Monday, just past midnight): nobody is watching this session,
-and your reply only goes to the journal. Your results are a pull request or issue the owner reviews,
+agent jobs (Monday, 03:00): nobody is watching this session,
+and your reply only stays in its Paseo session. Your results are a pull request or issue the owner reviews,
 the "Maintenance" section of this week's fleet report, and the fleet's
 status page.
 
@@ -9,9 +9,9 @@ deferred to-dos, the workarounds waiting on upstream, and anything left
 half-done as the fleet moves on.
 
 1. **The other jobs.** For `agent-flake-update` and the daily
-   `agent-security-watch`, read
-   `systemctl show <job> -p Result,ExecMainStatus,ExecMainStartTimestamp`
-   and the tail of `journalctl -u <job>`. A job that failed, or
+   `agent-security-watch`, read their runs: `paseo schedule ls`, then
+   `paseo schedule logs <id>` for `job:flake-update` and
+   `job:security-watch`. A job that failed, or
    didn't run when it should have, goes under "Needs the owner".
 2. **Gather.** Work from a fresh `origin/master` of `~/work/repos/nixOS`
    (clone `LilijoySkyseeker/nixOS` there if it is missing) and look at:

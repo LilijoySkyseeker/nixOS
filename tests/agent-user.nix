@@ -8,45 +8,38 @@ pkgs.testers.runNixOSTest {
   node.pkgsReadOnly = false;
   defaults.nixpkgs.config.allowUnfree = true;
 
-  nodes.machine =
-    { lib, ... }:
-    {
-      imports = [ agentUserModule ];
+  nodes.machine = {
+    imports = [ agentUserModule ];
 
-      # stand-in for lilijoy: the home the agent must never see into
-      users.users.lilijoy = {
-        isNormalUser = true;
-        homeMode = "700";
-      };
-      # mirror profile-pc: only wheel may talk to the nix daemon
-      nix.settings.allowed-users = [ "@wheel" ];
-      # fire the weekly jobs' timer often, to see it start them repeatedly
-      systemd.timers.agent-weekly.timerConfig = {
-        OnCalendar = lib.mkForce "*:*:0/20";
-        AccuracySec = "1s";
-      };
-      # mirror torrent: iptables firewall backend
-      networking.nftables.enable = false;
-      environment.systemPackages = [
-        pkgs.curl
-        pkgs.git
-        pkgs.jq
-      ];
-      services.openssh.enable = true;
-      # a fixed-output build: runs as nixbld with host networking
-      environment.etc."fod.nix".text = ''
-        { url }:
-        derivation {
-          name = "egress-probe";
-          system = "x86_64-linux";
-          builder = builtins.storePath "${pkgs.bash}/bin/bash";
-          args = [ "-c" "''${builtins.storePath "${pkgs.curl}"}/bin/curl -sS --max-time 5 ''${url} >&2; exit 1" ];
-          outputHashMode = "flat";
-          outputHashAlgo = "sha256";
-          outputHash = "0000000000000000000000000000000000000000000000000000";
-        }
-      '';
+    # stand-in for lilijoy: the home the agent must never see into
+    users.users.lilijoy = {
+      isNormalUser = true;
+      homeMode = "700";
     };
+    # mirror profile-pc: only wheel may talk to the nix daemon
+    nix.settings.allowed-users = [ "@wheel" ];
+    # mirror torrent: iptables firewall backend
+    networking.nftables.enable = false;
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.git
+      pkgs.jq
+    ];
+    services.openssh.enable = true;
+    # a fixed-output build: runs as nixbld with host networking
+    environment.etc."fod.nix".text = ''
+      { url }:
+      derivation {
+        name = "egress-probe";
+        system = "x86_64-linux";
+        builder = builtins.storePath "${pkgs.bash}/bin/bash";
+        args = [ "-c" "''${builtins.storePath "${pkgs.curl}"}/bin/curl -sS --max-time 5 ''${url} >&2; exit 1" ];
+        outputHashMode = "flat";
+        outputHashAlgo = "sha256";
+        outputHash = "0000000000000000000000000000000000000000000000000000";
+      }
+    '';
+  };
 
   # a LAN host the agent must not reach (the test net is 192.168.1.0/24)
   nodes.lan =
@@ -173,53 +166,9 @@ pkgs.testers.runNixOSTest {
         rc, _ = machine.execute(as_agent("curl --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN after a firewall reload")
 
-        # the scheduled jobs: same sandbox, one shared cap
-        for unit in ["agent-flake-update", "agent-security-watch", "agent-maintenance"]:
-            def sprop(p):
-                return machine.succeed(f"systemctl show {unit} -p {p} --value").strip()
-            for p, want in [("NoNewPrivileges", "yes"), ("PrivateTmp", "yes"), ("PrivateDevices", "yes"),
-                            ("ProtectSystem", "strict"), ("User", "agent"), ("Slice", "agent.slice")]:
-                check(sprop(p) == want, f"{unit}: {p}={sprop(p)!r}")
-            check("/home/agent" in sprop("ReadWritePaths"), f"{unit}: ReadWritePaths={sprop('ReadWritePaths')!r}")
-            inacc = sprop("InaccessiblePaths")
-            for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
-                check(sock in inacc, f"{unit}: {sock} not inaccessible: {inacc!r}")
-            check("firewall.service" in sprop("BindsTo"), f"{unit}: BindsTo={sprop('BindsTo')!r}")
-            check("firewall.service" in sprop("After"), f"{unit}: not ordered after firewall.service")
-            check("flock /home/agent/.agent-jobs.lock" in sprop("ExecStart"), f"{unit}: not under the shared job lock")
-        for timer in ["agent-weekly.timer", "agent-security-watch.timer"]:
-            state = machine.succeed(f"systemctl is-active {timer} || true").strip()
-            check(state == "active", f"{timer}: {state!r}")
-        # each activation of the weekly target reaches both jobs, not
-        # just the first (they fail here: no Claude login in the VM)
-        jobs = ["agent-flake-update", "agent-maintenance"]
-        def ran():
-            return {j: machine.succeed(f"systemctl show {j} -p ConditionTimestampMonotonic --value").strip() for j in jobs}
-        # the test node fires the timer every 20s (see nodes.machine)
-        seen = []
-        for _ in range(2):
-            before = ran()
-            machine.wait_until_succeeds(
-                "systemctl show agent-maintenance -p ConditionTimestampMonotonic --value | grep -vx '%s'"
-                % before["agent-maintenance"], timeout=90)
-            machine.wait_until_succeeds("! systemctl list-jobs --no-legend | grep -q agent-")
-            seen.append(ran())
-        for j in jobs:
-            check(seen[0][j] not in ("", "0"), f"{j} never ran")
-            check(seen[1][j] != seen[0][j], f"{j} didn't run on the second activation")
-            # no login: the job fails (and so pages), it doesn't skip
-            result = machine.succeed(f"systemctl show {j} -p Result --value").strip()
-            check(result == "exit-code", f"{j}: Result={result!r}, expected a failure")
-        # GPU and KVM: bound in and allowed; tun and display nodes refused
-        for unit in ["agent-flake-update", "agent-security-watch", "agent-maintenance"]:
-            allow = machine.succeed(f"systemctl show {unit} -p DeviceAllow --value")
-            for dev in ["/dev/kvm", "/dev/kfd", "/dev/dri/by-path/"]:
-                check(dev in allow, f"{unit}: {dev} not allowed: {allow!r}")
-            binds = machine.succeed(f"systemctl show {unit} -p BindPaths --value")
-            check("/dev/dri" in binds and "/dev/kvm" in binds, f"{unit}: BindPaths={binds!r}")
-            check("tun" not in allow + binds, f"{unit}: tun exposed")
-        # the same device rules on a probe process, since the real units
-        # can't start in the VM (no logins)
+        # GPU and KVM bound in and allowed, tun and display nodes refused: the
+        # agent sandbox's device rules on a probe process (the unit itself,
+        # paseo, is checked in tests/local-ai.nix)
         probe = ("systemd-run --wait --pipe --quiet -p User=agent -p PrivateDevices=yes "
                  "-p BindPaths=-/dev/kvm -p BindPaths=-/dev/dri -p 'DeviceAllow=/dev/kvm rw' "
                  "-p SupplementaryGroups=kvm -- sh -c ")
@@ -278,6 +227,14 @@ pkgs.testers.runNixOSTest {
         # notes live in AGENTS.local.md, not in Claude's own memory
         mem = machine.succeed("jq -c .autoMemoryEnabled /home/agent/.claude/settings.json").strip()
         assert mem == "false", f"autoMemoryEnabled={mem!r}"
+        # the rm check's prompt, which bypass mode keeps, is answered with allow
+        # in bypass mode only
+        hook = machine.succeed("jq -r '.hooks.PermissionRequest[0] | .matcher + \" \" + .hooks[0].type + \" \" + .hooks[0].command' /home/agent/.claude/settings.json").split()
+        assert hook[:2] == ["Bash|Monitor", "command"], f"PermissionRequest hook: {hook!r}"
+        out = machine.succeed(f"echo '{{\"permission_mode\":\"bypassPermissions\",\"tool_name\":\"Bash\"}}' | {hook[2]} | jq -c .").strip()
+        assert out == '{"hookSpecificOutput":{"decision":{"behavior":"allow"},"hookEventName":"PermissionRequest"}}', f"bypass: {out!r}"
+        out = machine.succeed(f"echo '{{\"permission_mode\":\"default\",\"tool_name\":\"Bash\"}}' | {hook[2]}").strip()
+        assert out == "", f"default mode got an answer: {out!r}"
         # a CLI-owned key survives the merge
         # as_agent() single-quotes its command, so write the CLI key as root
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")

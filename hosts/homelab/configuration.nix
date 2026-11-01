@@ -93,7 +93,6 @@
   services.xserver.videoDrivers = [ "nvidia" ];
   hardware.nvidia = {
     # nvidiaPackages.stable (production) dropped Pascal support upstream
-    # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
     package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
     # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
     open = false;
@@ -383,7 +382,7 @@
       # under the 5m interval: a hung run would block every later tick
       TimeoutStartSec = "2min";
       StateDirectory = "heartbeat";
-      # docs/hardening.md sandboxing baseline; root only to read the key
+      # root only to read the key
       NoNewPrivileges = true;
       ProtectSystem = "strict";
       ProtectHome = true;
@@ -529,7 +528,6 @@
 
   # myDatasets: per-service ZFS datasets, tiered.
   # a new entry needs a manual zfs create on the live host before deploy
-  # (docs/procedures/new-service.md)
   myDatasets = {
     # jellyfin cacheDir + /var/lib/docker reclassified persist
     # managePersistence = false: entries already exist elsewhere
