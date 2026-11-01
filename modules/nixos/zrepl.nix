@@ -126,7 +126,7 @@ _: {
       # placeholder.encryption is required: zrepl's "unspecified" default
       # fails every receive that creates a placeholder, and configcheck
       # doesn't catch it
-      # security (F-P6-03): the source controls the send stream, so pin props
+      # security: the source controls the send stream, so pin props
       # a hostile stream could set (e.g. mountpoint=/etc, canmount=on, shares);
       # -o and -x are exclusive per property, so each is in one list only
       mkRecv = {
@@ -935,7 +935,7 @@ _: {
           after = [ "local-fs.target" ];
         };
 
-        # security (F-P6-04): the puller destroys whatever snapshots it names,
+        # security: the puller destroys whatever snapshots it names,
         # ignoring local keep rules; a non-zrepl hold tag can't be released
         # over RPC; only ever @blank, holding zrepl_ snapshots pins the pool
         systemd.services.zrepl-protect-blank = lib.mkIf (cfg.serve.enable && cfg.serve.datasets != [ ]) {

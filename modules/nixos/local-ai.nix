@@ -4,7 +4,8 @@
 # - /srv/models: the model store (zroot/local/models, replicated to homelab)
 # - gamemode hook: a game unloads every model and blocks loads until it exits
 # - paseo: one remote way into the agent sandbox for Claude, Codex or a local
-#   model, tailnet-only through tailscale serve
+#   model, tailnet-only through tailscale serve; the agents' subagents and
+#   scheduled jobs run in it too, so the owner sees them there
 _: {
   flake.modules.nixos."local-ai" =
     {
@@ -52,6 +53,8 @@ _: {
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
             # explicit: a config that omits it keeps the legacy relay-on behavior
             relay.enabled = false;
+            # agents delegate with the `paseo` cli, one way for every harness
+            mcp.injectIntoAgents = false;
           };
           features.webUi.enabled = false;
           agents.providers = {
@@ -98,6 +101,80 @@ _: {
       agentModelAccess = {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
+      };
+      # the agents' scheduled jobs; a prompt changes only through a reviewed PR.
+      # Mondays just past midnight: the owner's weekly Claude usage resets
+      # Sunday at 17:00. Maintenance reads the flake update's result.
+      agentJobs = [
+        {
+          name = "job:flake-update";
+          cron = "15 0 * * 1";
+          prompt = ./agent-jobs/flake-update.md;
+        }
+        {
+          name = "job:maintenance";
+          cron = "0 3 * * 1";
+          prompt = ./agent-jobs/maintenance.md;
+        }
+        {
+          # security incidents move in hours (#140)
+          name = "job:security-watch";
+          cron = "0 6 * * *";
+          prompt = ./agent-jobs/security-watch.md;
+        }
+      ];
+      agentJobsFile = pkgs.writeText "agent-jobs.json" (
+        builtins.toJSON (map (j: j // { prompt = builtins.readFile j.prompt; }) agentJobs)
+      );
+      # makes the daemon's job:* schedules match agentJobs. It updates only
+      # what differs, since a new cadence resets the next run and would drop
+      # one missed while torrent was off. The owner's pause and archive switch
+      # from the app stay; an edited prompt, time, provider or folder goes back
+      agentSchedulesSync = pkgs.writeShellApplication {
+        name = "agent-schedules-sync";
+        runtimeInputs = [
+          paseo
+          pkgs.jq
+        ];
+        text = ''
+          want=${agentJobsFile}
+          tz=${config.time.timeZone}
+          have=""
+          for _ in $(seq 60); do
+            have=$(paseo schedule ls --json 2>/dev/null) && break
+            sleep 2
+          done
+          [ -n "$have" ] || { echo "paseo daemon not reachable" >&2; exit 1; }
+
+          # job:* schedules no longer declared, and duplicates of declared ones
+          jq -r --slurpfile want "$want" '
+            [.[] | select((.name // "") | startswith("job:"))] | group_by(.name)[]
+            | .[0].name as $n
+            | if any($want[0][]; .name == $n) then .[1:][] else .[] end
+            | .id' <<<"$have" | while read -r id; do
+            paseo schedule delete "$id" >/dev/null
+          done
+
+          jq -c '.[]' "$want" | while read -r job; do
+            name=$(jq -r .name <<<"$job")
+            cron=$(jq -r .cron <<<"$job")
+            prompt=$(jq -r .prompt <<<"$job")
+            id=$(jq -r --arg n "$name" 'map(select(.name == $n))[0].id // empty' <<<"$have")
+            if [ -z "$id" ]; then
+              paseo schedule create --name "$name" --cron "$cron" --timezone "$tz" \
+                --provider claude --cwd /home/agent/work "$prompt" >/dev/null
+              continue
+            fi
+            cur=$(paseo schedule inspect "$id" --json)
+            args=()
+            [ "$(jq -r '.cadence.expression + " " + .cadence.timezone' <<<"$cur")" = "$cron $tz" ] \
+              || args+=(--cron "$cron" --timezone "$tz")
+            [ "$(jq -r .prompt <<<"$cur")" = "$prompt" ] || args+=(--prompt "$prompt")
+            [ "$(jq -r '.target.config | .provider + " " + .cwd' <<<"$cur")" = "claude /home/agent/work" ] \
+              || args+=(--provider claude --cwd /home/agent/work)
+            [ ''${#args[@]} -eq 0 ] || paseo schedule update "$id" "''${args[@]}" >/dev/null
+          done
+        '';
       };
     in
     {
@@ -193,11 +270,33 @@ _: {
         ];
       };
 
+      # agents start subagents with `paseo run`
+      users.users.agent.packages = [ paseo ];
+
+      # the scheduled jobs live in the daemon, so each run shows in the app;
+      # this unit declares them there again whenever they change
+      systemd.services.agent-schedules = {
+        description = "Declare the agents' scheduled jobs as Paseo schedules";
+        wantedBy = [ "multi-user.target" ];
+        wants = [ "paseo.service" ];
+        after = [ "paseo.service" ];
+        environment.HOME = "/home/agent";
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "agent";
+          Group = "agent";
+          ExecStart = lib.getExe agentSchedulesSync;
+        };
+      };
+
       # sends "continue" to an agent stopped on a usage limit once its quota is back
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
+        # multi-user.target, so activation starts it while paseo is already running
         wantedBy = [ "multi-user.target" ];
+        after = [ "paseo.service" ];
         serviceConfig = {
           ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
           Restart = "always";

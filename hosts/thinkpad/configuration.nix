@@ -111,7 +111,7 @@
   services.openssh = {
     enable = true;
     openFirewall = false;
-    # docs/hardening.md's SSH baseline; see hosts/torrent/configuration.nix
+    # see hosts/torrent/configuration.nix
     # for why these are `settings`, not `extraConfig`
     allowSFTP = false;
     settings = {

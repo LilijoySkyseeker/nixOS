@@ -12,7 +12,7 @@ in
       ...
     }:
     {
-      # bash: unknown command fetches and runs it from nixpkgs; desktop only (docs/accepted-risks.md AR-4)
+      # bash: unknown command fetches and runs it from nixpkgs; desktop only
       programs.bash.initExtra = ''
         command_not_found_handle() { comma "$@"; }
       '';

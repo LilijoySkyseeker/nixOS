@@ -3,66 +3,15 @@
 A flake-based NixOS/home-manager configuration for four machines
 (`thinkpad`, `torrent`, `homelab`, `vps`), managed from one
 repo. Covers disko partitioning, sops-nix secrets, impermanence,
-home-manager, and a distributed multi-host flake setup. `docs/` has
-the reasoning behind how it's put together.
-
-## Layout
-
-This flake uses the **dendritic pattern**
-([flake-parts](https://flake.parts/) + [import-tree](https://github.com/vic/import-tree)):
-every `.nix` file under `modules/` registers *itself* into
-`flake.modules.nixos.<name>` or `flake.modules.homeManager.<name>`, instead
-of being manually added to some other file's `imports`. There's no single
-"list of every module" to keep in sync — the file tree under `modules/` *is*
-the registry.
-
-```
-flake.nix                          # thin entry point: flake-parts + import-tree ./modules
-modules/flake/                     # vars, pkgs, systems, and hosts.nix (composes all 4 hosts)
-hosts/<name>/configuration.nix     # host-local config only (hardware, hostname, disko)
-modules/profiles/{default,PC,server}.nix # shared config, layered by machine role
-modules/{nixos,home-manager,services}/   # reusable modules, one file = one flake.modules.* entry
-secrets/ + .sops.yaml               # sops-nix encrypted secrets
-```
-
-`modules/flake/hosts.nix` is the file to check for "what does host X
-actually run" — it lists, per host, which `flake.modules.*` entries get
-pulled in. A module existing under `modules/` doesn't mean any host uses
-it; that's still decided by `hosts.nix`. For how it all fits together — see
-[`docs/architecture.md`](./docs/architecture.md).
-[`.claude/rules/nix.md`](./.claude/rules/nix.md) covers conventions
-(formatting, when a custom NixOS options module is worth writing vs. a
-plain config file). [`docs/procedures/`](./docs/procedures/) has
-runbooks for adding a host, adding a service, rotating a secret.
-
-```bash
-nix develop     # or: direnv allow
-nixos-rebuild build --flake .#<host>
-```
-
-The dev shell wires up git hooks and `pull.rebase true` automatically.
-Conventions for changes and PRs are in [`AGENTS.md`](./AGENTS.md).
-
-## Hosts
-
-| Host | Role | Purpose |
-|---|---|---|
-| `thinkpad` | Desktop | Secondary laptop. |
-| `torrent` | Desktop | Primary desktop. |
-| `homelab` | Server | Home server: media (Jellyfin), photo/video backup (Immich, tailnet-only), game servers, NFS, DNS automation, backups. |
-| `vps` | Server | Public-facing edge: forwards the game ports to homelab over WireGuard, rate-limited per source IP. |
-
-Known issues and incident history per host live in each host's own
-`hosts/<name>/README.md`.
+home-manager, and a distributed multi-host flake setup.
 
 ## Interesting stuff
 
 - Root on `homelab` is wiped on every boot. Every piece of state that
   survives is explicitly declared, not just whatever happened to be
   lying around.
-- `vps` fronts everything public (just the game ports, rate-limited per
-  source IP) and tunnels back to `homelab` over WireGuard, which is
-  never directly reachable from the internet itself.
+- `vps` fronts everything public and tunnels back to `homelab` over
+  WireGuard, which is never directly reachable from the internet itself.
 - `homelab` builds and pushes `vps`'s closure over the tailnet. The
   VPS never compiles its own config, so a small droplet never has to
   risk OOMing mid-deploy.
