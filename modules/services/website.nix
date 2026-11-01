@@ -130,8 +130,6 @@ in
         group = "website";
       };
       users.groups.website = { };
-      # profile-server allows root only; this adds the deploy user (the lists merge)
-      nix.settings.allowed-users = [ "website" ];
       systemd.services.website-deploy = {
         description = "Build skyseekerlabs.net from main and publish it";
         after = [ "network-online.target" ];
