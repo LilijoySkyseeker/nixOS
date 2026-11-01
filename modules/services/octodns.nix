@@ -76,15 +76,6 @@ _: {
             value = vpsPublicIp;
           }
         ];
-        # no SRV: Hytale clients don't look them up (server manual, "Future
-        # Additions"), so the port stays the default 5520
-        hytale = [
-          {
-            type = "A";
-            ttl = 300;
-            value = vpsPublicIp;
-          }
-        ];
       };
 
       yamlFormat = pkgs-unstable.formats.yaml { };

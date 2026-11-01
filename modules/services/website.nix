@@ -81,7 +81,6 @@ in
           redir https://${domain}{uri} permanent
         '';
         virtualHosts."minecraft.${domain}".extraConfig = gameOops "minecraft";
-        virtualHosts."hytale.${domain}".extraConfig = gameOops "hytale";
       };
       # the bind address only exists once wg0 is up
       systemd.services.caddy = {

@@ -109,7 +109,6 @@ in
         nixosModules.immich
         nixosModules.beets
         nixosModules.minecraft
-        nixosModules.hytale
         nixosModules.octodns
         nixosModules.nfs
         nixosModules.samba

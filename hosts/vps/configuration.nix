@@ -351,11 +351,6 @@ in
         sourcePort = 19132; # minecraft: geyser (bedrock edition)
       }
       {
-        destination = "10.100.0.2:5520";
-        proto = "udp";
-        sourcePort = 5520; # hytale (QUIC)
-      }
-      {
         destination = "10.100.0.2:80";
         proto = "tcp";
         sourcePort = 80; # website: ACME challenges and the https redirect
@@ -388,12 +383,6 @@ in
     iptables -t raw -A vps-ratelimit -p udp --dport 19132 \
       -m hashlimit --hashlimit-above 1000/second --hashlimit-burst 500 \
       --hashlimit-mode srcip --hashlimit-name mc-bedrock-flood -j DROP
-
-    # hytale: cap packet rate per source IP; the retired factorio rule's
-    # figure, not measured
-    iptables -t raw -A vps-ratelimit -p udp --dport 5520 \
-      -m hashlimit --hashlimit-above 2000/second --hashlimit-burst 1000 \
-      --hashlimit-mode srcip --hashlimit-name hytale-flood -j DROP
 
     # website: cap new HTTP(S) connections per source IP
     iptables -t raw -A vps-ratelimit -p tcp -m multiport --dports 80,443 --syn \
