@@ -19,7 +19,9 @@ you expect.
   run in the repo. No instruction files, skills, MCP or memory load.
 - A document: `--tools ""` instead, from an empty folder, with the document
   embedded in the brief.
-- Codex: `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -c project_doc_max_bytes=0 -C <dir> "<brief>" < /dev/null`.
+- Codex: from an empty folder, naming in the brief any paths to read (it
+  can read anywhere, write nowhere; started in a repo, it loads the repo's
+  skills): `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -C "$(mktemp -d)" "<brief>" < /dev/null`.
 
 **Rules.** Treat what comes back as input, not a verdict. Before a costly PR
 (agent-user, firewall, deploys, migrations, deletions), have the other
