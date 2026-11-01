@@ -8,8 +8,7 @@ _: {
     }:
     let
       cfg = config.myBackupRestoreTest;
-      # shared canary path convention from modules/nixos/backup-canary.nix
-      canaryRelPath = config.myBackupCanary.relPath;
+      canaryRelPath = ".backup-canary/canary.txt";
       canaryBaseName = builtins.baseNameOf canaryRelPath;
 
       # shared by zbackup.targets and restic.targets: dataset -> canary content
@@ -31,18 +30,8 @@ _: {
         exit "$fail"
       '';
 
-      hardeningBase = {
-        # root: zfs clone/mount/destroy and restic's root-owned password file
-        # aren't delegable. no PrivateDevices: zbackup needs /dev/zfs
-        NoNewPrivileges = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        ProtectKernelModules = true;
-        ProtectKernelTunables = true;
-        ProtectKernelLogs = true;
-        ProtectControlGroups = true;
-        RestrictNamespaces = true;
-        PrivateTmp = true;
+      serviceBase = {
+        Type = "oneshot";
         StateDirectory = "backup-restore-test";
       };
     in
@@ -50,18 +39,6 @@ _: {
       options.myBackupRestoreTest = {
         zbackup = {
           enable = lib.mkEnableOption "daily canary-file restore-and-verify against zbackup (zrepl) targets";
-
-          scratchDataset = lib.mkOption {
-            type = lib.types.str;
-            default = "zbackup/restore-test-scratch";
-            description = "Ephemeral zfs clone destination, cloned and destroyed every run.";
-          };
-
-          interval = lib.mkOption {
-            type = lib.types.str;
-            default = "*-*-* 04:30:00";
-            description = "systemd OnCalendar spec for the daily restore-test run.";
-          };
 
           targets = lib.mkOption {
             type = canaryTargetType;
@@ -127,13 +104,12 @@ _: {
               coreutils
               gnugrep
             ];
-            serviceConfig = hardeningBase // {
-              Type = "oneshot";
+            serviceConfig = serviceBase // {
               RuntimeDirectory = "backup-restore-test";
             };
             script = ''
               set -uo pipefail
-              scratch=${lib.escapeShellArg cfg.zbackup.scratchDataset}
+              scratch=zbackup/restore-test-scratch
               mnt="$RUNTIME_DIRECTORY/mnt"
               mkdir -p "$mnt"
               fail=0
@@ -142,21 +118,13 @@ _: {
               mountpoint -q "$mnt" && umount "$mnt"
               zfs destroy "$scratch" >/dev/null 2>&1 || true
 
-              # alternate newest/oldest snapshot by day of year, so a
-              # retention/prune regression at the tail of the grid shows up
-              day=$(date +%-j)
-
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: target: ''
                   echo "backup-restore-test: checking ${dataset}"
                   dataset=${lib.escapeShellArg dataset}
                   expected=${lib.escapeShellArg target.expectedContent}
 
-                  if [ $(( day % 2 )) -eq 0 ]; then
-                    snap=$(zfs list -Hp -t snapshot -o name -s creation "$dataset" 2>/dev/null | grep '@zrepl_' | tail -n1)
-                  else
-                    snap=$(zfs list -Hp -t snapshot -o name -s creation "$dataset" 2>/dev/null | grep '@zrepl_' | head -n1)
-                  fi
+                  snap=$(zfs list -Hp -t snapshot -o name -s creation "$dataset" 2>/dev/null | grep '@zrepl_' | tail -n1)
 
                   if [ -z "$snap" ]; then
                     echo "backup-restore-test: no zrepl snapshot found for $dataset"
@@ -191,7 +159,7 @@ _: {
           systemd.timers.backup-restore-test-zbackup = {
             wantedBy = [ "timers.target" ];
             timerConfig = {
-              OnCalendar = cfg.zbackup.interval;
+              OnCalendar = "*-*-* 04:30:00";
               Persistent = true;
             };
           };
@@ -204,9 +172,7 @@ _: {
               coreutils
               findutils
             ];
-            serviceConfig = hardeningBase // {
-              Type = "oneshot";
-            };
+            serviceConfig = serviceBase;
             script = ''
               set -uo pipefail
               scratch=$(mktemp -d)

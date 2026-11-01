@@ -16,7 +16,6 @@
     enable = true;
     hostAttr = "thinkpad";
     dates = "Thu 03:00";
-    autoReboot = false;
     operation = "boot";
     requireACPower = true;
   };
@@ -107,7 +106,6 @@
   # history; the local snap job keeps pruning while homelab is unreachable
   myZrepl = {
     enable = true;
-    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [
@@ -140,15 +138,6 @@
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
-
-  # emergency space reclaim: `systemctl start zfs-emergency-prune.service`
-  myZfsSpaceGuard = {
-    enable = true;
-    datasets = [
-      "zroot/local/home"
-      "zroot/local/root"
-    ];
-  };
 
   # backup restore-test canaries: content must match homelab's
   # myBackupRestoreTest.zbackup.targets byte for byte

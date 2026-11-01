@@ -5,7 +5,7 @@
 #     retries) and fails the unit, instead of muting the alert for hours
 #   * staleness alerts for two datasets ending in the same name get
 #     separate keys
-#   * a pool past poolCapacityWarn warns, and past poolCapacityCritical
+#   * a pool past 80% warns, and past 90%
 #     alerts again while the warning is still in its cooldown
 #
 # writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md

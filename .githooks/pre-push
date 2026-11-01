@@ -53,10 +53,6 @@ for host in $hosts; do
   fi
 done
 
-# push-deploy-sandbox reads a built file at eval time, which --no-build
-# can't rebuild once the GC has taken it; evaluating it alone builds it
-nix eval --raw .#checks.x86_64-linux.push-deploy-sandbox.drvPath > /dev/null
-
 echo "pre-push: nix flake check --no-build"
 if ! nix flake check --no-build; then
   echo "BLOCKED: nix flake check failed. Fix it, or push with --no-verify." >&2

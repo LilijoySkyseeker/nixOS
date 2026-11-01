@@ -26,17 +26,6 @@ while IFS= read -r file; do
     continue
   fi
 
-  # unreadable means undecided, which must not skip the scan
-  if ! mode="$(git ls-files -s -- "$file")"; then
-    echo "BLOCKED: cannot read the staged mode of $file; refusing to decide whether to scan it." >&2
-    fail=1
-    continue
-  fi
-  # a gitlink (submodule) is a commit id, not content
-  if [[ "$(cut -d' ' -f1 <<<"$mode")" == "160000" ]]; then
-    continue
-  fi
-
   if ! content="$(git show ":$file" 2>/dev/null)"; then
     echo "BLOCKED: cannot read the staged content of $file; refusing to scan it." >&2
     fail=1

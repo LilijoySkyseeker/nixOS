@@ -42,15 +42,6 @@ in
       # comes from the image
       systemd.tmpfiles.settings."10-minecraft-state"."/srv/minecraft/vanilla-plus".z.mode = "0700";
 
-      # docker userns-remap ownership migration; 1000 is itzg's baked-in uid
-      myDockerUserns.migrations = [
-        {
-          path = "/srv/minecraft/vanilla-plus";
-          uid = 1000;
-          gid = 1000;
-        }
-      ];
-
       # mc server
       virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
         autoStart = true;

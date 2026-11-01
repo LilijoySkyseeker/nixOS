@@ -24,7 +24,6 @@ in
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
-        nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"
@@ -60,7 +59,6 @@ in
             };
         }
         nixosModules."zrepl"
-        nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"

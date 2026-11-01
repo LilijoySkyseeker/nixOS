@@ -17,12 +17,6 @@ in
       options.myPullDeploy = {
         enable = lib.mkEnableOption "deploy master's latest revision on a schedule";
 
-        repoUrl = lib.mkOption {
-          type = lib.types.str;
-          default = "https://github.com/LilijoySkyseeker/nixOS.git";
-          description = "Git URL to mirror master from. Public, so no credentials.";
-        };
-
         hostAttr = lib.mkOption {
           type = lib.types.str;
           description = "nixosConfigurations attribute name to build/switch (e.g. \"thinkpad\").";
@@ -30,29 +24,7 @@ in
 
         dates = lib.mkOption {
           type = lib.types.str;
-          default = "Thu 03:00";
           description = "systemd OnCalendar spec for the deploy job.";
-        };
-
-        scheduleEnable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = ''
-            Whether the `pull-deploy` **timer** is installed. False keeps
-            the service defined and manually startable
-            (`systemctl start pull-deploy`) while stopping it happening
-            on a schedule.
-
-            The timer is removed rather than merely un-wanted, so a
-            `switch` actually stops a running timer instead of leaving it
-            armed until the next reboot.
-          '';
-        };
-
-        autoReboot = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Whether to reboot automatically when this job's switch changes the running kernel/initrd.";
         };
 
         operation = lib.mkOption {
@@ -122,7 +94,7 @@ in
               esac
             }
 
-            mirror_fetch "$mirror" ${lib.escapeShellArg cfg.repoUrl}
+            mirror_fetch "$mirror" https://github.com/LilijoySkyseeker/nixOS.git
             target=$(mirror_master "$mirror")
             running=$(revision_of /run/current-system)
             installed=$(revision_of "$profile")
@@ -145,7 +117,7 @@ in
             nixos-rebuild ${cfg.operation} --flake "git+file://$mirror?rev=$target#${cfg.hostAttr}"
             record_success
 
-            ${lib.optionalString (cfg.autoReboot && cfg.operation == "switch") ''
+            ${lib.optionalString (cfg.operation == "switch") ''
               # only a kernel this switch brought in, not one a manual
               # switch left unbooted
               kernel_after=$(readlink /run/current-system/kernel)
@@ -174,7 +146,7 @@ in
           "f /var/lib/pull-deploy/nixpkgs-date 0644 root root -"
         ];
 
-        systemd.timers.pull-deploy = lib.mkIf cfg.scheduleEnable {
+        systemd.timers.pull-deploy = {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.dates;

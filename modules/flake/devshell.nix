@@ -11,7 +11,6 @@
           nixos-anywhere # remote installs, e.g. `nixos-anywhere --flake .#vps root@<ip>`
 
           # editing/linting the flake itself
-          nixd # nix LSP
           nixfmt
           statix # lints
           deadnix # dead code detection
@@ -22,14 +21,8 @@
           age-plugin-yubikey # the YubiKey recipients in .sops.yaml
           ssh-to-age
 
-          # git hooks (.githooks/*, all bash)
-          shellcheck
-          shfmt
-
           # misc CLI needed by vps/homelab tooling (see hosts/vps/README.md)
           wireguard-tools # wg genkey/pubkey/genpsk
-          dig # DNS verification (octoDNS/Cloudflare records)
-          yq-go # secrets.yaml / other yaml
 
           gh
         ]

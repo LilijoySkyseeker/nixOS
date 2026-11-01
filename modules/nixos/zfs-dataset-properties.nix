@@ -24,18 +24,12 @@ _: {
           (which only runs at install time, so a property added later
           never reaches an already-installed host without this).
 
-          One shared mechanism for every current and future host, so a
-          property like this doesn't quietly drift out of sync between
-          hosts the way a one-off `zfs set` run by hand would --
-          `2026-08-28-nix-state-zfs-snapshot-dir-is-world-traversable-ex.md`
-          D1 is why this module exists.
-
           `zfs set` is idempotent, so reapplying every activation is
           always safe. Note some properties only take full effect, for
           state that predates the change, on that dataset's *next*
           unmount/mount or the host's next reboot -- verified true of
-          `snapdir` specifically (see the plan above); do not assume it
-          is true of every property without checking.
+          `snapdir` specifically; do not assume it is true of every
+          property without checking.
         '';
       };
 
@@ -45,21 +39,7 @@ _: {
           after = [ "zfs-mount.service" ];
           wantedBy = [ "zfs-mount.service" ];
           path = [ pkgs.zfs ];
-          serviceConfig = {
-            Type = "oneshot";
-
-            # runs as root (zfs set isn't delegable here); otherwise the same
-            # sandbox as zfs-space-guard.nix
-            NoNewPrivileges = true;
-            ProtectSystem = "strict";
-            ProtectHome = true;
-            ProtectKernelModules = true;
-            ProtectKernelTunables = true;
-            ProtectKernelLogs = true;
-            ProtectControlGroups = true;
-            RestrictNamespaces = true;
-            PrivateTmp = true;
-          };
+          serviceConfig.Type = "oneshot";
           script = lib.concatStringsSep "\n" (
             lib.mapAttrsToList (
               dataset: props:
