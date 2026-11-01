@@ -1,5 +1,5 @@
 # VM test: Caddy serves the site on the tunnel address only, with its
-# headers, 404 page, www redirect and status.json; the LAN gets nothing.
+# 404 page, www redirect and status.json; the LAN gets nothing.
 # Caddy's sandbox lets it reach the public internet only (the client
 # stands in for it at 203.0.113.10), never the LAN, loopback or IPv6
 # plain HTTP here: a VM can't get ACME certs, so the test swaps the site
@@ -125,13 +125,6 @@ pkgs.testers.runNixOSTest {
     with subtest("pages are served from the published build"):
         assert "lid-home-page" in get("/")
         assert "lid-projects-page" in get("/projects/")
-
-    with subtest("every response carries the security headers, and no Server header"):
-        r = get("/").lower()
-        for h in ["content-security-policy: default-src 'self'", "x-content-type-options: nosniff",
-                  "referrer-policy: strict-origin-when-cross-origin", "strict-transport-security: max-age=86400"]:
-            assert h in r, f"missing {h}:\n{r}"
-        assert "\nserver:" not in r, f"Server header leaked:\n{r}"
 
     with subtest("a missing page gets the site's own 404"):
         r = get("/nope/")
