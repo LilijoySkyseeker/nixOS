@@ -278,7 +278,6 @@ in
   # networkd reads PrivateKeyFile only at link setup and a key-only rotation
   # changes no unit file, so restart it explicitly
   sops.secrets.vps_wireguard_private_key.restartUnits = [ "systemd-networkd.service" ];
-  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "systemd-networkd.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.1/24" ];
     listenPort = 51820;
@@ -287,7 +286,6 @@ in
       {
         # homelab
         publicKey = "d4dZJWJpbExfmmZivueaSAuRItMHUWOAsoZBYt9rHTc=";
-        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         allowedIPs = [ "10.100.0.2/32" ];
       }
     ];

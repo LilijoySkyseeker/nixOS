@@ -497,8 +497,6 @@
   # wireguard-wg0 is a RemainAfterExit oneshot that reads the key once, so a
   # rotation needs an explicit restart (cycles the peer units too)
   sops.secrets.homelab_wireguard_private_key.restartUnits = [ "wireguard-wg0.service" ];
-  # same PSK as vps's wireguard_vps_homelab_psk
-  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "wireguard-wg0.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
@@ -506,7 +504,6 @@
       {
         # vps
         publicKey = "ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=";
-        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         # IPv4, not IPv6: homelab's rotating IPv6 privacy addresses leave
         # vps's learned endpoint stale and the tunnel silently dies
         endpoint = "137.184.45.18:51820";
