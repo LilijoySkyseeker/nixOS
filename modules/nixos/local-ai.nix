@@ -18,7 +18,11 @@ _: {
     let
       # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
       paseo = pkgs.paseo.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
+        patches = (old.patches or [ ]) ++ [
+          ./paseo/default-permissions.patch
+          # TODO: drop when getpaseo/paseo#7193 is in the packaged Paseo
+          ./paseo/usage-limit-resume.patch
+        ];
       });
       claudeApiCredits = pkgs.writeShellApplication {
         name = "claude-api-credits";
