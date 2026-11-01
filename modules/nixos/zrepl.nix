@@ -1,5 +1,4 @@
 _: {
-  # zrepl: snapshotting, local replication and both ends of remote replication
   # pull, not push: a push client can DestroySnapshots on its own backup
   # subtree, so a compromised source could wipe its history
   flake.modules.nixos."zrepl" =
@@ -18,7 +17,6 @@ _: {
       # seconds of path renegotiation (e.g. tailscale endpoint flapping)
       remoteDialTimeout = "60s";
 
-      # pattern -> bool map; a trailing "<" means the dataset and its children
       mkFilesystems = datasets: lib.genAttrs datasets (_: true);
 
       mkSnapshotting = {
@@ -46,7 +44,6 @@ _: {
         keep_receiver = keepReceiver;
       };
 
-      # retention on the host owning the data, and on the backup target
       sourcePruning =
         mkPruning
           [
@@ -79,9 +76,6 @@ _: {
         };
       };
 
-      # ---- job builders, one per role ------------------------------
-
-      # every dataset this host owns, however replicated; snap job default
       ownedDatasets = lib.unique (cfg.serve.datasets ++ cfg.local.datasets);
 
       # local snapshotting and a prune ceiling, beholden to no peer (under
@@ -117,14 +111,12 @@ _: {
           identity_file = toString r.identityFile;
           dial_timeout = remoteDialTimeout;
         };
-        # pull jobs don't append the client identity, unlike sink jobs
         root_fs = r.rootFs;
         interval = "15m";
         recv = mkRecv;
         pruning = sourcePruning;
       }) cfg.pull.remotes;
 
-      # same-host replication: a source/pull pair joined by a listener name;
       # source+pull, not push+sink, so replication has its own interval
       localJobs = lib.optionals cfg.local.enable [
         {
@@ -186,7 +178,6 @@ _: {
           description = "How often the snap job takes a snapshot.";
         };
 
-        # ---- passive sender (source hosts) --------------------------
         serve = {
           enable = lib.mkEnableOption "passive source role: snapshot locally and serve those snapshots to a puller";
 
@@ -221,7 +212,6 @@ _: {
           };
         };
 
-        # ---- active receiver (backup server) ------------------------
         pull = {
           remotes = lib.mkOption {
             default = { };
@@ -257,7 +247,6 @@ _: {
           };
         };
 
-        # ---- same-host replication ---------------------------------
         local = {
           enable = lib.mkEnableOption "same-host replication via zrepl's local transport (no ssh/tcp)";
 

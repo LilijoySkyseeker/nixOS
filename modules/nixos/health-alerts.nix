@@ -91,7 +91,6 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        # ZFS pool health, SMART health, failed systemd units, and stuck nixos-rebuild switches
         systemd.services.health-check = {
           description = "Check ZFS/SMART/systemd health and post to Discord on new problems";
           path = with pkgs; [
@@ -136,7 +135,6 @@ _: {
             }
 
             ${lib.optionalString cfg.checkZfs ''
-              # ZFS pool health
               if ! zpool_out=$(zpool status -x 2>&1); then
                 notify zfs-error "ZFS check failed" "$zpool_out"
               elif [ "$zpool_out" != "all pools are healthy" ]; then
@@ -146,7 +144,6 @@ _: {
                 clear_alert zfs-error
               fi
 
-              # pool capacity: a warning, then a separate critical alert
               # process substitution, not a pipe: notify must run in this shell
               while read -r pool cap; do
                 pool_key=$(printf '%s' "$pool" | tr -c 'a-zA-Z0-9_-' '-')
@@ -163,7 +160,6 @@ _: {
             ''}
 
             ${lib.optionalString cfg.checkSmart ''
-              # SMART health on every scannable drive
               smart_failed=""
               for dev in $(smartctl --scan | awk '{print $1}'); do
                 if ! smartctl -H "$dev" >/dev/null 2>&1; then
@@ -178,8 +174,6 @@ _: {
             ''}
 
             ${lib.optionalString (cfg.backupStaleness != { }) ''
-              # backup snapshot staleness (catches a replication target stuck
-              # making no progress, distinct from an individual run failing)
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
                   # keyed on the full dataset name: torrent's and thinkpad's
@@ -203,9 +197,6 @@ _: {
             ''}
 
             ${lib.optionalString (cfg.staleMarkerFiles != { }) ''
-              # marker-file staleness: hung runs and skipped deploys
-              # stat without -L: the profiles/system marker is a symlink into
-              # the store (mtime 1), so dereferencing makes every host stale
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (path: maxHours: ''
                   stale_key="marker-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg path} | tr -c 'a-zA-Z0-9_-' '-')"
@@ -224,7 +215,6 @@ _: {
               )}
             ''}
 
-            # failed systemd units
             failed=$(systemctl --failed --no-legend --plain)
             if [ -n "$failed" ]; then
               notify failed-units "systemd units failed" "$failed"
@@ -232,7 +222,6 @@ _: {
               clear_alert failed-units
             fi
 
-            # stuck nixos-rebuild switch
             stuck=""
             for unit in $(systemctl list-units --type=service --state=running --no-legend --plain | awk '{print $1}' | grep -E '^nixos-rebuild-switch-to-configuration'); do
               started=$(systemctl show "$unit" -p ActiveEnterTimestamp --value)

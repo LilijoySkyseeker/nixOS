@@ -11,7 +11,6 @@ _: {
       canaryRelPath = ".backup-canary/canary.txt";
       canaryBaseName = builtins.baseNameOf canaryRelPath;
 
-      # shared by zbackup.targets and restic.targets: dataset -> canary content
       canaryTargetType = lib.types.attrsOf (
         lib.types.submodule {
           options.expectedContent = lib.mkOption {
@@ -21,8 +20,6 @@ _: {
         }
       );
 
-      # touch a success marker (myHealthAlerts.staleMarkerFiles) iff every
-      # target passed, then propagate failure to systemd
       successEpilogue = markerName: ''
         if [ "$fail" -eq 0 ]; then
           touch "$STATE_DIRECTORY/${markerName}-last-success"

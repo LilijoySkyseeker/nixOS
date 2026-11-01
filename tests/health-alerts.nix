@@ -1,21 +1,8 @@
-# VM test: modules/nixos/health-alerts.nix's alert path, against a fake
-# webhook on the same VM.
-#
-#   * a post the webhook rejects leaves no cooldown stamp (so the next run
-#     retries) and fails the unit, instead of muting the alert for hours
-#   * staleness alerts for two datasets ending in the same name get
-#     separate keys
-#   * a pool past 80% warns, and past 90%
-#     alerts again while the warning is still in its cooldown
-#
-# writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md
 {
   pkgs,
   healthAlertsModule,
 }:
 let
-  # answers every POST with the status code in /run/fakehook/code and
-  # appends the body to /run/fakehook/posts
   fakehook = pkgs.writers.writePython3 "fakehook" { } ''
     import http.server
 
@@ -128,7 +115,6 @@ pkgs.testers.runNixOSTest {
             i += 1
         assert run_check() == 0
         assert posts().count("ZFS pool nearly full") == before + 1, posts()
-        # the warning stays in its cooldown rather than repeating
         assert posts().count("ZFS pool filling up") == 1, posts()
 
     with subtest("back under 80% clears both"):

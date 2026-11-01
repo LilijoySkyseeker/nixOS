@@ -1,4 +1,3 @@
-# VM test: userns-remap puts a non-zero host uid under container uid 0
 {
   pkgs,
   dockerUsernsModule,

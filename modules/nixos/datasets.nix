@@ -1,6 +1,3 @@
-# myDatasets: the per-service ZFS dataset registry.
-#
-# one entry, keyed by full dataset name, generates the disko entry
 _: {
   flake.modules.nixos."datasets" =
     {

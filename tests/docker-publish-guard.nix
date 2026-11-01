@@ -1,7 +1,3 @@
-# VM test: the DOCKER-USER allowlist constrains a docker-published port
-# a `-p` publish is DNAT'd and forwarded, never hitting INPUT, so
-# `firewall.interfaces.<iface>.allowed*Ports` look right and do nothing;
-# only real netfilter state and real packets prove the guard
 { pkgs, dockerPublishGuardModule }:
 let
   # built locally so the test needs no network; answers one line on 8080
@@ -36,7 +32,6 @@ pkgs.testers.runNixOSTest {
       virtualisation.docker.enable = true;
       virtualisation.docker.daemon.settings.userland-proxy = false;
 
-      # preload the local image: no registry, no network
       virtualisation.oci-containers.backend = "docker";
       virtualisation.oci-containers.containers.listener = {
         image = "guard-test-listener:latest";
@@ -140,14 +135,10 @@ pkgs.testers.runNixOSTest {
                 f"DROP precedes RETURN for {proto}/{port} — allowed traffic would be dropped"
 
     with subtest("nothing else is filtered — the chain falls through"):
-        # An unrelated forwarded port must not be touched, or this would
-        # be a blanket firewall rather than a guard on named ports.
         rules = machine.succeed(f"iptables -S {chain}")
         assert "--dport 8096" not in rules, \
             "guard chain matched a port it was never given"
 
-    # ---- the actual claim: a real packet, to a real container --------
-    # rules existing proves nothing; prove behaviour, both directions
 
     with subtest("a client off an unlisted interface cannot reach the container"):
         # The client is on the test LAN (eth1), which is not in
@@ -168,8 +159,6 @@ pkgs.testers.runNixOSTest {
         client.fail("nc -w 5 -z machine 8080")
 
     with subtest("guard rules only apply to traffic entering the bridge"):
-        # --dport alone also matches a container's outbound same-port traffic
-        # (factorio heartbeat, 34197 -> 34197); every rule needs -o docker0
         rules = machine.succeed(f"iptables -S {chain}").splitlines()
         for r in rules:
             if "--dport" not in r:
@@ -178,8 +167,6 @@ pkgs.testers.runNixOSTest {
                 f"rule not pinned to the bridge, will match outbound traffic too:\n{r}"
 
     with subtest("a container's own outbound same-port traffic is not dropped"):
-        # Send from inside the container to an outside address using the
-        # guarded port as *source* and destination
         before = machine.succeed(
             f"iptables -vnL {chain} | grep 'dpt:34197' | tail -1"
         ).split()[0]

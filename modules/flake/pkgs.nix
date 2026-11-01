@@ -27,7 +27,6 @@
     };
   };
 
-  # homelab's pkgs-stable, from its own release pin (flake.nix)
   flake.pkgsHomelab = import inputs.nixpkgs-homelab {
     system = "x86_64-linux";
     config = {

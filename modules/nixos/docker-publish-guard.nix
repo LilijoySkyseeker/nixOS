@@ -9,8 +9,6 @@ _: {
     let
       cfg = config.myDockerPublishGuard;
 
-      # published ports are DNAT'd before routing and never reach INPUT
-      # (nixos-fw); DOCKER-USER is the FORWARD chain docker won't rewrite
       chain = "docker-publish-guard";
 
       # `-o <bridge>` is load-bearing: dport alone also matches container

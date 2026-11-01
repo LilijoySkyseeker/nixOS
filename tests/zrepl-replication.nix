@@ -1,27 +1,3 @@
-# Integration test for modules/nixos/zrepl.nix.
-#
-# The per-host `nixos-rebuild build` only proves the generated YAML parses
-# (the module runs `zrepl configcheck`). It cannot prove that
-# a pull actually lands data, because the real datasets do not exist at
-# build time. This test builds two throwaway VMs with real zpools and
-# exercises the parts that only fail at runtime:
-#
-#   * a `serve` host answering a pull over ssh+stdinserver, through the
-#     forced command the module writes into root's authorized_keys, and
-#     that same key being unable to get a shell
-#   * `recv.placeholder.encryption` being set, without which the receiver
-#     cannot create the intermediate placeholder datasets the layout
-#     implies -- configcheck passes either way
-#   * received data appearing at `root_fs/<full source path>`, and still
-#     holding the payload when recovered the way backup-restore.md prescribes
-#   * a `snap` job snapshotting on its own, with no puller involved
-#   * the receiver ignoring properties a *hostile sender* puts in the
-#     stream, simulated by poisoning the dataset and editing the source's
-#     own zrepl.yml the way an attacker with root there would
-#     not covered: a resumed receive
-#
-# delete if zrepl is ever replaced
-# writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md
 {
   pkgs,
   zreplModule,
@@ -37,8 +13,6 @@ let
     snakeOilEd25519PublicKey
     ;
 
-  # Shared across both nodes: ZFS support plus a spare disk to build a
-  # pool on. The nixos test framework exposes emptyDiskImages as /dev/vdb.
   zfsNode = hostId: {
     boot.supportedFilesystems = [ "zfs" ];
     networking.hostId = hostId;
@@ -53,7 +27,6 @@ pkgs.testers.runNixOSTest {
   name = "zrepl-replication";
 
   nodes = {
-    # Passive sender, standing in for torrent/thinkpad.
     sourcehost =
       { ... }:
       {
@@ -76,7 +49,6 @@ pkgs.testers.runNixOSTest {
         };
       };
 
-    # Active receiver, standing in for homelab.
     puller =
       { ... }:
       {
@@ -231,7 +203,6 @@ pkgs.testers.runNixOSTest {
             timeout=180,
         )
 
-        # recv.properties.override: pinned to a specific safe value.
         for prop, want in [("mountpoint", "none"), ("canmount", "off")]:
             got = puller.succeed(
                 f"zfs get -H -o value {prop} backup/backup/sourcehost/tank/data"

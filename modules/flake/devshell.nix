@@ -5,29 +5,23 @@
       packages =
         with config.flake.pkgsUnstable;
         [
-          # core (needed even off-NixOS, e.g. macOS/other-distro w/ Nix installed)
           git
-          nixos-rebuild # `nixos-rebuild build/switch --flake .#<host>` from anywhere
-          nixos-anywhere # remote installs, e.g. `nixos-anywhere --flake .#vps root@<ip>`
+          nixos-rebuild
+          nixos-anywhere
 
-          # editing/linting the flake itself
           nixfmt
-          statix # lints
-          deadnix # dead code detection
+          statix
+          deadnix
 
-          # secrets
           sops
           age
-          age-plugin-yubikey # the YubiKey recipients in .sops.yaml
+          age-plugin-yubikey
           ssh-to-age
 
-          # misc CLI needed by vps/homelab tooling (see hosts/vps/README.md)
-          wireguard-tools # wg genkey/pubkey/genpsk
+          wireguard-tools
 
           gh
         ]
-        # shared with every host (modules/flake/debug-tools.nix); dev-only
-        # tools stay in the list above
         ++ config.flake.debugTools config.flake.pkgsUnstable;
 
       shellHook = ''
