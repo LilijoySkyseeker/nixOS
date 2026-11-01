@@ -157,7 +157,7 @@ One host is still structurally unusual, same as before the migration:
   another host.
 
 `torrent` also carries a second, untrusted principal: `agent-user` adds an
-`agent` Unix user that runs `claude remote-control` with no permission
+`agent` Unix user that runs agents with no permission
 prompts, walled off from lilijoy's home, the LAN and the tailnet. Its
 mechanics are in `docs/hardening.md` ("The `agent` user"); the design
 record lives outside the repo, in `~/Projects/agenticsandbox/`.
@@ -180,7 +180,7 @@ watcher starts with `multi-user.target`, including activation while Paseo is
 already running.
 
 `local-ai-speech` installs `transcribe`: Whisper large-v3-turbo for every
-language, with optional Nemotron speaker labels. Its models live under
+language, with Nemotron speaker labels. Its models live under
 `~/Agent/projects/local-ai/models/audio`, covered by home backups; see
 [provisioning](procedures/local-speech.md). It yields the GPU while gaming.
 Flash-Next, PaddleOCR and local text-to-speech are retired. The model-store

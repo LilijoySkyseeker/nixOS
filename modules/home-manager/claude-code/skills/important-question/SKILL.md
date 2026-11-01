@@ -11,8 +11,7 @@ Only the user starts this; don't suggest it.
 
 ## 1. Call the agents the user named
 
-The user names the answerers with the question, for example "important
-question, ask Claude, Gemini and DeepSeek: …". Call exactly those: don't
+The user names the answerers with the question. Call exactly those: don't
 add one, drop one or swap one for another. If they named none, ask which
 before you start, listing these:
 
@@ -21,11 +20,6 @@ before you start, listing these:
 - **Codex:** your own subagent if you are Codex, else
   `codex --search exec --skip-git-repo-check --ephemeral -C ~/work/scratch -o <file> "<prompt>" < /dev/null`
   (the answer is in `<file>`; delete it once you've merged).
-- **Gemini:** `agy -p --dangerously-skip-permissions "<prompt>" < /dev/null`.
-- **Any OpenRouter model:** `opencode run --standalone -m openrouter/<vendor>/<model> "<prompt>" < /dev/null`.
-  For a loose name ("DeepSeek", "Grok"), take the newest match in
-  `opencode models --standalone | grep '^openrouter/'` and say which
-  model you used. These are paid per token.
 
 The local model only when the user names it ("local", "Qwen"): naming it
 overrides the rule against using it for opinions. Its command is in the
@@ -58,5 +52,5 @@ the user is paying for, so never drop them to make the answer tidier.
 - **Conflicts first.** Each one with every side and its sources. You may
   say which side is better sourced, but the user decides.
 - **Then the answer**, with each claim labelled by who made it:
-  **[all]**, or the names, such as **[Claude]**, **[Claude, Gemini]**.
+  **[all]**, or the names, such as **[Claude]**.
 - Write for a phone screen: short sections, no wide tables.
