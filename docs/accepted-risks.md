@@ -15,16 +15,6 @@ a decision nobody has made yet (that is
 §4), or a rule everyone should follow (that is
 [`hardening.md`](hardening.md)).
 
-**Not accepted, ever:** a finding that's hard to fix only because agents
-run as `lilijoy`. That is a same-uid problem the agent-separation work is
-meant to remove: the agent's own Unix user, plus the "your place"
-hardening, both in `~/Projects/agenticsandbox`. Leave such a finding
-**open** (in the PR description or a handoff note) with a dated note
-naming which of those fixes it.
-Don't record it here, and don't offer "accept" as the recommended option.
-(User, 2026-10-05; first applied to OpenRig F1/F3/F6/F7 in
-`2026-10-05-package-openrig-and-add-it-to-the-pc-profile.md#D4`.)
-
 **Scaffolded 2026-08-27**, during the 2026-08-26 audit's Phase 4. §1 is
 complete as far as it can be. **§2 is not acceptance** — it is the list
 of risks that cannot move into §1 until decisions D1–D14 are answered,
@@ -150,9 +140,7 @@ must not hold a credential and must not run on fork PRs.
 (D3). No CI means branch protection is the *only* remaining control, so
 AR-5 makes D3 more urgent, not less. 2026-10-06: the agent user's bot
 account gets write access to this repo, so `master` protection (PR + 1
-review) is now a step of
-`2026-10-06-build-the-agent-s-place-a-separate-agent-user-on-torrent-reachable.md`
-(Task 6), done by the user in GitHub's settings.
+review) is done by the user in GitHub's settings.
 
 Stale since 2026-08-28: `.github/workflows/plan-gate.yml` exists, so "no
 workflow file has ever existed" no longer holds. It runs on `pull_request`
