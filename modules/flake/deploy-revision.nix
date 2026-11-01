@@ -3,7 +3,7 @@ _: {
   # revision of master from a root-owned bare mirror, never a checkout. a
   # plain string, not a derivation, so it works on any pkgs variant.
   # consumers must capture config.flake.deployRevisionScript in their outer
-  # `let`, before the inner module's `config` shadows it (docs/architecture.md)
+  # `let`, before the inner module's `config` shadows it
   flake.deployRevisionScript = ''
     # $1: mirror directory (a bare repo, created on first use), $2: repo URL
     mirror_fetch() {

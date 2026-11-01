@@ -138,7 +138,6 @@ _: {
           path = [ pkgs.iptables ];
 
           # not sandboxed: needs CAP_NET_ADMIN in the host netns
-          # (docs/hardening.md)
           script = ''
             set -euo pipefail
 

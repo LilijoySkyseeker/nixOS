@@ -15,7 +15,7 @@ _: {
       printers.ensureDefaultPrinter = "Brother_MFC_L2740DW";
 
       # scanning: CLOSED SOURCE brscan4, an unfree x86-only vendor blob dlopen'd
-      # into the desktop session (docs/adr/0003-unfree-brscan4-blob-for-scanning-on-torrent.md)
+      # into the desktop session
       # no extraBackends: the brscan4 module wires pkgs.brscan4 itself
       sane = {
         enable = true;

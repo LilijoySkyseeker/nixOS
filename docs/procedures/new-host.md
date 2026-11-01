@@ -16,10 +16,7 @@ shape; the vps README has the gotchas for a specific real deploy
    `modules/flake/hosts.nix`, picking `nixpkgs-stable` or
    `nixpkgs-unstable`, matching `specialArgs` pattern to an existing
    host on the same channel, and listing whichever `flake.modules.nixos.*`
-   registration keys the host needs in its `modules = [ ... ]` list
-   (see `docs/architecture.md` for how existing hosts are composed and
-   its "Navigating" section for how to find a module's actual
-   registration key).
+   registration keys the host needs in its `modules = [ ... ]` list.
    Also add `tag:<name>` to `tailscale/policy.hujson` (`tagOwners` and
    the grants), and merge it before minting the host's pre-tagged auth
    key: merging to `master` applies the policy, and edits made in the
@@ -45,39 +42,10 @@ shape; the vps README has the gotchas for a specific real deploy
 
 - Impermanence hosts need the `--extra-files` persist path placed
   correctly or the enrolled key won't survive a reboot.
-- DigitalOcean specifically needs `nixos-anywhere`'s
-  `--kexec-extra-flags -c`.
 - Verify disko device names and network interface names against the
   real target before running — a stale/scaffolded hardware config can
   silently point at the wrong disk.
 - Legacy BIOS vs UEFI boot loader choice needs to match the real
   target, not be assumed from another host.
-- **`kexec` can get OOM-killed on a tiny/RAM-constrained target, and
-  swap doesn't reliably fix it.** Confirmed live, twice, against a
-  fresh 1GB DigitalOcean droplet: first with no swap at all (613MB
-  nominally free per `free -h` still wasn't enough headroom), then
-  again *with* a 1G swapfile added — the second failure killed `kexec`
-  almost instantly with `anon-rss:0kB`, consistent with `kexec_load`
-  needing genuinely free, kernel-pinned physical RAM for the new
-  kernel+initrd that can't be satisfied by reclaiming swappable pages
-  from other processes. The fix that actually works: temporarily
-  resize the target to a bigger RAM tier before installing, resize
-  back down once it succeeds — document the temporary spec bump in the
-  host's own README (see `hosts/vps/README.md`) so it isn't a surprise
-  cost next time. `scripts/bootstrap-host.sh` checks the target's
-  total RAM against a 1900MB floor before touching anything (comfortably
-  clears DigitalOcean's 2GB tier at ~1962MB, rejects its 1GB tier at
-  ~956MB) and refuses to proceed if it's short, rather than run
-  headlong into the same OOM again. It also prints a reminder to resize
-  back down on success — easy to forget once the install itself is
-  working, and the upsize is meant to be temporary.
-- **Recreating a droplet that reuses its old IP leaves a stale SSH
-  host key in your `known_hosts`**, since the new box's key is
-  different even though the address isn't — `ssh` refuses to connect
-  with a scary "REMOTE HOST IDENTIFICATION HAS CHANGED" warning until
-  you `ssh-keygen -R <ip>` to clear the old entry. Expected in this
-  situation, not a sign of anything actually wrong, but don't blindly
-  disable host-key checking to work around it — confirm you actually
-  just recreated the box first.
 
 Full detail and exact commands for a real deploy: `hosts/vps/README.md`.

@@ -12,7 +12,7 @@ _: {
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # public: the game servers and the website (hosts/vps/README.md);
+      # public: the game servers and the website;
       # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [

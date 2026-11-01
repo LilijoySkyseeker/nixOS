@@ -79,6 +79,15 @@ fix_codex_login() {
   as_agent codex login --device-auth || true
 }
 
+# cold reads (other-agents skill): a second codex login in an empty home, so
+# it reads no AGENTS.md, skills or config; its own tokens, never a copy
+as_cold() { as_agent env HOME="$agent_home/.cold" CODEX_HOME="$agent_home/.cold/.codex" "$@"; }
+chk_codex_cold() { as_cold codex login status >/dev/null 2>&1; }
+fix_codex_cold() {
+  note "sign in with your ChatGPT account again, at the URL shown, using the code it prints"
+  as_cold codex login --device-auth || true
+}
+
 chk_collab() {
   local repo
   for repo in $BOT_REPOS; do
@@ -106,6 +115,7 @@ item "LAN/tailnet egress blocked" chk_egress "reload the firewall" fix_egress
 item "gh logged in as $BOT" chk_gh "log the agent's gh in as the bot" fix_gh
 item "Claude login and workspace trust" chk_claude "run claude once in ~agent/work" fix_claude
 item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
+item "cold codex logged in" chk_codex_cold "log the cold-read codex in with your ChatGPT account" fix_codex_cold
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
 item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""
 

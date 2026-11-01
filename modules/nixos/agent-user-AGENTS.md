@@ -13,6 +13,9 @@ like any other agent. That does not mean equal capability: do not use it
 for reviews, alternative opinions or independent checks of another
 agent's work.
 
+To start another agent, use `paseo run`; how, and how to run a cold read:
+the `other-agents` skill.
+
 ## Boundaries
 
 - No permission prompts: the Unix user, its systemd units and the egress

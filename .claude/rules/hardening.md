@@ -7,9 +7,6 @@ paths:
 
 # Hardening
 
-Before adding a service, opening a port, wiring a secret or adding a
-container, read the standing rules in `docs/hardening.md`. The short form:
-
 1. Rotating a sops recipient is not rotating the secret values (the repo is public).
 2. Give each host only the secrets it consumes (per-path `creation_rules`).
 3. Never generate key material on a snapshotted or replicated filesystem.

@@ -9,7 +9,7 @@ in
       # immich: self-hosted photo/video backup, tailnet-only
 
       # version-exact so a bump re-breaks the build instead of silently
-      # inheriting the exemption; accepted risk: docs/accepted-risks.md AR-9
+      # inheriting the exemption
       nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ];
 
       # immich-machine-learning pulls in imageio, and pillow 13 fails two of
@@ -53,7 +53,7 @@ in
         #
         # SECURITY-LOAD-BEARING: the recursive multimedia grant on /storage
         # re-applies every boot and would leak into the 0700 mediaLocation; the
-        # `A` below re-locks it each time (plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#F5)
+        # `A` below re-locks it each time
         tmpfiles.rules = lib.mkAfter [
           "a+ /storage - - - - user:immich:--x"
           # rwX: no execute bit on regular files

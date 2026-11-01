@@ -58,7 +58,7 @@ _: {
           serviceConfig = {
             Type = "oneshot";
 
-            # docs/hardening.md sandboxing baseline; stays root (zfs destroy
+            # stays root (zfs destroy
             # isn't delegable). no PrivateDevices: needs /dev/zfs
             NoNewPrivileges = true;
             ProtectSystem = "strict";
