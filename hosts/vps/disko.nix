@@ -34,6 +34,12 @@
                 type = "filesystem";
                 format = "ext4";
                 mountpoint = "/persist";
+                mountOptions = [
+                  "defaults"
+                  "noexec"
+                  "nosuid"
+                  "nodev"
+                ];
               };
             };
           };

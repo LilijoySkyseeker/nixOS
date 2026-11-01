@@ -121,9 +121,10 @@ in
     settings = {
       datasource_list = [ "ConfigDrive" ];
       datasource.ConfigDrive = { };
-      cloud_init_modules = [ ];
+      cloud_init_modules = [ "seed_random" ];
       cloud_config_modules = [ ];
       cloud_final_modules = [ ];
+      preserve_hostname = true;
     };
   };
   # upstream cloud-init's 05_logging.cfg verbatim (the NixOS module omits it):
@@ -190,7 +191,23 @@ in
     options = [
       "size=2G"
       "mode=0755"
+      "noexec"
+      "nosuid"
+      "nodev"
     ];
+  };
+  # exec-capable: cloud-init execs DigitalOcean's vendor-data boothook from
+  # here (root is noexec), and without it the droplet's network never arms
+  fileSystems."/var/lib/cloud" = {
+    device = "none";
+    fsType = "tmpfs";
+    options = [
+      "size=64M"
+      "mode=0755"
+      "nosuid"
+      "nodev"
+    ];
+    neededForBoot = true;
   };
   fileSystems."/persist".neededForBoot = true;
 
