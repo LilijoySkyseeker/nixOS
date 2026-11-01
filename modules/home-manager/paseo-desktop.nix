@@ -17,7 +17,16 @@ _: {
       );
     in
     {
-      home.packages = [ pkgs-unstable.paseo-desktop ];
+      # the daemon's patches, for their limit callout and credit spend in the UI
+      home.packages = [
+        (pkgs-unstable.paseo-desktop.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [
+            # TODO: drop when getpaseo/paseo#7193 is in the packaged Paseo
+            ../nixos/paseo/usage-limit-resume.patch
+            ../nixos/paseo/limit-fallback.patch
+          ];
+        }))
+      ];
 
       # every write goes through `run` to keep dry-run side-effect free
       home.activation.paseoDesktopSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
