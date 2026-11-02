@@ -22,7 +22,6 @@ _: {
 
         bitwarden-desktop
         thunderbird
-        vscode-fhs
         easyeffects
         qpwgraph
         libreoffice
