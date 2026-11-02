@@ -124,7 +124,7 @@ def whisper(work, backend, log, lang):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
              for t in json.load(open(f"{work}/diar.json"))]
-    lines, last = [], None
+    lines, last, since = [], None, 0.0
     for a, b, text in segs:
         # the speaker whose turns overlap this segment most
         overlap = {}
@@ -137,11 +137,15 @@ def whisper(work, backend, log, lang):
             spk = min(turns, key=lambda t: min(abs(a - t[1]), abs(b - t[0])))[2]
         else:
             spk = "unknown"
-        if spk == last:
+        # one speaker's long turn still gets a stamped line every half minute
+        # or so, at a sentence end where there is one
+        ended = lines and lines[-1].endswith((".", "?", "!"))
+        held = spk == last and (a - since < 30 or (a - since < 60 and not ended))
+        if held:
             lines[-1] += text
         else:
             lines.append(f"{stamp(a)} {spk}: {text.strip()}")
-            last = spk
+            last, since = spk, a
     return lines
 
 
