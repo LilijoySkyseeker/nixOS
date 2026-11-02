@@ -130,20 +130,22 @@ pkgs.testers.runNixOSTest {
           by_id = lambda n: machine.succeed(f"{paseo} schedule ls --json | jq -r --arg n {n} 'map(select(.name == $n))[0].id'").strip()
           # inspect, not ls: ls flattens cadence to a string and has no prompt
           field = lambda n, q: machine.succeed(f"{paseo} schedule inspect {by_id(n)} --json | jq -r '{q}'").strip()
-          want = "job:flake-update job:maintenance job:security-watch"
+          want = "job:maintenance job:update"
           machine.succeed("systemctl restart agent-schedules")
           assert names() == want, names()
           # a stray job, a hand-edited prompt; an untouched cadence keeps its next run
           machine.succeed(f"{paseo} schedule create --name job:old --cron '0 1 * * *' --provider claude --cwd /home/agent/work old")
           machine.succeed(f"{paseo} schedule update {by_id('job:maintenance')} --prompt drift --cwd /tmp")
-          next_run = field("job:security-watch", ".nextRunAt")
+          # runs archive themselves, so paseo's archive-on-finish is off
+          assert field("job:update", ".target.config.archiveOnFinish") == "false"
+          next_run = field("job:update", ".nextRunAt")
           machine.succeed("systemctl restart agent-schedules")
           assert names() == want, names()
           prompt = field("job:maintenance", '.prompt | split("\\n")[0]')
           assert "agent-maintenance" in prompt, prompt
           assert field("job:maintenance", ".target.config.cwd") == "/home/agent/work"
-          assert field("job:security-watch", ".nextRunAt") == next_run
-          tz = field("job:flake-update", ".cadence.timezone")
+          assert field("job:update", ".nextRunAt") == next_run
+          tz = field("job:update", ".cadence.timezone")
           assert tz == "America/Los_Angeles", tz
     '';
 }
