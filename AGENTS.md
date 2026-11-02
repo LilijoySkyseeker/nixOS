@@ -35,6 +35,9 @@ sets `core.hooksPath` so the git hooks run.
   and in parallel a
   review of the branch against `master` by an agent of another model
   family, started with `paseo run` (the `other-agents` skill).
+  Both read `~/research/Fleet/Security.md` first: what the fleet is
+  exposed to today and the risks the owner accepted (private, in the
+  vault; the daily update run keeps it).
 
 ## Git and PRs
 

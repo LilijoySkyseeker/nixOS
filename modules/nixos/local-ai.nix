@@ -125,39 +125,38 @@ _: {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
       };
-      # the agents' scheduled jobs; a prompt changes only through a reviewed PR.
-      # Mondays just past midnight: the owner's weekly Claude usage resets
-      # Sunday at 17:00. Maintenance reads the flake update's result.
+      # the agents' scheduled jobs; a prompt changes only through a reviewed PR,
+      # and reaches paseo at torrent's next boot or switch (agent-schedules).
+      # Maintenance runs at noon, well after the update, and reads its runs.
       agentJobs = [
         {
-          name = "job:flake-update";
-          cron = "15 0 * * 1";
-          prompt = ./agent-jobs/flake-update.md;
+          name = "job:update";
+          cron = "15 0 * * *";
+          prompt = ./agent-jobs/update.md;
         }
         {
           name = "job:maintenance";
-          cron = "0 3 * * 1";
+          cron = "0 12 * * 1";
           prompt = ./agent-jobs/maintenance.md;
-        }
-        {
-          # security incidents move in hours (#140)
-          name = "job:security-watch";
-          cron = "0 6 * * *";
-          prompt = ./agent-jobs/security-watch.md;
         }
       ];
       agentJobsFile = pkgs.writeText "agent-jobs.json" (
-        builtins.toJSON (map (j: j // { prompt = builtins.readFile j.prompt; }) agentJobs)
+        builtins.toJSON (
+          map (
+            j: j // { prompt = builtins.readFile j.prompt + builtins.readFile ./agent-jobs/ending.md; }
+          ) agentJobs
+        )
       );
       # makes the daemon's job:* schedules match agentJobs. It updates only
       # what differs, since a new cadence resets the next run and would drop
-      # one missed while torrent was off. The owner's pause and archive switch
-      # from the app stay; an edited prompt, time, provider or folder goes back
+      # one missed while torrent was off. The owner's pause from the app stays;
+      # an edited prompt, time, provider, folder or archive switch goes back
       agentSchedulesSync = pkgs.writeShellApplication {
         name = "agent-schedules-sync";
         runtimeInputs = [
           paseo
           pkgs.jq
+          pkgs.nodejs
         ];
         text = ''
           want=${agentJobsFile}
@@ -184,9 +183,8 @@ _: {
             prompt=$(jq -r .prompt <<<"$job")
             id=$(jq -r --arg n "$name" 'map(select(.name == $n))[0].id // empty' <<<"$have")
             if [ -z "$id" ]; then
-              paseo schedule create --name "$name" --cron "$cron" --timezone "$tz" \
-                --provider claude --cwd /home/agent/work "$prompt" >/dev/null
-              continue
+              id=$(paseo schedule create --name "$name" --cron "$cron" --timezone "$tz" \
+                --provider claude --cwd /home/agent/work "$prompt" --json | jq -r .id)
             fi
             cur=$(paseo schedule inspect "$id" --json)
             args=()
@@ -196,6 +194,10 @@ _: {
             [ "$(jq -r '.target.config | .provider + " " + .cwd' <<<"$cur")" = "claude /home/agent/work" ] \
               || args+=(--provider claude --cwd /home/agent/work)
             [ ''${#args[@]} -eq 0 ] || paseo schedule update "$id" "''${args[@]}" >/dev/null
+            # a run archives itself unless it needs the owner (agent-jobs/ending.md),
+            # so paseo must not archive every run when it ends
+            [ "$(jq -r .target.config.archiveOnFinish <<<"$cur")" = false ] \
+              || node ${./paseo/keep-runs.mjs} ${paseo}/lib/paseo "$id"
           done
         '';
       };
@@ -293,8 +295,19 @@ _: {
         ];
       };
 
-      # agents start subagents with `paseo run`
-      users.users.agent.packages = [ paseo ];
+      # agents start subagents with `paseo run`; job runs end with job-done
+      users.users.agent.packages = [
+        paseo
+        (pkgs.writeShellApplication {
+          name = "job-done";
+          runtimeInputs = [
+            paseo
+            pkgs.jq
+            pkgs.util-linux
+          ];
+          text = builtins.readFile ./paseo/job-done.sh;
+        })
+      ];
 
       # the scheduled jobs live in the daemon, so each run shows in the app;
       # this unit declares them there again whenever they change
