@@ -119,8 +119,10 @@ in
           };
         };
 
-        # the staleness marker exists from activation, so health-alerts
-        # doesn't page "missing" before the first run
+        # ReadWritePaths targets must exist before the unit starts, or it
+        # fails to set up its mount namespace; the staleness marker exists
+        # from activation, so health-alerts doesn't page "missing" before
+        # the first run
         systemd.tmpfiles.rules = [
           "d /root/.cache 0700 root root -"
           "d /root/.ssh 0700 root root -"
