@@ -21,13 +21,14 @@ format; the owner reads it on their phone:
 
 A quiet run is a few lines.
 
-The owner looks at the unarchived runs in Paseo: unarchived means "needs
-me". So, unless your report asks the owner for something beyond merging
-your PR (a question, a decision, a step only they can take, urgent
-security, or a failure they must fix), run this as your last command,
-before the report:
+The owner looks at the unarchived runs in Paseo's sidebar, which lists
+workspaces: unarchived means "needs me". So, unless your report asks the
+owner for something beyond merging your PR (a question, a decision, a
+step only they can take, urgent security, or a failure they must fix),
+run this as your last command, before the report:
 
-    setsid -f sh -c 'paseo wait "$PASEO_AGENT_ID"; paseo archive "$PASEO_AGENT_ID"' </dev/null >/dev/null 2>&1
+    setsid -f sh -c 'paseo wait "$PASEO_AGENT_ID"; for s in $(paseo schedule ls -q); do paseo schedule inspect "$s" --json; done | jq -r ".runs[] | select(.agentId == env.PASEO_AGENT_ID) | .workspaceId" | xargs -r -n1 paseo workspace archive' </dev/null >/dev/null 2>&1
 
-It archives this run once your turn is over. A run that needs the owner
-leaves it out and stays unarchived.
+Once your turn is over, it finds this run's workspace in its schedule
+and archives it, with you in it. A run that needs the owner leaves it
+out and stays unarchived.
