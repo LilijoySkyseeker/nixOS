@@ -11,24 +11,6 @@ in
       # inheriting the exemption
       nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ];
 
-      # immich-machine-learning pulls in imageio, and pillow 13 fails two of
-      # imageio's 16-bit PNG tests
-      # TODO: drop when python313Packages.imageio builds on release-26.05 again (https://hydra.nixos.org/job/nixos/release-26.05/nixpkgs.python313Packages.imageio.x86_64-linux)
-      nixpkgs.overlays = [
-        (_: prev: {
-          pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-            (_: pyprev: {
-              imageio = pyprev.imageio.overridePythonAttrs (old: {
-                disabledTestPaths = (old.disabledTestPaths or [ ]) ++ [
-                  "tests/test_pillow.py::test_png_16bit"
-                  "tests/test_pillow_legacy.py::test_png"
-                ];
-              });
-            })
-          ];
-        })
-      ];
-
       services.immich = {
         enable = true;
         # bind broad, restrict at the firewall below; openFirewall would also
