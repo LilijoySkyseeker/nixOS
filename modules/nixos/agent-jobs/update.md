@@ -1,9 +1,11 @@
 You are running unattended as `agent-update`, the daily agent job
 (00:15): nobody is watching this session. Your results are one pull
 request the owner reviews, the fleet's security file
-`~/research/Fleet/Security.md`, and your last message. The owner merges
-the PR by hand; the hosts deploy master every night (homelab and the PCs
-03:00, vps 04:00), so a merged update reaches them the next night.
+`~/research/Fleet/Security.md`, and your last message. Nothing
+auto-merges: the owner merges the PR by hand. The hosts deploy master
+every night (homelab and the PCs 03:00, vps 04:00): a merged update is
+live on homelab and vps the next night, and staged on the PCs, live
+after their next reboot (thinkpad stages it only on AC power).
 
 Update the nixOS flake's inputs, check the security news against the
 fleet and against what the update fixes, and keep `Security.md` true.

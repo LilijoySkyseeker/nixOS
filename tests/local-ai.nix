@@ -138,6 +138,7 @@ pkgs.testers.runNixOSTest {
           machine.succeed(f"{paseo} schedule update {by_id('job:maintenance')} --prompt drift --cwd /tmp")
           # runs archive themselves, so paseo's archive-on-finish is off
           assert field("job:update", ".target.config.archiveOnFinish") == "false"
+          machine.succeed("test -x /etc/profiles/per-user/agent/bin/job-done")
           next_run = field("job:update", ".nextRunAt")
           machine.succeed("systemctl restart agent-schedules")
           assert names() == want, names()

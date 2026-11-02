@@ -125,9 +125,9 @@ _: {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
       };
-      # the agents' scheduled jobs; a prompt changes only through a reviewed PR.
-      # The update runs ahead of the 03:00 deploys, so an auto-merged update
-      # would reach the hosts the same night; maintenance reads its runs.
+      # the agents' scheduled jobs; a prompt changes only through a reviewed PR,
+      # and reaches paseo at torrent's next boot or switch (agent-schedules).
+      # Maintenance runs at noon, well after the update, and reads its runs.
       agentJobs = [
         {
           name = "job:update";
@@ -136,7 +136,7 @@ _: {
         }
         {
           name = "job:maintenance";
-          cron = "0 3 * * 1";
+          cron = "0 12 * * 1";
           prompt = ./agent-jobs/maintenance.md;
         }
       ];
@@ -295,8 +295,19 @@ _: {
         ];
       };
 
-      # agents start subagents with `paseo run`
-      users.users.agent.packages = [ paseo ];
+      # agents start subagents with `paseo run`; job runs end with job-done
+      users.users.agent.packages = [
+        paseo
+        (pkgs.writeShellApplication {
+          name = "job-done";
+          runtimeInputs = [
+            paseo
+            pkgs.jq
+            pkgs.util-linux
+          ];
+          text = builtins.readFile ./paseo/job-done.sh;
+        })
+      ];
 
       # the scheduled jobs live in the daemon, so each run shows in the app;
       # this unit declares them there again whenever they change
