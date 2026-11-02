@@ -23,40 +23,10 @@ _: {
           '';
         };
 
-        interval = lib.mkOption {
-          type = lib.types.str;
-          default = "*:0/15";
-          description = "systemd OnCalendar spec for how often to run the health check.";
-        };
-
-        cooldownHours = lib.mkOption {
-          type = lib.types.int;
-          default = 6;
-          description = "Minimum hours between repeat alerts for the same still-ongoing problem.";
-        };
-
-        stuckSwitchThresholdMinutes = lib.mkOption {
-          type = lib.types.int;
-          default = 20;
-          description = "How long a nixos-rebuild switch can run before it's considered stuck.";
-        };
-
         checkZfs = lib.mkOption {
           type = lib.types.bool;
           default = true;
           description = "Whether to check ZFS pool health. Disable on hosts with no ZFS pools (e.g. cloud VMs) — otherwise `zpool status -x` reporting \"no pools available\" gets treated as unhealthy on every run.";
-        };
-
-        poolCapacityWarn = lib.mkOption {
-          type = lib.types.int;
-          default = 80;
-          description = "Pool capacity (percent allocated) at which to warn. ZFS slows down past about 80%.";
-        };
-
-        poolCapacityCritical = lib.mkOption {
-          type = lib.types.int;
-          default = 90;
-          description = "Pool capacity at which to alert again, separately from the warning, so a filling pool isn't hidden by the warning's cooldown.";
         };
 
         checkSmart = lib.mkOption {
@@ -121,24 +91,6 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        # alert state is keyed on each marker's basename, so markers differing
-        # only by directory would silently share one alert slot
-        assertions = [
-          {
-            assertion =
-              let
-                names = map baseNameOf (lib.attrNames cfg.staleMarkerFiles);
-              in
-              names == lib.unique names;
-            message = ''
-              myHealthAlerts.staleMarkerFiles has two entries with the same
-              file name, which would collide in the alert-state key:
-              ${lib.concatStringsSep ", " (lib.attrNames cfg.staleMarkerFiles)}
-            '';
-          }
-        ];
-
-        # ZFS pool health, SMART health, failed systemd units, and stuck nixos-rebuild switches
         systemd.services.health-check = {
           description = "Check ZFS/SMART/systemd health and post to Discord on new problems";
           path = with pkgs; [
@@ -154,7 +106,7 @@ _: {
           script = ''
             set -uo pipefail
             state="$STATE_DIRECTORY"
-            cooldown=$(( ${toString cfg.cooldownHours} * 3600 ))
+            cooldown=$(( 6 * 3600 ))
             now=$(date +%s)
 
             # a failed post leaves no stamp, so the next run retries it, and
@@ -183,7 +135,6 @@ _: {
             }
 
             ${lib.optionalString cfg.checkZfs ''
-              # ZFS pool health
               if ! zpool_out=$(zpool status -x 2>&1); then
                 notify zfs-error "ZFS check failed" "$zpool_out"
               elif [ "$zpool_out" != "all pools are healthy" ]; then
@@ -193,14 +144,13 @@ _: {
                 clear_alert zfs-error
               fi
 
-              # pool capacity: a warning, then a separate critical alert
               # process substitution, not a pipe: notify must run in this shell
               while read -r pool cap; do
                 pool_key=$(printf '%s' "$pool" | tr -c 'a-zA-Z0-9_-' '-')
-                if [ "$cap" -ge ${toString cfg.poolCapacityCritical} ]; then
-                  notify "pool-critical-$pool_key" "ZFS pool nearly full" "$pool is $cap% full (critical at ${toString cfg.poolCapacityCritical}%)"
-                elif [ "$cap" -ge ${toString cfg.poolCapacityWarn} ]; then
-                  notify "pool-warn-$pool_key" "ZFS pool filling up" "$pool is $cap% full (warning at ${toString cfg.poolCapacityWarn}%)"
+                if [ "$cap" -ge 90 ]; then
+                  notify "pool-critical-$pool_key" "ZFS pool nearly full" "$pool is $cap% full (critical at 90%)"
+                elif [ "$cap" -ge 80 ]; then
+                  notify "pool-warn-$pool_key" "ZFS pool filling up" "$pool is $cap% full (warning at 80%)"
                   clear_alert "pool-critical-$pool_key"
                 else
                   clear_alert "pool-warn-$pool_key"
@@ -210,7 +160,6 @@ _: {
             ''}
 
             ${lib.optionalString cfg.checkSmart ''
-              # SMART health on every scannable drive
               smart_failed=""
               for dev in $(smartctl --scan | awk '{print $1}'); do
                 if ! smartctl -H "$dev" >/dev/null 2>&1; then
@@ -225,8 +174,6 @@ _: {
             ''}
 
             ${lib.optionalString (cfg.backupStaleness != { }) ''
-              # backup snapshot staleness (catches a replication target stuck
-              # making no progress, distinct from an individual run failing)
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (dataset: maxHours: ''
                   # keyed on the full dataset name: torrent's and thinkpad's
@@ -250,9 +197,6 @@ _: {
             ''}
 
             ${lib.optionalString (cfg.staleMarkerFiles != { }) ''
-              # marker-file staleness: hung runs and skipped deploys
-              # stat without -L: the profiles/system marker is a symlink into
-              # the store (mtime 1), so dereferencing makes every host stale
               ${lib.concatStringsSep "\n" (
                 lib.mapAttrsToList (path: maxHours: ''
                   stale_key="marker-stale-$(${pkgs.coreutils}/bin/basename ${lib.escapeShellArg path} | tr -c 'a-zA-Z0-9_-' '-')"
@@ -271,7 +215,6 @@ _: {
               )}
             ''}
 
-            # failed systemd units
             failed=$(systemctl --failed --no-legend --plain)
             if [ -n "$failed" ]; then
               notify failed-units "systemd units failed" "$failed"
@@ -279,7 +222,6 @@ _: {
               clear_alert failed-units
             fi
 
-            # stuck nixos-rebuild switch
             stuck=""
             for unit in $(systemctl list-units --type=service --state=running --no-legend --plain | awk '{print $1}' | grep -E '^nixos-rebuild-switch-to-configuration'); do
               started=$(systemctl show "$unit" -p ActiveEnterTimestamp --value)
@@ -287,7 +229,7 @@ _: {
                 started_epoch=$(date -d "$started" +%s 2>/dev/null || echo 0)
                 if [ "$started_epoch" -gt 0 ]; then
                   elapsed_min=$(( (now - started_epoch) / 60 ))
-                  if [ "$elapsed_min" -ge ${toString cfg.stuckSwitchThresholdMinutes} ]; then
+                  if [ "$elapsed_min" -ge 20 ]; then
                     stuck="$stuck$unit has been running for $elapsed_min minutes\n"
                   fi
                 fi
@@ -327,7 +269,7 @@ _: {
         systemd.timers.health-check = {
           wantedBy = [ "timers.target" ];
           timerConfig = {
-            OnCalendar = cfg.interval;
+            OnCalendar = "*:0/15";
             Persistent = true;
           };
         };

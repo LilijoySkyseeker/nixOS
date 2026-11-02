@@ -9,7 +9,6 @@ let
 in
 {
   flake.nixosConfigurations = {
-    #==================================================
     thinkpad = inputs.nixpkgs-unstable.lib.nixosSystem {
       specialArgs = {
         inherit inputs;
@@ -24,7 +23,6 @@ in
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
         nixosModules."zrepl"
-        nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"
@@ -35,7 +33,6 @@ in
         nixosModules."reboot-notice"
       ];
     };
-    #==================================================
     torrent = inputs.nixpkgs-unstable.lib.nixosSystem {
       specialArgs = {
         inherit inputs;
@@ -49,9 +46,7 @@ in
         nixosModules.kde
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
-        # torrent only, not profile-pc
         nixosModules."agent-user"
-        # agent-user's shared ~/work, at ~/Agent for lilijoy
         {
           home-manager.users.lilijoy =
             { config, ... }:
@@ -60,7 +55,6 @@ in
             };
         }
         nixosModules."zrepl"
-        nixosModules."zfs-space-guard"
         nixosModules."zfs-dataset-properties"
         nixosModules."health-alerts"
         nixosModules."backup-canary"
@@ -78,7 +72,6 @@ in
         nixosModules."local-ai-speech"
       ];
     };
-    #==================================================
     # its own release pin (nixpkgs-homelab), not nixpkgs-stable
     homelab = inputs.nixpkgs-homelab.lib.nixosSystem {
       specialArgs = {
@@ -114,7 +107,6 @@ in
         nixosModules.website
       ];
     };
-    #==================================================
     vps = inputs.nixpkgs-stable.lib.nixosSystem {
       specialArgs = {
         # home-manager release matching nixpkgs-stable

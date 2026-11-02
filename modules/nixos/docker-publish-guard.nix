@@ -9,14 +9,12 @@ _: {
     let
       cfg = config.myDockerPublishGuard;
 
-      # published ports are DNAT'd before routing and never reach INPUT
-      # (nixos-fw); DOCKER-USER is the FORWARD chain docker won't rewrite
       chain = "docker-publish-guard";
 
       # `-o <bridge>` is load-bearing: dport alone also matches container
       # *outbound* traffic on same-port protocols (factorio's heartbeat,
       # SPT=DPT=34197), silently de-listing the server
-      match = p: "-o ${cfg.bridgeInterface} -p ${p.protocol} --dport ${toString p.port}";
+      match = p: "-o docker0 -p ${p.protocol} --dport ${toString p.port}";
 
       portRules = lib.concatMapStringsSep "\n" (p: ''
         # ${p.comment}
@@ -34,8 +32,7 @@ _: {
       egressRules =
         cmd: ranges:
         lib.concatMapStringsSep "\n" (
-          r:
-          "${cmd} -t mangle -A ${egressChain} -i ${cfg.bridgeInterface} -m conntrack --ctstate NEW -d ${r} -j DROP"
+          r: "${cmd} -t mangle -A ${egressChain} -i docker0 -m conntrack --ctstate NEW -d ${r} -j DROP"
         ) ranges;
       egressHook = cmd: ranges: ''
         ${cmd} -t mangle -N ${egressChain} 2>/dev/null || true
@@ -79,23 +76,6 @@ _: {
           '';
         };
 
-        bridgeInterface = lib.mkOption {
-          type = lib.types.str;
-          default = "docker0";
-          description = ''
-            The docker bridge published containers sit behind. Every rule
-            is pinned to it with `-o`, so the guard only ever sees traffic
-            being forwarded *into* the container network.
-
-            Without this the rules match on destination port alone, and a
-            protocol that uses the same port at both ends — Factorio's
-            server heartbeat is one — has its *outbound* packets matched
-            and dropped too. That failure is quiet and asymmetric:
-            inbound play keeps working while the server drops off the
-            public server list.
-          '';
-        };
-
         ports = lib.mkOption {
           default = [ ];
           description = ''
@@ -131,18 +111,6 @@ _: {
       };
 
       config = lib.mkIf cfg.enable {
-        assertions = [
-          {
-            assertion = cfg.ports == [ ] || cfg.allowedInterfaces != [ ];
-            message = ''
-              myDockerPublishGuard: ports are guarded but allowedInterfaces
-              is empty, which would drop every packet to them from
-              everywhere. If that is genuinely intended, stop publishing
-              the port instead.
-            '';
-          }
-        ];
-
         systemd.services.docker-publish-guard = {
           description = "Restrict docker-published ports to specific interfaces (DOCKER-USER)";
 
