@@ -49,6 +49,7 @@ _: {
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
           daemon = {
+            listen = "127.0.0.1:6767";
             # tailscale serve forwards this Host; ip and localhost are allowed by default
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
             # explicit: a config that omits it keeps the legacy relay-on behavior
@@ -211,6 +212,7 @@ _: {
 
       services.llama-swap = {
         enable = true;
+        port = 8080;
         settings = {
           # no stored request/response bodies: private prompts stay out of its api
           captureBuffer = 0;
@@ -223,7 +225,7 @@ _: {
                 "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD-Q4_K_M.gguf"
                 "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf"
                 "-ngl 99 -c 131072"
-                "--chat-template-file ${qwenTemplate}"
+                "--jinja --chat-template-file ${qwenTemplate}"
               ];
             };
           };

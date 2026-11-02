@@ -376,6 +376,7 @@
     enable = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
+    settings.PermitRootLogin = "prohibit-password";
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";

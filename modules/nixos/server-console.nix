@@ -17,5 +17,7 @@ in
     };
 
     services.logind.settings.Login.HandleLidSwitch = "ignore";
+
+    sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   };
 }
