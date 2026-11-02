@@ -15,7 +15,7 @@ _: {
     # see services/octodns.nix)
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files
-    # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, profiles/PC.nix)
+    # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, modules/nixos/desktop-apps.nix)
     gids = {
       multimedia = 999;
       flatpak = 998;
@@ -26,7 +26,7 @@ _: {
       torrent = "100.110.203.119";
       thinkpad = "100.95.127.26";
     };
-    # impermanence persistence root shared by profiles/default.nix and the
+    # impermanence persistence root shared by modules/nixos/base.nix and the
     # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
 

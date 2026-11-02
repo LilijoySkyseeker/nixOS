@@ -1,6 +1,6 @@
 _: {
   # debugging tools for inspecting a running system, shared by the devshell
-  # and every host (profiles/default.nix); dev-only tools stay in the devshell
+  # and every host (nixos/base.nix); dev-only tools stay in the devshell
   # always pass an unstable pkgs set, even on stable-pinned homelab, so versions
   # match fleet-wide; a function because each consumer has its own unstable pkgs
   # lands on every host incl. the public one: keep it short, no speculative
