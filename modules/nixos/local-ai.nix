@@ -351,10 +351,11 @@ _: {
         };
       };
 
-      # sends "continue" to an agent stopped on a usage limit once its quota is back
-      # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
+      # sends "continue" to a Codex agent stopped on a usage limit once its quota is
+      # back; Claude agents resume in the daemon (usage-limit-resume.patch)
+      # TODO: drop when Paseo resumes Codex agents after a usage limit itself
       systemd.services.paseo-resume = {
-        description = "Resume Paseo agents after their usage limit resets";
+        description = "Resume Paseo Codex agents after their usage limit resets";
         # multi-user.target, so activation starts it while paseo is already running
         wantedBy = [ "multi-user.target" ];
         after = [ "paseo.service" ];
