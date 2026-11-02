@@ -17,7 +17,6 @@
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
   };
 
-  # docker settings
   # SECURITY: the LAN NIC has a public IPv6 and myDockerPublishGuard is
   # IPv4-only; do not set `ipv6 = true` or restore userland-proxy without
   # extending the guard to ip6tables, or the game ports go internet-facing
@@ -32,7 +31,7 @@
     enable = true;
     allowedInterfaces = [
       "wg0" # public players, DNAT'd in by vps (its networking.nat.forwardPorts)
-      "tailscale0" # our own devices
+      "tailscale0"
     ];
     ports = [
       {
@@ -48,16 +47,13 @@
     ];
   };
 
-  # oci containers
   virtualisation.oci-containers.backend = "docker";
 
   # container uid 0 != host uid 0
   myDockerUserns.enable = true;
 
-  # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
-  # networking
   networking.networkmanager = {
     enable = true;
     insertNameservers = [
@@ -66,7 +62,6 @@
     ];
   };
 
-  # directory permissions
   # don't lock down /srv itself (0770 root breaks traversal for its non-root
   # services); its secrets are protected at the leaves, in each service module
   systemd.tmpfiles.rules = [
@@ -74,7 +69,6 @@
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
 
-  # sops
   sops.secrets = {
     homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
@@ -84,11 +78,10 @@
     };
   };
 
-  # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     backblazeWeekly = {
       initialize = true;
-      createWrapper = true; # usable with restic-backblazeWeekly
+      createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper, "Daily" name is legacy
       repository = "rclone:backblazeDaily:restic21029709384";
@@ -152,7 +145,6 @@
   };
   systemd.services.restic-backups-backblazeWeekly = {
     path = with pkgs-stable; [
-      # necessary for pre and post scripts
       zfs
       coreutils-full
       mount
@@ -168,7 +160,6 @@
       # 0700: holds the mounted snapshots of the persisted-state and media trees
       RuntimeDirectory = "restic-backups-backblazeWeekly";
       RuntimeDirectoryMode = "0700";
-      # backblaze bucket config
       ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # time since last success timer for alerting
       ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
@@ -223,7 +214,6 @@
   # mountpoint=none), so nixpkgs otherwise generates no import unit
   boot.zfs.extraPools = [ "zbackup" ];
 
-  # zfs snapshots + replication (zrepl)
   # pull, never push: zrepl's receiver exposes DestroySnapshots, so a
   # compromised source must have no handle on this host's backup history
   # restart on key rotation; a killed pull just retries next interval
@@ -270,16 +260,13 @@
     };
   };
 
-  # disable emergencymode
   systemd.enableEmergencyMode = false;
 
-  # Define your hostname.
   networking.hostName = "homelab";
 
   # weekly deploy of master, servers first: homelab Tue, vps Wed, PCs Thu,
   # so an update that breaks the servers hasn't yet reached the PCs used
   # to fix them. homelab is slow to build, hence a day each.
-  # by hand: cd /etc/nixos && git pull && nh os switch
   myPullDeploy = {
     enable = true;
     hostAttr = "homelab";
@@ -346,7 +333,6 @@
   systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
   systemd.timers.push-deploy-vps.timerConfig.Persistent = lib.mkForce false;
 
-  # discord alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
@@ -385,7 +371,6 @@
     };
   };
 
-  # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
     enable = true;
@@ -428,19 +413,16 @@
   # modes; takes full effect only after a mount cycle, not just a switch
   myZfsDatasetProperties."zroot/local/state".snapdir = "disabled";
 
-  # pool root datasets' properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zdata" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;
 
-  # myDatasets: per-service ZFS datasets.
   # a new entry needs a manual zfs create on the live host before deploy
   myDatasets = {
     "zroot/persist/jellyfin-cache".mountpoint = config.services.jellyfin.cacheDir;
     "zroot/persist/docker".mountpoint = "/var/lib/docker";
   };
 
-  # impermanance
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
   boot.initrd = {
@@ -461,9 +443,7 @@
     };
   };
 
-  # persistence
   environment.persistence."/nix/state" = {
-    # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
     enable = true;
     hideMounts = true;
     directories = [

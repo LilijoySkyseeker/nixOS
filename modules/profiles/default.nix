@@ -34,27 +34,18 @@ in
           btop
           wget
           eza
-          tldr
           bat
-          glow # markdown reader
+          tldr
+          glow
           zoxide
           git
-          lazygit
-          neovim
-          nixfmt
           rsync
-          sops # secrets management
+          sops
           smartmontools
-          trippy # ping+traceroute tool
-          psmisc # fuser, killall, pstree
+          psmisc
           ffmpeg
           flac
-          bitwarden-cli
-          topgrade
           tmux
-
-          zfs-prune-snapshots # TEMP, zfs needs module
-
         ]
         # shared with the devshell (modules/flake/debug-tools.nix); always unstable,
         # even on stable-pinned homelab, so debug tools match fleet-wide
@@ -70,18 +61,12 @@ in
           // lib.optionalAttrs (options.security.run0 ? enable) { enable = true; };
         })
         {
-          sudo = {
-            enable = false;
-            execWheelOnly = true;
-            package = pkgs-unstable.sudo.override { withInsults = true; };
-          };
+          sudo.enable = false;
         }
       ];
 
-      # 26.11 change for zfs security
       boot.zfs.forceImportRoot = false;
 
-      # tailscale
       # authKeyFile logs in on boot; per-host non-reusable key, pre-tagged tag:<hostname>
       services.tailscale = {
         enable = true;
@@ -121,37 +106,22 @@ in
         else
           { extraConfig = "SystemMaxUse=2G"; };
 
-      # firmware updates
       services.fwupd.enable = true;
 
-      # SMART disk health tool
       services.smartd = {
         enable = true;
         autodetect = true;
         notifications = {
           systembus-notify.enable = true;
           wall.enable = true;
-          x11.enable = true;
         };
       };
 
-      # allow cross compilation
-      boot.binfmt.emulatedSystems = [
-        "aarch64-linux"
-      ];
-
-      # allow unfree
       nixpkgs.config.allowUnfree = true;
 
-      # enable a firmware regardless of licence
       hardware.enableAllFirmware = true;
 
-      # make sure <nixpkgs> sources from the flake
-      nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable}" ];
-
-      # home-manager
       home-manager = {
-        # also pass inputs to home-manager modules
         extraSpecialArgs = {
           inherit
             inputs
@@ -162,26 +132,22 @@ in
         };
         useGlobalPkgs = true;
         useUserPackages = true;
-        backupFileExtension = "backup"; # Force backup conflicted files
+        backupFileExtension = "backup";
         overwriteBackup = true;
       };
 
-      # comma and cache
       programs.nix-index-database.comma.enable = true;
 
-      # neovim
       programs.neovim = {
         enable = true;
         defaultEditor = lib.mkForce true;
       };
 
-      # sops-nix support, secret managment
       sops = {
         defaultSopsFile = ../../secrets/secrets.yaml;
         defaultSopsFormat = "yaml";
       };
 
-      # auto gc with nh
       programs.nh = {
         enable = true;
         clean = {
@@ -191,31 +157,22 @@ in
         };
       };
 
-      # file system trim for ssd
       services.fstrim.enable = true;
 
-      # comma handles unknown commands instead (home-manager tooling.nix)
       programs.command-not-found.enable = false;
 
-      # remove all defualt packages
       environment.defaultPackages = lib.mkForce [ ];
 
-      # firewall
-      networking.firewall.enable = true;
-
-      # Enable Flake Support
       nix.settings.experimental-features = [
         "nix-command"
         "flakes"
       ];
 
-      # direnv
       programs.direnv = {
         enable = true;
         nix-direnv.enable = true;
       };
 
-      # Bootloader.
       boot.loader.systemd-boot = {
         enable = true;
         editor = false;
@@ -224,7 +181,6 @@ in
 
       boot.tmp.useTmpfs = true;
 
-      # Enable networking
       networking.networkmanager.enable = true;
       networking.nameservers = [
         "8.8.8.8"
@@ -232,16 +188,11 @@ in
       ];
       services.resolved.enable = true;
 
-      # Select internationalisation properties.
       i18n.defaultLocale = "en_US.UTF-8";
-      i18n.supportedLocales = [
-        "all"
-      ];
       i18n.extraLocaleSettings = {
-        LC_MEASUREMENT = "en_GB.UTF-8"; # metric units
+        LC_MEASUREMENT = "en_GB.UTF-8";
       };
 
-      # x86_64
       nixpkgs.hostPlatform = "x86_64-linux";
 
       # State Version for first install, don't touch

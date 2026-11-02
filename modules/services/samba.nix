@@ -9,9 +9,6 @@ _: {
         restartUnits = [ "samba-user-provision.service" ];
       };
 
-      # samba: tailnet-only share of /storage and /storage-bulk for android (no
-      # usable native NFS client); linux clients use nfs.nix
-
       # SMB-auth-only account, no shell/SSH; "multimedia" membership (jellyfin.nix)
       # grants filesystem access, matching NFS's gid-based auth
       users.users.android-smb = {
@@ -24,7 +21,7 @@ _: {
         enable = true;
         # no NetBIOS: android connects by tailnet hostname/IP; keeps 137-139 closed
         nmbd.enable = false;
-        winbindd.enable = false; # no AD/domain integration
+        winbindd.enable = false;
 
         settings = {
           global = {
@@ -54,8 +51,6 @@ _: {
         };
       };
 
-      # syncs android-smb's password from sops into passdb.tdb (add or update);
-      # idempotent, rerun by restartUnits above when the secret changes
       systemd.services.samba-user-provision = {
         description = "Provision the android-smb Samba user's password from sops";
         after = [ "sops-nix.service" ];

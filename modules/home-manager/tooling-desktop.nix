@@ -12,12 +12,10 @@ in
       ...
     }:
     {
-      # bash: unknown command fetches and runs it from nixpkgs; desktop only
       programs.bash.initExtra = ''
         command_not_found_handle() { comma "$@"; }
       '';
 
-      # KDE Connect
       services.kdeconnect = {
         enable = true;
         indicator = true;
@@ -30,20 +28,17 @@ in
           --group General --key customDevices "${ips.torrent},${ips.thinkpad}"
       '';
 
-      # OBS Studio
       programs.obs-studio = {
         enable = true;
         plugins = with pkgs-stable.obs-studio-plugins; [ obs-pipewire-audio-capture ];
       };
 
-      # Obsidian
       programs.obsidian = {
         enable = true;
         package = pkgs-unstable.obsidian;
         cli.enable = true;
       };
 
-      # Firefox
       programs.firefox = {
         enable = true;
         configPath = "${config.xdg.configHome}/mozilla/firefox";

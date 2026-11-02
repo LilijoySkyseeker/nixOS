@@ -2,7 +2,6 @@ _: {
   flake.modules.homeManager.tooling =
     {
       pkgs,
-      pkgs-stable,
       config,
       lib,
       options,
@@ -14,10 +13,9 @@ _: {
         et = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts";
         etl = "eza --tree --group-directories-first --header --git --git-ignore --icons --all --long --mounts --level";
       };
-      # nerd font glyphs for the prompt, by codepoint
       g = lib.mapAttrs (_: cp: builtins.fromJSON ''"\u${cp}"'') {
-        right = "e0b0"; # powerline arrow pointing right
-        left = "e0b2"; # powerline arrow pointing left
+        right = "e0b0";
+        left = "e0b2";
         nixos = "f313";
         branch = "f418";
         lock = "f023";
@@ -27,34 +25,26 @@ _: {
     in
     {
 
-      # Git
       programs.git = {
         enable = true;
         # sops template rendered here by profiles/PC.nix / profiles/server.nix
         includes = [ { path = "${config.home.homeDirectory}/.config/git/identity"; } ];
       };
 
-      # fzf
       programs.fzf = {
         enable = true;
-        enableFishIntegration = true;
       }
       # not declared on the home-manager release tracking nixpkgs-stable
       // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "enableNushellIntegration" ] options) {
         enableNushellIntegration = false; # nushell isn't used; avoids a min-fzf-version assertion
       }
-      # atuin owns Ctrl-R in bash; fish keeps fzf's
+      # atuin owns Ctrl-R in bash
       // lib.optionalAttrs (lib.hasAttrByPath [ "programs" "fzf" "historyWidget" "bash" ] options) {
         historyWidget.bash.command = "";
       };
 
-      # zoxide
-      programs.zoxide = {
-        enable = true;
-        enableFishIntegration = true;
-      };
+      programs.zoxide.enable = true;
 
-      # BTOP
       programs.btop = {
         enable = true;
         settings = {
@@ -66,7 +56,6 @@ _: {
         };
       };
 
-      # bash: the interactive shell
       programs.bash = {
         enable = true;
         inherit shellAliases;
@@ -115,7 +104,6 @@ _: {
         ];
       };
 
-      # ble.sh settings
       xdg.configFile."blesh/init.sh".text = ''
         bleopt history_share=1
         bind 'set completion-ignore-case on'
@@ -125,19 +113,16 @@ _: {
         function blerc/vim-mode-hook {
           # no "-- INSERT --" line; the cursor shape shows the mode
           bleopt keymap_vi_mode_show=
-          # cursor shape per vi mode: block in normal, bar in insert
           ble-bind -m vi_nmap --cursor 2
           ble-bind -m vi_imap --cursor 5
           ble-bind -m vi_omap --cursor 4
           ble-bind -m vi_xmap --cursor 2
           ble-bind -m vi_cmap --cursor 0
-          # up/down search history for what's already typed, like fish
           ble-bind -m vi_imap -f up 'history-substring-search-backward hide-status:immediate-accept:point=end:empty=history-move'
           ble-bind -m vi_imap -f down 'history-substring-search-forward hide-status:immediate-accept:point=end:empty=history-move'
         }
         blehook/eval-after-load keymap_vi blerc/vim-mode-hook
 
-        # enter runs a complete command even when it spans lines (a paste); otherwise adds a line
         function ble/widget/blerc/accept-if-complete {
           ble-edit/content/update-syntax
           if ble/syntax:bash/is-complete; then
@@ -150,10 +135,8 @@ _: {
         ble-bind -m vi_imap -f 'C-m' blerc/accept-if-complete
       '';
 
-      # starship: two-line rainbow powerline prompt, modelled on fish's tide
       programs.starship = {
         enable = true;
-        enableFishIntegration = false;
         settings = {
           add_newline = true;
           format = lib.concatStrings [
@@ -254,7 +237,6 @@ _: {
             style = "fg:black bg:green";
             format = "[${g.left}](fg:green)[ $symbol( $number) ]($style)";
           };
-          # just the ▼ while loaded and allowed, like tide
           direnv = {
             disabled = false;
             symbol = "▼";
@@ -284,54 +266,19 @@ _: {
         };
       };
 
-      # atuin: searchable shell history on Ctrl-R, local only (no account, no sync)
       programs.atuin = {
         enable = true;
-        enableFishIntegration = false;
         # up arrow stays ble.sh's history search
         flags = [ "--disable-up-arrow" ];
         settings.update_check = false;
       };
 
-      # direnv: load a repo's .envrc dev shell on cd
       programs.direnv = {
         enable = true;
         nix-direnv.enable = true;
         config.global.hide_env_diff = true;
       };
 
-      # fish: kept as a fallback shell until it's removed
-      programs.fish = {
-        enable = true;
-        interactiveShellInit = ''
-          set fish_greeting # Disable greeting
-          tide configure --auto --style=Rainbow --prompt_colors='16 colors' --show_time='24-hour format' --rainbow_prompt_separators=Angled --powerline_prompt_heads=Sharp --powerline_prompt_tails=Flat --powerline_prompt_style='Two lines, character and frame' --prompt_connection=Dotted --powerline_right_prompt_frame=Yes --prompt_spacing=Sparse --icons='Many icons' --transient=No
-          set -g fish_key_bindings fish_vi_key_bindings
-          clear
-        '';
-        plugins = [
-          {
-            name = "grc";
-            src = pkgs-stable.fishPlugins.grc.src;
-          }
-          {
-            name = "tide";
-            src = pkgs-stable.fishPlugins.tide.src;
-          }
-        ];
-        functions = {
-          __fish_command_not_found_handler.body = ''
-            comma $argv[1]
-          '';
-
-        };
-        inherit shellAliases;
-        shellAbbrs = {
-          rsync = "rsync --verbose --recursive --progress --human-readable";
-        };
-      };
-
-      # bat
       programs.bat = {
         enable = true;
         config = {
@@ -339,11 +286,9 @@ _: {
         };
       };
 
-      # eza
       programs.eza = {
         enable = true;
         enableBashIntegration = false;
-        enableFishIntegration = false;
       };
     };
 }

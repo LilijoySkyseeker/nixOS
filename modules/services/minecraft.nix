@@ -12,20 +12,18 @@ in
         OPS=${config.sops.placeholder.minecraft_username}
       '';
 
-      # persistence
       environment.persistence.${vars.persistRoot}.directories = [
         {
           directory = "/srv/minecraft/vanilla-plus";
         }
       ];
 
-      # mc server
       virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
         autoStart = true;
         image = "itzg/minecraft-server";
         ports = [
           "25565:25565"
-          "19132:19132/udp" # Geyser Bedrock listener
+          "19132:19132/udp"
         ];
         environment = {
           TYPE = "FABRIC";

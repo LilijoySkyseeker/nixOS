@@ -62,7 +62,6 @@ in
         {
           home-manager.users.lilijoy.imports = [
             homeManagerModules."audio-switch"
-            homeManagerModules."update-keys"
           ];
         }
         # torrent only, not profile-pc: static-IP printer/scanner entries are

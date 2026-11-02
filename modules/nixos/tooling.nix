@@ -2,25 +2,8 @@ _: {
   flake.modules.nixos.tooling =
     { lib, ... }:
     {
-      # Git
-      programs.git = {
-        enable = true;
-        config = {
-          push.autoSetupRemote = true;
-        };
-      };
-
-      # fish: fallback shell; bash is the interactive shell (home-manager tooling.nix)
-      programs.fish = {
-        enable = true;
-      };
       environment.shellAliases = lib.mkForce { }; # clear NixOS's default aliases; ours live in home-manager
 
-      # neovim
-      programs.neovim = {
-        enable = true;
-        defaultEditor = lib.mkForce true;
-      };
       programs.nvf = {
         enable = true;
         enableManpages = true;
@@ -85,7 +68,7 @@ _: {
             };
             statusline.lualine = {
               enable = true;
-              setupOpts.options.theme = lib.mkForce "gruvbox_dark"; # TEMP
+              setupOpts.options.theme = lib.mkForce "gruvbox_dark";
             };
             visuals = {
               highlight-undo = {

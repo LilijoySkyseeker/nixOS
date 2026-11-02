@@ -1,6 +1,5 @@
 {
   pkgs-unstable,
-  pkgs-stable,
   config,
   vars,
   ...
@@ -18,36 +17,16 @@
     operation = "boot";
   };
 
-  # System installed pkgs
-  environment.systemPackages =
-    (with pkgs-unstable; [
-      # closed source
-      bambu-studio
-    ])
-    ++ (with pkgs-stable; [
-    ]);
+  environment.systemPackages = [ pkgs-unstable.bambu-studio ];
 
-  # drivers, r8125 for ethernet, look for when kernel is 6.7+ to try wifi and bt drivers, https://wireless.docs.kernel.org/en/latest/en/users/drivers/mediatek.html, mt7925
-  boot.extraModulePackages = with config.boot.kernelPackages; [
-    r8125
-  ];
-  boot.kernelModules = [ "r8125" ];
-  nixpkgs.config.allowBroken = true; # check on next stable release to see if needed
-
-  # cpu power management
   powerManagement.cpuFreqGovernor = "performance";
 
-  # arm the board's hardware watchdog (sp5100_tco, /dev/watchdog0): a full
-  # hang resets the machine in ~30s instead of sitting frozen until power-cycled
   systemd.settings.Manager.RuntimeWatchdogSec = "30s";
 
-  # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
-  # Define your hostname.
   networking.hostName = "torrent";
 
-  # zfs support
   boot.supportedFilesystems = [ "zfs" ];
   services.zfs = {
     autoScrub.enable = true;
@@ -56,7 +35,6 @@
   networking.hostId = "0376f9ae";
   fileSystems."/nix".neededForBoot = true;
 
-  # zroot root dataset's own properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   # gguf files: large sequential reads that don't compress. primarycache stays
   # "all": llama.cpp's mmap faults 4 KiB pages, and without the arc each fault
@@ -76,7 +54,6 @@
       datasets = [
         "zroot/local/home"
         "zroot/local/root"
-        # open model weights, kept in case their downloads disappear
         "zroot/local/models"
       ];
       clients.homelab.publicKey = vars.zreplPullerKey;
@@ -88,7 +65,6 @@
   services.openssh = {
     enable = true;
     openFirewall = false;
-    # also disables scp (sftp-based in modern OpenSSH); zrepl uses neither
     allowSFTP = false;
     settings = {
       PermitRootLogin = "forced-commands-only";
@@ -97,14 +73,14 @@
 
       # in `settings`, not
       # `extraConfig`: sshd_config is first-directive-wins and `settings`
-      # renders first. trailing values are the OpenSSH 10.4p1 defaults
-      AuthenticationMethods = "publickey"; # default: any
-      AllowAgentForwarding = false; # default: yes
-      AllowStreamLocalForwarding = false; # default: yes
-      AllowTcpForwarding = false; # default: yes
-      PermitTunnel = "no"; # default: no
-      ClientAliveInterval = 60; # default: 0, no idle timeout
-      ClientAliveCountMax = 5; # default: 3
+      # renders first
+      AuthenticationMethods = "publickey";
+      AllowAgentForwarding = false;
+      AllowStreamLocalForwarding = false;
+      AllowTcpForwarding = false;
+      PermitTunnel = "no";
+      ClientAliveInterval = 60;
+      ClientAliveCountMax = 5;
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
@@ -143,8 +119,6 @@
     # off: smartctl needs the disk group + CAP_SYS_RAWIO (root-equivalent), and
     # the fleet-wide smartd already reaches a human via the graphical session
     checkSmart = false;
-    # no backupStaleness: homelab's own myHealthAlerts watches this host's replicas
-    #
     # a pull-deploy that stops running; a failed one pages as a failed
     # unit. 504h = 21 days, weekly deploys plus two weeks of slack
     staleMarkerFiles = {

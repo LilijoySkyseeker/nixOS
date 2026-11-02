@@ -65,8 +65,31 @@ _: {
               extends = "codex";
               label = "Local";
               description = "A local model on torrent's GPU (llama-swap), in the Codex harness";
+              # Scope these overrides to the local harness: cloud models keep
+              # their own context budgets and timeouts. Compact well before
+              # long image histories make prompt processing take minutes.
+              # Allow 15 idle minutes for cold prefill instead of cancelling
+              # and retrying it every five minutes.
+              command = [
+                (lib.getExe pkgs.codex)
+                "-c"
+                "model_context_window=131072"
+                "-c"
+                "model_auto_compact_token_limit=32768"
+                "-c"
+                "model_provider=local"
+                "-c"
+                "model_providers.local.name=Local"
+                "-c"
+                "model_providers.local.base_url=${swapUrl}/v1"
+                "-c"
+                "model_providers.local.wire_api=responses"
+                "-c"
+                "model_providers.local.env_key=OPENAI_API_KEY"
+                "-c"
+                "model_providers.local.stream_idle_timeout_ms=900000"
+              ];
               env = {
-                OPENAI_BASE_URL = swapUrl;
                 OPENAI_API_KEY = "local";
               };
               models = [
