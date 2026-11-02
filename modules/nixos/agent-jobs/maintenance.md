@@ -3,6 +3,9 @@ agent jobs (Monday, 03:00): nobody is watching this session,
 and your reply only stays in its Paseo session. Your results are a pull request or issue the owner reviews,
 the "Maintenance" section of this week's fleet report, and the fleet's
 status page.
+The run ends when your turn does: a background command's
+notification never arrives, so wait for builds and checks in the
+foreground before you reply.
 
 Keep the background work from being forgotten: the agents' friction, the
 deferred to-dos, the workarounds waiting on upstream, and anything left
