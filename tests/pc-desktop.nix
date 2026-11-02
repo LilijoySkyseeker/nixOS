@@ -1,12 +1,11 @@
 # VM test: the PCs' desktop session starts whole: profile-pc (with
-# lilijoy's Home Manager and Stylix) and kde, logged in through SDDM.
+# lilijoy's Home Manager, Stylix and KDE), logged in through SDDM.
 # Plasma's shell, KWin and the polkit agent run and stay up, none of them
 # logs a QML module or type it can't load. A build can't show any of this.
 {
   pkgs,
   specialArgs,
   profilePcModule,
-  kdeModule,
 }:
 pkgs.testers.runNixOSTest {
   name = "pc-desktop";
@@ -20,7 +19,6 @@ pkgs.testers.runNixOSTest {
     {
       imports = [
         profilePcModule
-        kdeModule
       ];
       virtualisation.memorySize = 6144;
       virtualisation.cores = 4;

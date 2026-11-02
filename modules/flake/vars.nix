@@ -13,7 +13,7 @@ _: {
     username = "lilijoy";
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files
-    # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, profiles/PC.nix)
+    # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, modules/nixos/desktop-apps.nix)
     gids = {
       multimedia = 999;
       flatpak = 998;

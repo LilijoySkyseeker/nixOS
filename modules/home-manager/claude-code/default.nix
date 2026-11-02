@@ -1,7 +1,7 @@
 _: {
   # the CLI writes ~/.claude/settings.json itself (/model, /effort), so no store
   # symlink: managed keys are merged into the mutable file on activation
-  # package comes from profile-pc's systemPackages
+  # package comes from nixos/desktop-apps.nix's systemPackages
   flake.modules.homeManager.claude-code =
     {
       config,

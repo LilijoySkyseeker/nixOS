@@ -5,7 +5,7 @@ let
   debugTools = config.flake.debugTools;
 in
 {
-  flake.modules.nixos."profile-default" =
+  flake.modules.nixos.base =
     {
       config,
       pkgs-unstable,
