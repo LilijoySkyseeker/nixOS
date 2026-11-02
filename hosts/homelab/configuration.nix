@@ -49,8 +49,7 @@
 
   virtualisation.oci-containers.backend = "docker";
 
-  # container uid 0 != host uid 0; per-path uid migrations live in
-  # modules/services/minecraft.nix next to its path
+  # container uid 0 != host uid 0
   myDockerUserns.enable = true;
 
   time.timeZone = "America/Los_Angeles";
@@ -255,13 +254,10 @@
         "zdata/storage/storage"
         "zdata/storage/storage-bulk"
         "zroot/local/state"
-      ]
-      ++ config.myDatasetsReplicated;
+      ];
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
-
-    preserveLegacySnapshots = false;
   };
 
   systemd.enableEmergencyMode = false;
@@ -276,7 +272,6 @@
     hostAttr = "homelab";
     dates = "Tue 03:00";
     operation = "switch";
-    autoReboot = true;
     # the weekly restic->Backblaze run can take days (~2.9TiB), and a switch
     # restarts any changed unit, so defer rather than kill it
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
@@ -341,7 +336,6 @@
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
-    interval = "*:0/15";
     # hours; zrepl replicates every 15m
     backupStaleness = {
       "zbackup/backup/homelab/zdata/storage/storage" = 6;
@@ -425,19 +419,8 @@
 
   # a new entry needs a manual zfs create on the live host before deploy
   myDatasets = {
-    # managePersistence = false: entries already exist elsewhere
-    # (jellyfin.nix's cacheDir, the /var/lib/docker line below)
-    # no owner/group either, they'd have no effect
-    "zroot/persist/jellyfin-cache" = {
-      tier = "persist";
-      mountpoint = config.services.jellyfin.cacheDir;
-      managePersistence = false;
-    };
-    "zroot/persist/docker" = {
-      tier = "persist";
-      mountpoint = "/var/lib/docker";
-      managePersistence = false;
-    };
+    "zroot/persist/jellyfin-cache".mountpoint = config.services.jellyfin.cacheDir;
+    "zroot/persist/docker".mountpoint = "/var/lib/docker";
   };
 
   fileSystems."/nix/state".neededForBoot = true;

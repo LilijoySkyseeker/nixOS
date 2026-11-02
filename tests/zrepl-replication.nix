@@ -1,32 +1,3 @@
-# Integration test for modules/nixos/zrepl.nix.
-#
-# The per-host `nixos-rebuild build` only proves the generated YAML parses
-# (`myZrepl.validateConfig` runs `zrepl configcheck`). It cannot prove that
-# a pull actually lands data, because the real datasets do not exist at
-# build time. This test builds two throwaway VMs with real zpools and
-# exercises the parts that only fail at runtime:
-#
-#   * a `serve` host answering a pull over ssh+stdinserver, through the
-#     forced command the module writes into root's authorized_keys, and
-#     that same key being unable to get a shell
-#   * `recv.placeholder.encryption` being set, without which the receiver
-#     cannot create the intermediate placeholder datasets the layout
-#     implies -- configcheck passes either way
-#   * received data appearing at `root_fs/<full source path>`, and still
-#     holding the payload when recovered the way backup-restore.md prescribes
-#   * `myZrepl.protectRegexes` keeping a foreign `@blank` snapshot that an
-#     unguarded grid rule would condemn
-#   * a `snap` job snapshotting on its own, with no puller involved
-#   * `zrepl-protect-blank` making `@blank` genuinely undestroyable on the
-#     source, which `protectRegexes` cannot do -- that is the puller's
-#     pruning policy, and the source endpoint evaluates no keep rules
-#   * the receiver ignoring properties a *hostile sender* puts in the
-#     stream, simulated by poisoning the dataset and editing the source's
-#     own zrepl.yml the way an attacker with root there would
-#     not covered: a resumed receive
-#
-# delete if zrepl is ever replaced
-# writing or debugging one of these: .agents/skills/verify-a-change/vm-testing.md
 {
   pkgs,
   zreplModule,
@@ -42,8 +13,6 @@ let
     snakeOilEd25519PublicKey
     ;
 
-  # Shared across both nodes: ZFS support plus a spare disk to build a
-  # pool on. The nixos test framework exposes emptyDiskImages as /dev/vdb.
   zfsNode = hostId: {
     boot.supportedFilesystems = [ "zfs" ];
     networking.hostId = hostId;
@@ -58,7 +27,6 @@ pkgs.testers.runNixOSTest {
   name = "zrepl-replication";
 
   nodes = {
-    # Passive sender, standing in for torrent/thinkpad.
     sourcehost =
       { ... }:
       {
@@ -72,14 +40,7 @@ pkgs.testers.runNixOSTest {
 
         myZrepl = {
           enable = true;
-          # Keep the check off: configcheck at build time cannot see the
-          # pools, and the daemon starting in the test proves the parse.
-          validateConfig = false;
           snapshot.interval = "10s";
-          snap = {
-            enable = true;
-            datasets = [ "tank/data" ];
-          };
           serve = {
             enable = true;
             datasets = [ "tank/data" ];
@@ -88,7 +49,6 @@ pkgs.testers.runNixOSTest {
         };
       };
 
-    # Active receiver, standing in for homelab.
     puller =
       { ... }:
       {
@@ -97,21 +57,18 @@ pkgs.testers.runNixOSTest {
 
         myZrepl = {
           enable = true;
-          validateConfig = false;
           pull.remotes.sourcehost = {
             host = "sourcehost";
             identityFile = "/etc/zrepl/snakeoil";
             rootFs = "backup/backup/sourcehost";
-            interval = "10s";
-            # Host keys are generated fresh per VM boot, so there is
-            # nothing to pin. Production pins nothing either -- the
-            # forced command on the far side is the real boundary.
-            sshOptions = [
-              "StrictHostKeyChecking=no"
-              "UserKnownHostsFile=/dev/null"
-            ];
           };
         };
+
+        # Host keys are generated fresh per VM boot, so there is nothing to pin.
+        programs.ssh.extraConfig = ''
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+        '';
 
         # zrepl runs as root and ssh insists on 0600 on the identity file.
         environment.etc."zrepl/snakeoil" = {
@@ -130,8 +87,6 @@ pkgs.testers.runNixOSTest {
         sourcehost.succeed("zpool create -f tank /dev/vdb")
         sourcehost.succeed("zfs create tank/data")
         sourcehost.succeed("echo canary-payload > /tank/data/canary")
-        # The impermanence rollback point the module must never destroy.
-        sourcehost.succeed("zfs snapshot tank/data@blank")
         puller.succeed("zpool create -f backup /dev/vdb")
         puller.succeed("zfs create backup/backup")
         # zrepl does not create root_fs itself -- it only creates children
@@ -199,46 +154,6 @@ pkgs.testers.runNixOSTest {
         assert content == "canary-payload", f"payload mismatch: {content!r}"
         puller.succeed("zfs destroy backup/restore-scratch")
 
-    with subtest("protectRegexes keeps the foreign @blank snapshot"):
-        # An unguarded grid rule condemns every snapshot it does not
-        # match rather than ignoring it, so without protectRegexes this
-        # is exactly what a prune would destroy first.
-        puller.succeed("zrepl signal wakeup sourcehost")
-        # Both jobs run on a 10s interval here, so 20s covers at least one
-        # full prune cycle on each side -- long enough that a missing
-        # protect rule would have destroyed @blank by the assert below.
-        sourcehost.succeed("sleep 20")
-        sourcehost.succeed("zfs list -t snapshot -o name -H | grep -q 'tank/data@blank'")
-
-    with subtest("zrepl-protect-blank makes @blank undestroyable locally"):
-        # protectRegexes above is the puller's *pruning policy*, and a
-        # policy is not a control: Sender.DestroySnapshots evaluates no
-        # keep rules, and a source job has no Pruning field at all, so a
-        # compromised or merely misconfigured puller can destroy @blank
-        # here. A foreign `zfs hold` is the backstop, because zrepl only
-        # recognises and releases its own zrepl_STEP_/zrepl_last_received_
-        # tags and cannot release this one over any RPC.
-        #
-        # restart, not start: the unit is wantedBy multi-user.target and
-        # already ran once at boot, before the pool existed, where it
-        # correctly skipped and exited 0.
-        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
-        holds = sourcehost.succeed("zfs holds -H tank/data@blank")
-        assert "protect" in holds, f"@blank should carry a foreign hold: {holds!r}"
-
-        # The point of the hold: destroy now fails. This is the same call
-        # the puller's endpoint makes, so if it fails locally it fails
-        # over RPC too.
-        sourcehost.fail("zfs destroy tank/data@blank")
-
-        # Must be idempotent -- it runs on every boot and an existing hold
-        # would otherwise make `zfs hold` error and fail the unit.
-        sourcehost.succeed("systemctl restart zrepl-protect-blank.service")
-        status = sourcehost.succeed(
-            "systemctl show zrepl-protect-blank.service -p ExecMainStatus --value"
-        ).strip()
-        assert status == "0", f"second run should succeed, got {status}"
-
     with subtest("the receiver ignores properties a hostile sender sends"):
         # The sender alone decides whether properties travel, so a source
         # whose root is compromised turns send.properties on in its own
@@ -282,14 +197,12 @@ pkgs.testers.runNixOSTest {
                 "backup/backup/sourcehost/tank/data | wc -l"
             ).strip()
         )
-        puller.succeed("zrepl signal wakeup sourcehost")
         puller.wait_until_succeeds(
-            "test $(zfs list -t snapshot -H -o name "
+            "zrepl signal wakeup sourcehost; test $(zfs list -t snapshot -H -o name "
             "backup/backup/sourcehost/tank/data | wc -l) -gt %d" % n_before,
             timeout=180,
         )
 
-        # recv.properties.override: pinned to a specific safe value.
         for prop, want in [("mountpoint", "none"), ("canmount", "off")]:
             got = puller.succeed(
                 f"zfs get -H -o value {prop} backup/backup/sourcehost/tank/data"

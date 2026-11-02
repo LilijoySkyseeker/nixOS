@@ -186,7 +186,7 @@ lives in one file.
   (`environment.etc.<name>.source = thatToplevel;` is enough — nothing
   needs to read the file, existing in the closure is the point) so its
   whole closure, glibc included, is already registered when the VM
-  boots. `tests/push-deploy-sandbox.nix` is the worked example.
+  boots.
 - **`ReadWritePaths` does not create the directory it grants access to.**
   On a fresh root user with no prior `.cache`, `ProtectSystem=strict` +
   `ReadWritePaths=[...]` fails mount-namespace setup outright with ENOENT
@@ -234,8 +234,7 @@ lives in one file.
   correctly (a near-exact `fileSystems`/`networking.interfaces` copy of
   the real config still isn't enough — see the next few points).
   `evalResult.config.nodes.<name>` is the resolved config directly (no
-  extra `.config` beneath that). `tests/push-deploy-sandbox.nix` is the
-  worked example.
+  extra `.config` beneath that).
 - **Even inheriting the right wiring, a few defaults still need forcing
   back on for a node that's actually meant to be switched into:**
   - `system.switch.enable` (`nixos/modules/system/activation/

@@ -2,17 +2,15 @@ _: {
   flake.vars = {
     # root access ssh keys
     publicSshKeys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad" # thinkpad
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFA+HAQkhmPxKyJFSopziqIVNvFqEaqyRWPVvgu+urfh lilijoy@nixos-thinkpad"
       "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIPlHQiJlsDCcOWk/EadTOgm8mnkGpsg1y8gzvhUgsg7rAAAABHNzaDo= lilijoy@yubikey" # keychain YubiKey 5C NFC, serial 27674308
       "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIALu+W5qQ76HBkHDZLAJ9Fd1ECG/v4MAFI9AnSYGu5vsAAAABHNzaDo= lilijoy@yubikey-torrent" # torrent's YubiKey 5C Nano, serial 29680883
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6pG0Y9QdCBRJZKpCD62U3uXl5Lz/bE0ifWLbhZ4q9o lilijoy@torrent" # torrent
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII6pG0Y9QdCBRJZKpCD62U3uXl5Lz/bE0ifWLbhZ4q9o lilijoy@torrent"
     ];
     # public half of homelab's zrepl pull key (private: homelab_zrepl_key
     # sops secret); both source hosts pin it to a forced `zrepl stdinserver`
     zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
     username = "lilijoy";
-    # public domain fronted by hosts/vps (minecraft subdomain,
-    # see services/octodns.nix)
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files
     # (services/jellyfin.nix, modules/nixos/nfs-homelab-mounts.nix, modules/nixos/desktop-apps.nix)
@@ -26,11 +24,8 @@ _: {
       torrent = "100.110.203.119";
       thinkpad = "100.95.127.26";
     };
-    # impermanence persistence root shared by modules/nixos/base.nix and the
-    # homelab services that append their own state dirs to it
     persistRoot = "/nix/state";
 
-    # disko.nix's zpool rootFsOptions, shared by every zpool on every host
     zfsRootFsOptions = {
       acltype = "posixacl";
       xattr = "sa";

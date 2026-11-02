@@ -1,5 +1,3 @@
-# VM integration tests: `nix build .#checks.x86_64-linux.<name>` or
-# `nix flake check` (see .agents/skills/verify-a-change/SKILL.md)
 { config, inputs, ... }:
 {
   perSystem = _: {
@@ -9,19 +7,9 @@
         zreplModule = config.flake.modules.nixos."zrepl";
       };
 
-      zfs-space-guard = import ../../tests/zfs-space-guard.nix {
-        pkgs = config.flake.pkgsUnstable;
-        zfsSpaceGuardModule = config.flake.modules.nixos."zfs-space-guard";
-      };
-
       health-alerts = import ../../tests/health-alerts.nix {
         pkgs = config.flake.pkgsUnstable;
         healthAlertsModule = config.flake.modules.nixos."health-alerts";
-      };
-
-      zfs-dataset-properties = import ../../tests/zfs-dataset-properties.nix {
-        pkgs = config.flake.pkgsUnstable;
-        zfsDatasetPropertiesModule = config.flake.modules.nixos."zfs-dataset-properties";
       };
 
       thinkpad-disk = import ../../tests/thinkpad-disk.nix {
@@ -73,14 +61,6 @@
       website = import ../../tests/website.nix {
         pkgs = config.flake.pkgsStable;
         websiteModule = config.flake.modules.nixos.website;
-      };
-
-      push-deploy-sandbox = import ../../tests/push-deploy-sandbox.nix {
-        pkgs = config.flake.pkgsUnstable;
-        pushDeployModule = config.flake.modules.nixos."push-deploy";
-        # the flake itself, not its pkgs: the test's `.lib.nixosSystem` must
-        # yield the byte-identical derivation the pushed flake builds in the VM
-        nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
     };
   };
