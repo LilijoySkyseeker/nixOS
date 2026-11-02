@@ -1,0 +1,2049 @@
+From 0d469263d28e48d02394d2bf0465de9396fb2fe4 Mon Sep 17 00:00:00 2001
+From: agent <agent@torrent>
+Date: Sun, 1 Nov 2026 12:43:15 -0800
+Subject: [PATCH] feat(claude): resume opted-in chats after usage limits reset
+
+getpaseo/paseo#7193 by kotusenka (head 5c7567a73), applied onto v0.12.0
+without its QA evidence; conflicts in agent-projections.ts and messages.test.ts
+resolved for v0.12.0.
+---
+ .../e2e/browser/usage-limit-resume.spec.ts    | 141 +++++++
+ .../app/e2e/support/helpers/mock-agent.ts     |   5 +-
+ .../e2e/support/helpers/usage-limit-resume.ts | 123 ++++++
+ packages/app/src/composer/index.tsx           |   2 +
+ .../app/src/composer/usage-limit-callout.tsx  | 114 ++++++
+ packages/app/src/i18n/resources/ar.ts         |   9 +
+ packages/app/src/i18n/resources/en.ts         |   9 +
+ packages/app/src/i18n/resources/es.ts         |   9 +
+ packages/app/src/i18n/resources/fr.ts         |  10 +
+ packages/app/src/i18n/resources/ja.ts         |   9 +
+ packages/app/src/i18n/resources/ko.ts         |   9 +
+ packages/app/src/i18n/resources/pt-BR.ts      |   9 +
+ packages/app/src/i18n/resources/ru.ts         |   9 +
+ packages/app/src/i18n/resources/zh-CN.ts      |   9 +
+ packages/app/src/stores/session-store.ts      |   2 +
+ packages/app/src/utils/agent-snapshots.ts     |   2 +
+ packages/protocol/src/agent-types.ts          |   2 +
+ packages/protocol/src/agent-usage-limit.ts    |  16 +
+ packages/protocol/src/messages.test.ts        |  28 ++
+ packages/protocol/src/messages.ts             |   4 +
+ .../src/server/agent/agent-archive.test.ts    |   8 +
+ .../server/src/server/agent/agent-archive.ts  |   1 +
+ .../server/src/server/agent/agent-manager.ts  | 164 +++++++-
+ .../src/server/agent/agent-projections.ts     |   3 +
+ .../src/server/agent/agent-sdk-types.ts       |   2 +
+ .../server/src/server/agent/agent-storage.ts  |   2 +
+ .../providers/claude/agent.redesign.test.ts   | 138 +++++++
+ .../server/agent/providers/claude/agent.ts    |  32 ++
+ .../agent/providers/mock-load-test-agent.ts   |  24 +-
+ .../server/agent/usage-limit-resume.test.ts   | 380 ++++++++++++++++++
+ .../src/server/agent/usage-limit-resume.ts    |  63 +++
+ packages/server/src/server/bootstrap.ts       |  13 +
+ .../server/src/server/websocket-server.ts     |   1 +
+ public-docs/providers.md                      |   8 +
+ 34 files changed, 1354 insertions(+), 6 deletions(-)
+ create mode 100644 packages/app/e2e/browser/usage-limit-resume.spec.ts
+ create mode 100644 packages/app/e2e/support/helpers/usage-limit-resume.ts
+ create mode 100644 packages/app/src/composer/usage-limit-callout.tsx
+ create mode 100644 packages/protocol/src/agent-usage-limit.ts
+ create mode 100644 packages/server/src/server/agent/usage-limit-resume.test.ts
+ create mode 100644 packages/server/src/server/agent/usage-limit-resume.ts
+
+diff --git a/packages/app/e2e/browser/usage-limit-resume.spec.ts b/packages/app/e2e/browser/usage-limit-resume.spec.ts
+new file mode 100644
+index 000000000..dea507288
+--- /dev/null
++++ b/packages/app/e2e/browser/usage-limit-resume.spec.ts
+@@ -0,0 +1,141 @@
++import { expect, test } from "../support/fixtures";
++import { seedMockAgentWorkspace, openAgentRoute } from "../support/helpers/mock-agent";
++import { submitMessageWithButton } from "../support/helpers/composer";
++import {
++  captureUsageLimit,
++  holdUsageLimitSave,
++  emitSyntheticUsageLimit,
++  openUsageLimitChat,
++  reloadUsageLimitChat,
++  setUsageLimitResume,
++  usageLimitResumeSwitch,
++} from "../support/helpers/usage-limit-resume";
++
++for (const viewport of [
++  { name: "wide", width: 1280, height: 900 },
++  { name: "compact", width: 390, height: 844 },
++]) {
++  test(`usage limit opt-in survives reload and can be cancelled (${viewport.name})`, async ({
++    page,
++  }, testInfo) => {
++    const agent = await seedMockAgentWorkspace({
++      repoPrefix: "usage-limit-",
++      title: "Interrupted task",
++    });
++    try {
++      await openUsageLimitChat({ page, agent, viewport });
++      await emitSyntheticUsageLimit({
++        page,
++        resetsAt: new Date(Date.now() + 300_000).toISOString(),
++      });
++      const toggle = usageLimitResumeSwitch(page);
++      await expect(page.getByText("Retry available at", { exact: false })).toBeVisible();
++      await expect(toggle).toHaveAttribute("aria-checked", "false");
++      await captureUsageLimit({
++        page,
++        testInfo,
++        name: `limit-disabled-${viewport.name}.png`,
++        colorScheme: "light",
++      });
++      await setUsageLimitResume({ page, enabled: true });
++      await expect(page.getByText("Will continue at", { exact: false })).toBeVisible();
++      await reloadUsageLimitChat(page);
++      await expect(toggle).toHaveAttribute("aria-checked", "true");
++      await expect(page.getByText("Will continue at", { exact: false })).toBeVisible();
++      await captureUsageLimit({
++        page,
++        testInfo,
++        name: `limit-enabled-${viewport.name}.png`,
++        colorScheme: "light",
++      });
++      await captureUsageLimit({
++        page,
++        testInfo,
++        name: `limit-enabled-${viewport.name}-dark.png`,
++        colorScheme: "dark",
++      });
++      await setUsageLimitResume({ page, enabled: false });
++      await expect(toggle).toHaveAttribute("aria-checked", "false");
++      await expect(page.getByText("Retry available at", { exact: false })).toBeVisible();
++      await submitMessageWithButton(page, "Continue manually");
++      await expect(toggle).toHaveCount(0);
++    } finally {
++      await agent.cleanup();
++    }
++  });
++}
++
++test("overdue opt-in continues the same chat once", async ({ page }) => {
++  const agent = await seedMockAgentWorkspace({
++    repoPrefix: "usage-limit-due-",
++    title: "Resume this task",
++  });
++  try {
++    await openAgentRoute(page, agent);
++    await emitSyntheticUsageLimit({
++      page,
++      resetsAt: new Date(Date.now() - 120_000).toISOString(),
++    });
++    const toggle = usageLimitResumeSwitch(page);
++    await expect(toggle).toHaveAttribute("aria-checked", "false");
++    await setUsageLimitResume({ page, enabled: true });
++    await expect(page.getByText("Enabled for this chat", { exact: false })).toBeVisible({
++      timeout: 15_000,
++    });
++    await expect(page.getByText("The usage limit reset.", { exact: false })).toHaveCount(1);
++    await expect(toggle).toHaveAttribute("aria-checked", "true");
++    await setUsageLimitResume({ page, enabled: false });
++    await expect(toggle).toHaveCount(0);
++  } finally {
++    await agent.cleanup();
++  }
++});
++
++test("missing reset time leaves manual continuation available", async ({ page }) => {
++  const agent = await seedMockAgentWorkspace({
++    repoPrefix: "usage-limit-unknown-",
++    title: "Unknown reset",
++  });
++  try {
++    await openAgentRoute(page, agent);
++    await emitSyntheticUsageLimit({ page, resetsAt: null });
++    await expect(page.getByText("did not report a reset time", { exact: false })).toBeVisible();
++    await expect(usageLimitResumeSwitch(page)).toBeDisabled();
++    await submitMessageWithButton(page, "Continue manually");
++    await expect(usageLimitResumeSwitch(page)).toHaveCount(0);
++  } finally {
++    await agent.cleanup();
++  }
++});
++
++test("failed opt-in keeps an error visible and permits retry on a narrow screen", async ({
++  page,
++}, testInfo) => {
++  const agent = await seedMockAgentWorkspace({
++    repoPrefix: "usage-limit-save-",
++    title: "Retry preference",
++  });
++  try {
++    const save = await holdUsageLimitSave({ page, agentId: agent.agentId });
++    await openUsageLimitChat({ page, agent, viewport: { width: 320, height: 844 } });
++    await emitSyntheticUsageLimit({ page, resetsAt: new Date(Date.now() + 300000).toISOString() });
++    await setUsageLimitResume({ page, enabled: true });
++    await save.waitForRequest();
++    await expect(usageLimitResumeSwitch(page)).toBeDisabled();
++    await expect(page.getByText("Saving…", { exact: true })).toBeVisible();
++    await captureUsageLimit({ page, testInfo, name: "pending-compact.png", colorScheme: "light" });
++    save.reject();
++    await expect(
++      page.getByText("Could not save this setting. Try again.", { exact: false }),
++    ).toBeVisible();
++    await expect(usageLimitResumeSwitch(page)).toHaveAttribute("aria-checked", "false");
++    await captureUsageLimit({ page, testInfo, name: "error-compact.png", colorScheme: "dark" });
++    await setUsageLimitResume({ page, enabled: true });
++    await expect(page.getByText("Will continue at", { exact: false })).toBeVisible();
++    await expect(
++      page.getByText("Could not save this setting. Try again.", { exact: false }),
++    ).toHaveCount(0);
++  } finally {
++    await agent.cleanup();
++  }
++});
+diff --git a/packages/app/e2e/support/helpers/mock-agent.ts b/packages/app/e2e/support/helpers/mock-agent.ts
+index f6176b0f0..1f01af0f5 100644
+--- a/packages/app/e2e/support/helpers/mock-agent.ts
++++ b/packages/app/e2e/support/helpers/mock-agent.ts
+@@ -91,7 +91,10 @@ export async function openAgentRoute(
+   page: Page,
+   input: { workspaceId: string; agentId: string },
+ ): Promise<void> {
+-  await page.goto(buildAgentRoute(input.workspaceId, input.agentId), { waitUntil: "commit" });
++  const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_METRO_PORT}`;
++  await page.goto(new URL(buildAgentRoute(input.workspaceId, input.agentId), baseURL).href, {
++    waitUntil: "commit",
++  });
+   await page.waitForURL(
+     (url) => url.pathname.includes("/workspace/") && !url.searchParams.has("open"),
+     { timeout: 60_000, waitUntil: "commit" },
+diff --git a/packages/app/e2e/support/helpers/usage-limit-resume.ts b/packages/app/e2e/support/helpers/usage-limit-resume.ts
+new file mode 100644
+index 000000000..c7f1aa6b1
+--- /dev/null
++++ b/packages/app/e2e/support/helpers/usage-limit-resume.ts
+@@ -0,0 +1,123 @@
++import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
++import { openAgentRoute, type MockAgentWorkspace } from "./mock-agent";
++import { daemonWsRoutePattern } from "./daemon-port";
++import { submitMessageWithButton } from "./composer";
++
++interface UsageLimitChatInput {
++  page: Page;
++  agent: MockAgentWorkspace;
++  viewport: NonNullable<ReturnType<Page["viewportSize"]>>;
++}
++
++interface UsageLimitPreferenceInput {
++  page: Page;
++  enabled: boolean;
++}
++
++interface UsageLimitCaptureInput {
++  page: Page;
++  testInfo: TestInfo;
++  name: string;
++  colorScheme: "light" | "dark";
++}
++
++interface SyntheticUsageLimitInput {
++  page: Page;
++  resetsAt: string | null;
++}
++
++export function usageLimitResumeSwitch(page: Page): Locator {
++  return page.getByRole("switch", { name: "Resume after usage limit", exact: true });
++}
++
++export async function openUsageLimitChat({ page, agent, viewport }: UsageLimitChatInput) {
++  await page.setViewportSize(viewport);
++  await openAgentRoute(page, agent);
++}
++
++export async function setUsageLimitResume({ page, enabled }: UsageLimitPreferenceInput) {
++  const toggle = usageLimitResumeSwitch(page);
++  await expect(toggle).toHaveAttribute("aria-checked", String(!enabled));
++  await toggle.click();
++}
++
++export async function reloadUsageLimitChat(page: Page) {
++  await page.reload();
++  await expect(usageLimitResumeSwitch(page)).toBeVisible();
++}
++
++export async function captureUsageLimit({
++  page,
++  testInfo,
++  name,
++  colorScheme,
++}: UsageLimitCaptureInput) {
++  await page.emulateMedia({ colorScheme });
++  // Reanimated drives this transition in JavaScript, so capture the settled thumb position.
++  await expect
++    .poll(() =>
++      usageLimitResumeSwitch(page).evaluate((toggle) => {
++        const thumb = toggle.querySelector('div[style*="translateX"]');
++        const track = thumb?.parentElement;
++        if (!track || !thumb) return false;
++        const trackBounds = track.getBoundingClientRect();
++        const thumbBounds = thumb.getBoundingClientRect();
++        return toggle.getAttribute("aria-checked") === "true"
++          ? trackBounds.right - thumbBounds.right < 4
++          : thumbBounds.left - trackBounds.left < 4;
++      }),
++    )
++    .toBe(true);
++  await page.screenshot({ path: testInfo.outputPath(name) });
++}
++
++export async function emitSyntheticUsageLimit({ page, resetsAt }: SyntheticUsageLimitInput) {
++  await submitMessageWithButton(page, `Emit synthetic usage limit: ${resetsAt ?? "unknown"}`);
++}
++
++/** Holds one real-client preference RPC at the network boundary, then rejects only that save. */
++export async function holdUsageLimitSave(input: { page: Page; agentId: string }) {
++  const requested = Promise.withResolvers<void>();
++  let rejectSave: (() => void) | null = null;
++  let held = false;
++  await input.page.routeWebSocket(daemonWsRoutePattern(), (ws) => {
++    const server = ws.connectToServer();
++    ws.onMessage((message) => {
++      const envelope = JSON.parse(typeof message === "string" ? message : message.toString("utf8"));
++      if (
++        !held &&
++        envelope.type === "session" &&
++        envelope.message?.type === "update_agent_request" &&
++        envelope.message.agentId === input.agentId
++      ) {
++        held = true;
++        rejectSave = () =>
++          ws.send(
++            JSON.stringify({
++              type: "session",
++              message: {
++                type: "rpc_error",
++                payload: {
++                  requestId: envelope.message.requestId,
++                  requestType: "update_agent_request",
++                  error: "Preference could not be saved",
++                  code: "save_rejected",
++                },
++              },
++            }),
++          );
++        requested.resolve();
++        return;
++      }
++      server.send(message);
++    });
++    server.onMessage((message) => ws.send(message));
++  });
++  return {
++    waitForRequest: () => requested.promise,
++    reject: () => {
++      if (!rejectSave) throw new Error("Preference save has not arrived");
++      rejectSave();
++    },
++  };
++}
+diff --git a/packages/app/src/composer/index.tsx b/packages/app/src/composer/index.tsx
+index 10d670fca..fb7ba3da5 100644
+--- a/packages/app/src/composer/index.tsx
++++ b/packages/app/src/composer/index.tsx
+@@ -1,3 +1,4 @@
++import { UsageLimitCallout } from "./usage-limit-callout";
+ import {
+   useComposerEditingSession,
+   useComposerFullscreen,
+@@ -2409,6 +2410,7 @@ function ComposerContentImpl({
+         {/* Input area */}
+         <View style={inputAreaContainerStyle}>
+           <View style={inputAreaContentStyle}>
++            {isFullscreen ? null : <UsageLimitCallout serverId={serverId} agentId={agentId} />}
+             {isFullscreen ? null : queueList}
+             {!isFullscreen && sendErrorNode}
+ 
+diff --git a/packages/app/src/composer/usage-limit-callout.tsx b/packages/app/src/composer/usage-limit-callout.tsx
+new file mode 100644
+index 000000000..7b6b19756
+--- /dev/null
++++ b/packages/app/src/composer/usage-limit-callout.tsx
+@@ -0,0 +1,114 @@
++import { useMutation } from "@tanstack/react-query";
++import { Text, View } from "react-native";
++import { useTranslation } from "react-i18next";
++import { StyleSheet } from "react-native-unistyles";
++import {
++  AUTO_RESUME_USAGE_LIMIT_LABEL,
++  usageLimitResumeAt,
++} from "@getpaseo/protocol/agent-usage-limit";
++import { Switch } from "@/components/ui/switch";
++import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
++import { useSessionStore } from "@/stores/session-store";
++
++interface UsageLimitCalloutProps {
++  serverId: string;
++  agentId?: string;
++}
++
++export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps) {
++  const { t, i18n } = useTranslation();
++  const client = useHostRuntimeClient(serverId);
++  const isConnected = useHostRuntimeIsConnected(serverId);
++  // COMPAT(usageLimitResume): added in v0.12.0; remove gate after 2027-04-17.
++  const supported = useSessionStore(
++    (state) => state.sessions[serverId]?.serverInfo?.features?.usageLimitResume === true,
++  );
++  const limit = useSessionStore((state) =>
++    agentId ? state.sessions[serverId]?.agents.get(agentId)?.usageLimit : undefined,
++  );
++  const enabled = useSessionStore((state) =>
++    agentId
++      ? state.sessions[serverId]?.agents.get(agentId)?.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] ===
++        "true"
++      : false,
++  );
++  const mutation = useMutation({
++    mutationFn: async (value: boolean) => {
++      if (!client || !agentId) throw new Error("Agent is unavailable");
++      await client.updateAgent(agentId, {
++        labels: { [AUTO_RESUME_USAGE_LIMIT_LABEL]: String(value) },
++      });
++    },
++  });
++  if (!supported || (!limit && !enabled)) return null;
++
++  const resumeAt = limit ? usageLimitResumeAt(limit) : null;
++  const missingReset = Boolean(limit && resumeAt === null);
++  let description = t("agentPanel.usageLimit.enabled");
++  if (missingReset) description = t("agentPanel.usageLimit.unknownReset");
++  if (resumeAt !== null) {
++    const at = new Date(resumeAt).toLocaleString(i18n.language, {
++      month: "short",
++      day: "numeric",
++      hour: "numeric",
++      minute: "2-digit",
++      timeZoneName: "short",
++    });
++    description = t(
++      enabled ? "agentPanel.usageLimit.scheduled" : "agentPanel.usageLimit.available",
++      { at },
++    );
++  }
++
++  return (
++    <View style={styles.container} testID="usage-limit-callout">
++      <View style={styles.row}>
++        <View style={styles.copy}>
++          <Text style={styles.title}>{t("agentPanel.usageLimit.label")}</Text>
++          <View>
++            <Text
++              style={[styles.description, mutation.isPending && styles.hidden]}
++              accessibilityElementsHidden={mutation.isPending}
++              importantForAccessibility={mutation.isPending ? "no-hide-descendants" : "auto"}
++            >
++              {description}
++            </Text>
++            {mutation.isPending ? (
++              <Text style={[styles.description, styles.saving]}>
++                {t("agentPanel.usageLimit.saving")}
++              </Text>
++            ) : null}
++          </View>
++        </View>
++        <Switch
++          testID="usage-limit-auto-resume"
++          accessibilityLabel={t("agentPanel.usageLimit.label")}
++          value={mutation.isPending ? mutation.variables : enabled}
++          disabled={!isConnected || mutation.isPending || (missingReset && !enabled)}
++          onValueChange={mutation.mutate}
++        />
++      </View>
++      {mutation.isError ? (
++        <Text style={styles.error}>{t("agentPanel.usageLimit.saveFailed")}</Text>
++      ) : null}
++    </View>
++  );
++}
++
++const styles = StyleSheet.create((theme) => ({
++  container: {
++    padding: theme.spacing[3],
++    marginBottom: theme.spacing[2],
++    borderWidth: theme.borderWidth[1],
++    borderColor: theme.colors.border,
++    borderRadius: theme.borderRadius.lg,
++    gap: theme.spacing[2],
++  },
++  row: { flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
++  copy: { flex: 1, gap: theme.spacing[1] },
++  title: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
++  description: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
++  hidden: { opacity: 0 },
++  saving: { position: "absolute", top: 0, left: 0, right: 0 },
++  error: { color: theme.colors.statusDanger, fontSize: theme.fontSize.sm },
++}));
+diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
+index 4adf945b6..a8607ae1a 100644
+--- a/packages/app/src/i18n/resources/ar.ts
++++ b/packages/app/src/i18n/resources/ar.ts
+@@ -250,6 +250,15 @@ export const ar: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "تعذّر حفظ هذا الإعداد. حاول مرة أخرى.",
++      label: "المتابعة بعد إعادة تعيين حد الاستخدام",
++      enabled: "مفعّل لهذه المحادثة. أبقِ المضيف قيد التشغيل.",
++      available: "تم بلوغ حد الاستخدام. تتاح إعادة المحاولة في {{at}}.",
++      scheduled: "ستستأنف المحادثة في {{at}} إذا كان المضيف يعمل.",
++      unknownReset: "لم يحدد المزوّد وقت إعادة التعيين. تابع يدويًا.",
++      saving: "جارٍ الحفظ…",
++    },
+     states: {
+       notFound: "لم يتم العثور على Agent",
+       failedToLoad: "فشل تحميل الوكيل",
+diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
+index 9bb046003..addc11c96 100644
+--- a/packages/app/src/i18n/resources/en.ts
++++ b/packages/app/src/i18n/resources/en.ts
+@@ -246,6 +246,15 @@ export const en = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "Could not save this setting. Try again.",
++      label: "Resume after usage limit",
++      enabled: "Enabled for this chat. Keep the host running.",
++      available: "Usage limit reached. Retry available at {{at}}.",
++      scheduled: "Will continue at {{at}} while the host is running.",
++      unknownReset: "The provider did not report a reset time. Continue manually.",
++      saving: "Saving…",
++    },
+     states: {
+       notFound: "Agent not found",
+       failedToLoad: "Failed to load agent",
+diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
+index 9ed1e8557..d386e147b 100644
+--- a/packages/app/src/i18n/resources/es.ts
++++ b/packages/app/src/i18n/resources/es.ts
+@@ -252,6 +252,15 @@ export const es: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "No se pudo guardar este ajuste. Inténtalo de nuevo.",
++      label: "Continuar al restablecerse el límite",
++      enabled: "Activado para este chat. Mantén el servidor en ejecución.",
++      available: "Límite alcanzado. Puedes reintentar a las {{at}}.",
++      scheduled: "Continuará a las {{at}} si el servidor está en ejecución.",
++      unknownReset: "El proveedor no indicó cuándo se restablece el límite. Continúa manualmente.",
++      saving: "Guardando…",
++    },
+     states: {
+       notFound: "Agentno encontrado",
+       failedToLoad: "No se pudo cargar el agente",
+diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
+index 6563b1100..44ade0ab9 100644
+--- a/packages/app/src/i18n/resources/fr.ts
++++ b/packages/app/src/i18n/resources/fr.ts
+@@ -253,6 +253,16 @@ export const fr: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "Impossible d’enregistrer ce réglage. Réessayez.",
++      label: "Reprendre après la limite d’utilisation",
++      enabled: "Activé pour cette conversation. Gardez l’hôte en marche.",
++      available: "Limite atteinte. Nouvelle tentative possible à {{at}}.",
++      scheduled: "Reprendra à {{at}} si l’hôte est en marche.",
++      unknownReset:
++        "Le fournisseur n’a pas indiqué l’heure de réinitialisation. Reprenez manuellement.",
++      saving: "Enregistrement…",
++    },
+     states: {
+       notFound: "Agent introuvable",
+       failedToLoad: "Impossible de charger l’agent",
+diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
+index eb22dd663..b6c3b56b8 100644
+--- a/packages/app/src/i18n/resources/ja.ts
++++ b/packages/app/src/i18n/resources/ja.ts
+@@ -252,6 +252,15 @@ export const ja: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "設定を保存できませんでした。もう一度お試しください。",
++      label: "利用制限の解除後に再開",
++      enabled: "このチャットで有効です。ホストを起動したままにしてください。",
++      available: "利用制限に達しました。{{at}}から再試行できます。",
++      scheduled: "ホストが稼働していれば{{at}}に再開します。",
++      unknownReset: "プロバイダーから解除時刻が通知されませんでした。手動で再開してください。",
++      saving: "保存中…",
++    },
+     states: {
+       notFound: "エージェントが見つかりません",
+       failedToLoad: "エージェントの読み込みに失敗しました",
+diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
+index afdb8974e..71f8afb8e 100644
+--- a/packages/app/src/i18n/resources/ko.ts
++++ b/packages/app/src/i18n/resources/ko.ts
+@@ -250,6 +250,15 @@ export const ko: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "설정을 저장하지 못했습니다. 다시 시도해 주세요.",
++      label: "사용량 제한 해제 후 계속",
++      enabled: "이 채팅에서 활성화되었습니다. 호스트를 켜 두세요.",
++      available: "사용량 제한에 도달했습니다. {{at}}부터 다시 시도할 수 있습니다.",
++      scheduled: "호스트가 실행 중이면 {{at}}에 계속합니다.",
++      unknownReset: "공급자가 제한 해제 시각을 제공하지 않았습니다. 수동으로 계속하세요.",
++      saving: "저장 중…",
++    },
+     states: {
+       notFound: "에이전트를 찾을 수 없습니다",
+       failedToLoad: "에이전트를 불러오지 못했습니다",
+diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
+index f89fb97bf..40d3315c9 100644
+--- a/packages/app/src/i18n/resources/pt-BR.ts
++++ b/packages/app/src/i18n/resources/pt-BR.ts
+@@ -251,6 +251,15 @@ export const ptBR: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "Não foi possível salvar esta configuração. Tente novamente.",
++      label: "Continuar após a redefinição do limite",
++      enabled: "Ativado para este chat. Mantenha o servidor em execução.",
++      available: "Limite atingido. Nova tentativa disponível em {{at}}.",
++      scheduled: "Continuará em {{at}} se o servidor estiver em execução.",
++      unknownReset: "O provedor não informou o horário de redefinição. Continue manualmente.",
++      saving: "Salvando…",
++    },
+     states: {
+       notFound: "Agente não encontrado",
+       failedToLoad: "Falha ao carregar agente",
+diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
+index a1a70822b..86de08856 100644
+--- a/packages/app/src/i18n/resources/ru.ts
++++ b/packages/app/src/i18n/resources/ru.ts
+@@ -252,6 +252,15 @@ export const ru: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "Не удалось сохранить настройку. Попробуйте ещё раз.",
++      label: "Продолжать после сброса лимита",
++      enabled: "Включено для этого чата. Сервер должен оставаться запущенным.",
++      available: "Лимит исчерпан. Повторный запуск доступен с {{at}}.",
++      scheduled: "Чат продолжится {{at}}, если сервер будет запущен.",
++      unknownReset: "Провайдер не сообщил время сброса. Продолжите вручную.",
++      saving: "Сохранение…",
++    },
+     states: {
+       notFound: "Агент не найден",
+       failedToLoad: "Не удалось загрузить агента",
+diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
+index ca221d7d3..26ca1fc13 100644
+--- a/packages/app/src/i18n/resources/zh-CN.ts
++++ b/packages/app/src/i18n/resources/zh-CN.ts
+@@ -250,6 +250,15 @@ export const zhCN: TranslationResources = {
+     },
+   },
+   agentPanel: {
++    usageLimit: {
++      saveFailed: "无法保存此设置，请重试。",
++      label: "用量限制重置后继续",
++      enabled: "已为此聊天启用。请保持主机运行。",
++      available: "已达到用量限制。可在 {{at}} 后重试。",
++      scheduled: "主机运行时，将于 {{at}} 继续。",
++      unknownReset: "提供商未报告重置时间。请手动继续。",
++      saving: "正在保存…",
++    },
+     states: {
+       notFound: "未找到 Agent",
+       failedToLoad: "加载 Agent 失败",
+diff --git a/packages/app/src/stores/session-store.ts b/packages/app/src/stores/session-store.ts
+index 9b70d9048..321f78ede 100644
+--- a/packages/app/src/stores/session-store.ts
++++ b/packages/app/src/stores/session-store.ts
+@@ -1,3 +1,4 @@
++import type { AgentUsageLimit } from "@getpaseo/protocol/agent-usage-limit";
+ import equal from "fast-deep-equal";
+ import { create } from "zustand";
+ import { subscribeWithSelector } from "zustand/middleware";
+@@ -87,6 +88,7 @@ export interface Agent {
+   runtimeInfo?: AgentRuntimeInfo;
+   lastUsage?: AgentUsage;
+   lastError?: string | null;
++  usageLimit?: AgentUsageLimit;
+   title: string | null;
+   cwd: string;
+   workspaceId?: string;
+diff --git a/packages/app/src/utils/agent-snapshots.ts b/packages/app/src/utils/agent-snapshots.ts
+index c1c70c640..a69520fff 100644
+--- a/packages/app/src/utils/agent-snapshots.ts
++++ b/packages/app/src/utils/agent-snapshots.ts
+@@ -79,6 +79,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
+     ...(agent.runtimeInfo ? { runtimeInfo: agent.runtimeInfo } : {}),
+     ...(agent.lastUsage ? { lastUsage: agent.lastUsage } : {}),
+     ...(agent.lastError ? { lastError: agent.lastError } : {}),
++    usageLimit: agent.usageLimit,
+     title: agent.title,
+     labels: agent.labels,
+     requiresAttention: agent.requiresAttention ?? false,
+@@ -122,6 +123,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
+     runtimeInfo: snapshot.runtimeInfo,
+     lastUsage: snapshot.lastUsage,
+     lastError: snapshot.lastError ?? null,
++    usageLimit: snapshot.usageLimit,
+     title: snapshot.title ?? null,
+     cwd: snapshot.cwd,
+     workspaceId: snapshot.workspaceId,
+diff --git a/packages/protocol/src/agent-types.ts b/packages/protocol/src/agent-types.ts
+index c7fffe8ce..4bde52944 100644
+--- a/packages/protocol/src/agent-types.ts
++++ b/packages/protocol/src/agent-types.ts
+@@ -1,3 +1,4 @@
++import type { AgentUsageLimit } from "./agent-usage-limit.js";
+ import type { AgentMessage } from "./agent-message.js";
+ import type { AgentAttachment } from "./messages.js";
+ 
+@@ -410,6 +411,7 @@ export type AgentStreamEvent =
+       error: string;
+       code?: string;
+       diagnostic?: string;
++      usageLimit?: AgentUsageLimit;
+       turnId?: string;
+     }
+   | { type: "turn_canceled"; provider: AgentProvider; reason: string; turnId?: string }
+diff --git a/packages/protocol/src/agent-usage-limit.ts b/packages/protocol/src/agent-usage-limit.ts
+new file mode 100644
+index 000000000..1853b788c
+--- /dev/null
++++ b/packages/protocol/src/agent-usage-limit.ts
+@@ -0,0 +1,16 @@
++import { z } from "zod";
++
++export const AUTO_RESUME_USAGE_LIMIT_LABEL = "paseo.auto-resume-usage-limit";
++export const USAGE_LIMIT_RESUME_DELAY_MS = 60_000;
++
++export const AgentUsageLimitSchema = z.object({
++  resetsAt: z.string().nullable(),
++});
++
++export type AgentUsageLimit = z.infer<typeof AgentUsageLimitSchema>;
++
++export function usageLimitResumeAt(limit: AgentUsageLimit): number | null {
++  if (limit.resetsAt === null) return null;
++  const resetsAt = Date.parse(limit.resetsAt);
++  return Number.isFinite(resetsAt) ? resetsAt + USAGE_LIMIT_RESUME_DELAY_MS : null;
++}
+diff --git a/packages/protocol/src/messages.test.ts b/packages/protocol/src/messages.test.ts
+index ca3ab8613..0a6d968ac 100644
+--- a/packages/protocol/src/messages.test.ts
++++ b/packages/protocol/src/messages.test.ts
+@@ -1,6 +1,7 @@
+ import { describe, expect, test } from "vitest";
+ import {
+   AgentTimelineItemPayloadSchema,
++  AgentStreamEventPayloadSchema,
+   FileExplorerRequestSchema,
+   PaseoWorktreeArchiveRequestSchema,
+   parseServerInfoStatusPayload,
+@@ -548,3 +549,30 @@ test("agent messages are an optional semantic payload on existing tool rows", ()
+     }).success,
+   ).toBe(false);
+ });
++
++describe("usage limit resume compatibility", () => {
++  const failed = { type: "turn_failed", provider: "claude", error: "Usage limit reached" };
++
++  test("accepts failures from older daemons without usage limit metadata", () => {
++    expect(AgentStreamEventPayloadSchema.parse(failed)).toEqual(failed);
++  });
++
++  test.each([null, "2026-10-17T06:40:00.000Z"])(
++    "preserves structured usage limit metadata: %s",
++    (resetsAt) => {
++      const event = { ...failed, usageLimit: { resetsAt } };
++      expect(AgentStreamEventPayloadSchema.parse(event)).toEqual(event);
++    },
++  );
++
++  test("accepts old server info and advertises new support explicitly", () => {
++    const oldInfo = { status: "server_info", serverId: "srv-test" };
++    expect(parseServerInfoStatusPayload(oldInfo)?.features?.usageLimitResume).toBeUndefined();
++    expect(
++      parseServerInfoStatusPayload({
++        ...oldInfo,
++        features: { usageLimitResume: true },
++      })?.features?.usageLimitResume,
++    ).toBe(true);
++  });
++});
+diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
+index a7a2182d9..870d5d19e 100644
+--- a/packages/protocol/src/messages.ts
++++ b/packages/protocol/src/messages.ts
+@@ -1,3 +1,4 @@
++import { AgentUsageLimitSchema } from "./agent-usage-limit.js";
+ import { AgentMessageSchema } from "./agent-message.js";
+ import { PluginRegistryIdentitySchema } from "./plugin-registry.js";
+ import { AgentProfileSchema, AgentSkillSelectionSchema } from "./agent-profile.js";
+@@ -742,6 +743,7 @@ export const AgentStreamEventPayloadSchema = z.discriminatedUnion("type", [
+     error: z.string(),
+     code: z.string().optional(),
+     diagnostic: z.string().optional(),
++    usageLimit: AgentUsageLimitSchema.optional(),
+   }),
+   z.object({
+     type: z.literal("turn_canceled"),
+@@ -832,6 +834,7 @@ export const AgentSnapshotPayloadSchema = z.object({
+   runtimeInfo: AgentRuntimeInfoSchema.optional(),
+   lastUsage: AgentUsageSchema.optional(),
+   lastError: z.string().optional(),
++  usageLimit: AgentUsageLimitSchema.optional(),
+   title: z.string().nullable(),
+   labels: z.record(z.string(), z.string()).default({}),
+   requiresAttention: z.boolean().optional(),
+@@ -3586,6 +3589,7 @@ export const ServerInfoStatusPayloadSchema = z
+         backgroundWorkspaces: z.boolean().optional(),
+         providersSnapshot: z.boolean().optional(),
+         usageSources: z.boolean().optional(),
++        usageLimitResume: z.boolean().optional(),
+         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
+         providersSnapshotCwd: z.boolean().optional(),
+         // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
+diff --git a/packages/server/src/server/agent/agent-archive.test.ts b/packages/server/src/server/agent/agent-archive.test.ts
+index c4dd34b7e..f53c502c6 100644
+--- a/packages/server/src/server/agent/agent-archive.test.ts
++++ b/packages/server/src/server/agent/agent-archive.test.ts
+@@ -68,3 +68,11 @@ test("can stamp updatedAt to the archive timestamp", () => {
+ 
+   expect(archived.updatedAt).toBe("2025-01-03T00:00:00.000Z");
+ });
++
++test("archiving cancels a pending usage-limit continuation", () => {
++  const archived = buildArchivedAgentRecord({
++    ...BASE_RECORD,
++    usageLimit: { resetsAt: "2026-10-17T06:40:00.000Z" },
++  });
++  expect(archived.usageLimit).toBeUndefined();
++});
+diff --git a/packages/server/src/server/agent/agent-archive.ts b/packages/server/src/server/agent/agent-archive.ts
+index 7e35d98f8..14250f2ac 100644
+--- a/packages/server/src/server/agent/agent-archive.ts
++++ b/packages/server/src/server/agent/agent-archive.ts
+@@ -15,6 +15,7 @@ export function buildArchivedAgentRecord(
+   return {
+     ...record,
+     archivedAt,
++    usageLimit: undefined,
+     updatedAt: options?.updatedAt ?? record.updatedAt,
+     lastStatus: normalizeArchivedStatus(record.lastStatus),
+     requiresAttention: false,
+diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
+index a15d94389..37164e74f 100644
+--- a/packages/server/src/server/agent/agent-manager.ts
++++ b/packages/server/src/server/agent/agent-manager.ts
+@@ -1,3 +1,8 @@
++import {
++  AUTO_RESUME_USAGE_LIMIT_LABEL,
++  usageLimitResumeAt,
++  type AgentUsageLimit,
++} from "@getpaseo/protocol/agent-usage-limit";
+ import { projectTimelineRows } from "./timeline-projection.js";
+ import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
+ import { describeHookAgent, publishAgentStream } from "../plugins/lifecycle/index.js";
+@@ -91,7 +96,12 @@ import {
+   type ProviderSubagentStoreEvent,
+ } from "./provider-subagents/store.js";
+ import { withTimeout } from "../../utils/promise-timeout.js";
+-import { extractAttention } from "../persistence-hooks.js";
++import {
++  extractAttention,
++  extractTimestamps,
++  buildConfigOverrides,
++  toAgentPersistenceHandle,
++} from "../persistence-hooks.js";
+ 
+ const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
+ const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
+@@ -430,6 +440,7 @@ interface ManagedAgentBase {
+   activeTurnId: string | null;
+   activeTurnStartedAt: Date | null;
+   lastUsage?: AgentUsage;
++  usageLimit?: AgentUsageLimit;
+   lastError?: string;
+   attention: AttentionState;
+   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
+@@ -546,6 +557,28 @@ interface WriteLabelsResult {
+   live: boolean;
+ }
+ 
++interface UsageLimitPreferencePatch {
++  agentId: string;
++  labels: AgentLabelPatch | undefined;
++}
++
++interface ResumeAfterUsageLimitInput {
++  agentId: string;
++  expected: AgentUsageLimit;
++}
++
++interface UsageLimitResumeDispatchInput {
++  agentId: string;
++  lastUserMessageAt: Date | null | undefined;
++  signal: AbortSignal;
++}
++
++interface UsageLimitResumeClaimInput {
++  record: StoredAgentRecord;
++  existing: ManagedAgent | undefined;
++  handle: AgentPersistenceHandle;
++}
++
+ interface AgentMetadataPatch {
+   title?: string;
+   labels?: AgentLabelPatch;
+@@ -758,6 +791,7 @@ export class AgentManager {
+   private readonly inFlightAgentCloses = new Map<string, Promise<void>>();
+   private readonly reloadedSessionCloses = new WeakMap<AgentSession, Promise<void>>();
+   private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
++  private readonly usageLimitResumeAttempts = new Map<string, AbortController>();
+   private readonly agentStreamCoalescer: AgentStreamCoalescer;
+   private mcpBaseUrl: string | null;
+   private readonly mcpAuthToken: string | null;
+@@ -1441,6 +1475,8 @@ export class AgentManager {
+     return this.registerSession(session, storedConfig, resolvedAgentId, {
+       ...options,
+       persistence: handle,
++      usageLimit: record?.usageLimit,
++      lastError: record?.lastError ?? undefined,
+       restoring: true,
+     });
+   }
+@@ -1630,6 +1666,7 @@ export class AgentManager {
+         historyPrimed: rehydrateFromDisk ? false : preservedHistoryPrimed,
+         lastUsage: preservedLastUsage,
+         lastError: preservedLastError,
++        usageLimit: existing.usageLimit,
+         attention: preservedAttention,
+         restoring: true,
+       });
+@@ -1822,6 +1859,7 @@ export class AgentManager {
+   }
+ 
+   async archiveAgent(agentId: string): Promise<{ archivedAt: string }> {
++    this.usageLimitResumeAttempts.get(agentId)?.abort();
+     return this.runLifecycleMutation(agentId, () => this.archiveAgentUnlocked(agentId));
+   }
+ 
+@@ -1859,6 +1897,7 @@ export class AgentManager {
+       throw new Error(`Agent ${agentId} not found in storage after snapshot`);
+     }
+ 
++    agent.usageLimit = undefined;
+     const { archivedAt } = await this.markRecordArchived(stored, requestedArchivedAt);
+     agent.updatedAt = new Date(archivedAt);
+     await this.closeAgentRuntime(agentId);
+@@ -2012,6 +2051,7 @@ export class AgentManager {
+         lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
+         lastUsage: undefined,
+         lastError: record.lastError ?? undefined,
++        usageLimit: record.usageLimit,
+         attention,
+         internal: record.internal,
+         labels: record.labels,
+@@ -2121,6 +2161,7 @@ export class AgentManager {
+   }
+ 
+   async setLabels(agentId: string, labels: Record<string, string>): Promise<void> {
++    this.cancelUsageLimitResumeForLabels({ agentId, labels });
+     await this.runLifecycleMutation(agentId, async () => {
+       const agent = this.requireAgent(agentId);
+       await this.writeLabels(agent.id, labels);
+@@ -2270,6 +2311,7 @@ export class AgentManager {
+   }
+ 
+   async archiveSnapshot(agentId: string, archivedAt: string): Promise<StoredAgentRecord> {
++    this.usageLimitResumeAttempts.get(agentId)?.abort();
+     return this.runLifecycleMutation(agentId, () =>
+       this.archiveSnapshotUnlocked(agentId, archivedAt),
+     );
+@@ -2367,6 +2409,7 @@ export class AgentManager {
+       labels?: Record<string, string>;
+     },
+   ): Promise<void> {
++    this.cancelUsageLimitResumeForLabels({ agentId, labels: updates.labels });
+     await this.runLifecycleMutation(agentId, () =>
+       this.updateAgentMetadataUnlocked(agentId, updates),
+     );
+@@ -2411,6 +2454,120 @@ export class AgentManager {
+     return result;
+   }
+ 
++  private cancelUsageLimitResumeForLabels({ agentId, labels }: UsageLimitPreferencePatch): void {
++    const preference = labels?.[AUTO_RESUME_USAGE_LIMIT_LABEL];
++    if (preference !== undefined && preference !== "true") {
++      // Mark cancellation on receipt; the durable label write still uses the lifecycle lane.
++      this.usageLimitResumeAttempts.get(agentId)?.abort();
++    }
++  }
++
++  async resumeAfterUsageLimit({ agentId, expected }: ResumeAfterUsageLimitInput): Promise<void> {
++    if (this.usageLimitResumeAttempts.has(agentId)) return;
++    const attempt = new AbortController();
++    this.usageLimitResumeAttempts.set(agentId, attempt);
++    try {
++      await this.runLifecycleMutation(agentId, async () => {
++        if (attempt.signal.aborted) return;
++        const registry = this.requireRegistry();
++        const record = await registry.get(agentId);
++        const existing = this.agents.get(agentId);
++        const resumeAt = usageLimitResumeAt(expected);
++        if (!record || !this.acceptingAgentRegistrations || record.archivedAt || record.internal)
++          return;
++        const labels = existing ? existing.labels : record.labels;
++        const limit = existing ? existing.usageLimit : record.usageLimit;
++        if (
++          labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true" ||
++          limit?.resetsAt !== expected.resetsAt ||
++          resumeAt === null ||
++          resumeAt > Date.now() ||
++          this.hasInFlightRun(agentId) ||
++          (existing && existing.pendingPermissions.size > 0)
++        )
++          return;
++        const handle = toAgentPersistenceHandle(
++          this.getRegisteredProviderIds(),
++          record.persistence,
++        );
++        if (!handle) return;
++
++        const lastUserMessageAt = await this.claimUsageLimitResume({ record, existing, handle });
++        // A manual turn may finish while the durable claim or history load is awaiting I/O.
++        if (
++          !this.canDispatchUsageLimitResume({ agentId, lastUserMessageAt, signal: attempt.signal })
++        )
++          return;
++        void this.runAgent(
++          agentId,
++          "The usage limit reset. Continue the interrupted task from where you stopped, respecting the existing instructions. If the task is already complete, do not start new work.",
++          { clientMessageId: randomUUID() },
++        ).catch((error) => {
++          this.logger.warn({ err: error, agentId }, "Failed to resume after usage limit");
++        });
++      });
++    } finally {
++      this.usageLimitResumeAttempts.delete(agentId);
++    }
++  }
++
++  private canDispatchUsageLimitResume({
++    agentId,
++    lastUserMessageAt,
++    signal,
++  }: UsageLimitResumeDispatchInput): boolean {
++    const agent = this.agents.get(agentId);
++    return Boolean(
++      !signal.aborted &&
++      this.acceptingAgentRegistrations &&
++      agent &&
++      agent.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] === "true" &&
++      !this.hasInFlightRun(agentId) &&
++      agent.pendingPermissions.size === 0 &&
++      agent.lastUserMessageAt === lastUserMessageAt,
++    );
++  }
++
++  private async claimUsageLimitResume({
++    record,
++    existing,
++    handle,
++  }: UsageLimitResumeClaimInput): Promise<Date | null | undefined> {
++    // Consume durably before loading or dispatching: a crash must not replay an unattended prompt.
++    if (existing) {
++      const lastUserMessageAt = existing.lastUserMessageAt;
++      const limit = existing.usageLimit;
++      existing.usageLimit = undefined;
++      try {
++        await this.persistSnapshot(existing);
++      } catch (error) {
++        // A failed claim did not consume the durable wait. Preserve it unless newer work won.
++        const unchanged = existing.lastUserMessageAt === lastUserMessageAt;
++        const canRestore = unchanged && !this.hasInFlightRun(existing.id) && !existing.usageLimit;
++        if (canRestore) existing.usageLimit = limit;
++        throw error;
++      }
++      this.emitState(existing, { persist: false });
++      return lastUserMessageAt;
++    }
++    const consumed = {
++      ...record,
++      usageLimit: undefined,
++      updatedAt: this.nextStoredUpdatedAt(record),
++    };
++    await this.requireRegistry().upsert(consumed);
++    this.dispatchStoredAgentState(consumed);
++    await this.resumeAgentFromPersistenceInternal(
++      handle,
++      buildConfigOverrides(consumed),
++      record.id,
++      { ...extractTimestamps(consumed), attention: extractAttention(consumed) },
++    );
++    const lastUserMessageAt = this.agents.get(record.id)?.lastUserMessageAt;
++    await this.hydrateTimelineFromProvider(record.id);
++    return lastUserMessageAt;
++  }
++
+   async runAgent(
+     agentId: string,
+     prompt: AgentPromptInput,
+@@ -2620,6 +2777,7 @@ export class AgentManager {
+     const agent = existingAgent;
+     const isReplacement = agent.pendingReplacement;
+     agent.lastError = undefined;
++    agent.usageLimit = undefined;
+ 
+     const pendingRun = this.runs.createPendingRun(agentId);
+ 
+@@ -3563,6 +3721,7 @@ export class AgentManager {
+       persistence?: AgentPersistenceHandle;
+       historyPrimed?: boolean;
+       lastUsage?: AgentUsage;
++      usageLimit?: AgentUsageLimit;
+       lastError?: string;
+       attention?: AttentionState;
+       /**
+@@ -3748,6 +3907,7 @@ export class AgentManager {
+           labels?: Record<string, string>;
+           historyPrimed?: boolean;
+           lastUsage?: AgentUsage;
++          usageLimit?: AgentUsageLimit;
+           lastError?: string;
+           attention?: AttentionState;
+           persistence?: AgentPersistenceHandle;
+@@ -3790,6 +3950,7 @@ export class AgentManager {
+       lastUserMessageAt: options?.lastUserMessageAt ?? null,
+       lastUsage: options?.lastUsage,
+       lastError: options?.lastError,
++      usageLimit: options?.usageLimit,
+       attention: resolveInitialAttention(options?.attention),
+       internal: config.internal ?? false,
+       labels: options?.labels ?? {},
+@@ -4641,6 +4802,7 @@ export class AgentManager {
+       agent.lifecycle = "error";
+     }
+     agent.lastError = event.error;
++    if (!options?.fromHistory) agent.usageLimit = event.usageLimit;
+     await this.appendSystemErrorTimelineMessage(
+       agent,
+       event.provider,
+diff --git a/packages/server/src/server/agent/agent-projections.ts b/packages/server/src/server/agent/agent-projections.ts
+index 3f2a9b777..709ac20d4 100644
+--- a/packages/server/src/server/agent/agent-projections.ts
++++ b/packages/server/src/server/agent/agent-projections.ts
+@@ -91,6 +91,7 @@ export function toStoredAgentRecord(
+     features: normalizeFeatures(agent.features),
+     persistence,
+     lastError: agent.lastError ?? undefined,
++    usageLimit: agent.usageLimit,
+     requiresAttention: agent.attention.requiresAttention,
+     attentionReason: agent.attention.requiresAttention ? agent.attention.attentionReason : null,
+     attentionTimestamp: agent.attention.requiresAttention
+@@ -139,6 +140,7 @@ export function toAgentPayload(
+     persistence: projectPersistenceHandleForWire(agent.persistence),
+     title: options?.title ?? null,
+     labels: agent.labels,
++    usageLimit: agent.usageLimit,
+     ...(agent.internal ? { internal: true } : {}),
+   };
+ 
+@@ -250,6 +252,7 @@ export function buildStoredAgentPayload(
+     archivedAt: record.archivedAt ?? null,
+     ...(record.internal ? { internal: true } : {}),
+     labels: normalizeLabels(record.labels),
++    usageLimit: record.usageLimit,
+     ...(typeof record.lastError === "string" ? { lastError: record.lastError } : {}),
+     ...(providerAvailable ? {} : { providerUnavailable: true }),
+   };
+diff --git a/packages/server/src/server/agent/agent-sdk-types.ts b/packages/server/src/server/agent/agent-sdk-types.ts
+index 59fb6022e..f19054ea8 100644
+--- a/packages/server/src/server/agent/agent-sdk-types.ts
++++ b/packages/server/src/server/agent/agent-sdk-types.ts
+@@ -1,3 +1,4 @@
++import type { AgentUsageLimit } from "@getpaseo/protocol/agent-usage-limit";
+ import type {
+   AgentFeature,
+   AgentFeatureSelect,
+@@ -428,6 +429,7 @@ export type AgentStreamEvent =
+       error: string;
+       code?: string;
+       diagnostic?: string;
++      usageLimit?: AgentUsageLimit;
+       turnId?: string;
+     }
+   | { type: "turn_canceled"; provider: AgentProvider; reason: string; turnId?: string }
+diff --git a/packages/server/src/server/agent/agent-storage.ts b/packages/server/src/server/agent/agent-storage.ts
+index be94a31d4..56c00ee3b 100644
+--- a/packages/server/src/server/agent/agent-storage.ts
++++ b/packages/server/src/server/agent/agent-storage.ts
+@@ -1,3 +1,4 @@
++import { AgentUsageLimitSchema } from "@getpaseo/protocol/agent-usage-limit";
+ import { promises as fs, type Dirent } from "node:fs";
+ import path from "node:path";
+ import { z } from "zod";
+@@ -69,6 +70,7 @@ const STORED_AGENT_SCHEMA = z.object({
+   features: z.array(AgentFeatureSchema).optional(),
+   persistence: PERSISTENCE_HANDLE_SCHEMA,
+   lastError: z.string().nullable().optional(),
++  usageLimit: AgentUsageLimitSchema.optional(),
+   requiresAttention: z.boolean().optional(),
+   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
+   attentionTimestamp: z.string().nullable().optional(),
+diff --git a/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts b/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
+index 539392652..901170f69 100644
+--- a/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
++++ b/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
+@@ -2060,3 +2060,141 @@ test("does not use stream_event uuid as assistant message identity when message_
+ 
+   await session.close();
+ });
++
++test.each(["success", "error_during_execution"])(
++  "exposes a rejected subscription limit on a %s result",
++  async (subtype) => {
++    const resetsAt = Math.ceil(Date.now() / 1000) + 18_000;
++    const frames = [
++      { type: "system", subtype: "init", session_id: "limited-session", model: "opus" },
++      {
++        type: "rate_limit_event",
++        rate_limit_info: { status: "rejected", resetsAt, rateLimitType: "five_hour" },
++      },
++      {
++        type: "assistant",
++        error: "rate_limit",
++        message: { content: [{ type: "text", text: "You've hit your session limit" }] },
++      },
++      {
++        type: "result",
++        subtype,
++        is_error: true,
++        result: "You've hit your session limit",
++        errors: ["Usage limit reached"],
++        usage: buildUsage(),
++      },
++    ];
++    sdkQueryFactory.mockImplementation(() =>
++      createBaseQueryMock(
++        vi.fn(async () => {
++          const value = frames.shift();
++          return value ? { done: false, value } : { done: true, value: undefined };
++        }),
++      ),
++    );
++    const session = await createSession();
++    try {
++      const events = await collectUntilTerminal(streamSession(session, "continue the task"));
++      expect(events.at(-1)).toMatchObject({
++        type: "turn_failed",
++        provider: "claude",
++        usageLimit: { resetsAt: new Date(resetsAt * 1000).toISOString() },
++      });
++      expect(events.filter((event) => event.type === "turn_completed")).toHaveLength(0);
++    } finally {
++      await session.close();
++    }
++  },
++);
++
++test.each([
++  { status: "allowed_warning", resetsAt: 4_000_000_000 },
++  { status: "rejected", resetsAt: 4_000_000_000, isUsingOverage: true },
++])("does not turn an advisory or overage event into a failure: %j", async (info) => {
++  const frames = [
++    { type: "system", subtype: "init", session_id: "allowed-session", model: "opus" },
++    { type: "rate_limit_event", rate_limit_info: info },
++    { type: "result", subtype: "success", is_error: false, result: "done", usage: buildUsage() },
++  ];
++  sdkQueryFactory.mockImplementation(() =>
++    createBaseQueryMock(
++      vi.fn(async () => {
++        const value = frames.shift();
++        return value ? { done: false, value } : { done: true, value: undefined };
++      }),
++    ),
++  );
++  const session = await createSession();
++  try {
++    const events = await collectUntilTerminal(streamSession(session, "hello"));
++    expect(events.at(-1)).toMatchObject({ type: "turn_completed" });
++  } finally {
++    await session.close();
++  }
++});
++
++test.each([undefined, 1, Number.NaN, Number.MAX_VALUE])(
++  "does not guess a reset time from error prose: %s",
++  async (resetsAt) => {
++    const frames = [
++      { type: "system", subtype: "init", session_id: "unknown-reset-session", model: "opus" },
++      { type: "rate_limit_event", rate_limit_info: { status: "rejected", resetsAt } },
++      {
++        type: "result",
++        subtype: "error_during_execution",
++        is_error: true,
++        errors: ["You've hit your session limit · resets 9:40am (Europe/Moscow)"],
++        usage: buildUsage(),
++      },
++    ];
++    sdkQueryFactory.mockImplementation(() =>
++      createBaseQueryMock(
++        vi.fn(async () => {
++          const value = frames.shift();
++          return value ? { done: false, value } : { done: true, value: undefined };
++        }),
++      ),
++    );
++    const session = await createSession();
++    try {
++      const events = await collectUntilTerminal(streamSession(session, "hello"));
++      expect(events.at(-1)).toMatchObject({ type: "turn_failed", usageLimit: { resetsAt: null } });
++    } finally {
++      await session.close();
++    }
++  },
++);
++
++test("an autonomous turn's usage limit does not leak into a later unrelated failure", async () => {
++  const session = await createSession();
++  const internal: SessionStateInternals = asInternals(session);
++  const query = createPendingQueryMock();
++  const events: AgentStreamEvent[] = [];
++  session.subscribe((event) => events.push(event));
++  const failure = {
++    ...successResult(),
++    subtype: "error_during_execution",
++    is_error: true,
++    errors: ["Request failed"],
++  };
++  try {
++    await internal.routeSdkMessageFromPump(claudeTurnInit(), query);
++    await internal.routeSdkMessageFromPump(
++      {
++        ...rateLimitEvent,
++        rate_limit_info: { status: "rejected", resetsAt: Math.ceil(Date.now() / 1000) + 18_000 },
++      },
++      query,
++    );
++    await internal.routeSdkMessageFromPump(failure, query);
++    await internal.routeSdkMessageFromPump(claudeTurnInit(), query);
++    await internal.routeSdkMessageFromPump(failure, query);
++    const failures = events.filter((event) => event.type === "turn_failed");
++    expect(failures).toHaveLength(2);
++    expect(failures[0]).toHaveProperty("usageLimit.resetsAt");
++    expect(failures[1]).not.toHaveProperty("usageLimit");
++  } finally {
++    await session.close();
++  }
++});
+diff --git a/packages/server/src/server/agent/providers/claude/agent.ts b/packages/server/src/server/agent/providers/claude/agent.ts
+index 2af8983de..a2e31d824 100644
+--- a/packages/server/src/server/agent/providers/claude/agent.ts
++++ b/packages/server/src/server/agent/providers/claude/agent.ts
+@@ -1,3 +1,4 @@
++import type { AgentUsageLimit } from "@getpaseo/protocol/agent-usage-limit";
+ import { validateProviderOptions } from "../../provider-options.js";
+ import type { ChildProcess } from "node:child_process";
+ import { randomUUID } from "node:crypto";
+@@ -2289,6 +2290,7 @@ class ClaudeAgentSession implements AgentSession {
+   private mainTurnInFlight = false;
+   private foregroundHasVisibleActivity = false;
+   private activeTurnHasAssistantText = false;
++  private activeUsageLimit: AgentUsageLimit | undefined;
+   private readonly contextUsage: ClaudeContextUsageState;
+   private userMessageIds: string[] = [];
+   private readonly emittedUserMessageIds = new Set<string>();
+@@ -2430,6 +2432,7 @@ class ClaudeAgentSession implements AgentSession {
+     this.activeForegroundTurnId = turnId;
+     this.foregroundHasVisibleActivity = false;
+     this.activeTurnHasAssistantText = false;
++    this.activeUsageLimit = undefined;
+     this.contextUsage.beginTurn();
+     this.transitionTurnState("foreground", "foreground turn started");
+     this.clearRecentStderr();
+@@ -3727,6 +3730,7 @@ class ClaudeAgentSession implements AgentSession {
+       error: normalized,
+       ...(code ? { code } : {}),
+       ...(diagnostic ? { diagnostic } : {}),
++      ...(this.activeUsageLimit ? { usageLimit: this.activeUsageLimit } : {}),
+     };
+   }
+ 
+@@ -3843,6 +3847,7 @@ class ClaudeAgentSession implements AgentSession {
+     this.activeForegroundTurnId = null;
+     this.activeForegroundQuery = null;
+     this.activeForegroundInput = null;
++    this.activeUsageLimit = undefined;
+     this.cancelCurrentTurn = null;
+     this.activeTurnHasAssistantText = false;
+     this.compactionMarkerOpen = false;
+@@ -3857,6 +3862,7 @@ class ClaudeAgentSession implements AgentSession {
+     }
+ 
+     if (terminalSeen) {
++      this.activeUsageLimit = undefined;
+       this.compactionMarkerOpen = false;
+       if (this.activeForegroundTurnId) {
+         this.activeForegroundTurnId = null;
+@@ -3895,6 +3901,7 @@ class ClaudeAgentSession implements AgentSession {
+       return;
+     }
+     this.notifySubscribers({ type: "turn_completed", provider: "claude" });
++    this.activeUsageLimit = undefined;
+     this.autonomousTurn = null;
+     this.activeForegroundQuery = null;
+     this.activeForegroundInput = null;
+@@ -4377,6 +4384,7 @@ class ClaudeAgentSession implements AgentSession {
+       return this.translateSidechainFrameToEvents(message, parentToolUseId);
+     }
+ 
++    this.observeUsageLimit(message);
+     const events: AgentStreamEvent[] = [];
+     this.appendTaskStateEvent(message, events);
+ 
+@@ -4457,6 +4465,24 @@ class ClaudeAgentSession implements AgentSession {
+     this.permissionClearingSteerUuids.delete(lifecycle.commandUuid);
+   }
+ 
++  private observeUsageLimit(message: SDKMessage): void {
++    if (message.type === "assistant" && message.error === "rate_limit") {
++      this.activeUsageLimit ??= { resetsAt: null };
++      return;
++    }
++    if (message.type !== "rate_limit_event") return;
++    const info = message.rate_limit_info;
++    const usingOverage = info.isUsingOverage || info.overageInUse;
++    if (info.status !== "rejected" || usingOverage) {
++      this.activeUsageLimit = undefined;
++      return;
++    }
++    const resetMs = (info.resetsAt ?? 0) * 1000;
++    const reset = new Date(resetMs);
++    const hasFutureReset = Number.isFinite(reset.getTime()) && resetMs > Date.now();
++    this.activeUsageLimit = { resetsAt: hasFutureReset ? reset.toISOString() : null };
++  }
++
+   private appendTaskStateEvent(message: SDKMessage, events: AgentStreamEvent[]): void {
+     const item = this.taskState.observe(message);
+     if (item) events.push({ type: "timeline", provider: "claude", item });
+@@ -4784,6 +4810,12 @@ class ClaudeAgentSession implements AgentSession {
+     events: AgentStreamEvent[],
+   ): void {
+     const usage = this.convertUsage(message);
++    if (this.activeUsageLimit && (message.is_error || message.subtype !== "success")) {
++      const error = message.subtype === "success" ? message.result : message.errors.join("\n");
++      events.push(...this.sidechainTracker.finishAll("failed"));
++      events.push(this.buildTurnFailedEvent(error || "Usage limit reached"));
++      return;
++    }
+     if (message.subtype === "success") {
+       events.push(...this.sidechainTracker.finishAll("completed"));
+       // Built-in slash commands (e.g. /voice, /usage, "Unknown command: …")
+diff --git a/packages/server/src/server/agent/providers/mock-load-test-agent.ts b/packages/server/src/server/agent/providers/mock-load-test-agent.ts
+index ce9714c5f..bc480fae5 100644
+--- a/packages/server/src/server/agent/providers/mock-load-test-agent.ts
++++ b/packages/server/src/server/agent/providers/mock-load-test-agent.ts
+@@ -1,3 +1,4 @@
++import type { AgentUsageLimit } from "@getpaseo/protocol/agent-usage-limit";
+ import { randomUUID } from "node:crypto";
+ import type { Logger } from "pino";
+ import type {
+@@ -192,6 +193,11 @@ function nextBurstSize(profile: BurstProfile, sequence: number): number {
+   return profile.minTokens + ((hash >>> 0) % span);
+ }
+ 
++interface FailedTurnInput {
++  turn: ActiveTurn;
++  usageLimit?: AgentUsageLimit;
++}
++
+ interface ActiveTurn {
+   turnId: string;
+   assistantMessageId: string;
+@@ -254,6 +260,14 @@ function shouldEmitPlanApprovalPrompt(prompt: AgentPromptInput): boolean {
+   return /emit\s+(?:a\s+)?synthetic\s+plan\s+approval/i.test(promptToText(prompt));
+ }
+ 
++function parseUsageLimitPrompt(prompt: AgentPromptInput): AgentUsageLimit | undefined {
++  const match = /^emit synthetic usage limit: (unknown|[\dT:.Z+-]+)$/i.exec(
++    promptToText(prompt).trim(),
++  );
++  if (!match) return undefined;
++  return { resetsAt: match[1] === "unknown" ? null : match[1] };
++}
++
+ function shouldEmitTurnFailure(prompt: AgentPromptInput): boolean {
+   return /emit\s+(?:a\s+)?synthetic\s+turn\s+failure/i.test(promptToText(prompt));
+ }
+@@ -869,9 +883,10 @@ export class MockLoadTestAgentSession implements AgentSession {
+     const structuredBranchName = parseStructuredBranchNamePrompt(prompt);
+     const settledAssistantImageMarkdown = parseSettledAssistantImageMarkdown(prompt);
+     const steeringReplayShape = parseSteeringReplayShape(prompt);
++    const usageLimit = parseUsageLimitPrompt(prompt);
+     const scheduleTurn = () => {
+-      if (shouldEmitTurnFailure(prompt)) {
+-        this.scheduleFailedTurn(turn);
++      if (shouldEmitTurnFailure(prompt) || usageLimit) {
++        this.scheduleFailedTurn({ turn, usageLimit });
+       } else if (steeringReplayShape) {
+         this.scheduleSteeringReplayTurn(turn, steeringReplayShape);
+       } else if (this.streamingAssistantResponse !== null) {
+@@ -1157,7 +1172,7 @@ export class MockLoadTestAgentSession implements AgentSession {
+     turn.timer.unref?.();
+   }
+ 
+-  private scheduleFailedTurn(turn: ActiveTurn): void {
++  private scheduleFailedTurn({ turn, usageLimit }: FailedTurnInput): void {
+     turn.timer = setTimeout(() => {
+       if (this.activeTurn !== turn) {
+         return;
+@@ -1169,7 +1184,8 @@ export class MockLoadTestAgentSession implements AgentSession {
+         type: "turn_failed",
+         provider: this.provider,
+         turnId: turn.turnId,
+-        error: "Requested mock provider failure",
++        error: usageLimit ? "Usage limit reached" : "Requested mock provider failure",
++        ...(usageLimit ? { usageLimit } : {}),
+       });
+       turn.resolve({
+         sessionId: this.id,
+diff --git a/packages/server/src/server/agent/usage-limit-resume.test.ts b/packages/server/src/server/agent/usage-limit-resume.test.ts
+new file mode 100644
+index 000000000..833d870f6
+--- /dev/null
++++ b/packages/server/src/server/agent/usage-limit-resume.test.ts
+@@ -0,0 +1,380 @@
++import { afterEach, expect, test } from "vitest";
++import { mkdtemp, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import path from "node:path";
++import { AUTO_RESUME_USAGE_LIMIT_LABEL } from "@getpaseo/protocol/agent-usage-limit";
++import { createTestLogger } from "../../test-utils/test-logger.js";
++import { AgentManager } from "./agent-manager.js";
++import { AgentStorage } from "./agent-storage.js";
++import { MockLoadTestAgentClient } from "./providers/mock-load-test-agent.js";
++import { UsageLimitResumeService } from "./usage-limit-resume.js";
++
++interface PausedOperation {
++  entered: Promise<void>;
++  release: () => void;
++}
++
++class OperationGate {
++  private readonly started = Promise.withResolvers<void>();
++  private readonly released = Promise.withResolvers<void>();
++
++  get control(): PausedOperation {
++    return { entered: this.started.promise, release: () => this.released.resolve() };
++  }
++
++  async wait(): Promise<void> {
++    this.started.resolve();
++    await this.released.promise;
++  }
++}
++
++// Keep real JSON persistence, with an injected failure/pause at the storage boundary.
++class ControlledAgentStorage extends AgentStorage {
++  private snapshotGate: OperationGate | null = null;
++  private snapshotError: Error | null = null;
++
++  pauseNextSnapshot(): PausedOperation {
++    const gate = new OperationGate();
++    this.snapshotGate = gate;
++    return gate.control;
++  }
++
++  failNextSnapshot(): void {
++    this.snapshotError = new Error("Injected snapshot write failure");
++  }
++
++  override async applySnapshot(...args: Parameters<AgentStorage["applySnapshot"]>): Promise<void> {
++    const gate = this.snapshotGate;
++    const error = this.snapshotError;
++    this.snapshotGate = null;
++    this.snapshotError = null;
++    if (gate) await gate.wait();
++    if (error) throw error;
++    await super.applySnapshot(...args);
++  }
++}
++
++class ControlledMockClient extends MockLoadTestAgentClient {
++  private resumeGate: OperationGate | null = null;
++
++  pauseNextResume(): PausedOperation {
++    const gate = new OperationGate();
++    this.resumeGate = gate;
++    return gate.control;
++  }
++
++  override async resumeSession(...args: Parameters<MockLoadTestAgentClient["resumeSession"]>) {
++    const gate = this.resumeGate;
++    this.resumeGate = null;
++    if (gate) await gate.wait();
++    return super.resumeSession(...args);
++  }
++}
++
++const cleanup: Array<() => Promise<void>> = [];
++afterEach(async () => {
++  for (const close of cleanup.splice(0).toReversed()) await close();
++});
++
++interface SetupInput {
++  resetsAt?: string | null;
++}
++
++interface CreateServiceInput {
++  workspaceAllowed?: boolean;
++}
++
++async function setup({ resetsAt = new Date(Date.now() - 120_000).toISOString() }: SetupInput = {}) {
++  const home = await mkdtemp(path.join(tmpdir(), "usage-limit-test-"));
++  const logger = createTestLogger();
++  let registry = new ControlledAgentStorage(path.join(home, "agents"), logger);
++  let provider = new ControlledMockClient(logger);
++  let manager = new AgentManager({
++    clients: { mock: provider },
++    registry,
++    logger,
++  });
++  const closeManager = async () => {
++    manager.prepareForShutdown();
++    for (const item of manager.listAgents()) await manager.closeAgent(item.id);
++    await manager.flushForShutdown();
++  };
++  cleanup.push(async () => {
++    await closeManager();
++    await rm(home, { recursive: true, force: true });
++  });
++  const agent = await manager.createAgent(
++    {
++      provider: "mock",
++      cwd: home,
++      model: "e2e-fast-stream",
++      featureValues: { mockAssistantResponse: "Task resumed." },
++    },
++    undefined,
++    { workspaceId: "usage-limit-test-workspace" },
++  );
++  await expect(
++    manager.runAgent(agent.id, `Emit synthetic usage limit: ${resetsAt ?? "unknown"}`),
++  ).rejects.toThrow("Usage limit reached");
++  await manager.flushForShutdown();
++  const originalHandle = (await registry.get(agent.id))?.persistence;
++  function createService({ workspaceAllowed = true }: CreateServiceInput = {}) {
++    return new UsageLimitResumeService({
++      agentStorage: registry,
++      agentManager: manager,
++      logger,
++      canResumeWorkspace: async () => workspaceAllowed,
++    });
++  }
++  return {
++    get provider() {
++      return provider;
++    },
++    get registry() {
++      return registry;
++    },
++    agentId: agent.id,
++    originalHandle,
++    createService,
++    get manager() {
++      return manager;
++    },
++    restart: async () => {
++      await closeManager();
++      registry = new ControlledAgentStorage(path.join(home, "agents"), logger);
++      provider = new ControlledMockClient(logger);
++      manager = new AgentManager({
++        clients: { mock: provider },
++        registry,
++        logger,
++      });
++    },
++    enable: () =>
++      manager.updateAgentMetadata(agent.id, {
++        labels: { [AUTO_RESUME_USAGE_LIMIT_LABEL]: "true" },
++      }),
++  };
++}
++
++type UsageLimitFixture = Awaited<ReturnType<typeof setup>>;
++
++function resumedMessages({ manager, agentId }: UsageLimitFixture) {
++  if (!manager.getAgent(agentId)) return [];
++  return manager
++    .getTimeline(agentId)
++    .filter(
++      (item) => item.type === "user_message" && item.text.startsWith("The usage limit reset."),
++    );
++}
++
++test("opt-in is required; concurrent scans resume once in the same provider session", async () => {
++  const fixture = await setup();
++  const service = fixture.createService();
++  await service.tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  await fixture.enable();
++  await Promise.all([service.tick(), service.tick()]);
++  await expect
++    .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
++    .toBe("Task resumed.");
++  await fixture.manager.flushForShutdown();
++  await service.tick();
++  expect(resumedMessages(fixture)).toHaveLength(1);
++  expect((await fixture.registry.get(fixture.agentId))?.persistence).toEqual(
++    fixture.originalHandle,
++  );
++  expect((await fixture.registry.get(fixture.agentId))?.usageLimit).toBeUndefined();
++});
++
++test("an overdue opted-in wait survives a daemon restart", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.restart();
++  await fixture.createService().tick();
++  await expect
++    .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
++    .toBe("Task resumed.");
++  expect(resumedMessages(fixture)).toHaveLength(1);
++  expect(fixture.manager.getAgent(fixture.agentId)?.persistence).toEqual(fixture.originalHandle);
++});
++
++test.each([
++  null,
++  new Date(Date.now() + 3_600_000).toISOString(),
++  new Date(Date.now() - 30_000).toISOString(),
++])("does not retry before a known reset plus buffer: %s", async (resetsAt) => {
++  const fixture = await setup({ resetsAt });
++  await fixture.enable();
++  await fixture.createService().tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++});
++
++test("disabling the preference cancels unattended continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.manager.updateAgentMetadata(fixture.agentId, {
++    labels: { [AUTO_RESUME_USAGE_LIMIT_LABEL]: "false" },
++  });
++  await fixture.createService().tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++});
++
++test("a manual continuation cancels the pending wait", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.manager.runAgent(fixture.agentId, "I will continue myself");
++  await fixture.createService().tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++});
++
++test("archiving clears the durable wait and prevents continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.manager.archiveAgent(fixture.agentId);
++  await fixture.createService().tick();
++  expect((await fixture.registry.get(fixture.agentId))?.usageLimit).toBeUndefined();
++  expect(fixture.manager.getAgent(fixture.agentId)).toBeNull();
++});
++
++test("a blocked workspace prevents unattended continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.createService({ workspaceAllowed: false }).tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++});
++
++test("shutdown prevents unattended continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  fixture.manager.prepareForShutdown();
++  await fixture.createService().tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++});
++
++test("a manual turn completing during a slow durable claim cancels continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  const claim = fixture.registry.pauseNextSnapshot();
++  const tick = fixture.createService().tick();
++  try {
++    await claim.entered;
++    await fixture.manager.runAgent(fixture.agentId, "Continue manually while saving");
++  } finally {
++    claim.release();
++    await tick;
++  }
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect(await fixture.manager.getLastAssistantMessage(fixture.agentId)).toBe("Task resumed.");
++});
++
++test("switch-off received during a durable claim prevents automatic dispatch", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  const claim = fixture.registry.pauseNextSnapshot();
++  const tick = fixture.createService().tick();
++  await claim.entered;
++  const disable = fixture.manager.updateAgentMetadata(fixture.agentId, {
++    labels: { [AUTO_RESUME_USAGE_LIMIT_LABEL]: "false" },
++  });
++  claim.release();
++  await Promise.all([tick, disable]);
++  await fixture.manager.flushForShutdown();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect((await fixture.registry.get(fixture.agentId))?.labels[AUTO_RESUME_USAGE_LIMIT_LABEL]).toBe(
++    "false",
++  );
++});
++
++test("switch-off received during cold provider recovery prevents automatic dispatch", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.restart();
++  const recovery = fixture.provider.pauseNextResume();
++  const tick = fixture.createService().tick();
++  await recovery.entered;
++  const disable = fixture.manager.updateAgentMetadata(fixture.agentId, {
++    labels: { [AUTO_RESUME_USAGE_LIMIT_LABEL]: "false" },
++  });
++  recovery.release();
++  await Promise.all([tick, disable]);
++  await fixture.manager.flushForShutdown();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect((await fixture.registry.get(fixture.agentId))?.labels[AUTO_RESUME_USAGE_LIMIT_LABEL]).toBe(
++    "false",
++  );
++});
++
++test("a failed durable claim preserves the wait and retries after storage recovers", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  const originalLimit = (await fixture.registry.get(fixture.agentId))?.usageLimit;
++  fixture.registry.failNextSnapshot();
++  const service = fixture.createService();
++  await service.tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect(fixture.manager.getAgent(fixture.agentId)?.usageLimit).toEqual(originalLimit);
++  expect((await fixture.registry.get(fixture.agentId))?.usageLimit).toEqual(originalLimit);
++  await service.tick();
++  await expect
++    .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
++    .toBe("Task resumed.");
++  await service.tick();
++  expect(resumedMessages(fixture)).toHaveLength(1);
++});
++
++test("a failed claim does not restore a wait replaced by manual continuation", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  fixture.registry.failNextSnapshot();
++  const claim = fixture.registry.pauseNextSnapshot();
++  const service = fixture.createService();
++  const tick = service.tick();
++  try {
++    await claim.entered;
++    await fixture.manager.runAgent(fixture.agentId, "Continue manually during the failed save");
++  } finally {
++    claim.release();
++    await tick;
++  }
++  await service.tick();
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect(fixture.manager.getAgent(fixture.agentId)?.usageLimit).toBeUndefined();
++  expect((await fixture.registry.get(fixture.agentId))?.usageLimit).toBeUndefined();
++});
++
++test("a failed claim preserves a newer usage limit from a manual turn", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  fixture.registry.failNextSnapshot();
++  const claim = fixture.registry.pauseNextSnapshot();
++  const tick = fixture.createService().tick();
++  const resetsAt = new Date(Date.now() + 3_600_000).toISOString();
++  try {
++    await claim.entered;
++    await expect(
++      fixture.manager.runAgent(fixture.agentId, `Emit synthetic usage limit: ${resetsAt}`),
++    ).rejects.toThrow("Usage limit reached");
++  } finally {
++    claim.release();
++    await tick;
++  }
++  expect(resumedMessages(fixture)).toHaveLength(0);
++  expect(fixture.manager.getAgent(fixture.agentId)?.usageLimit).toEqual({ resetsAt });
++});
++
++test("archiving during cold recovery cancels continuation before its durable archive", async () => {
++  const fixture = await setup();
++  await fixture.enable();
++  await fixture.restart();
++  const before = await fixture.registry.get(fixture.agentId);
++  const recovery = fixture.provider.pauseNextResume();
++  const tick = fixture.createService().tick();
++  await recovery.entered;
++  const archive = fixture.manager.archiveSnapshot(fixture.agentId, new Date().toISOString());
++  recovery.release();
++  await Promise.all([tick, archive]);
++  const after = await fixture.registry.get(fixture.agentId);
++  expect(after?.lastUserMessageAt).toBe(before?.lastUserMessageAt);
++  expect(after?.usageLimit).toBeUndefined();
++  expect(fixture.manager.getAgent(fixture.agentId)).toBeNull();
++});
+diff --git a/packages/server/src/server/agent/usage-limit-resume.ts b/packages/server/src/server/agent/usage-limit-resume.ts
+new file mode 100644
+index 000000000..964858dcd
+--- /dev/null
++++ b/packages/server/src/server/agent/usage-limit-resume.ts
+@@ -0,0 +1,63 @@
++import {
++  AUTO_RESUME_USAGE_LIMIT_LABEL,
++  usageLimitResumeAt,
++} from "@getpaseo/protocol/agent-usage-limit";
++import type { Logger } from "pino";
++import type { AgentManager } from "./agent-manager.js";
++import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
++
++interface UsageLimitResumeOptions {
++  agentStorage: Pick<AgentStorage, "list">;
++  agentManager: Pick<AgentManager, "resumeAfterUsageLimit">;
++  canResumeWorkspace: (record: StoredAgentRecord) => Promise<boolean>;
++  logger: Logger;
++}
++
++export class UsageLimitResumeService {
++  private timer: ReturnType<typeof setInterval> | null = null;
++  private pending: Promise<void> | null = null;
++
++  constructor(private readonly options: UsageLimitResumeOptions) {}
++
++  start(): void {
++    if (this.timer) return;
++    this.timer = setInterval(() => {
++      void this.tick().catch((error) => {
++        this.options.logger.error({ err: error }, "Usage limit resume scan failed");
++      });
++    }, 5_000);
++    this.timer.unref();
++  }
++
++  async stop(): Promise<void> {
++    if (this.timer) clearInterval(this.timer);
++    this.timer = null;
++    await this.pending;
++  }
++
++  tick(): Promise<void> {
++    if (this.pending) return this.pending;
++    this.pending = this.resumeDueAgents().finally(() => {
++      this.pending = null;
++    });
++    return this.pending;
++  }
++
++  private async resumeDueAgents(): Promise<void> {
++    for (const record of await this.options.agentStorage.list()) {
++      if (record.archivedAt || record.internal || !record.usageLimit) continue;
++      if (record.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true") continue;
++      const resumeAt = usageLimitResumeAt(record.usageLimit);
++      if (resumeAt === null || resumeAt > Date.now()) continue;
++      try {
++        if (!(await this.options.canResumeWorkspace(record))) continue;
++        await this.options.agentManager.resumeAfterUsageLimit({
++          agentId: record.id,
++          expected: record.usageLimit,
++        });
++      } catch (error) {
++        this.options.logger.warn({ err: error, agentId: record.id }, "Usage limit resume failed");
++      }
++    }
++  }
++}
+diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
+index 727c7b789..3c84234ff 100644
+--- a/packages/server/src/server/bootstrap.ts
++++ b/packages/server/src/server/bootstrap.ts
+@@ -1,3 +1,4 @@
++import { UsageLimitResumeService } from "./agent/usage-limit-resume.js";
+ import type { PluginRegistries } from "@getpaseo/protocol/plugin-registry";
+ import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
+ import express from "express";
+@@ -1369,6 +1370,16 @@ export async function createPaseoDaemon(
+     createPaseoWorktreeWorkspace: createSchedulePaseoWorktreeExternal,
+     archiveWorkspace: archiveScheduleWorkspaceExternal,
+   });
++  const usageLimitResume = new UsageLimitResumeService({
++    agentStorage,
++    agentManager,
++    logger,
++    canResumeWorkspace: async (record) => {
++      if (!record.workspaceId) return false;
++      const workspace = await workspaceRegistry.get(record.workspaceId);
++      return Boolean(workspace && !workspace.archivedAt && !workspace.untrustedSource);
++    },
++  });
+   await scheduleService.start();
+   agentManager.setAgentArchivedCallback(async (agentId) => {
+     try {
+@@ -1794,6 +1805,7 @@ export async function createPaseoDaemon(
+       // model loading doesn't block the server from accepting connections.
+       speechService.start();
+       scriptHealthMonitor.start();
++      usageLimitResume.start();
+     } catch (error) {
+       localCredential = null;
+       await deleteLocalCredential(config.paseoHome);
+@@ -1823,6 +1835,7 @@ export async function createPaseoDaemon(
+     // Freeze both ingress and registration before taking the agent closure snapshot.
+     wsServer?.prepareForShutdown();
+     agentManager.prepareForShutdown();
++    await usageLimitResume.stop();
+     await closeAllAgents(logger, agentManager);
+     await withTimeout({
+       promise: pluginRuntime.drainEvents(),
+diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
+index e833a07ce..ee94979f0 100644
+--- a/packages/server/src/server/websocket-server.ts
++++ b/packages/server/src/server/websocket-server.ts
+@@ -1791,6 +1791,7 @@ export class VoiceAssistantWebSocketServer {
+       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
+       features: {
+         usageSources: true,
++        usageLimitResume: true,
+         ownedSubscriptions: true,
+         agentRequestReceipts: true,
+         workspaceRequestReceipts: true,
+diff --git a/public-docs/providers.md b/public-docs/providers.md
+index fc23bff78..1f8b672c8 100644
+--- a/public-docs/providers.md
++++ b/public-docs/providers.md
+@@ -23,6 +23,14 @@ A provider is the contract between Paseo and one external agent CLI: how to laun
+ 
+ Either way, **you install the underlying CLI**. Paseo runs it.
+ 
++## Resume after a usage limit
++
++When Claude Code stops at a subscription limit, turn on **Resume after usage limit** above the composer. The host continues the same chat one minute after the reset time reported by Claude. The switch is off by default and stays enabled for that chat until you turn it off.
++
++You can close the app while waiting. Keep the host running; if it restarts, it recovers the pending wait. Sending a message manually or archiving the agent cancels that wait. Turning off the switch cancels it too.
++
++If Claude does not report a reset time, continue manually. Paseo does not guess a five-hour delay or retry other failures. Automatic continuation currently supports Claude Code; other providers need to report a structured usage-limit failure and reset time before they can use it.
++
+ ## Where to go next
+ 
+ - [Supported providers](/docs/supported-providers), the full list with install links.
+-- 
+2.56.0
+

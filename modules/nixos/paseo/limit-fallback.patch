@@ -1,0 +1,1425 @@
+From d19e2d3101756b9919f7c254eb2270e8dc9250f0 Mon Sep 17 00:00:00 2001
+From: agent <agent@torrent>
+Date: Sun, 1 Nov 2026 13:14:51 -0800
+Subject: [PATCH] feat: continue a Claude chat on a limit-fallback profile, and
+ show its API spend
+
+A profile with limitFallback: true (extending its base provider) is used
+while the base is at a usage limit: the limit callout offers to move the
+chat there in place and continue; new chats start there; chats move back
+when the limit resets. Auto-resume after a limit is on unless a chat opts
+out. A profile with creditBudget records estimated spend per turn in
+$PASEO_HOME/credit-ledger.jsonl, shown per chat and per billing cycle.
+---
+ .../src/components/context-window-meter.tsx   |  27 ++-
+ .../app/src/composer/usage-limit-callout.tsx  |  53 ++++-
+ packages/app/src/i18n/resources/ar.ts         |   3 +
+ packages/app/src/i18n/resources/en.ts         |   3 +
+ packages/app/src/i18n/resources/es.ts         |   3 +
+ packages/app/src/i18n/resources/fr.ts         |   3 +
+ packages/app/src/i18n/resources/ja.ts         |   3 +
+ packages/app/src/i18n/resources/ko.ts         |   3 +
+ packages/app/src/i18n/resources/pt-BR.ts      |   3 +
+ packages/app/src/i18n/resources/ru.ts         |   3 +
+ packages/app/src/i18n/resources/zh-CN.ts      |   3 +
+ packages/app/src/stores/session-store.ts      |   3 +-
+ packages/app/src/utils/agent-snapshots.ts     |   2 +
+ packages/client/src/daemon-client.ts          |  22 ++
+ packages/protocol/src/agent-usage-limit.ts    |  34 ++++
+ packages/protocol/src/messages.ts             |  18 +-
+ packages/protocol/src/provider-config.ts      |   5 +
+ .../src/server/agent/agent-manager.test.ts    |  83 ++++++++
+ .../server/src/server/agent/agent-manager.ts  | 188 +++++++++++++++++-
+ .../src/server/agent/agent-projections.ts     |   1 +
+ .../src/server/agent/credit-ledger.test.ts    |  37 ++++
+ .../server/src/server/agent/credit-ledger.ts  |  90 +++++++++
+ .../src/server/agent/provider-registry.ts     |  10 +
+ .../server/agent/provider-snapshot-manager.ts |   7 +-
+ .../server/agent/usage-limit-resume.test.ts   |   5 +-
+ .../src/server/agent/usage-limit-resume.ts    |  19 +-
+ .../authorization/operation-permissions.ts    |   2 +
+ packages/server/src/server/bootstrap.ts       |   2 +
+ packages/server/src/server/session.ts         |   3 +
+ .../agent-config/agent-config-session.ts      |  20 ++
+ .../server/src/server/websocket-server.ts     |   1 +
+ 31 files changed, 631 insertions(+), 28 deletions(-)
+ create mode 100644 packages/server/src/server/agent/credit-ledger.test.ts
+ create mode 100644 packages/server/src/server/agent/credit-ledger.ts
+
+diff --git a/packages/app/src/components/context-window-meter.tsx b/packages/app/src/components/context-window-meter.tsx
+index 11931bdd4..d14f96fe1 100644
+--- a/packages/app/src/components/context-window-meter.tsx
++++ b/packages/app/src/components/context-window-meter.tsx
+@@ -3,11 +3,14 @@ import { Pressable, Text, View, useWindowDimensions } from "react-native";
+ import Svg, { Circle } from "react-native-svg";
+ import { StyleSheet, withUnistyles } from "react-native-unistyles";
+ import { useTranslation } from "react-i18next";
++import type { TFunction } from "i18next";
++import type { CreditSpend } from "@getpaseo/protocol/agent-usage-limit";
+ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+ import { useIsCompactFormFactor } from "@/constants/layout";
+ import { isNative } from "@/constants/platform";
+ import { useHostReportsUsage } from "@/usage";
++import { useSessionStore } from "@/stores/session-store";
+ import type { Theme } from "@/styles/theme";
+ import { ContextWindowDetails } from "./context-window-details";
+ import { ContextWindowSheet } from "./context-window-sheet";
+@@ -49,8 +52,20 @@ function clampPercentage(value: number): number {
+   return Math.max(0, Math.min(100, value));
+ }
+ 
+-function formatSessionCost(value: number): string | null {
+-  if (!Number.isFinite(value) || value <= 0) {
++function formatCreditSpend(spend: CreditSpend, t: TFunction): string {
++  return t("contextWindow.creditSpend", {
++    chat: `$${spend.chatUsd.toFixed(2)}`,
++    cycle: `$${spend.cycleUsd.toFixed(2)}`,
++    budget: `$${spend.budgetUsd}`,
++    until: new Date(spend.cycleEndsAt).toLocaleDateString(undefined, {
++      month: "short",
++      day: "numeric",
++    }),
++  });
++}
++
++function formatSessionCost(value: number | null | undefined): string | null {
++  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+     return null;
+   }
+   if (value < 0.01) {
+@@ -178,8 +193,12 @@ export function ContextWindowMeter({
+     }),
+     [percentage],
+   );
+-  const formattedSessionCost =
+-    typeof totalCostUsd === "number" ? formatSessionCost(totalCostUsd) : null;
++  const creditSpend = useSessionStore(
++    (state) => state.sessions[serverId]?.agents.get(agentId)?.creditSpend,
++  );
++  const formattedSessionCost = creditSpend
++    ? formatCreditSpend(creditSpend, t)
++    : formatSessionCost(totalCostUsd);
+   const containerStyle = geometry.containerStyle;
+   const ring = (
+     <ContextWindowRing
+diff --git a/packages/app/src/composer/usage-limit-callout.tsx b/packages/app/src/composer/usage-limit-callout.tsx
+index 7b6b19756..631c75f6b 100644
+--- a/packages/app/src/composer/usage-limit-callout.tsx
++++ b/packages/app/src/composer/usage-limit-callout.tsx
+@@ -1,11 +1,14 @@
++import { useCallback } from "react";
+ import { useMutation } from "@tanstack/react-query";
+ import { Text, View } from "react-native";
+ import { useTranslation } from "react-i18next";
+ import { StyleSheet } from "react-native-unistyles";
+ import {
+   AUTO_RESUME_USAGE_LIMIT_LABEL,
++  autoResumesUsageLimit,
+   usageLimitResumeAt,
+ } from "@getpaseo/protocol/agent-usage-limit";
++import { Button } from "@/components/ui/button";
+ import { Switch } from "@/components/ui/switch";
+ import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+ import { useSessionStore } from "@/stores/session-store";
+@@ -27,10 +30,7 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+     agentId ? state.sessions[serverId]?.agents.get(agentId)?.usageLimit : undefined,
+   );
+   const enabled = useSessionStore((state) =>
+-    agentId
+-      ? state.sessions[serverId]?.agents.get(agentId)?.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] ===
+-        "true"
+-      : false,
++    agentId ? autoResumesUsageLimit(state.sessions[serverId]?.agents.get(agentId)?.labels) : false,
+   );
+   const mutation = useMutation({
+     mutationFn: async (value: boolean) => {
+@@ -40,7 +40,7 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+       });
+     },
+   });
+-  if (!supported || (!limit && !enabled)) return null;
++  if (!supported || !limit) return null;
+ 
+   const resumeAt = limit ? usageLimitResumeAt(limit) : null;
+   const missingReset = Boolean(limit && resumeAt === null);
+@@ -88,6 +88,7 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+           onValueChange={mutation.mutate}
+         />
+       </View>
++      {agentId ? <ContinueOnFallbackButton serverId={serverId} agentId={agentId} /> : null}
+       {mutation.isError ? (
+         <Text style={styles.error}>{t("agentPanel.usageLimit.saveFailed")}</Text>
+       ) : null}
+@@ -95,6 +96,47 @@ export function UsageLimitCallout({ serverId, agentId }: UsageLimitCalloutProps)
+   );
+ }
+ 
++interface ContinueOnFallbackButtonProps {
++  serverId: string;
++  agentId: string;
++}
++
++// Moves the chat to its provider's limit-fallback profile (e.g. API credits) and continues it.
++function ContinueOnFallbackButton({ serverId, agentId }: ContinueOnFallbackButtonProps) {
++  const { t } = useTranslation();
++  const client = useHostRuntimeClient(serverId);
++  const isConnected = useHostRuntimeIsConnected(serverId);
++  const supported = useSessionStore(
++    (state) => state.sessions[serverId]?.serverInfo?.features?.limitFallback === true,
++  );
++  const fallback = useMutation({
++    mutationFn: async () => {
++      if (!client) throw new Error("Agent is unavailable");
++      await client.continueOnLimitFallback(agentId);
++    },
++  });
++  const handlePress = useCallback(() => fallback.mutate(), [fallback]);
++  if (!supported) return null;
++  return (
++    <>
++      <Button
++        testID="usage-limit-continue-fallback"
++        variant="default"
++        size="sm"
++        style={styles.button}
++        disabled={!isConnected}
++        loading={fallback.isPending}
++        onPress={handlePress}
++      >
++        {t("agentPanel.usageLimit.continueOnFallback")}
++      </Button>
++      {fallback.isError ? (
++        <Text style={styles.error}>{t("agentPanel.usageLimit.switchFailed")}</Text>
++      ) : null}
++    </>
++  );
++}
++
+ const styles = StyleSheet.create((theme) => ({
+   container: {
+     padding: theme.spacing[3],
+@@ -111,4 +153,5 @@ const styles = StyleSheet.create((theme) => ({
+   hidden: { opacity: 0 },
+   saving: { position: "absolute", top: 0, left: 0, right: 0 },
+   error: { color: theme.colors.statusDanger, fontSize: theme.fontSize.sm },
++  button: { alignSelf: "flex-start" },
+ }));
+diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
+index a8607ae1a..bf51ec2f8 100644
+--- a/packages/app/src/i18n/resources/ar.ts
++++ b/packages/app/src/i18n/resources/ar.ts
+@@ -251,6 +251,8 @@ export const ar: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "تعذّر حفظ هذا الإعداد. حاول مرة أخرى.",
+       label: "المتابعة بعد إعادة تعيين حد الاستخدام",
+       enabled: "مفعّل لهذه المحادثة. أبقِ المضيف قيد التشغيل.",
+@@ -2022,6 +2024,7 @@ export const ar: TranslationResources = {
+     dismiss: "رفض",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "لا توجد بيانات للسياق",
+     accessibilityNoData: "نافذة السياق: لا توجد بيانات للسياق",
+     title: "نافذة السياق",
+diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
+index addc11c96..a9a349f1c 100644
+--- a/packages/app/src/i18n/resources/en.ts
++++ b/packages/app/src/i18n/resources/en.ts
+@@ -247,6 +247,8 @@ export const en = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Could not save this setting. Try again.",
+       label: "Resume after usage limit",
+       enabled: "Enabled for this chat. Keep the host running.",
+@@ -2047,6 +2049,7 @@ export const en = {
+     dismiss: "Dismiss",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "No context data",
+     accessibilityNoData: "Context window: No context data",
+     title: "Context window",
+diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
+index d386e147b..9e7541097 100644
+--- a/packages/app/src/i18n/resources/es.ts
++++ b/packages/app/src/i18n/resources/es.ts
+@@ -253,6 +253,8 @@ export const es: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "No se pudo guardar este ajuste. Inténtalo de nuevo.",
+       label: "Continuar al restablecerse el límite",
+       enabled: "Activado para este chat. Mantén el servidor en ejecución.",
+@@ -2070,6 +2072,7 @@ export const es: TranslationResources = {
+     dismiss: "Despedir",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "No hay datos de contexto",
+     accessibilityNoData: "Ventana de contexto: No hay datos de contexto",
+     title: "ventana contextual",
+diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
+index 44ade0ab9..13e6c66a8 100644
+--- a/packages/app/src/i18n/resources/fr.ts
++++ b/packages/app/src/i18n/resources/fr.ts
+@@ -254,6 +254,8 @@ export const fr: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Impossible d’enregistrer ce réglage. Réessayez.",
+       label: "Reprendre après la limite d’utilisation",
+       enabled: "Activé pour cette conversation. Gardez l’hôte en marche.",
+@@ -2069,6 +2071,7 @@ export const fr: TranslationResources = {
+     dismiss: "Ignorer",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "Aucune donnée de contexte",
+     accessibilityNoData: "Fenêtre de contexte : aucune donnée de contexte",
+     title: "Fenêtre de contexte",
+diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
+index b6c3b56b8..b8625d4f1 100644
+--- a/packages/app/src/i18n/resources/ja.ts
++++ b/packages/app/src/i18n/resources/ja.ts
+@@ -253,6 +253,8 @@ export const ja: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "設定を保存できませんでした。もう一度お試しください。",
+       label: "利用制限の解除後に再開",
+       enabled: "このチャットで有効です。ホストを起動したままにしてください。",
+@@ -2042,6 +2044,7 @@ export const ja: TranslationResources = {
+     dismiss: "閉じる",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "コンテキストデータがありません",
+     accessibilityNoData: "コンテキストウィンドウ：コンテキストデータがありません",
+     title: "コンテキストウィンドウ",
+diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
+index 71f8afb8e..7b3c46b7e 100644
+--- a/packages/app/src/i18n/resources/ko.ts
++++ b/packages/app/src/i18n/resources/ko.ts
+@@ -251,6 +251,8 @@ export const ko: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "설정을 저장하지 못했습니다. 다시 시도해 주세요.",
+       label: "사용량 제한 해제 후 계속",
+       enabled: "이 채팅에서 활성화되었습니다. 호스트를 켜 두세요.",
+@@ -2032,6 +2034,7 @@ export const ko: TranslationResources = {
+     dismiss: "닫기",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "컨텍스트 데이터 없음",
+     accessibilityNoData: "컨텍스트 창: 컨텍스트 데이터 없음",
+     title: "컨텍스트 윈도우",
+diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
+index 40d3315c9..f3bb5649b 100644
+--- a/packages/app/src/i18n/resources/pt-BR.ts
++++ b/packages/app/src/i18n/resources/pt-BR.ts
+@@ -252,6 +252,8 @@ export const ptBR: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Não foi possível salvar esta configuração. Tente novamente.",
+       label: "Continuar após a redefinição do limite",
+       enabled: "Ativado para este chat. Mantenha o servidor em execução.",
+@@ -2055,6 +2057,7 @@ export const ptBR: TranslationResources = {
+     dismiss: "Dispensar",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "Sem dados de contexto",
+     accessibilityNoData: "Janela de contexto: sem dados de contexto",
+     title: "Janela de contexto",
+diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
+index 86de08856..2bb2a1f1a 100644
+--- a/packages/app/src/i18n/resources/ru.ts
++++ b/packages/app/src/i18n/resources/ru.ts
+@@ -253,6 +253,8 @@ export const ru: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "Не удалось сохранить настройку. Попробуйте ещё раз.",
+       label: "Продолжать после сброса лимита",
+       enabled: "Включено для этого чата. Сервер должен оставаться запущенным.",
+@@ -2055,6 +2057,7 @@ export const ru: TranslationResources = {
+     dismiss: "Закрыть",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "Нет данных о контексте",
+     accessibilityNoData: "Контекстное окно: нет данных о контексте",
+     title: "Контекстное окно",
+diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
+index 26ca1fc13..c8bd4d778 100644
+--- a/packages/app/src/i18n/resources/zh-CN.ts
++++ b/packages/app/src/i18n/resources/zh-CN.ts
+@@ -251,6 +251,8 @@ export const zhCN: TranslationResources = {
+   },
+   agentPanel: {
+     usageLimit: {
++      continueOnFallback: "Continue on API credits",
++      switchFailed: "Could not switch this chat. Try again.",
+       saveFailed: "无法保存此设置，请重试。",
+       label: "用量限制重置后继续",
+       enabled: "已为此聊天启用。请保持主机运行。",
+@@ -2000,6 +2002,7 @@ export const zhCN: TranslationResources = {
+     dismiss: "关闭",
+   },
+   contextWindow: {
++    creditSpend: "{{chat}} this chat · {{cycle}} of {{budget}} until {{until}}",
+     noData: "暂无上下文数据",
+     accessibilityNoData: "上下文窗口：暂无上下文数据",
+     title: "上下文窗口",
+diff --git a/packages/app/src/stores/session-store.ts b/packages/app/src/stores/session-store.ts
+index 321f78ede..cc3f01c53 100644
+--- a/packages/app/src/stores/session-store.ts
++++ b/packages/app/src/stores/session-store.ts
+@@ -1,4 +1,4 @@
+-import type { AgentUsageLimit } from "@getpaseo/protocol/agent-usage-limit";
++import type { AgentUsageLimit, CreditSpend } from "@getpaseo/protocol/agent-usage-limit";
+ import equal from "fast-deep-equal";
+ import { create } from "zustand";
+ import { subscribeWithSelector } from "zustand/middleware";
+@@ -89,6 +89,7 @@ export interface Agent {
+   lastUsage?: AgentUsage;
+   lastError?: string | null;
+   usageLimit?: AgentUsageLimit;
++  creditSpend?: CreditSpend;
+   title: string | null;
+   cwd: string;
+   workspaceId?: string;
+diff --git a/packages/app/src/utils/agent-snapshots.ts b/packages/app/src/utils/agent-snapshots.ts
+index a69520fff..10d65a1ca 100644
+--- a/packages/app/src/utils/agent-snapshots.ts
++++ b/packages/app/src/utils/agent-snapshots.ts
+@@ -80,6 +80,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
+     ...(agent.lastUsage ? { lastUsage: agent.lastUsage } : {}),
+     ...(agent.lastError ? { lastError: agent.lastError } : {}),
+     usageLimit: agent.usageLimit,
++    creditSpend: agent.creditSpend,
+     title: agent.title,
+     labels: agent.labels,
+     requiresAttention: agent.requiresAttention ?? false,
+@@ -124,6 +125,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
+     lastUsage: snapshot.lastUsage,
+     lastError: snapshot.lastError ?? null,
+     usageLimit: snapshot.usageLimit,
++    creditSpend: snapshot.creditSpend,
+     title: snapshot.title ?? null,
+     cwd: snapshot.cwd,
+     workspaceId: snapshot.workspaceId,
+diff --git a/packages/client/src/daemon-client.ts b/packages/client/src/daemon-client.ts
+index e0e4d9ddc..0040cca6d 100644
+--- a/packages/client/src/daemon-client.ts
++++ b/packages/client/src/daemon-client.ts
+@@ -3653,6 +3653,28 @@ export class DaemonClient {
+     }
+   }
+ 
++  async continueOnLimitFallback(agentId: string): Promise<void> {
++    const requestId = this.createRequestId();
++    const message = SessionInboundMessageSchema.parse({
++      type: "agent.limit_fallback.continue.request",
++      agentId,
++      requestId,
++    });
++    const payload = await this.sendRequest({
++      requestId,
++      message,
++      options: { skipQueue: true },
++      select: (msg) => {
++        if (msg.type !== "agent.limit_fallback.continue.response") return null;
++        if (msg.payload.requestId !== requestId) return null;
++        return msg.payload;
++      },
++    });
++    if (!payload.accepted) {
++      throw new Error(payload.error ?? "continueOnLimitFallback rejected");
++    }
++  }
++
+   async setAgentFeature(agentId: string, featureId: string, value: unknown): Promise<void> {
+     const requestId = this.createRequestId();
+     const message = SessionInboundMessageSchema.parse({
+diff --git a/packages/protocol/src/agent-usage-limit.ts b/packages/protocol/src/agent-usage-limit.ts
+index 1853b788c..933dd8c94 100644
+--- a/packages/protocol/src/agent-usage-limit.ts
++++ b/packages/protocol/src/agent-usage-limit.ts
+@@ -2,6 +2,8 @@ import { z } from "zod";
+ 
+ export const AUTO_RESUME_USAGE_LIMIT_LABEL = "paseo.auto-resume-usage-limit";
+ export const USAGE_LIMIT_RESUME_DELAY_MS = 60_000;
++// On an agent moved to a limit-fallback profile: when to move it back (ISO), or "unknown".
++export const LIMIT_FALLBACK_LABEL = "paseo.limit-fallback";
+ 
+ export const AgentUsageLimitSchema = z.object({
+   resetsAt: z.string().nullable(),
+@@ -9,8 +11,40 @@ export const AgentUsageLimitSchema = z.object({
+ 
+ export type AgentUsageLimit = z.infer<typeof AgentUsageLimitSchema>;
+ 
++// On unless a chat opts out: an unattended chat should pick up where it stopped.
++export function autoResumesUsageLimit(labels: Record<string, string> | undefined): boolean {
++  return labels?.[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "false";
++}
++
+ export function usageLimitResumeAt(limit: AgentUsageLimit): number | null {
+   if (limit.resetsAt === null) return null;
+   const resetsAt = Date.parse(limit.resetsAt);
+   return Number.isFinite(resetsAt) ? resetsAt + USAGE_LIMIT_RESUME_DELAY_MS : null;
+ }
++
++// A metered profile's monthly allowance (e.g. a plan's included API credits).
++export const CreditBudgetSchema = z.object({
++  monthlyUsd: z.number().positive(),
++  // Day of month the allowance renews, in the host's time zone.
++  cycleDay: z.number().int().min(1).max(28),
++});
++
++export type CreditBudget = z.infer<typeof CreditBudgetSchema>;
++
++// Estimated from the cost each turn reports; the provider's billing page is authoritative.
++export const CreditSpendSchema = z.object({
++  chatUsd: z.number(),
++  cycleUsd: z.number(),
++  budgetUsd: z.number(),
++  cycleEndsAt: z.string(),
++});
++
++export type CreditSpend = z.infer<typeof CreditSpendSchema>;
++
++export function creditCycle(now: Date, cycleDay: number): { start: Date; end: Date } {
++  const start = new Date(now.getFullYear(), now.getMonth(), cycleDay);
++  if (start > now) start.setMonth(start.getMonth() - 1);
++  const end = new Date(start);
++  end.setMonth(end.getMonth() + 1);
++  return { start, end };
++}
+diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
+index 870d5d19e..98dae4ab7 100644
+--- a/packages/protocol/src/messages.ts
++++ b/packages/protocol/src/messages.ts
+@@ -1,4 +1,4 @@
+-import { AgentUsageLimitSchema } from "./agent-usage-limit.js";
++import { AgentUsageLimitSchema, CreditSpendSchema } from "./agent-usage-limit.js";
+ import { AgentMessageSchema } from "./agent-message.js";
+ import { PluginRegistryIdentitySchema } from "./plugin-registry.js";
+ import { AgentProfileSchema, AgentSkillSelectionSchema } from "./agent-profile.js";
+@@ -835,6 +835,7 @@ export const AgentSnapshotPayloadSchema = z.object({
+   lastUsage: AgentUsageSchema.optional(),
+   lastError: z.string().optional(),
+   usageLimit: AgentUsageLimitSchema.optional(),
++  creditSpend: CreditSpendSchema.optional(),
+   title: z.string().nullable(),
+   labels: z.record(z.string(), z.string()).default({}),
+   requiresAttention: z.boolean().optional(),
+@@ -1955,6 +1956,18 @@ export const SetAgentModelRequestMessageSchema = z.object({
+   requestId: z.string(),
+ });
+ 
++// Move a chat stopped at its usage limit to its provider's limit-fallback profile, and continue it.
++export const ContinueOnLimitFallbackRequestMessageSchema = z.object({
++  type: z.literal("agent.limit_fallback.continue.request"),
++  agentId: z.string(),
++  requestId: z.string(),
++});
++
++export const ContinueOnLimitFallbackResponseMessageSchema = z.object({
++  type: z.literal("agent.limit_fallback.continue.response"),
++  payload: AgentActionResponsePayloadSchema,
++});
++
+ export const SetAgentModelResponseMessageSchema = z.object({
+   type: z.literal("set_agent_model_response"),
+   payload: AgentActionResponsePayloadSchema,
+@@ -3297,6 +3310,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
+   AgentForkContextRequestMessageSchema,
+   SetAgentModeRequestMessageSchema,
+   SetAgentModelRequestMessageSchema,
++  ContinueOnLimitFallbackRequestMessageSchema,
+   SetAgentThinkingRequestMessageSchema,
+   SetAgentFeatureRequestMessageSchema,
+   AgentConfigApplyRequestMessageSchema,
+@@ -3590,6 +3604,7 @@ export const ServerInfoStatusPayloadSchema = z
+         providersSnapshot: z.boolean().optional(),
+         usageSources: z.boolean().optional(),
+         usageLimitResume: z.boolean().optional(),
++        limitFallback: z.boolean().optional(),
+         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
+         providersSnapshotCwd: z.boolean().optional(),
+         // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
+@@ -6968,6 +6983,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
+   WriteProjectConfigResponseMessageSchema,
+   SetAgentModeResponseMessageSchema,
+   SetAgentModelResponseMessageSchema,
++  ContinueOnLimitFallbackResponseMessageSchema,
+   SetAgentThinkingResponseMessageSchema,
+   SetAgentFeatureResponseMessageSchema,
+   AgentConfigApplyResponseMessageSchema,
+diff --git a/packages/protocol/src/provider-config.ts b/packages/protocol/src/provider-config.ts
+index c94f8ca96..e21d07ff1 100644
+--- a/packages/protocol/src/provider-config.ts
++++ b/packages/protocol/src/provider-config.ts
+@@ -1,4 +1,5 @@
+ import { z } from "zod";
++import { CreditBudgetSchema } from "./agent-usage-limit.js";
+ import type { AgentProvider } from "./agent-types.js";
+ import { AgentProviderSchema } from "./provider-manifest.js";
+ 
+@@ -50,6 +51,10 @@ export const ProviderProfileModelSchema = z.object({
+ 
+ export const ProviderOverrideSchema = z.object({
+   extends: z.string().optional(),
++  // Start and continue this profile's chats while its base provider is at a usage limit.
++  limitFallback: z.boolean().optional(),
++  // Billed per token: track estimated spend against this allowance.
++  creditBudget: CreditBudgetSchema.optional(),
+   label: z.string().optional(),
+   description: z.string().optional(),
+   command: z.array(z.string().min(1)).min(1).optional(),
+diff --git a/packages/server/src/server/agent/agent-manager.test.ts b/packages/server/src/server/agent/agent-manager.test.ts
+index 44e38a344..eab16c672 100644
+--- a/packages/server/src/server/agent/agent-manager.test.ts
++++ b/packages/server/src/server/agent/agent-manager.test.ts
+@@ -11892,3 +11892,86 @@ test.each([false, true])(
+     }
+   },
+ );
++
++function createLimitFallbackManager() {
++  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
++  const storage = new AgentStorage(join(workdir, "agents"), logger);
++  const subscription = new TestAgentClient("claude");
++  const credits = new TestAgentClient("claude-api-credits");
++  const manager = new AgentManager({
++    clients: { claude: subscription, "claude-api-credits": credits, codex: new TestAgentClient() },
++    providerDefinitions: {
++      claude: { enabled: true },
++      "claude-api-credits": { enabled: true, derivedFromProviderId: "claude", limitFallback: true },
++      codex: { enabled: true },
++    },
++    registry: storage,
++    logger,
++  });
++  const limitClaudeUntil = (resetsAt: string) =>
++    (
++      manager as unknown as { recordProviderLimit(p: string, l: { resetsAt: string }): void }
++    ).recordProviderLimit("claude", { resetsAt });
++  return { workdir, manager, credits, limitClaudeUntil };
++}
++
++test("switchAgentProvider moves an idle agent between profiles of one provider in place", async () => {
++  const { workdir, manager, credits } = createLimitFallbackManager();
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  const until = "2026-11-02T00:00:00.000Z";
++
++  const moved = await manager.switchAgentProvider(agent.id, "claude-api-credits", {
++    fallbackUntil: until,
++  });
++  expect(moved.id).toBe(agent.id);
++  expect(moved.provider).toBe("claude-api-credits");
++  expect(moved.labels["paseo.limit-fallback"]).toBe(until);
++  expect(credits.resumeOverrides).toHaveLength(1);
++
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBe(until);
++
++  await manager.switchAgentProvider(agent.id, "claude");
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBeUndefined();
++});
++
++test("switchAgentProvider refuses a provider that is not a profile of the same base", async () => {
++  const { workdir, manager } = createLimitFallbackManager();
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  await expect(manager.switchAgentProvider(agent.id, "codex")).rejects.toThrow(
++    "unrelated provider",
++  );
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++});
++
++test("new chats start on the limit fallback until the limit resets, then move back", async () => {
++  const { workdir, manager, limitClaudeUntil } = createLimitFallbackManager();
++  const resetsAt = new Date(Date.now() + 60 * 60_000).toISOString();
++  limitClaudeUntil(resetsAt);
++
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  expect(agent.provider).toBe("claude-api-credits");
++  expect(agent.labels["paseo.limit-fallback"]).toBe(resetsAt);
++
++  await manager.restoreDueLimitFallbacks(Date.parse(resetsAt) - 1);
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude-api-credits");
++
++  await manager.restoreDueLimitFallbacks(Date.parse(resetsAt) + 1);
++  expect(manager.getAgent(agent.id)?.provider).toBe("claude");
++  expect(manager.getAgent(agent.id)?.labels["paseo.limit-fallback"]).toBeUndefined();
++});
++
++test("chats are not moved to the fallback once the limit has passed", async () => {
++  const { workdir, manager, limitClaudeUntil } = createLimitFallbackManager();
++  limitClaudeUntil(new Date(Date.now() - 1000).toISOString());
++  const agent = await manager.createAgent({ provider: "claude", cwd: workdir }, undefined, {
++    workspaceId: undefined,
++  });
++  expect(agent.provider).toBe("claude");
++});
+diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
+index 37164e74f..583751962 100644
+--- a/packages/server/src/server/agent/agent-manager.ts
++++ b/packages/server/src/server/agent/agent-manager.ts
+@@ -1,9 +1,14 @@
+ import {
+   AUTO_RESUME_USAGE_LIMIT_LABEL,
++  LIMIT_FALLBACK_LABEL,
++  autoResumesUsageLimit,
++  type CreditBudget,
++  type CreditSpend,
+   usageLimitResumeAt,
+   type AgentUsageLimit,
+ } from "@getpaseo/protocol/agent-usage-limit";
+ import { projectTimelineRows } from "./timeline-projection.js";
++import type { CreditLedger } from "./credit-ledger.js";
+ import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
+ import { describeHookAgent, publishAgentStream } from "../plugins/lifecycle/index.js";
+ import type { PluginSessionOpenRequest } from "@getpaseo/plugin/server";
+@@ -130,6 +135,15 @@ function submittedPromptText(prompt: AgentPromptInput): string {
+     .trim();
+ }
+ 
++// A provider switch resumes the same native session under another profile.
++function resolveReloadTarget(
++  existing: ManagedAgent,
++  override: AgentProvider | undefined,
++): { provider: AgentProvider; handle: AgentPersistenceHandle | null } {
++  const provider = override ?? existing.persistence?.provider ?? existing.provider;
++  return { provider, handle: existing.persistence ? { ...existing.persistence, provider } : null };
++}
++
+ export class AgentManagerShuttingDownError extends Error {
+   constructor() {
+     super("Agent manager is shutting down");
+@@ -308,6 +322,8 @@ interface AgentManagerRescueTimeouts {
+ interface ProviderEnabledFlag {
+   enabled: boolean;
+   derivedFromProviderId?: string | null;
++  limitFallback?: boolean;
++  creditBudget?: CreditBudget;
+   applyToolPolicy?: (
+     config: AgentSessionConfig,
+     toolPolicy: ToolPolicy | undefined,
+@@ -329,6 +345,7 @@ export interface CreateAgentOptions {
+ 
+ export interface AgentManagerOptions {
+   pluginLifecycle?: PluginLifecycle;
++  creditLedger?: CreditLedger;
+   /** An internal workspace makes every agent created inside it internal. */
+   clients?: ProviderClientMap;
+   providerDefinitions?: ProviderEnabledMap;
+@@ -440,6 +457,7 @@ interface ManagedAgentBase {
+   activeTurnId: string | null;
+   activeTurnStartedAt: Date | null;
+   lastUsage?: AgentUsage;
++  creditSpend?: CreditSpend;
+   usageLimit?: AgentUsageLimit;
+   lastError?: string;
+   attention: AttentionState;
+@@ -773,6 +791,9 @@ export class AgentManager {
+   private readonly clients = new Map<AgentProvider, AgentClient>();
+   private readonly providerEnabled = new Map<AgentProvider, boolean>();
+   private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
++  private readonly creditLedger?: CreditLedger;
++  // Host-wide: a subscription limit applies to every chat on that provider.
++  private readonly providerLimitedUntil = new Map<AgentProvider, number>();
+   private readonly agents = new Map<string, LiveManagedAgent>();
+   private readonly timelineStore = new InMemoryAgentTimelineStore();
+   private readonly providerSubagents = new ProviderSubagentStore();
+@@ -812,6 +833,7 @@ export class AgentManager {
+ 
+   constructor(options: AgentManagerOptions) {
+     this.pluginLifecycle = options.pluginLifecycle;
++    this.creditLedger = options.creditLedger;
+     this.idFactory = options?.idFactory ?? (() => randomUUID());
+     this.registry = options?.registry;
+     this.durableTimelineStore = options?.durableTimelineStore;
+@@ -1324,6 +1346,14 @@ export class AgentManager {
+       options = { ...options, env: request.env };
+     }
+     await this.deleteAgentState(resolvedAgentId);
++    const fallback = config.internal ? null : this.activeLimitFallback(config.provider);
++    if (fallback) {
++      config = { ...config, provider: fallback.provider };
++      options = {
++        ...options,
++        labels: { ...options.labels, [LIMIT_FALLBACK_LABEL]: fallback.until },
++      };
++    }
+     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+       config,
+       resolvedAgentId,
+@@ -1583,7 +1613,7 @@ export class AgentManager {
+   private async reloadAgentSessionInternal(
+     agentId: string,
+     overrides?: Partial<AgentSessionConfig>,
+-    options?: { rehydrateFromDisk?: boolean },
++    options?: { rehydrateFromDisk?: boolean; provider?: AgentProvider },
+   ): Promise<ManagedAgent> {
+     this.assertAcceptingAgentRegistrations();
+     let existing = this.requireSessionAgent(agentId);
+@@ -1596,8 +1626,7 @@ export class AgentManager {
+     const preservedLastUsage = existing.lastUsage;
+     const preservedLastError = existing.lastError;
+     const preservedAttention = existing.attention;
+-    const handle = existing.persistence;
+-    const provider = handle?.provider ?? existing.provider;
++    const { provider, handle } = resolveReloadTarget(existing, options?.provider);
+     const client = this.requireClient(provider);
+     const refreshConfig = {
+       ...existing.config,
+@@ -2462,6 +2491,139 @@ export class AgentManager {
+     }
+   }
+ 
++  /**
++   * Move an idle agent to another profile of the same provider (e.g. a Claude
++   * subscription profile and an API-key profile), keeping its ID, native session
++   * and timeline. The label marks a temporary move, undone when the limit resets.
++   */
++  async switchAgentProvider(
++    agentId: string,
++    provider: AgentProvider,
++    options?: { fallbackUntil?: string },
++  ): Promise<ManagedAgent> {
++    this.usageLimitResumeAttempts.get(agentId)?.abort();
++    return this.trackAgentRegistrationOperation(
++      this.runLifecycleMutation(agentId, async () => {
++        const existing = this.requireSessionAgent(agentId);
++        if (existing.provider === provider) return existing;
++        if (this.hasInFlightRun(agentId) || existing.pendingPermissions.size > 0) {
++          throw new Error("Stop the agent before switching its provider");
++        }
++        if (!existing.persistence) {
++          throw new Error("The agent has no saved session to resume");
++        }
++        if (this.providerBase(existing.provider) !== this.providerBase(provider)) {
++          throw new Error(
++            `Cannot switch '${existing.provider}' to unrelated provider '${provider}'`,
++          );
++        }
++        if (this.providerDefinitions.get(provider)?.enabled === false) {
++          throw new Error(`Provider '${provider}' is disabled`);
++        }
++        await this.reloadAgentSessionInternal(agentId, undefined, { provider });
++        const agent = this.requireSessionAgent(agentId);
++        const labels = { ...agent.labels };
++        if (options?.fallbackUntil) labels[LIMIT_FALLBACK_LABEL] = options.fallbackUntil;
++        else delete labels[LIMIT_FALLBACK_LABEL];
++        agent.labels = labels;
++        // The limit belonged to the old profile; its scheduled resume no longer applies.
++        agent.usageLimit = undefined;
++        agent.lastError = undefined;
++        this.touchUpdatedAt(agent);
++        await this.persistSnapshot(agent);
++        this.emitState(agent, { persist: false });
++        return { ...agent };
++      }),
++    );
++  }
++
++  /** Move a chat stopped at its provider's usage limit to the fallback profile and continue it. */
++  async continueOnLimitFallback(agentId: string): Promise<void> {
++    const existing = this.requireSessionAgent(agentId);
++    const fallback = this.limitFallbackFor(existing.provider);
++    if (!fallback) throw new Error(`No limit fallback is configured for '${existing.provider}'`);
++    const until =
++      existing.usageLimit?.resetsAt ??
++      this.activeLimitFallback(existing.provider)?.until ??
++      "unknown";
++    await this.switchAgentProvider(agentId, fallback, { fallbackUntil: until });
++    void this.runAgent(
++      agentId,
++      "Continue the interrupted task from where you stopped, respecting the existing instructions. If the task is already complete, do not start new work.",
++      { clientMessageId: randomUUID() },
++    ).catch((error) => {
++      this.logger.warn({ err: error, agentId }, "Failed to continue on limit fallback");
++    });
++  }
++
++  /** Move idle fallback chats back once their base provider's limit has reset. */
++  async restoreDueLimitFallbacks(now = Date.now()): Promise<void> {
++    for (const agent of this.agents.values()) {
++      const until = agent.labels[LIMIT_FALLBACK_LABEL];
++      if (until === undefined) continue;
++      const base = this.providerBase(agent.provider);
++      const due =
++        until === "unknown" ? this.activeLimitFallback(base) === null : Date.parse(until) <= now;
++      if (!due || this.hasInFlightRun(agent.id) || agent.pendingPermissions.size > 0) continue;
++      try {
++        await this.switchAgentProvider(agent.id, base);
++      } catch (error) {
++        this.logger.warn(
++          { err: error, agentId: agent.id },
++          "Failed to restore from limit fallback",
++        );
++      }
++    }
++  }
++
++  private recordProviderLimit(provider: AgentProvider, limit: AgentUsageLimit | undefined): void {
++    const resetsAt = limit?.resetsAt ? Date.parse(limit.resetsAt) : NaN;
++    if (!Number.isFinite(resetsAt)) return;
++    this.providerLimitedUntil.set(
++      provider,
++      Math.max(resetsAt, this.providerLimitedUntil.get(provider) ?? 0),
++    );
++  }
++
++  private limitFallbackFor(provider: AgentProvider): AgentProvider | null {
++    for (const [id, definition] of this.providerDefinitions) {
++      if (
++        definition.limitFallback &&
++        definition.enabled &&
++        definition.derivedFromProviderId === provider
++      ) {
++        return id;
++      }
++    }
++    return null;
++  }
++
++  /** The fallback profile to use now, and when the limit on `provider` ends. */
++  private activeLimitFallback(
++    provider: AgentProvider,
++  ): { provider: AgentProvider; until: string } | null {
++    const until = this.providerLimitedUntil.get(provider);
++    if (until === undefined) return null;
++    if (until <= Date.now()) {
++      this.providerLimitedUntil.delete(provider);
++      return null;
++    }
++    const fallback = this.limitFallbackFor(provider);
++    return fallback ? { provider: fallback, until: new Date(until).toISOString() } : null;
++  }
++
++  private refreshCreditSpend(agent: ManagedAgent): void {
++    const budget = this.providerDefinitions.get(agent.provider)?.creditBudget;
++    agent.creditSpend =
++      budget && this.creditLedger
++        ? this.creditLedger.spend(agent.id, agent.provider, budget)
++        : undefined;
++  }
++
++  private providerBase(provider: AgentProvider): AgentProvider {
++    return this.providerDefinitions.get(provider)?.derivedFromProviderId ?? provider;
++  }
++
+   async resumeAfterUsageLimit({ agentId, expected }: ResumeAfterUsageLimitInput): Promise<void> {
+     if (this.usageLimitResumeAttempts.has(agentId)) return;
+     const attempt = new AbortController();
+@@ -2478,7 +2640,7 @@ export class AgentManager {
+         const labels = existing ? existing.labels : record.labels;
+         const limit = existing ? existing.usageLimit : record.usageLimit;
+         if (
+-          labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true" ||
++          !autoResumesUsageLimit(labels) ||
+           limit?.resetsAt !== expected.resetsAt ||
+           resumeAt === null ||
+           resumeAt > Date.now() ||
+@@ -2521,7 +2683,7 @@ export class AgentManager {
+       !signal.aborted &&
+       this.acceptingAgentRegistrations &&
+       agent &&
+-      agent.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] === "true" &&
++      autoResumesUsageLimit(agent.labels) &&
+       !this.hasInFlightRun(agentId) &&
+       agent.pendingPermissions.size === 0 &&
+       agent.lastUserMessageAt === lastUserMessageAt,
+@@ -4637,6 +4799,7 @@ export class AgentManager {
+           eventTurnId,
+           isForegroundEvent,
+           terminalDisposition,
++          fromHistory: options?.fromHistory === true,
+         });
+         return undefined;
+       case "turn_failed":
+@@ -4740,6 +4903,7 @@ export class AgentManager {
+     eventTurnId: string | undefined;
+     isForegroundEvent: boolean;
+     terminalDisposition: ActiveTurnTerminalDisposition;
++    fromHistory: boolean;
+   }): void {
+     const { agent, event, eventTurnId, isForegroundEvent, terminalDisposition } = params;
+     this.logger.trace(
+@@ -4756,6 +4920,14 @@ export class AgentManager {
+     if (terminalDisposition === "stale") return;
+     if (event.usage) {
+       agent.lastUsage = { ...agent.lastUsage, ...event.usage };
++      if (typeof event.usage.totalCostUsd === "number" && !params.fromHistory) {
++        this.creditLedger?.record({
++          agentId: agent.id,
++          provider: agent.provider,
++          sessionTotalUsd: event.usage.totalCostUsd,
++          metered: this.providerDefinitions.get(agent.provider)?.creditBudget !== undefined,
++        });
++      }
+     }
+     // If no usage on turn_completed, keep lastUsage as-is so context window
+     // data accumulated during streaming isn't lost when the provider omits
+@@ -4802,7 +4974,10 @@ export class AgentManager {
+       agent.lifecycle = "error";
+     }
+     agent.lastError = event.error;
+-    if (!options?.fromHistory) agent.usageLimit = event.usageLimit;
++    if (!options?.fromHistory) {
++      agent.usageLimit = event.usageLimit;
++      this.recordProviderLimit(agent.provider, event.usageLimit);
++    }
+     await this.appendSystemErrorTimelineMessage(
+       agent,
+       event.provider,
+@@ -5109,6 +5284,7 @@ export class AgentManager {
+   private emitState(agent: ManagedAgent, options?: { persist?: boolean }): void {
+     // Keep attention as an edge-triggered unread signal, not a level signal.
+     this.checkAndSetAttention(agent);
++    this.refreshCreditSpend(agent);
+     if (options?.persist !== false) {
+       this.enqueueBackgroundPersist(agent);
+     }
+diff --git a/packages/server/src/server/agent/agent-projections.ts b/packages/server/src/server/agent/agent-projections.ts
+index 709ac20d4..f8948c4cd 100644
+--- a/packages/server/src/server/agent/agent-projections.ts
++++ b/packages/server/src/server/agent/agent-projections.ts
+@@ -141,6 +141,7 @@ export function toAgentPayload(
+     title: options?.title ?? null,
+     labels: agent.labels,
+     usageLimit: agent.usageLimit,
++    creditSpend: agent.creditSpend,
+     ...(agent.internal ? { internal: true } : {}),
+   };
+ 
+diff --git a/packages/server/src/server/agent/credit-ledger.test.ts b/packages/server/src/server/agent/credit-ledger.test.ts
+new file mode 100644
+index 000000000..fa50686dc
+--- /dev/null
++++ b/packages/server/src/server/agent/credit-ledger.test.ts
+@@ -0,0 +1,37 @@
++import { mkdtempSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { expect, test } from "vitest";
++import { creditCycle } from "@getpaseo/protocol/agent-usage-limit";
++import { createTestLogger } from "../../test-utils/test-logger.js";
++import { CreditLedger } from "./credit-ledger.js";
++
++const budget = { monthlyUsd: 100, cycleDay: 2 };
++
++function ledgerPath() {
++  return join(mkdtempSync(join(tmpdir(), "credit-ledger-")), "credit-ledger.jsonl");
++}
++
++test("metered spend is the increase in the session's running cost, and survives a restart", () => {
++  const path = ledgerPath();
++  const ledger = new CreditLedger(path, createTestLogger());
++  // Subscription turns set the baseline without counting as spend.
++  ledger.record({ agentId: "a", provider: "claude", sessionTotalUsd: 0.5, metered: false });
++  ledger.record({ agentId: "a", provider: "credits", sessionTotalUsd: 0.53, metered: true });
++  ledger.record({ agentId: "a", provider: "credits", sessionTotalUsd: 0.6, metered: true });
++  ledger.record({ agentId: "b", provider: "credits", sessionTotalUsd: 0.02, metered: true });
++
++  for (const current of [ledger, new CreditLedger(path, createTestLogger())]) {
++    const spend = current.spend("a", "credits", budget);
++    expect(spend.chatUsd).toBeCloseTo(0.1);
++    expect(spend.cycleUsd).toBeCloseTo(0.12);
++    expect(spend.budgetUsd).toBe(100);
++  }
++});
++
++test("the cycle renews on its day of the month", () => {
++  const { start, end } = creditCycle(new Date(2026, 10, 1, 12), 2);
++  expect(start).toEqual(new Date(2026, 9, 2));
++  expect(end).toEqual(new Date(2026, 10, 2));
++  expect(creditCycle(new Date(2026, 10, 2, 0, 1), 2).start).toEqual(new Date(2026, 10, 2));
++});
+diff --git a/packages/server/src/server/agent/credit-ledger.ts b/packages/server/src/server/agent/credit-ledger.ts
+new file mode 100644
+index 000000000..26e8bd55b
+--- /dev/null
++++ b/packages/server/src/server/agent/credit-ledger.ts
+@@ -0,0 +1,90 @@
++import { appendFileSync, readFileSync } from "node:fs";
++import type { Logger } from "pino";
++import {
++  creditCycle,
++  type CreditBudget,
++  type CreditSpend,
++} from "@getpaseo/protocol/agent-usage-limit";
++
++interface LedgerLine {
++  at: string;
++  agentId: string;
++  provider: string;
++  // The provider session's running cost total; spend is its increase on a metered provider.
++  sessionTotalUsd: number;
++  usd: number;
++}
++
++/**
++ * Estimated spend on metered (API-billed) profiles, from the running session cost a
++ * provider reports after each turn. Append-only JSONL, replayed at startup.
++ */
++export class CreditLedger {
++  private readonly baselines = new Map<string, number>();
++  private readonly chatUsd = new Map<string, number>();
++  private readonly spends: Array<{ at: number; provider: string; usd: number }> = [];
++
++  constructor(
++    private readonly path: string,
++    private readonly logger: Logger,
++  ) {
++    let text = "";
++    try {
++      text = readFileSync(path, "utf8");
++    } catch {
++      return; // no spend recorded yet
++    }
++    for (const raw of text.split("\n")) {
++      if (!raw) continue;
++      try {
++        this.apply(JSON.parse(raw) as LedgerLine);
++      } catch {
++        this.logger.warn({ path }, "Skipping an unreadable credit ledger line");
++      }
++    }
++  }
++
++  record(input: { agentId: string; provider: string; sessionTotalUsd: number; metered: boolean }) {
++    const baseline = this.baselines.get(input.agentId);
++    if (baseline === input.sessionTotalUsd) return;
++    // A lower total is a new provider session: its whole total is new spend.
++    const delta =
++      baseline === undefined || input.sessionTotalUsd < baseline
++        ? input.sessionTotalUsd
++        : input.sessionTotalUsd - baseline;
++    const line: LedgerLine = {
++      at: new Date().toISOString(),
++      agentId: input.agentId,
++      provider: input.provider,
++      sessionTotalUsd: input.sessionTotalUsd,
++      usd: input.metered ? delta : 0,
++    };
++    this.apply(line);
++    try {
++      appendFileSync(this.path, `${JSON.stringify(line)}\n`);
++    } catch (error) {
++      this.logger.warn({ err: error, path: this.path }, "Failed to append to the credit ledger");
++    }
++  }
++
++  spend(agentId: string, provider: string, budget: CreditBudget, now = new Date()): CreditSpend {
++    const cycle = creditCycle(now, budget.cycleDay);
++    let cycleUsd = 0;
++    for (const entry of this.spends) {
++      if (entry.provider === provider && entry.at >= cycle.start.getTime()) cycleUsd += entry.usd;
++    }
++    return {
++      chatUsd: this.chatUsd.get(agentId) ?? 0,
++      cycleUsd,
++      budgetUsd: budget.monthlyUsd,
++      cycleEndsAt: cycle.end.toISOString(),
++    };
++  }
++
++  private apply(line: LedgerLine) {
++    this.baselines.set(line.agentId, line.sessionTotalUsd);
++    if (line.usd <= 0) return;
++    this.chatUsd.set(line.agentId, (this.chatUsd.get(line.agentId) ?? 0) + line.usd);
++    this.spends.push({ at: Date.parse(line.at), provider: line.provider, usd: line.usd });
++  }
++}
+diff --git a/packages/server/src/server/agent/provider-registry.ts b/packages/server/src/server/agent/provider-registry.ts
+index 9f85e4d37..7f843e59a 100644
+--- a/packages/server/src/server/agent/provider-registry.ts
++++ b/packages/server/src/server/agent/provider-registry.ts
+@@ -1,3 +1,4 @@
++import type { CreditBudget } from "@getpaseo/protocol/agent-usage-limit";
+ import type { Logger } from "pino";
+ import type { ProviderOptions, ToolPolicy } from "@getpaseo/protocol/agent-types";
+ 
+@@ -76,6 +77,9 @@ export interface ProviderDefinition extends AgentProviderDefinition {
+    * generic ACP providers (which only extend the literal "acp" sentinel).
+    */
+   derivedFromProviderId: string | null;
++  /** Used in place of its base provider while that is at a usage limit. */
++  limitFallback: boolean;
++  creditBudget?: CreditBudget;
+   supportsExactMcpPreapproval: boolean;
+   applyToolPolicy: (
+     config: AgentSessionConfig,
+@@ -140,6 +144,8 @@ interface ResolvedProvider {
+   profileModelsAreAdditive: boolean;
+   enabled: boolean;
+   derivedFromProviderId: string | null;
++  limitFallback?: boolean;
++  creditBudget?: CreditBudget;
+   providerOptions?: ProviderOptions;
+   createBaseClient: (logger: Logger) => AgentClient;
+   contract: ProviderContract;
+@@ -648,6 +654,8 @@ function createRegistryEntry(
+     configuration,
+     enabled: resolved.enabled,
+     derivedFromProviderId: resolved.derivedFromProviderId,
++    limitFallback: resolved.limitFallback === true,
++    creditBudget: resolved.creditBudget,
+     supportsExactMcpPreapproval: resolved.contract.supportsExactMcpPreapproval,
+     applyToolPolicy: (config, toolPolicy) => {
+       if (toolPolicy && !resolved.contract.supportsExactMcpPreapproval) {
+@@ -888,6 +896,8 @@ function addDerivedProviders(
+       profileModelsAreAdditive: false,
+       enabled: override.enabled !== false,
+       derivedFromProviderId: baseProviderId,
++      limitFallback: override.limitFallback === true,
++      creditBudget: override.creditBudget,
+       providerOptions,
+       createBaseClient: (logger) =>
+         baseFactory(logger, mergedRuntimeSettings, {
+diff --git a/packages/server/src/server/agent/provider-snapshot-manager.ts b/packages/server/src/server/agent/provider-snapshot-manager.ts
+index b10a4f8e0..922854d91 100644
+--- a/packages/server/src/server/agent/provider-snapshot-manager.ts
++++ b/packages/server/src/server/agent/provider-snapshot-manager.ts
+@@ -185,7 +185,10 @@ export interface AgentManagerProviderState {
+   providerDefinitions: Partial<
+     Record<
+       AgentProvider,
+-      Pick<ProviderDefinition, "enabled" | "derivedFromProviderId" | "applyToolPolicy">
++      Pick<
++        ProviderDefinition,
++        "enabled" | "derivedFromProviderId" | "limitFallback" | "creditBudget" | "applyToolPolicy"
++      >
+     >
+   >;
+   clients: Partial<Record<AgentProvider, AgentClient>>;
+@@ -370,6 +373,8 @@ export class ProviderSnapshotManager {
+       providerDefinitions[provider] = {
+         enabled: definition.enabled,
+         derivedFromProviderId: definition.derivedFromProviderId,
++        limitFallback: definition.limitFallback,
++        creditBudget: definition.creditBudget,
+         applyToolPolicy: definition.applyToolPolicy,
+       };
+       if (definition.enabled) {
+diff --git a/packages/server/src/server/agent/usage-limit-resume.test.ts b/packages/server/src/server/agent/usage-limit-resume.test.ts
+index 833d870f6..a30bd38b8 100644
+--- a/packages/server/src/server/agent/usage-limit-resume.test.ts
++++ b/packages/server/src/server/agent/usage-limit-resume.test.ts
+@@ -167,12 +167,9 @@ function resumedMessages({ manager, agentId }: UsageLimitFixture) {
+     );
+ }
+ 
+-test("opt-in is required; concurrent scans resume once in the same provider session", async () => {
++test("resume is on by default; concurrent scans resume once in the same provider session", async () => {
+   const fixture = await setup();
+   const service = fixture.createService();
+-  await service.tick();
+-  expect(resumedMessages(fixture)).toHaveLength(0);
+-  await fixture.enable();
+   await Promise.all([service.tick(), service.tick()]);
+   await expect
+     .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
+diff --git a/packages/server/src/server/agent/usage-limit-resume.ts b/packages/server/src/server/agent/usage-limit-resume.ts
+index 964858dcd..2f3eab609 100644
+--- a/packages/server/src/server/agent/usage-limit-resume.ts
++++ b/packages/server/src/server/agent/usage-limit-resume.ts
+@@ -1,20 +1,19 @@
+-import {
+-  AUTO_RESUME_USAGE_LIMIT_LABEL,
+-  usageLimitResumeAt,
+-} from "@getpaseo/protocol/agent-usage-limit";
++import { autoResumesUsageLimit, usageLimitResumeAt } from "@getpaseo/protocol/agent-usage-limit";
+ import type { Logger } from "pino";
+ import type { AgentManager } from "./agent-manager.js";
+ import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
+ 
+ interface UsageLimitResumeOptions {
+   agentStorage: Pick<AgentStorage, "list">;
+-  agentManager: Pick<AgentManager, "resumeAfterUsageLimit">;
++  agentManager: Pick<AgentManager, "resumeAfterUsageLimit" | "restoreDueLimitFallbacks">;
+   canResumeWorkspace: (record: StoredAgentRecord) => Promise<boolean>;
+   logger: Logger;
+ }
+ 
+ export class UsageLimitResumeService {
+   private timer: ReturnType<typeof setInterval> | null = null;
++  // Separate from the resume scan, so a slow restore never delays a resume claim.
++  private fallbackTimer: ReturnType<typeof setInterval> | null = null;
+   private pending: Promise<void> | null = null;
+ 
+   constructor(private readonly options: UsageLimitResumeOptions) {}
+@@ -27,11 +26,19 @@ export class UsageLimitResumeService {
+       });
+     }, 5_000);
+     this.timer.unref();
++    this.fallbackTimer = setInterval(() => {
++      void this.options.agentManager.restoreDueLimitFallbacks().catch((error) => {
++        this.options.logger.error({ err: error }, "Limit fallback restore failed");
++      });
++    }, 15_000);
++    this.fallbackTimer.unref();
+   }
+ 
+   async stop(): Promise<void> {
+     if (this.timer) clearInterval(this.timer);
++    if (this.fallbackTimer) clearInterval(this.fallbackTimer);
+     this.timer = null;
++    this.fallbackTimer = null;
+     await this.pending;
+   }
+ 
+@@ -46,7 +53,7 @@ export class UsageLimitResumeService {
+   private async resumeDueAgents(): Promise<void> {
+     for (const record of await this.options.agentStorage.list()) {
+       if (record.archivedAt || record.internal || !record.usageLimit) continue;
+-      if (record.labels[AUTO_RESUME_USAGE_LIMIT_LABEL] !== "true") continue;
++      if (!autoResumesUsageLimit(record.labels)) continue;
+       const resumeAt = usageLimitResumeAt(record.usageLimit);
+       if (resumeAt === null || resumeAt > Date.now()) continue;
+       try {
+diff --git a/packages/server/src/server/authorization/operation-permissions.ts b/packages/server/src/server/authorization/operation-permissions.ts
+index e7e77bc0d..b5061fbd9 100644
+--- a/packages/server/src/server/authorization/operation-permissions.ts
++++ b/packages/server/src/server/authorization/operation-permissions.ts
+@@ -172,6 +172,7 @@ const INBOUND_PERMISSION = {
+   set_agent_feature_request: "workspace.write",
+   set_agent_mode_request: "workspace.write",
+   set_agent_model_request: "workspace.write",
++  "agent.limit_fallback.continue.request": "workspace.write",
+   set_agent_thinking_request: "workspace.write",
+   set_daemon_config_request: "daemon.manage",
+   set_voice_mode: "workspace.write",
+@@ -397,6 +398,7 @@ const OUTBOUND_PERMISSION = {
+   set_agent_feature_response: "workspace.write",
+   set_agent_mode_response: "workspace.write",
+   set_agent_model_response: "workspace.write",
++  "agent.limit_fallback.continue.response": "workspace.write",
+   set_agent_thinking_response: "workspace.write",
+   set_daemon_config_response: "daemon.manage",
+   set_voice_mode_response: "workspace.write",
+diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
+index 3c84234ff..678fa1b60 100644
+--- a/packages/server/src/server/bootstrap.ts
++++ b/packages/server/src/server/bootstrap.ts
+@@ -1,4 +1,5 @@
+ import { UsageLimitResumeService } from "./agent/usage-limit-resume.js";
++import { CreditLedger } from "./agent/credit-ledger.js";
+ import type { PluginRegistries } from "@getpaseo/protocol/plugin-registry";
+ import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
+ import express from "express";
+@@ -949,6 +950,7 @@ export async function createPaseoDaemon(
+   const initialAgentManagerState = providerSnapshotManager.getAgentManagerProviderState();
+   const agentManager = new AgentManager({
+     pluginLifecycle: pluginRuntime,
++    creditLedger: new CreditLedger(path.join(config.paseoHome, "credit-ledger.jsonl"), logger),
+     clients: initialAgentManagerState.clients,
+     providerDefinitions: initialAgentManagerState.providerDefinitions,
+     registry: agentStorage,
+diff --git a/packages/server/src/server/session.ts b/packages/server/src/server/session.ts
+index 08d3f0eef..8c3138c16 100644
+--- a/packages/server/src/server/session.ts
++++ b/packages/server/src/server/session.ts
+@@ -1020,6 +1020,7 @@ export class Session {
+         setMode: async (agentId, modeId) =>
+           (await setAgentModeCommand({ agentManager }, { agentId, modeId })).notice,
+         setModel: (agentId, modelId) => agentManager.setAgentModel(agentId, modelId),
++        continueOnLimitFallback: (agentId) => agentManager.continueOnLimitFallback(agentId),
+         setFeature: (agentId, featureId, value) =>
+           agentManager.setAgentFeature(agentId, featureId, value),
+         setThinking: (agentId, thinkingOptionId) =>
+@@ -2796,6 +2797,8 @@ export class Session {
+         return this.agentConfigSession.handleSetAgentModeRequest(msg);
+       case "set_agent_model_request":
+         return this.agentConfigSession.handleSetAgentModelRequest(msg);
++      case "agent.limit_fallback.continue.request":
++        return this.agentConfigSession.handleContinueOnLimitFallbackRequest(msg);
+       case "set_agent_feature_request":
+         return this.agentConfigSession.handleSetAgentFeatureRequest(msg);
+       case "set_agent_thinking_request":
+diff --git a/packages/server/src/server/session/agent-config/agent-config-session.ts b/packages/server/src/server/session/agent-config/agent-config-session.ts
+index 8cf239419..998ccdb47 100644
+--- a/packages/server/src/server/session/agent-config/agent-config-session.ts
++++ b/packages/server/src/server/session/agent-config/agent-config-session.ts
+@@ -28,6 +28,7 @@ export interface AgentConfigOperations {
+   ensureLoaded(agentId: string): Promise<void>;
+   setMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null>;
+   setModel(agentId: string, modelId: string | null): Promise<void>;
++  continueOnLimitFallback(agentId: string): Promise<void>;
+   setFeature(agentId: string, featureId: string, value: unknown): Promise<void>;
+   setThinking(
+     agentId: string,
+@@ -102,6 +103,25 @@ export class AgentConfigSession {
+     });
+   }
+ 
++  handleContinueOnLimitFallbackRequest(
++    msg: Extract<SessionInboundMessage, { type: "agent.limit_fallback.continue.request" }>,
++  ): Promise<void> {
++    const { agentId, requestId } = msg;
++    return this.applyConfigChange({
++      agentId,
++      requestId,
++      logLabel: "agent.limit_fallback.continue.request",
++      logFields: { agentId, requestId },
++      failureText: "Failed to continue on the limit fallback",
++      run: async () => {
++        await this.operations.continueOnLimitFallback(agentId);
++        return undefined;
++      },
++      emitResponse: (payload) =>
++        this.host.emit({ type: "agent.limit_fallback.continue.response", payload }),
++    });
++  }
++
+   handleSetAgentFeatureRequest(
+     msg: Extract<SessionInboundMessage, { type: "set_agent_feature_request" }>,
+   ): Promise<void> {
+diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
+index ee94979f0..9a118c2c9 100644
+--- a/packages/server/src/server/websocket-server.ts
++++ b/packages/server/src/server/websocket-server.ts
+@@ -1792,6 +1792,7 @@ export class VoiceAssistantWebSocketServer {
+       features: {
+         usageSources: true,
+         usageLimitResume: true,
++        limitFallback: true,
+         ownedSubscriptions: true,
+         agentRequestReceipts: true,
+         workspaceRequestReceipts: true,
+-- 
+2.56.0
+

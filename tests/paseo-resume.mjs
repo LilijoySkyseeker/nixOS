@@ -1,34 +1,14 @@
 // The watcher on recorded provider messages and a fake daemon, offline.
 import assert from 'node:assert/strict';
 const { limitHit, quotaBack, poll, PROMPT } = await import(process.argv[2]);
-const limitText = "You've hit your session limit · resets 2:40pm (America/Los_Angeles)";
 const codex = 'You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage to purchase more credits or try again at 5:13 PM.';
-const line = (o) => JSON.stringify(o);
-const user = line({ type: 'user', isSidechain: false, message: { role: 'user', content: 'go on' } });
-const reply = (text) => line({ type: 'assistant', isSidechain: false, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text }] } });
-// as claude code writes it, then its notice
-const limit = line({ type: 'assistant', isSidechain: false, error: 'rate_limit', isApiErrorMessage: true, message: { model: '<synthetic>', content: [{ type: 'text', text: limitText }] } });
-const notice = line({ type: 'system', subtype: 'informational', content: 'Usage limit reached · continuing automatically at 2:40pm' });
-const taskNotice = line({ type: 'user', isSidechain: false, origin: { kind: 'task-notification', producer: 'session-task' }, queueTranscriptOnly: true, message: { role: 'user', content: '<task-notification>Agent failed: usage limit</task-notification>' } });
-const claude = (status, ...lines) => [{ provider: 'claude', status, cwd: '/home/agent/work', persistence: { sessionId: 's' } }, async () => `{"cut":\n${lines.join('\n')}\n`];
-const hit = (agent, read = async () => null) => limitHit(agent, read);
+const limited = (id) => ({ id, provider: 'codex', status: 'error', lastError: codex });
 
-assert.equal(await hit({ provider: 'codex', status: 'error', lastError: codex }), codex);
-assert.equal(await hit(...claude('idle', user, limit)), limitText);
-assert.equal(await hit(...claude('idle', user, limit, notice)), limitText);
-assert.equal(await hit(...claude('idle', user, limit, taskNotice, taskNotice)), limitText);
-// already continued, or the model only saying it
-assert.equal(await hit(...claude('idle', limit, user)), null);
-assert.equal(await hit(...claude('idle', limit, taskNotice, user)), null);
-assert.equal(await hit(...claude('idle', user, reply('Done'), taskNotice)), null);
-// a notification delivered as a new turn still supersedes the old limit
-assert.equal(await hit(...claude('idle', limit, taskNotice.replace('"queueTranscriptOnly":true', '"queueTranscriptOnly":false'))), null);
-assert.equal(await hit(...claude('idle', user, reply(limitText))), null);
-// a turn still going, no transcript, another error
-assert.equal(await hit(...claude('running', user, limit)), null);
-assert.equal(await hit(claude('idle')[0]), null);
-assert.equal(await hit({ provider: 'codex', status: 'error', lastError: 'Overloaded' }), null);
-assert.equal(await hit({ provider: 'codex', status: 'idle', lastError: codex }), null);
+assert.equal(limitHit(limited('a')), codex);
+assert.equal(limitHit({ provider: 'codex', status: 'error', lastError: 'Overloaded' }), null);
+assert.equal(limitHit({ provider: 'codex', status: 'idle', lastError: codex }), null);
+// claude limits are the daemon's (usage-limit-resume.patch)
+assert.equal(limitHit({ provider: 'claude', status: 'error', lastError: codex }), null);
 
 const report = (...windows) => ({ fetchedAt: '2026-10-26T02:38:03Z', report: { status: 'available', windows } });
 const w = (usedPct, summary = true) => ({ id: 'w', summary, usedPct });
@@ -41,27 +21,28 @@ assert.equal(quotaBack([{ report: { status: 'unavailable' } }]), false);
 assert.equal(quotaBack([]), false);
 
 // whole polls against a fake daemon: what gets sent
-const daemon = ({ agents, usedPct = 41 }) => {
+const daemon = ({ agents, usedPct = 41, failFor }) => {
   const sent = [];
   return {
     sent,
     fetchAgents: async () => ({ entries: agents().map((agent) => ({ agent })) }),
-    listUsageReports: async () => ({ reports: [report(w(usedPct), w(5))] }),
+    listUsageReports: async ({ agentId }) => {
+      if (agentId === failFor) throw Error('gone');
+      return { reports: [report(w(usedPct), w(5))] };
+    },
     sendAgentMessage: async (id, text) => sent.push([id, text]),
   };
 };
-const read = claude('idle', user, limit)[1];
-const limited = (id) => ({ id, provider: 'claude', status: 'idle', cwd: '/home/agent/work', persistence: { sessionId: id } });
 // quota back: sent
 let d = daemon({ agents: () => [limited('a')] });
-await poll(d, { read });
+await poll(d);
 assert.deepEqual(d.sent, [['a', PROMPT]]);
 // quota still out: nothing sent
 d = daemon({ agents: () => [limited('b')], usedPct: 100 });
-await poll(d, { read });
+await poll(d);
 assert.equal(d.sent.length, 0);
 // one agent that fails to check doesn't stop the others
-d = daemon({ agents: () => [limited('bad'), limited('e')] });
-await poll(d, { read: async (cwd, id) => { if (id === 'bad') throw Error('gone'); return read(); } });
+d = daemon({ agents: () => [limited('bad'), limited('e')], failFor: 'bad' });
+await poll(d);
 assert.deepEqual(d.sent, [['e', PROMPT]]);
 console.log('paseo-resume decisions ok');

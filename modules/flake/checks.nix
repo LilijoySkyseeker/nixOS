@@ -83,6 +83,23 @@
         # yield the byte-identical derivation the pushed flake builds in the VM
         nixpkgsUnstableFlake = config.flake.nixpkgsUnstableFlake;
       };
+
+      # node unit tests of paseo-continue-on-credits; no VM
+      paseo-continue-on-credits =
+        let
+          pkgs = config.flake.pkgsUnstable;
+          src = pkgs.lib.fileset.toSource {
+            root = ../..;
+            fileset = pkgs.lib.fileset.unions [
+              ../../modules/nixos/paseo/continue-on-credits.mjs
+              ../../tests/paseo-continue-on-credits.mjs
+            ];
+          };
+        in
+        pkgs.runCommand "paseo-continue-on-credits" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+          node --test ${src}/tests/paseo-continue-on-credits.mjs
+          touch $out
+        '';
     };
   };
 }
