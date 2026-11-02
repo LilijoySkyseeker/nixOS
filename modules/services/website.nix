@@ -46,6 +46,7 @@ in
         virtualHosts.${domain}.extraConfig = ''
           bind ${wgAddress}
           encode zstd gzip
+          header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
           # written by website-status, read by the page's status stickers
           handle /status.json {
             root * ${statusDir}
@@ -225,6 +226,17 @@ in
           StateDirectory = "website-status";
           # caddy serves status.json from here
           StateDirectoryMode = "0755";
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          PrivateNetwork = true;
+          ProtectSystem = "strict";
+          ReadWritePaths = [ statusDir ];
+          ProtectHome = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectKernelLogs = true;
+          ProtectControlGroups = true;
+          RestrictNamespaces = true;
         };
       };
       systemd.timers.website-status = {
