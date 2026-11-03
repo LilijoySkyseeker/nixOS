@@ -206,8 +206,10 @@ def main():
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
     p.add_argument("-f", "--format", choices=["text", "json"], default="text",
                    help="text (default): stamped lines, one per speaker's spoken paragraph; "
-                   "json: the same lines with start and end times and every word's times, "
-                   "plus non-speech sounds (laughter, music, effects) as less certain guesses")
+                   "json: the same lines with start and end times and every word's times")
+    p.add_argument("--sounds", action="store_true",
+                   help="with -f json: also guess non-speech sounds (laughter, music, effects); "
+                   "unreliable and about 3x slower")
     a = p.parse_args()
 
     work = tempfile.mkdtemp(prefix="transcribe.")
@@ -222,7 +224,7 @@ def main():
             sys.exit(open(log).read())
         lines, language = got
         if a.format == "json":
-            found = sounds(work, backend, log)
+            found = sounds(work, backend, log) if a.sounds else []
             if found is None:
                 sys.exit(open(log).read())
             for snd in found:
@@ -231,10 +233,12 @@ def main():
                 ln["start"], ln["end"] = round(ln["start"], 2), round(ln["end"], 2)
                 for w in ln["words"]:
                     w["start"], w["end"] = round(w["start"], 2), round(w["end"], 2)
-            json.dump({"language": language, "lines": lines, "sounds": found,
-                       "sounds_note": "sounds are an AudioSet classifier's guesses on 3 s windows, "
-                       "less certain than the speech lines; confidence is its score (0-1)"},
-                      sys.stdout, ensure_ascii=False)
+            out = {"language": language, "lines": lines}
+            if a.sounds:
+                out["sounds"] = found
+                out["sounds_note"] = ("sounds are an AudioSet classifier's guesses on 3 s windows, "
+                                      "less certain than the speech lines; confidence is its score (0-1)")
+            json.dump(out, sys.stdout, ensure_ascii=False)
             sys.stdout.write("\n")
         else:
             sys.stdout.write("".join(f"{stamp(ln['start'])} {ln['speaker']}: {ln['text']}\n" for ln in lines))
