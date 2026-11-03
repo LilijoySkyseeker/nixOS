@@ -16,6 +16,9 @@ curl -s 127.0.0.1:8080/v1/chat/completions -H 'content-type: application/json' \
 
 `transcribe FILE`. One
 language per file: `-l auto` detects it once.
+Each line is one speaker's spoken paragraph, broken where they pause.
+`-f json` gives the same lines with every word's start and end, for
+tools that line text up with the audio.
 
 ## Models on disk
 
