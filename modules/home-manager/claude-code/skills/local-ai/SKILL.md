@@ -18,7 +18,10 @@ curl -s 127.0.0.1:8080/v1/chat/completions -H 'content-type: application/json' \
 language per file: `-l auto` detects it once.
 Each line is one speaker's spoken paragraph, broken where they pause.
 `-f json` gives the same lines with every word's start and end, for
-tools that line text up with the audio.
+tools that line text up with the audio, plus non-speech `sounds`
+(laughter, music, rain, effects): an AudioSet classifier's guesses,
+less certain than the speech, each with a confidence. About 3× slower
+than text.
 
 ## Models on disk
 
