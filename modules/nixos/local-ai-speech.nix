@@ -1,7 +1,7 @@
 # local-ai-speech: local transcription on torrent for every agent and the user
 # - transcribe: whisper.cpp large-v3-turbo with nemotron speaker labels,
 #   on the RX 7900 XTX when no game runs and VRAM is free; text, or json with word times
-#   and non-speech sounds (AST AudioSet, ast-audioset-f32.gguf in the models folder)
+#   and, with --sounds, non-speech sounds (AST AudioSet, ast-audioset-f32.gguf in the models folder)
 # models live in the shared work folder, covered by the normal home backups
 { inputs, ... }:
 {
