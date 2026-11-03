@@ -19,6 +19,8 @@ AUDIO = os.environ["LOCAL_AI_AUDIO"]
 VRAM_DEV = os.environ["VRAM_DEV"]
 GAMING_MARKER = os.environ["GAMING_MARKER"]
 RATE = 16000
+# seconds of silence after a sentence end that start a new line
+PAUSE = 0.5
 
 
 def gpu_free():
@@ -124,7 +126,7 @@ def whisper(work, backend, log, lang):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
              for t in json.load(open(f"{work}/diar.json"))]
-    lines, last, since = [], None, 0.0
+    lines = []
     for a, b, text in segs:
         # the speaker whose turns overlap this segment most
         overlap = {}
@@ -137,16 +139,18 @@ def whisper(work, backend, log, lang):
             spk = min(turns, key=lambda t: min(abs(a - t[1]), abs(b - t[0])))[2]
         else:
             spk = "unknown"
-        # one speaker's long turn still gets a stamped line every half minute
-        # or so, at a sentence end where there is one
-        ended = lines and lines[-1].endswith((".", "?", "!"))
-        held = spk == last and (a - since < 30 or (a - since < 60 and not ended))
-        if held:
-            lines[-1] += text
+        # a new line when the speaker changes, or where a sentence ends and they pause:
+        # a long turn reads as spoken paragraphs, broken where the speaker broke it
+        prev = lines[-1] if lines else None
+        paused = prev and prev["text"].rstrip().endswith((".", "?", "!")) and a - prev["end"] >= PAUSE
+        if prev and prev["speaker"] == spk and not paused:
+            prev["text"] += text
+            prev["end"] = b
+            prev["words"].append({"start": a, "end": b, "text": text})
         else:
-            lines.append(f"{stamp(a)} {spk}: {text.strip()}")
-            last, since = spk, a
-    return lines
+            lines.append({"speaker": spk, "start": a, "end": b, "text": text.strip(),
+                          "words": [{"start": a, "end": b, "text": text}]})
+    return lines, detected
 
 
 def main():
@@ -157,6 +161,9 @@ def main():
         "Any audio or video file ffmpeg reads.")
     p.add_argument("file")
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
+    p.add_argument("-f", "--format", choices=["text", "json"], default="text",
+                   help="text (default): stamped lines, one per speaker's spoken paragraph; "
+                   "json: the same lines with start and end times and every word's times")
     a = p.parse_args()
 
     work = tempfile.mkdtemp(prefix="transcribe.")
@@ -166,10 +173,19 @@ def main():
                         "-ac", "1", "-ar", str(RATE), "-f", "wav", f"{work}/in.wav"], check=True)
         backend = "vulkan" if gpu_free() else "cpu"
         # assign speakers after recognition, so diarization does not gate speech
-        lines = whisper(work, backend, log, a.lang or "en")
-        if lines is None:
+        got = whisper(work, backend, log, a.lang or "en")
+        if got is None:
             sys.exit(open(log).read())
-        sys.stdout.write("\n".join(lines) + "\n")
+        lines, language = got
+        if a.format == "json":
+            for ln in lines:
+                ln["start"], ln["end"] = round(ln["start"], 2), round(ln["end"], 2)
+                for w in ln["words"]:
+                    w["start"], w["end"] = round(w["start"], 2), round(w["end"], 2)
+            json.dump({"language": language, "lines": lines}, sys.stdout, ensure_ascii=False)
+            sys.stdout.write("\n")
+        else:
+            sys.stdout.write("".join(f"{stamp(ln['start'])} {ln['speaker']}: {ln['text']}\n" for ln in lines))
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

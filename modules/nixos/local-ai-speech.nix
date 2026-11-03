@@ -1,6 +1,6 @@
 # local-ai-speech: local transcription on torrent for every agent and the user
 # - transcribe: whisper.cpp large-v3-turbo with nemotron speaker labels,
-#   on the RX 7900 XTX when no game runs and VRAM is free
+#   on the RX 7900 XTX when no game runs and VRAM is free; text, or json with word times
 # models live in the shared work folder, covered by the normal home backups
 { inputs, ... }:
 {
