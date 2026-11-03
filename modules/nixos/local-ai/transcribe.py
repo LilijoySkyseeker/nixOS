@@ -106,10 +106,12 @@ def recognize(wav, out, backend, log, lang, extra=()):
         cmd.append("-ng")
     if not run(cmd, log):
         return None
-    res = json.load(open(f"{out}.json"))
+    # one segment per token can split a multibyte character (a ♪, an accent) between two
+    # segments, which leaves invalid UTF-8 in whisper's JSON: read it leniently, drop the halves
+    res = json.load(open(f"{out}.json", encoding="utf-8", errors="replace"))
     # word segments carry their own leading space (none in chinese or japanese)
-    segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"])
-            for s in res["transcription"] if s["text"].strip()]
+    segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"].replace("\ufffd", ""))
+            for s in res["transcription"] if s["text"].replace("\ufffd", "").strip()]
     return segs, res.get("result", {}).get("language", "?")
 
 
