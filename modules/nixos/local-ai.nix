@@ -18,7 +18,11 @@ _: {
     let
       # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
       paseo = pkgs.paseo.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
+        patches = (old.patches or [ ]) ++ [
+          ./paseo/default-permissions.patch
+          # TODO: drop when https://github.com/getpaseo/paseo/issues/3248 is fixed
+          ./paseo/cli-notify.patch
+        ];
       });
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
