@@ -59,8 +59,8 @@ the `other-agents` skill.
 
 ## Git and publishing
 
-- Open a PR as a draft while any of its work is still pending (a review,
-  a test, an answer from the owner), and mark it ready only when nothing
+- Open a PR as a draft while any of its work is still pending (a test,
+  an answer from the owner), and mark it ready only when nothing
   but the owner's review is left. The owner merges ready PRs.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
@@ -71,10 +71,10 @@ the `other-agents` skill.
   in one PR.
 - Once your PR merges, remove its worktree and delete its branch, locally
   and on the remote.
-- No AI attribution anywhere: no `Co-authored-by` trailers, "Generated
-  with" lines, session links or agent signatures in commits, PR or issue
-  bodies, review comments or code. Not every harness has a setting for
-  this, so this line is the control.
+- Don't add promotional AI credit (`Co-authored-by` trailers, "Generated
+  with" lines, session links, agent signatures) to commits, PR or issue
+  bodies, review comments or code. Git adds an `Agent: <model> <agent-id>`
+  trailer to your commits for you.
 - **Nothing is published under your GitHub account**: no repos, forks or
   gists. Public work in anyone else's project goes out under the owner's
   account, since it's their responsibility: you prepare the text and the

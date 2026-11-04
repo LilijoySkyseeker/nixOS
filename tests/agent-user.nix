@@ -260,6 +260,8 @@ pkgs.testers.runNixOSTest {
         email = machine.succeed(as_agent("git config user.email")).strip()
         assert name == "LilijoySkyseeker-agent", f"user.name: {name!r}"
         assert email == "338765425+LilijoySkyseeker-agent@users.noreply.github.com", f"user.email: {email!r}"
+        hooks = machine.succeed(as_agent("git hook list prepare-commit-msg"))
+        assert "agent-trailer" in hooks, f"the commit trailer hook isn't declared: {hooks!r}"
 
     with subtest("agent-setup --check"):
         rc, out = machine.execute(as_agent("agent-setup --check 2>&1"))

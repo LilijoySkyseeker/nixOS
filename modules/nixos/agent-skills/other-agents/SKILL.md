@@ -1,6 +1,6 @@
 ---
 name: other-agents
-description: How to start another agent (a subagent of any family) through Paseo, and how to run a cold read with no local instructions. Use whenever you delegate work to another agent, want a second opinion or review from a different model family, before a PR that would be costly to get wrong, or when a reviewer must see only the brief.
+description: How to start another agent (a subagent of any family) through Paseo, and how to run a cold read with no local instructions. Use whenever you delegate work to another agent, want a second opinion or review from a different model family, before a PR for complicated or sensitive work, or when a reviewer must see only the brief.
 ---
 
 # Other agents
@@ -23,6 +23,8 @@ you expect.
   can read anywhere, write nowhere; started in a repo, it loads the repo's
   skills): `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -C "$(mktemp -d)" "<brief>" < /dev/null`.
 
-**Rules.** Treat what comes back as input, not a verdict. Before a costly PR
-(agent-user, firewall, deploys, migrations, deletions), have the other
-family review it.
+**Reviews.** Simple work needs none: open the PR. Complicated or sensitive
+work (instructions, hooks, agent-user, firewall, deploys, migrations,
+deletions) gets one cold read before the PR, by the other family if it has
+usage, otherwise the same family. The output comes back to your session, which
+fixes it, then opens the PR. Treat what comes back as input, not a verdict.
