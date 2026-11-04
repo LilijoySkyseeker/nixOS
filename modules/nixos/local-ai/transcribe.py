@@ -19,6 +19,8 @@ AUDIO = os.environ["LOCAL_AI_AUDIO"]
 VRAM_DEV = os.environ["VRAM_DEV"]
 GAMING_MARKER = os.environ["GAMING_MARKER"]
 RATE = 16000
+# seconds of silence after a sentence end that start a new line
+PAUSE = 0.5
 
 
 def gpu_free():
@@ -50,6 +52,49 @@ def diarize(work, backend, log):
     return audiocpp(backend, log, *args)
 
 
+# AudioSet labels that only say someone is talking: the speech lines already carry that
+SPEECHY = {"Speech", "Male speech, man speaking", "Female speech, woman speaking", "Child speech, kid speaking",
+           "Conversation", "Narration, monologue", "Speech synthesizer", "Inside, small room", "Inside, large room or hall"}
+SOUND_WIN, SOUND_HOP, SOUND_MIN = 3.0, 1.5, 0.25
+
+
+def sounds(work, backend, log):
+    """Non-speech sounds (laughter, rain, music, effects) as labelled stretches: an AudioSet
+    classifier on overlapping windows. Guesses, less certain than the speech lines."""
+    src = wave.open(f"{work}/in.wav")
+    data, n = src.readframes(src.getnframes()), src.getnframes()
+    os.makedirs(f"{work}/win")
+    win, hop = int(SOUND_WIN * RATE), int(SOUND_HOP * RATE)
+    for k, start in enumerate(range(0, max(1, n - win + 1), hop)):
+        out = wave.open(f"{work}/win/{k:06d}.wav", "w")
+        out.setnchannels(1), out.setsampwidth(2), out.setframerate(RATE)
+        out.writeframes(data[start * 2:(start + win) * 2])
+        out.close()
+    clog = f"{work}/cls.log"
+    if not audiocpp(backend, clog, "--task", "cls", "--family", "ast_audioset", "--model",
+                    f"{AUDIO}/ast-audioset-f32.gguf", "--batch-audio-dir", f"{work}/win",
+                    "--request-option", "top_k=8"):
+        shutil.copyfile(clog, log)
+        return None
+    stretches, cur = [], None
+    for line in open(clog):
+        if line.startswith("request_id="):
+            cur = int(line.split("=", 1)[1]) * SOUND_HOP
+        elif line.startswith("custom_schema_output=") and cur is not None:
+            for sc in json.loads(line.split("=", 1)[1])["data"]["scores"]:
+                if sc["label"] not in SPEECHY and sc["score"] >= SOUND_MIN:
+                    stretches.append([cur, cur + SOUND_WIN, sc["label"], sc["score"]])
+            cur = None
+    # one stretch per label while its windows keep overlapping
+    merged = []
+    for a, b, label, score in sorted(stretches, key=lambda x: (x[2], x[0])):
+        if merged and merged[-1]["label"] == label and a <= merged[-1]["end"]:
+            merged[-1]["end"], merged[-1]["confidence"] = b, max(merged[-1]["confidence"], score)
+        else:
+            merged.append({"start": a, "end": b, "label": label, "confidence": score})
+    return sorted(merged, key=lambda x: x["start"])
+
+
 def recognize(wav, out, backend, log, lang, extra=()):
     cmd = ["whisper-cli", "-m", f"{AUDIO}/ggml-large-v3-turbo-q8_0.bin", "-l", lang,
            "-t", str(os.cpu_count()), "-np", "-oj", "-of", out, "-f", wav,
@@ -61,10 +106,12 @@ def recognize(wav, out, backend, log, lang, extra=()):
         cmd.append("-ng")
     if not run(cmd, log):
         return None
-    res = json.load(open(f"{out}.json"))
+    # one segment per token can split a multibyte character (a ♪, an accent) between two
+    # segments, which leaves invalid UTF-8 in whisper's JSON: read it leniently, drop the halves
+    res = json.load(open(f"{out}.json", encoding="utf-8", errors="replace"))
     # word segments carry their own leading space (none in chinese or japanese)
-    segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"])
-            for s in res["transcription"] if s["text"].strip()]
+    segs = [(s["offsets"]["from"] / 1000, s["offsets"]["to"] / 1000, s["text"].replace("\ufffd", ""))
+            for s in res["transcription"] if s["text"].replace("\ufffd", "").strip()]
     return segs, res.get("result", {}).get("language", "?")
 
 
@@ -124,7 +171,7 @@ def whisper(work, backend, log, lang):
         return None
     turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
              for t in json.load(open(f"{work}/diar.json"))]
-    lines, last = [], None
+    lines = []
     for a, b, text in segs:
         # the speaker whose turns overlap this segment most
         overlap = {}
@@ -137,12 +184,18 @@ def whisper(work, backend, log, lang):
             spk = min(turns, key=lambda t: min(abs(a - t[1]), abs(b - t[0])))[2]
         else:
             spk = "unknown"
-        if spk == last:
-            lines[-1] += text
+        # a new line when the speaker changes, or where a sentence ends and they pause:
+        # a long turn reads as spoken paragraphs, broken where the speaker broke it
+        prev = lines[-1] if lines else None
+        paused = prev and prev["text"].rstrip().endswith((".", "?", "!")) and a - prev["end"] >= PAUSE
+        if prev and prev["speaker"] == spk and not paused:
+            prev["text"] += text
+            prev["end"] = b
+            prev["words"].append({"start": a, "end": b, "text": text})
         else:
-            lines.append(f"{stamp(a)} {spk}: {text.strip()}")
-            last = spk
-    return lines
+            lines.append({"speaker": spk, "start": a, "end": b, "text": text.strip(),
+                          "words": [{"start": a, "end": b, "text": text}]})
+    return lines, detected
 
 
 def main():
@@ -153,6 +206,12 @@ def main():
         "Any audio or video file ffmpeg reads.")
     p.add_argument("file")
     p.add_argument("-l", "--lang", help="any language: 'auto' to detect, or a code such as de, ja, zh")
+    p.add_argument("-f", "--format", choices=["text", "json"], default="text",
+                   help="text (default): stamped lines, one per speaker's spoken paragraph; "
+                   "json: the same lines with start and end times and every word's times")
+    p.add_argument("--sounds", action="store_true",
+                   help="with -f json: also guess non-speech sounds (laughter, music, effects); "
+                   "unreliable and about 3x slower")
     a = p.parse_args()
 
     work = tempfile.mkdtemp(prefix="transcribe.")
@@ -162,10 +221,29 @@ def main():
                         "-ac", "1", "-ar", str(RATE), "-f", "wav", f"{work}/in.wav"], check=True)
         backend = "vulkan" if gpu_free() else "cpu"
         # assign speakers after recognition, so diarization does not gate speech
-        lines = whisper(work, backend, log, a.lang or "en")
-        if lines is None:
+        got = whisper(work, backend, log, a.lang or "en")
+        if got is None:
             sys.exit(open(log).read())
-        sys.stdout.write("\n".join(lines) + "\n")
+        lines, language = got
+        if a.format == "json":
+            found = sounds(work, backend, log) if a.sounds else []
+            if found is None:
+                sys.exit(open(log).read())
+            for snd in found:
+                snd["start"], snd["end"], snd["confidence"] = round(snd["start"], 2), round(snd["end"], 2), round(snd["confidence"], 2)
+            for ln in lines:
+                ln["start"], ln["end"] = round(ln["start"], 2), round(ln["end"], 2)
+                for w in ln["words"]:
+                    w["start"], w["end"] = round(w["start"], 2), round(w["end"], 2)
+            out = {"language": language, "lines": lines}
+            if a.sounds:
+                out["sounds"] = found
+                out["sounds_note"] = ("sounds are an AudioSet classifier's guesses on 3 s windows, "
+                                      "less certain than the speech lines; confidence is its score (0-1)")
+            json.dump(out, sys.stdout, ensure_ascii=False)
+            sys.stdout.write("\n")
+        else:
+            sys.stdout.write("".join(f"{stamp(ln['start'])} {ln['speaker']}: {ln['text']}\n" for ln in lines))
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

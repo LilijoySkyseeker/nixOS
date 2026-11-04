@@ -51,9 +51,10 @@ Routes that work where the obvious one doesn't:
 - **Search engines:** Google search and Lens 429 or CAPTCHA from torrent's
   IP, and DuckDuckGo's HTML endpoint challenges. Google News RSS
   (`news.google.com/rss/search?q=...`) and Bing through plain curl work.
-- **YouTube:** every client gets "Sign in to confirm you're not a bot",
-  so captions and audio can't be fetched. Ask the owner for the file and
-  transcribe it locally (the `local-ai` skill).
+- **YouTube:** captions work: `yt-dlp --skip-download --write-auto-subs
+  --sub-langs en-orig URL` (translated tracks 429). Video and audio get
+  "Sign in to confirm you're not a bot"; for those, ask the owner for the
+  file and transcribe it locally (the `local-ai` skill).
 - **PubMed:** pages want cookies; use the E-utilities API
   (`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi`).
 - **PDFs:** WebFetch returns them as binary; save them with

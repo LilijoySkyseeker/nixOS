@@ -13,7 +13,7 @@
   myPullDeploy = {
     enable = true;
     hostAttr = "thinkpad";
-    dates = "Thu 03:00";
+    dates = "03:00";
     operation = "boot";
     requireACPower = true;
   };
@@ -132,9 +132,9 @@
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
     checkSmart = false;
-    # a pull-deploy that stops running. 720h, not torrent's 504: a laptop
+    # a pull-deploy that stops running. 720h, not torrent's 72: a laptop
     # goes dark for weeks and requireACPower legitimately skips battery
-    # Thursdays
+    # nights
     staleMarkerFiles = {
       "/var/lib/pull-deploy/deployed" = 720;
     };

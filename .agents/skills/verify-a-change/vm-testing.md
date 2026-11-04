@@ -107,11 +107,6 @@ checks.<name> = import ../../tests/<name>.nix {
 Pass the module under test in explicitly rather than importing the whole
 host — the point is to exercise the module, not to rebuild a host.
 
-`checks.nix` is for VM tests only. A check that boots nothing —
-`tests/gate-script-check.nix`, which runs the repo's own gate scripts —
-registers in `modules/flake/gate-checks.nix` instead, so one `checks` key
-lives in one file.
-
 ## Things that will bite you
 
 - **`nixos-anywhere --vm-test` can't validate a real disko layout or
@@ -200,7 +195,7 @@ lives in one file.
 - **`security.run0.enableSudoAlias` needs `security.run0.enable = true`
   *and* `security.sudo.enable = false` set together**, or you get an
   assertion failure. Check the combination already in real use (e.g.
-  `modules/profiles/default.nix`) rather than guessing it.
+  `modules/nixos/base.nix`) rather than guessing it.
 - **A VM test node boots straight from its built closure and never runs a
   real install or `nixos-rebuild switch`.**
   `/nix/var/nix/profiles/system` won't exist unless the test creates it —
