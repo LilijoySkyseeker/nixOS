@@ -262,6 +262,9 @@
 
   systemd.enableEmergencyMode = false;
 
+  # accounts are only what this config declares; `passwd` or `useradd` here does not outlive a switch
+  users.mutableUsers = false;
+
   networking.hostName = "homelab";
 
   # nightly deploy of master; vps follows homelab's revision, so homelab

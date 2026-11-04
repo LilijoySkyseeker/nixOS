@@ -214,6 +214,8 @@ _: {
 
       services.llama-swap = {
         enable = true;
+        # swapUrl and the gaming hooks call this address; the module default is `localhost`
+        listenAddress = "127.0.0.1";
         port = 8080;
         settings = {
           # no stored request/response bodies: private prompts stay out of its api
