@@ -94,6 +94,19 @@
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
       };
+      # a config hook, not core.hooksPath: repos keep their own hooks, and it
+      # still runs where a repo sets core.hooksPath (nixOS). paseo comes from
+      # the caller's PATH, like every agent session's
+      commitTrailer = pkgs.writeShellApplication {
+        name = "agent-commit-trailer";
+        bashOptions = [ ];
+        runtimeInputs = with pkgs; [
+          coreutils
+          gnugrep
+          jq
+        ];
+        text = builtins.readFile ./agent-tools/commit-trailer.sh;
+      };
       # git identity: the bot's noreply address (its public GitHub id); gh
       # from PATH as the credential helper, since `gh auth setup-git` writes a
       # store path that the GC later removes
@@ -104,6 +117,9 @@
         [credential "https://github.com"]
           helper =
           helper = !gh auth git-credential
+        [hook "agent-trailer"]
+          event = prepare-commit-msg
+          command = ${lib.getExe commitTrailer}
       '';
       # trust the nixOS repo's .envrc in every clone and worktree of it
       # (a string prefix: nixOS-* matches too), so each new worktree has its
