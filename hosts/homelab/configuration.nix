@@ -262,6 +262,9 @@
 
   systemd.enableEmergencyMode = false;
 
+  # accounts are only what this config declares; `passwd` or `useradd` here does not outlive a switch
+  users.mutableUsers = false;
+
   networking.hostName = "homelab";
 
   # nightly deploy of master; vps follows homelab's revision, so homelab
@@ -377,6 +380,7 @@
     enable = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
+    settings.PermitRootLogin = "prohibit-password";
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";

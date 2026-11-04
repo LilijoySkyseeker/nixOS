@@ -1,5 +1,6 @@
 _: {
   flake.modules.nixos."desktop-audio" = _: {
+    services.pulseaudio.enable = false;
     security.rtkit.enable = true;
     services.pipewire = {
       enable = true;

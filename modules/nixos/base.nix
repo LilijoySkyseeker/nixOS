@@ -163,6 +163,8 @@ in
 
       environment.defaultPackages = lib.mkForce [ ];
 
+      networking.firewall.enable = true;
+
       nix.settings.experimental-features = [
         "nix-command"
         "flakes"

@@ -212,6 +212,7 @@ in
   fileSystems."/persist".neededForBoot = true;
 
   environment.persistence."/persist" = {
+    enable = true;
     directories = [
       "/var/log"
       "/var/lib/nixos" # avoids uid/gid complaints on reboot
@@ -265,6 +266,7 @@ in
     openFirewall = false;
     settings.KbdInteractiveAuthentication = false;
     settings.PasswordAuthentication = false;
+    settings.PermitRootLogin = "prohibit-password";
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -342,6 +344,9 @@ in
       -m hashlimit --hashlimit-above 120/minute --hashlimit-burst 60 \
       --hashlimit-mode srcip --hashlimit-name http-new -j DROP
   '';
+
+  # this box never needs to forward IPv6
+  boot.kernel.sysctl."net.ipv6.conf.all.forwarding" = false;
 
   # default 90s start timeout kills tailscaled-autoconnect before tailscale is Running on a slow boot
   systemd.services.tailscaled-autoconnect.serviceConfig.TimeoutStartSec = "300s";

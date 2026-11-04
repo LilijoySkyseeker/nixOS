@@ -19,12 +19,15 @@ _: {
 
       services.samba = {
         enable = true;
+        # scoped to tailscale0 below; openFirewall would open every interface
+        openFirewall = false;
         # no NetBIOS: android connects by tailnet hostname/IP; keeps 137-139 closed
         nmbd.enable = false;
         winbindd.enable = false;
 
         settings = {
           global = {
+            security = "user";
             "server min protocol" = "SMB3";
             # no printer sharing; shrinks RPC attack surface
             "load printers" = false;
@@ -39,6 +42,8 @@ _: {
             "force group" = "multimedia";
             "create mask" = "0660";
             "directory mask" = "0770";
+            # symlinks must not let a client escape the share
+            "wide links" = false;
           };
           "storage-bulk" = {
             path = "/storage-bulk";
@@ -47,6 +52,7 @@ _: {
             "force group" = "multimedia";
             "create mask" = "0660";
             "directory mask" = "0770";
+            "wide links" = false;
           };
         };
       };
