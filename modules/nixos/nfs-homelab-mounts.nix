@@ -3,7 +3,7 @@ let
   vars = config.flake.vars;
 in
 {
-  flake.modules.nixos."nfs-homelab-mounts" = _: {
+  flake.modules.nixos."nfs-homelab-mounts" = { utils, ... }: {
     # must match homelab's "multimedia" gid (services/jellyfin.nix): NFS
     # sec=sys authorizes by numeric uid/gid
     users.groups.multimedia = {
@@ -42,5 +42,12 @@ in
           options = mountOpts;
         };
       };
+
+    # a mount attempt fails whenever homelab is unreachable (offline, tailnet
+    # not up yet at boot) and the automount retries on the next access
+    myHealthAlerts.ignoreFailedUnits = map (path: "${utils.escapeSystemdPath path}.mount") [
+      "/home/lilijoy/storage"
+      "/home/lilijoy/storage-bulk"
+    ];
   };
 }

@@ -23,6 +23,13 @@ _: {
           '';
         };
 
+        ignoreFailedUnits = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          example = [ "home-lilijoy-storage.mount" ];
+          description = "Unit names the failed-units check skips: units whose failure is expected and recovers on its own.";
+        };
+
         checkZfs = lib.mkOption {
           type = lib.types.bool;
           default = true;
@@ -215,7 +222,10 @@ _: {
               )}
             ''}
 
-            failed=$(systemctl --failed --no-legend --plain)
+            failed=$(systemctl --failed --no-legend --plain${
+              lib.optionalString (cfg.ignoreFailedUnits != [ ])
+                " | awk 'NR == FNR { ignored[$0]; next } !($1 in ignored)' ${pkgs.writeText "health-check-ignored-units" (lib.concatLines cfg.ignoreFailedUnits)} -"
+            })
             if [ -n "$failed" ]; then
               notify failed-units "systemd units failed" "$failed"
             else
