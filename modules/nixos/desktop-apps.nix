@@ -59,8 +59,13 @@ _: {
       users.groups.flatpak.gid = vars.gids.flatpak;
       services.flatpak = {
         enable = true;
+        # the list is all there is: anything else in the system installation is
+        # uninstalled when this unit next runs (boot or switch); ~/.var/app stays
+        uninstallUnmanaged = true;
         packages = [
           "info.beyondallreason.bar"
+          "com.github.tchx84.Flatseal"
+          "io.github.amit9838.mousam"
         ];
       };
     };
