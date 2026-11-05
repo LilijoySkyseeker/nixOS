@@ -1,0 +1,57 @@
+# Voice mode in Paseo (GPT-Live)
+
+Goal: talk with a Paseo session the way ChatGPT voice works: a natural spoken
+conversation, with real work handed to the session's agent.
+
+`modules/nixos/paseo/gpt-live.patch`, applied to the daemon and the desktop app,
+adds this. The voice button on a session, a new tab or New workspace starts it.
+Voice runs only while it is on; the store mobile app doesn't have it and doesn't
+receive spoken lines, though it shows the hand-offs as ordinary messages.
+
+## Provisioning
+
+1. Create a project API key at https://platform.openai.com/api-keys. Give the
+   project a monthly spend limit: every agent runs as `agent` and can read the
+   key, so that limit is the limit on misuse. Audio and microphone transcripts go
+   to OpenAI whichever agent backs the session.
+2. Add it to the torrent secrets, then deploy:
+
+   ```bash
+   sops secrets/torrent.yaml   # add: gpt_live_api_key: <key>
+   ```
+
+   Until `gpt_live_api_key` is there, torrent's system does not build: sops-nix
+   rejects the missing key. Rotating the key needs no restart; each voice start
+   reads the file.
+
+Cost: GPT-Live bills about $0.05 per minute while voice is on, plus the hand-off
+model (`gpt-6-luna`) and the agent's own usage. Settings > Voice has **Close when
+quiet** and **While the agent works**; the default keeps voice open during work,
+which keeps billing. Out of credits shows as voice failing to start, or as a
+hand-off that never happens, with the error in `~/.paseo/daemon.log`.
+
+## Where things are
+
+- Transcripts: `~/.paseo/voice-transcripts/<agent id>/*.jsonl`, one per voice
+  session, kept like chat transcripts (backed up with `/home`). Threads restore
+  their spoken lines from them, because provider history doesn't hold them.
+- Errors: `grep GPT-Live ~/.paseo/daemon.log`.
+- Patch source: `~/work/repos/external/paseo-credits`, worktree
+  `paseo-live-0.14`, branch `feat/gpt-live-0.14`, on top of the other Paseo
+  patches. Regenerate with
+  `git diff feat/claude-credit-fallback-0.14..feat/gpt-live-0.14`.
+
+## Rollback
+
+To turn GPT-Live off, remove `PASEO_GPT_LIVE_API_KEY_FILE` from
+`modules/nixos/local-ai.nix`: voice falls back to Paseo's own speech settings. To
+remove it entirely, also remove `gpt-live.patch` from that file and from
+`modules/home-manager/paseo-desktop.nix`, and the secret from
+`hosts/torrent/configuration.nix`.
+
+## Changing the prompts
+
+`scripts/gpt-live-routing-check.ts` in the patch source plays synthesised phrases
+into real GPT-Live with a stand-in agent and reports routing, hand-offs and
+relaying. It costs real API time; read the transcripts it leaves in
+`/tmp/gpt-live-routing-*/` before running it again.
