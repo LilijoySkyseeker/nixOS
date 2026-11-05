@@ -82,6 +82,7 @@
           fetchCurl
           fetchCurlImpersonate
           pkgs.xvfb-run
+          pkgs.poppler-utils
           (pkgs.writeShellScriptBin "browser-fetch" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium
           '')
