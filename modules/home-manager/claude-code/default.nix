@@ -126,6 +126,7 @@ _: {
         };
         # tips shown next to the spinner
         spinnerTipsEnabled = false;
+        cleanupPeriodDays = 36500;
         # no AI attribution in commits or PRs; sub-keys
         # rather than `attribution = false` so older CLI versions read it too
         attribution = {
