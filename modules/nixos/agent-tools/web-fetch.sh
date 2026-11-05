@@ -71,9 +71,8 @@ shell_only() {
   [ "$(extract-text "$url" < "$body" | wc -c)" -lt 300 ]
 }
 if blocked "$code" || shell_only; then
-  # file downloads and feeds stay on the curl tiers: Chromium shows XML
-  # as a page of its own
-  case $mode in file | feed)
+  # feeds stay on the curl tiers: Chromium shows XML as a page of its own
+  case $mode in feed)
     echo "web-fetch: blocked ($code) at $tier" >&2
     exit 1
     ;;
@@ -84,7 +83,8 @@ if blocked "$code" || shell_only; then
   # own exit status, since xvfb-run's can fail in its cleanup after a good page
   # shellcheck disable=SC2016 # expanded by the inner sh
   timeout --kill-after=10 440 xvfb-run -a -s '-screen 0 1920x1080x24' \
-    sh -c 'browser-fetch "$1"; echo $? > "$2"' sh "$url" "$status" > "$body" || true
+    sh -c 'browser-fetch "$1" "$3"; echo $? > "$2"' sh "$url" "$status" \
+    "$([ "$mode" = file ] && echo file)" > "$body" || true
   [ "$(cat "$status")" = 0 ] || code=000
   type=text/html
   tier=browser
