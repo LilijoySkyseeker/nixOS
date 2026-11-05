@@ -306,6 +306,10 @@ _: {
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
           ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          # voice on unless it was turned off in the app; in the managed keys, a
+          # restart would undo the app's switch
+          ${lib.getExe pkgs.jq} 'if .features.voiceMode.enabled == null then .features.voiceMode.enabled = true else . end' "$f.tmp" > "$f.tmp2"
+          mv "$f.tmp2" "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
           # loads from sops
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"

@@ -24,10 +24,11 @@ GPT-Live too. This is untested on a phone. From the app's unpatched code:
 
 ## Provisioning
 
-1. Create a project API key at https://platform.openai.com/api-keys. Give the
-   project a monthly spend limit: every agent runs as `agent` and can read the
-   key, so that limit is the limit on misuse. Audio and microphone transcripts go
-   to OpenAI whichever agent backs the session.
+1. Create a project API key at https://platform.openai.com/api-keys. On the
+   project's budget, turn on **Enforce a hard limit**: every agent runs as `agent`
+   and can read the key, so that is the limit on misuse, and without it the budget
+   only sends alerts
+   ([spend limits](https://developers.openai.com/api/docs/guides/spend-limits)).
 2. Add it to the torrent secrets, then deploy:
 
    ```bash
@@ -37,6 +38,16 @@ GPT-Live too. This is untested on a phone. From the app's unpatched code:
    Until `gpt_live_api_key` is there, torrent's system does not build: sops-nix
    rejects the missing key. Rotating the key needs no restart; each voice start
    reads the file.
+
+What leaves the machine, whichever agent backs the session, even a local one:
+microphone audio, up to 12,000 characters of the thread and 6,000 of earlier voice
+conversation at each start, then the agent's answers, the kinds of steps it takes,
+and permission tool names.
+
+Only the user's speech can start work: the daemon refuses a hand-off unless
+GPT-Live recognised the user's words in the last 20 seconds, because text the agent
+read reaches the voice as context. Voice mode is on unless switched off in
+Settings > Voice, which also closes a running session.
 
 Cost: GPT-Live bills about $0.05 per minute while voice is on, plus the hand-off
 model (`gpt-6-luna`) and the agent's own usage. Settings > Voice has **Close when
