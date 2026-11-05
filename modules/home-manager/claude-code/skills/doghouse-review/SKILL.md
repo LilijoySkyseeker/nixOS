@@ -9,7 +9,7 @@ Apply the six rules from your global instructions to the thing, as someone who
 didn't build it and whose job is to subtract. Scale the review to the thing: a
 quick question gets a few sentences, a plan or design gets the parts table
 below. The definitions of the rules, and the reasons behind them, are in
-`/home/agent/research/Projects/Golden Engineering Rules.md`; read it when a
+`/home/agent/vault/Areas/Engineering/Golden Engineering Rules.md`; read it when a
 rule is in doubt, not every time.
 
 ## What a review produces

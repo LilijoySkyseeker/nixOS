@@ -9,7 +9,9 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 agent_home=/home/agent
-research=/home/lilijoy/Documents/Vault/Research
+vault=/home/lilijoy/Documents/Vault
+# the folders agent-user.nix mounts at ~/vault/<name>
+vault_folders="Areas Library Projects Old"
 state=$agent_home/.claude.json
 
 # run0 keeps the caller's cwd, which the other user may not be able to read
@@ -43,13 +45,27 @@ item() {
 
 chk_module() { id agent >/dev/null 2>&1; }
 
-chk_research() { [ -d "$research" ]; }
-fix_research() { as_user mkdir -p "$research"; }
+chk_vault() {
+  local folder
+  for folder in $vault_folders; do [ -d "$vault/$folder" ] || return 1; done
+}
+fix_vault() {
+  local folder
+  for folder in $vault_folders; do as_user mkdir -p "$vault/$folder"; done
+}
 
-chk_mount() { as_agent sh -c 'touch ~/research/.agent-setup-probe && rm ~/research/.agent-setup-probe' 2>/dev/null; }
+chk_mount() {
+  local folder
+  for folder in $vault_folders; do
+    as_agent sh -c "touch ~/vault/$folder/.agent-setup-probe && rm ~/vault/$folder/.agent-setup-probe" 2>/dev/null || return 1
+  done
+}
 fix_mount() {
-  systemctl reset-failed home-agent-research.mount home-agent-research.automount 2>/dev/null || true
-  systemctl restart home-agent-research.automount
+  local folder
+  for folder in $vault_folders; do
+    systemctl reset-failed "home-agent-vault-$folder.mount" "home-agent-vault-$folder.automount" 2>/dev/null || true
+    systemctl restart "home-agent-vault-$folder.automount"
+  done
 }
 
 chk_egress() {
@@ -110,8 +126,8 @@ if ! chk_module; then
   exit 1
 fi
 ok "agent-user module deployed"
-item "research folder" chk_research "create $research (as lilijoy)" fix_research
-item "research mount" chk_mount "reset and restart the research automount" fix_mount
+item "vault folders" chk_vault "create the shared folders in $vault (as lilijoy)" fix_vault
+item "vault mounts" chk_mount "reset and restart the vault automounts" fix_mount
 item "LAN/tailnet egress blocked" chk_egress "reload the firewall" fix_egress
 item "gh logged in as $BOT" chk_gh "log the agent's gh in as the bot" fix_gh
 item "Claude login and workspace trust" chk_claude "run claude once in ~agent/work" fix_claude

@@ -26,7 +26,7 @@ In this order. Each has to pass before effort goes into the next.
    against a measure that serves the goal.
 5. **Automate.** Make it permanent. It isn't done until it lasts without you.
 
-What each rule means, and why: `/home/agent/research/Projects/Golden
+What each rule means, and why: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`. Applying them to a thing someone else made: the
 `doghouse-review` skill. Before any work starts: the `goal-setting` skill.
 

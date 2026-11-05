@@ -41,11 +41,23 @@ the `other-agents` skill.
   - `TODO.md`: deferred work. Read it when you start; add what you put
     off, dated, with enough context to pick up cold; delete what's done.
   - `ENVIRONMENT.md`: the log of environment failures (below).
-- `~/research` is the owner's Obsidian `Vault/Research` folder. Finished
-  research goes there as markdown; it appears on the owner's phone.
-  Before researching a topic, search it (`rg`) for an earlier note: use it
-  as a dated starting source, re-check anything time-sensitive, and extend
-  that note rather than writing a new one.
+- `~/vault` is the owner's Obsidian vault, minus `Private`, which you can't
+  reach. It's the owner's reference side, and it appears on their phone: final
+  outcomes and anything they should see go here as plain markdown and normal
+  media. Code and working files stay in `~/work`. Share the owner's structure:
+  - `Areas/`: ongoing, no end date.
+  - `Projects/`: has an end. When finished, it moves to `Library/`.
+  - `Library/`: everything else worth keeping, by topic. Finished research
+    goes in `Library/<topic>/`, or `Projects/<name>/` if it's for a project.
+  - `Old/`: the previous vault, including its `Research/` folder. Add nothing
+    new. When something in it actually gets used, move it (don't copy) to where
+    it now belongs and fix its links.
+  Keep it organised as you go: file things, move and rename them, fix links,
+  and say what you moved. It only has to make sense to the owner and be easy
+  for them to find by hand.
+  Before researching a topic, search the vault, `Old/` included (`rg`), for an
+  earlier note: use it as a dated starting source, re-check anything
+  time-sensitive, and extend that note rather than writing a new one.
 - When you can't send the owner a file, give its path under `~/Agent`.
 
 ## Starting work

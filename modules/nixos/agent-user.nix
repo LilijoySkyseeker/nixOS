@@ -9,6 +9,15 @@
     }:
     let
       bot = "LilijoySkyseeker-agent";
+      # the vault folders agents share, each mounted at ~/vault/<name>. Mounted
+      # one by one so anything else at the vault root, Private included, stays
+      # out of reach by default.
+      vaultFolders = [
+        "Areas"
+        "Library"
+        "Projects"
+        "Old"
+      ];
       # every agent harness: where it reads user-level instructions and
       # skills; adding or dropping an agent is one entry here
       harnesses = {
@@ -289,7 +298,7 @@
         ) egress}
       '';
 
-      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
+      # bindfs: the shared vault folders only, agent-owned on its side, lilijoy:users on disk
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
         # merge the keys this repo owns into the agent's CLI-owned settings.json
@@ -463,22 +472,18 @@
         );
 
         # systemd mount + automount, not fileSystems
-        mounts = [
-          {
-            what = "/home/lilijoy/Documents/Vault/Research";
-            where = "/home/agent/research";
-            type = "fuse.bindfs";
-            options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
-            # no start limit: a missing source must not wedge the automount
-            unitConfig.StartLimitIntervalSec = 0;
-          }
-        ];
-        automounts = [
-          {
-            where = "/home/agent/research";
-            wantedBy = [ "multi-user.target" ];
-          }
-        ];
+        mounts = map (folder: {
+          what = "/home/lilijoy/Documents/Vault/${folder}";
+          where = "/home/agent/vault/${folder}";
+          type = "fuse.bindfs";
+          options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
+          # no start limit: a missing source must not wedge the automount
+          unitConfig.StartLimitIntervalSec = 0;
+        }) vaultFolders;
+        automounts = map (folder: {
+          where = "/home/agent/vault/${folder}";
+          wantedBy = [ "multi-user.target" ];
+        }) vaultFolders;
       };
     };
 }
