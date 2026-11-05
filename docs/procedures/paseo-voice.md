@@ -5,8 +5,22 @@ conversation, with real work handed to the session's agent.
 
 `modules/nixos/paseo/gpt-live.patch`, applied to the daemon and the desktop app,
 adds this. The voice button on a session, a new tab or New workspace starts it.
-Voice runs only while it is on; the store mobile app doesn't have it and doesn't
-receive spoken lines, though it shows the hand-offs as ordinary messages.
+Voice runs only while it is on.
+
+## The store mobile app
+
+It isn't patched, but the voice lives in the daemon, so its voice button reaches
+GPT-Live too. This is untested on a phone. From the app's unpatched code:
+
+- Ending voice while the agent works also cancels the agent's work. Don't press
+  stop mid-task unless you mean that.
+- Spoken lines don't appear in its chat; hand-offs show as ordinary messages.
+- The voice button is hidden while the agent works, and a new session can't start
+  by voice.
+- After a quiet close it still looks like voice is on, and it won't reopen voice
+  when the agent finishes.
+- The smooth-playback fixes are in the desktop's audio engine only, so audio may
+  have gaps.
 
 ## Provisioning
 
