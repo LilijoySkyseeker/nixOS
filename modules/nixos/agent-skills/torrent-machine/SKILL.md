@@ -9,6 +9,10 @@ You run as the Unix user `agent` on torrent, the owner's NixOS desktop, in
 systemd units with a sandbox. The user, its units and the egress firewall
 are the boundary; the agents' own sandboxes are off (no permission prompts).
 
+It often runs the owner's work for days at a time. Don't ask for a reboot
+unless an issue needs dealing with ASAP; use judgment, and an update waiting
+for the next boot isn't one.
+
 ## Hardware (as of 2026-10-17)
 
 - CPU: AMD Ryzen 7 9800X3D, 8 cores / 16 threads, up to 5.27 GHz, 96 MiB L3
