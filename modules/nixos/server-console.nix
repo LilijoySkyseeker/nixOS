@@ -1,12 +1,9 @@
 { config, ... }:
 let
-  nixosModules = config.flake.modules.nixos;
   homeManagerModules = config.flake.modules.homeManager;
 in
 {
   flake.modules.nixos."server-console" = _: {
-    imports = [ nixosModules."login-summary" ];
-
     programs.nh = {
       flake = "/etc/nixos";
     };

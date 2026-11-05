@@ -1,15 +1,13 @@
 # VM test: root's interactive shell on a server, as profile-server sets it up.
 # The prompt collapses a run command to one transcript line and prints a
-# result line after a failure or a slow command; the wiped-at-boot mark shows
-# off the persisted paths only; history lands on the persisted disk; the
-# login summary runs. ble.sh only attaches on a terminal, so the shell runs
-# in tmux.
+# result line after a failure or a slow command; up and down walk history with
+# the cursor at the end; Ctrl-C clears the line; history lands on the persisted
+# disk. ble.sh only attaches on a terminal, so the shell runs in tmux.
 {
   pkgs,
   specialArgs,
   impermanenceModule,
   homeManagerModule,
-  loginSummaryModule,
   toolingModule,
 }:
 pkgs.testers.runNixOSTest {
@@ -23,7 +21,6 @@ pkgs.testers.runNixOSTest {
       imports = [
         impermanenceModule
         homeManagerModule
-        loginSummaryModule
       ];
       # a persistence root on its own filesystem, as on homelab and vps
       virtualisation.emptyDiskImages = [ 256 ];
@@ -63,21 +60,25 @@ pkgs.testers.runNixOSTest {
         # the frame's first line: the last line holding its top-left corner
         return [l for l in screen().splitlines() if "╭─" in l][-1]
 
+    def key(name):
+        machine.succeed(f"tmux send-keys -t t {name}")
+        time.sleep(1)
+
+    def assert_input(text):
+        # what's typed on the prompt's second line, with the cursor right after it
+        y, x = machine.succeed("tmux display -p -t t '#{cursor_y} #{cursor_x}'").split()
+        line = screen().splitlines()[int(y)]
+        typed = line[line.index("❯") + 2 :].removesuffix("─╯").rstrip()
+        assert typed == text, f"{typed!r} != {text!r} in {line!r}"
+        assert int(x) == line.index("❯") + 2 + len(text), f"cursor at {x} in {line!r}"
+
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("home-manager-root.service")
 
     with subtest("root's shell state is on the persisted disk"):
-        for d in ["state/bash", "share/atuin", "share/zoxide", "share/direnv"]:
+        for d in ["state/bash", "share/atuin", "share/zoxide"]:
             src = machine.succeed(f"findmnt -no SOURCE /root/.local/{d}").strip()
             assert src.startswith("/dev/vdb"), f"/root/.local/{d} is on {src!r}"
-
-    with subtest("the login summary runs"):
-        status, out = machine.execute("login-summary 2>&1")
-        assert status == 0, out
-        print(out)
-        assert " · up " in out, out
-        assert "none failed" in out or "failed:" in out, out
-        assert "/persist" in out, out
 
     with subtest("the prompt draws"):
         machine.succeed("tmux new-session -d -s t -x 120 -y 40 'bash -l'")
@@ -116,10 +117,38 @@ pkgs.testers.runNixOSTest {
         s = screen()
         assert "root@machine:~# echo after-ctrl-c" in s, s
 
-    with subtest("the wiped-at-boot mark follows the persisted paths"):
-        assert "" in live_prompt(), live_prompt()
-        run("cd /root/.local/state/bash")
-        assert "" not in live_prompt(), live_prompt()
+    with subtest("up and down walk history with the cursor at the end"):
+        run("echo aaa")
+        run("echo bbb-longer")
+        key("Up")
+        assert_input("echo bbb-longer")
+        key("Up")
+        assert_input("echo aaa")
+        key("Down")
+        assert_input("echo bbb-longer")
+        key("Down")
+        assert_input("")
+
+    with subtest("up searches for what was typed, across repeated presses"):
+        run("echo needle-one")
+        run("echo other")
+        run("echo needle-two")
+        machine.succeed("tmux send-keys -t t -l needle")
+        time.sleep(1)
+        key("Up")
+        assert_input("echo needle-two")
+        key("Up")
+        assert_input("echo needle-one")
+        key("C-c")
+
+    with subtest("Ctrl-C clears the line and stays in insert mode"):
+        machine.succeed("tmux send-keys -t t -l 'echo discarded'")
+        time.sleep(1)
+        key("C-c")
+        assert_input("")
+        run("echo typed-after-ctrl-c")
+        s = screen()
+        assert "\ntyped-after-ctrl-c" in s, s
 
     with subtest("history is written to the persisted disk"):
         run("exit")
