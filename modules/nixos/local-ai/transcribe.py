@@ -167,10 +167,17 @@ def whisper(work, backend, log, lang):
     segs, detected = got
     # the repair clips keep the file's language rather than detecting their own
     segs = repair(work, segs, backend, log, detected if lang == "auto" else lang)
-    if not diarize(work, backend, log):
-        return None
-    turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
-             for t in json.load(open(f"{work}/diar.json"))]
+    if not segs:
+        return [], detected
+    # diarization only labels speakers, so it can't cost the words: it writes no turns
+    # file when it finds no speaker, and a failed run still leaves the text
+    ok = diarize(work, backend, log)
+    turns = []
+    if ok and os.path.exists(f"{work}/diar.json"):
+        turns = [(t["start_sample"] / RATE, t["end_sample"] / RATE, t["speaker_id"])
+                 for t in json.load(open(f"{work}/diar.json"))]
+    elif not ok:
+        print("transcribe: diarization failed, speakers are 'unknown':\n" + open(log).read()[-500:], file=sys.stderr)
     lines = []
     for a, b, text in segs:
         # the speaker whose turns overlap this segment most
@@ -217,16 +224,20 @@ def main():
     work = tempfile.mkdtemp(prefix="transcribe.")
     try:
         log = f"{work}/log"
-        subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", a.file, "-vn",
-                        "-ac", "1", "-ar", str(RATE), "-f", "wav", f"{work}/in.wav"], check=True)
+        # -map: a file with no audio track fails with a message of its own
+        ff = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", a.file, "-map", "0:a:0", "-vn",
+                             "-ac", "1", "-ar", str(RATE), "-f", "wav", f"{work}/in.wav"], capture_output=True, text=True)
+        has_audio = ff.returncode == 0
+        if not has_audio and "matches no streams" not in ff.stderr:
+            sys.exit(ff.stderr)
         backend = "vulkan" if gpu_free() else "cpu"
         # assign speakers after recognition, so diarization does not gate speech
-        got = whisper(work, backend, log, a.lang or "en")
+        got = whisper(work, backend, log, a.lang or "en") if has_audio else ([], None)
         if got is None:
             sys.exit(open(log).read())
         lines, language = got
         if a.format == "json":
-            found = sounds(work, backend, log) if a.sounds else []
+            found = sounds(work, backend, log) if a.sounds and has_audio else []
             if found is None:
                 sys.exit(open(log).read())
             for snd in found:
