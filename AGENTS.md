@@ -32,7 +32,7 @@ sets `core.hooksPath` so the git hooks run.
 - **Security review:** a change that touches firewall rules, open ports,
   secrets wiring, authentication, or adds or exposes a service counts as
   sensitive, so it gets the review in the `other-agents` skill. The brief
-  names `~/research/Fleet/Security.md` to read first: what the fleet is
+  names `~/vault/Areas/Fleet/Security.md` to read first: what the fleet is
   exposed to today and the risks the owner accepted (private, in the
   vault; the daily update run keeps it).
 
