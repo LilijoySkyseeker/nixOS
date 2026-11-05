@@ -88,6 +88,10 @@ fleet and against what the update fixes, and keep `Security.md` true.
       rotate, an account), or urgent (exploited, and reachable on the
       fleet): it goes under "You do" in your report, and this run stays
       unarchived.
+    - torrent is the owner's PC and often runs things for days. A reboot
+      goes under "You do" only for an issue they must deal with ASAP
+      (exploited, and reachable on torrent, with the fix already installed).
+      A booted kernel or system behind the installed one isn't that.
 12. **Keep `Security.md` true.** Its sections, by state; every entry has
     a date and its exit:
     - **Exposed and unfixed:** the fleet runs it and no fix is in a
