@@ -1,56 +1,6 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: agent <agent@torrent>
-Date: Wed, 4 Nov 2026 18:00:00 -0800
-Subject: [PATCH] feat(claude): resume opted-in chats after usage limits reset
-
-getpaseo/paseo#7193 by kotusenka (head 5c7567a73), applied onto v0.14.0
-without its QA evidence; add/add conflicts in five files kept both sides.
----
- .../e2e/browser/usage-limit-resume.spec.ts    | 141 +++++++
- .../app/e2e/support/helpers/mock-agent.ts     |   5 +-
- .../e2e/support/helpers/usage-limit-resume.ts | 123 ++++++
- packages/app/src/composer/index.tsx           |   2 +
- .../app/src/composer/usage-limit-callout.tsx  | 114 ++++++
- packages/app/src/i18n/resources/ar.ts         |   9 +
- packages/app/src/i18n/resources/en.ts         |   9 +
- packages/app/src/i18n/resources/es.ts         |   9 +
- packages/app/src/i18n/resources/fr.ts         |  10 +
- packages/app/src/i18n/resources/ja.ts         |   9 +
- packages/app/src/i18n/resources/ko.ts         |   9 +
- packages/app/src/i18n/resources/pt-BR.ts      |   9 +
- packages/app/src/i18n/resources/ru.ts         |   9 +
- packages/app/src/i18n/resources/zh-CN.ts      |   9 +
- packages/app/src/stores/session-store.ts      |   2 +
- packages/app/src/utils/agent-snapshots.ts     |   2 +
- packages/protocol/src/agent-types.ts          |   2 +
- packages/protocol/src/agent-usage-limit.ts    |  16 +
- packages/protocol/src/messages.test.ts        |  27 ++
- packages/protocol/src/messages.ts             |   4 +
- .../src/server/agent/agent-archive.test.ts    |   8 +
- .../server/src/server/agent/agent-archive.ts  |   1 +
- .../server/src/server/agent/agent-manager.ts  | 164 +++++++-
- .../src/server/agent/agent-projections.ts     |   3 +
- .../src/server/agent/agent-sdk-types.ts       |   2 +
- .../server/src/server/agent/agent-storage.ts  |   2 +
- .../providers/claude/agent.redesign.test.ts   | 138 +++++++
- .../server/agent/providers/claude/agent.ts    |  32 ++
- .../agent/providers/mock-load-test-agent.ts   |  24 +-
- .../server/agent/usage-limit-resume.test.ts   | 380 ++++++++++++++++++
- .../src/server/agent/usage-limit-resume.ts    |  63 +++
- packages/server/src/server/bootstrap.ts       |  13 +
- .../server/src/server/websocket-server.ts     |   1 +
- public-docs/providers.md                      |   8 +
- 34 files changed, 1353 insertions(+), 6 deletions(-)
- create mode 100644 packages/app/e2e/browser/usage-limit-resume.spec.ts
- create mode 100644 packages/app/e2e/support/helpers/usage-limit-resume.ts
- create mode 100644 packages/app/src/composer/usage-limit-callout.tsx
- create mode 100644 packages/protocol/src/agent-usage-limit.ts
- create mode 100644 packages/server/src/server/agent/usage-limit-resume.test.ts
- create mode 100644 packages/server/src/server/agent/usage-limit-resume.ts
-
 diff --git a/packages/app/e2e/browser/usage-limit-resume.spec.ts b/packages/app/e2e/browser/usage-limit-resume.spec.ts
 new file mode 100644
-index 000000000..dea507288
+index 0000000..dea5072
 --- /dev/null
 +++ b/packages/app/e2e/browser/usage-limit-resume.spec.ts
 @@ -0,0 +1,141 @@
@@ -196,7 +146,7 @@ index 000000000..dea507288
 +  }
 +});
 diff --git a/packages/app/e2e/support/helpers/mock-agent.ts b/packages/app/e2e/support/helpers/mock-agent.ts
-index f6176b0f0..1f01af0f5 100644
+index f6176b0..1f01af0 100644
 --- a/packages/app/e2e/support/helpers/mock-agent.ts
 +++ b/packages/app/e2e/support/helpers/mock-agent.ts
 @@ -91,7 +91,10 @@ export async function openAgentRoute(
@@ -213,7 +163,7 @@ index f6176b0f0..1f01af0f5 100644
      { timeout: 60_000, waitUntil: "commit" },
 diff --git a/packages/app/e2e/support/helpers/usage-limit-resume.ts b/packages/app/e2e/support/helpers/usage-limit-resume.ts
 new file mode 100644
-index 000000000..c7f1aa6b1
+index 0000000..c7f1aa6
 --- /dev/null
 +++ b/packages/app/e2e/support/helpers/usage-limit-resume.ts
 @@ -0,0 +1,123 @@
@@ -341,7 +291,7 @@ index 000000000..c7f1aa6b1
 +  };
 +}
 diff --git a/packages/app/src/composer/index.tsx b/packages/app/src/composer/index.tsx
-index b7088ddee..3eddeb59f 100644
+index d6b4bae..606d74c 100644
 --- a/packages/app/src/composer/index.tsx
 +++ b/packages/app/src/composer/index.tsx
 @@ -1,3 +1,4 @@
@@ -359,7 +309,7 @@ index b7088ddee..3eddeb59f 100644
  
 diff --git a/packages/app/src/composer/usage-limit-callout.tsx b/packages/app/src/composer/usage-limit-callout.tsx
 new file mode 100644
-index 000000000..7b6b19756
+index 0000000..7b6b197
 --- /dev/null
 +++ b/packages/app/src/composer/usage-limit-callout.tsx
 @@ -0,0 +1,114 @@
@@ -478,7 +428,7 @@ index 000000000..7b6b19756
 +  error: { color: theme.colors.statusDanger, fontSize: theme.fontSize.sm },
 +}));
 diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
-index 81050ae5e..4c97a4c60 100644
+index 8d7c2a2..5c566de 100644
 --- a/packages/app/src/i18n/resources/ar.ts
 +++ b/packages/app/src/i18n/resources/ar.ts
 @@ -253,6 +253,15 @@ export const ar: TranslationResources = {
@@ -498,7 +448,7 @@ index 81050ae5e..4c97a4c60 100644
        notFound: "لم يتم العثور على Agent",
        failedToLoad: "فشل تحميل الوكيل",
 diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
-index 655f041ec..04b30360e 100644
+index 1f61a83..4dd7416 100644
 --- a/packages/app/src/i18n/resources/en.ts
 +++ b/packages/app/src/i18n/resources/en.ts
 @@ -249,6 +249,15 @@ export const en = {
@@ -518,7 +468,7 @@ index 655f041ec..04b30360e 100644
        notFound: "Agent not found",
        failedToLoad: "Failed to load agent",
 diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
-index f7e347213..ce302132a 100644
+index 7e5a1d4..762200b 100644
 --- a/packages/app/src/i18n/resources/es.ts
 +++ b/packages/app/src/i18n/resources/es.ts
 @@ -255,6 +255,15 @@ export const es: TranslationResources = {
@@ -538,7 +488,7 @@ index f7e347213..ce302132a 100644
        notFound: "Agentno encontrado",
        failedToLoad: "No se pudo cargar el agente",
 diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
-index 86ff05375..7d6fff825 100644
+index 551f4a4..b8c658b 100644
 --- a/packages/app/src/i18n/resources/fr.ts
 +++ b/packages/app/src/i18n/resources/fr.ts
 @@ -256,6 +256,16 @@ export const fr: TranslationResources = {
@@ -559,7 +509,7 @@ index 86ff05375..7d6fff825 100644
        notFound: "Agent introuvable",
        failedToLoad: "Impossible de charger l’agent",
 diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
-index 5a4b594a2..9ceb6e79e 100644
+index 4b1b8b6..31f109f 100644
 --- a/packages/app/src/i18n/resources/ja.ts
 +++ b/packages/app/src/i18n/resources/ja.ts
 @@ -255,6 +255,15 @@ export const ja: TranslationResources = {
@@ -579,7 +529,7 @@ index 5a4b594a2..9ceb6e79e 100644
        notFound: "エージェントが見つかりません",
        failedToLoad: "エージェントの読み込みに失敗しました",
 diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
-index 242324dd2..5bf812b0c 100644
+index b9e33b4..1707340 100644
 --- a/packages/app/src/i18n/resources/ko.ts
 +++ b/packages/app/src/i18n/resources/ko.ts
 @@ -253,6 +253,15 @@ export const ko: TranslationResources = {
@@ -599,7 +549,7 @@ index 242324dd2..5bf812b0c 100644
        notFound: "에이전트를 찾을 수 없습니다",
        failedToLoad: "에이전트를 불러오지 못했습니다",
 diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
-index bbef1d73c..d646e0df8 100644
+index 2fa6c30..7e91793 100644
 --- a/packages/app/src/i18n/resources/pt-BR.ts
 +++ b/packages/app/src/i18n/resources/pt-BR.ts
 @@ -254,6 +254,15 @@ export const ptBR: TranslationResources = {
@@ -619,7 +569,7 @@ index bbef1d73c..d646e0df8 100644
        notFound: "Agente não encontrado",
        failedToLoad: "Falha ao carregar agente",
 diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
-index aa06a9b91..a0f36a357 100644
+index 9a6eb5b..2ffdb4d 100644
 --- a/packages/app/src/i18n/resources/ru.ts
 +++ b/packages/app/src/i18n/resources/ru.ts
 @@ -255,6 +255,15 @@ export const ru: TranslationResources = {
@@ -639,7 +589,7 @@ index aa06a9b91..a0f36a357 100644
        notFound: "Агент не найден",
        failedToLoad: "Не удалось загрузить агента",
 diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
-index f5d0c44ee..49aa12160 100644
+index 553d821..0c01e92 100644
 --- a/packages/app/src/i18n/resources/zh-CN.ts
 +++ b/packages/app/src/i18n/resources/zh-CN.ts
 @@ -253,6 +253,15 @@ export const zhCN: TranslationResources = {
@@ -659,7 +609,7 @@ index f5d0c44ee..49aa12160 100644
        notFound: "未找到 Agent",
        failedToLoad: "加载 Agent 失败",
 diff --git a/packages/app/src/stores/session-store.ts b/packages/app/src/stores/session-store.ts
-index 911573762..41531d089 100644
+index 9115737..41531d0 100644
 --- a/packages/app/src/stores/session-store.ts
 +++ b/packages/app/src/stores/session-store.ts
 @@ -1,3 +1,4 @@
@@ -676,7 +626,7 @@ index 911573762..41531d089 100644
    cwd: string;
    workspaceId?: string;
 diff --git a/packages/app/src/utils/agent-snapshots.ts b/packages/app/src/utils/agent-snapshots.ts
-index 13a7bcd14..a72bbc6b0 100644
+index 13a7bcd..a72bbc6 100644
 --- a/packages/app/src/utils/agent-snapshots.ts
 +++ b/packages/app/src/utils/agent-snapshots.ts
 @@ -79,6 +79,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
@@ -696,7 +646,7 @@ index 13a7bcd14..a72bbc6b0 100644
      cwd: snapshot.cwd,
      workspaceId: snapshot.workspaceId,
 diff --git a/packages/protocol/src/agent-types.ts b/packages/protocol/src/agent-types.ts
-index c7fffe8ce..4bde52944 100644
+index ca04655..a927776 100644
 --- a/packages/protocol/src/agent-types.ts
 +++ b/packages/protocol/src/agent-types.ts
 @@ -1,3 +1,4 @@
@@ -714,7 +664,7 @@ index c7fffe8ce..4bde52944 100644
    | { type: "turn_canceled"; provider: AgentProvider; reason: string; turnId?: string }
 diff --git a/packages/protocol/src/agent-usage-limit.ts b/packages/protocol/src/agent-usage-limit.ts
 new file mode 100644
-index 000000000..1853b788c
+index 0000000..1853b78
 --- /dev/null
 +++ b/packages/protocol/src/agent-usage-limit.ts
 @@ -0,0 +1,16 @@
@@ -735,7 +685,7 @@ index 000000000..1853b788c
 +  return Number.isFinite(resetsAt) ? resetsAt + USAGE_LIMIT_RESUME_DELAY_MS : null;
 +}
 diff --git a/packages/protocol/src/messages.test.ts b/packages/protocol/src/messages.test.ts
-index 373cef409..d7e17452b 100644
+index 373cef4..d7e1745 100644
 --- a/packages/protocol/src/messages.test.ts
 +++ b/packages/protocol/src/messages.test.ts
 @@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
@@ -777,7 +727,7 @@ index 373cef409..d7e17452b 100644
 +  });
 +});
 diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
-index e04750beb..44b6c9e9a 100644
+index 77f2744..9bfb300 100644
 --- a/packages/protocol/src/messages.ts
 +++ b/packages/protocol/src/messages.ts
 @@ -1,3 +1,4 @@
@@ -785,7 +735,7 @@ index e04750beb..44b6c9e9a 100644
  import { AgentMessageSchema } from "./agent-message.js";
  import {
    HostsListRequestSchema,
-@@ -782,6 +783,7 @@ export const AgentStreamEventPayloadSchema = z.discriminatedUnion("type", [
+@@ -792,6 +793,7 @@ export const AgentStreamEventPayloadSchema = z.discriminatedUnion("type", [
      error: z.string(),
      code: z.string().optional(),
      diagnostic: z.string().optional(),
@@ -793,7 +743,7 @@ index e04750beb..44b6c9e9a 100644
    }),
    z.object({
      type: z.literal("turn_canceled"),
-@@ -872,6 +874,7 @@ export const AgentSnapshotPayloadSchema = z.object({
+@@ -882,6 +884,7 @@ export const AgentSnapshotPayloadSchema = z.object({
    runtimeInfo: AgentRuntimeInfoSchema.optional(),
    lastUsage: AgentUsageSchema.optional(),
    lastError: z.string().optional(),
@@ -801,16 +751,16 @@ index e04750beb..44b6c9e9a 100644
    title: z.string().nullable(),
    labels: z.record(z.string(), z.string()).default({}),
    requiresAttention: z.boolean().optional(),
-@@ -3661,6 +3664,7 @@ export const ServerInfoStatusPayloadSchema = z
-         connectedHosts: z.boolean().optional(),
-         hostMultiplexing: z.boolean().optional(),
+@@ -3683,6 +3686,7 @@ export const ServerInfoStatusPayloadSchema = z
+         // COMPAT(usageSetting): added in v0.14, remove after 2027-05-01.
+         usageSetting: z.boolean().optional(),
          usageSources: z.boolean().optional(),
 +        usageLimitResume: z.boolean().optional(),
          // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
          providersSnapshotCwd: z.boolean().optional(),
          // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
 diff --git a/packages/server/src/server/agent/agent-archive.test.ts b/packages/server/src/server/agent/agent-archive.test.ts
-index c4dd34b7e..f53c502c6 100644
+index c4dd34b..f53c502 100644
 --- a/packages/server/src/server/agent/agent-archive.test.ts
 +++ b/packages/server/src/server/agent/agent-archive.test.ts
 @@ -68,3 +68,11 @@ test("can stamp updatedAt to the archive timestamp", () => {
@@ -826,7 +776,7 @@ index c4dd34b7e..f53c502c6 100644
 +  expect(archived.usageLimit).toBeUndefined();
 +});
 diff --git a/packages/server/src/server/agent/agent-archive.ts b/packages/server/src/server/agent/agent-archive.ts
-index 7e35d98f8..14250f2ac 100644
+index 7e35d98..14250f2 100644
 --- a/packages/server/src/server/agent/agent-archive.ts
 +++ b/packages/server/src/server/agent/agent-archive.ts
 @@ -15,6 +15,7 @@ export function buildArchivedAgentRecord(
@@ -838,7 +788,7 @@ index 7e35d98f8..14250f2ac 100644
      lastStatus: normalizeArchivedStatus(record.lastStatus),
      requiresAttention: false,
 diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
-index 8cbdfc068..6793c6dc2 100644
+index 94250e5..f859c97 100644
 --- a/packages/server/src/server/agent/agent-manager.ts
 +++ b/packages/server/src/server/agent/agent-manager.ts
 @@ -2,6 +2,11 @@ import type { AttachedAgentTool, PluginAgentToolsRuntime } from "../plugins/agen
@@ -867,7 +817,7 @@ index 8cbdfc068..6793c6dc2 100644
  
  const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
  const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
-@@ -440,6 +450,7 @@ interface ManagedAgentBase {
+@@ -443,6 +453,7 @@ interface ManagedAgentBase {
    activeTurnId: string | null;
    activeTurnStartedAt: Date | null;
    lastUsage?: AgentUsage;
@@ -875,7 +825,7 @@ index 8cbdfc068..6793c6dc2 100644
    lastError?: string;
    attention: AttentionState;
    foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
-@@ -556,6 +567,28 @@ interface WriteLabelsResult {
+@@ -559,6 +570,28 @@ interface WriteLabelsResult {
    live: boolean;
  }
  
@@ -904,7 +854,7 @@ index 8cbdfc068..6793c6dc2 100644
  interface AgentMetadataPatch {
    title?: string;
    labels?: AgentLabelPatch;
-@@ -772,6 +805,7 @@ export class AgentManager {
+@@ -775,6 +808,7 @@ export class AgentManager {
    private readonly runtimeCleanupIdentities = new WeakMap<AgentSession, object>();
    private readonly collectingRuntimes = new Set<string>();
    private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
@@ -912,16 +862,16 @@ index 8cbdfc068..6793c6dc2 100644
    private readonly agentStreamCoalescer: AgentStreamCoalescer;
    private mcpBaseUrl: string | null;
    private readonly mcpAuthToken: string | null;
-@@ -1525,6 +1559,8 @@ export class AgentManager {
-     return this.registerSession(session, storedConfig, resolvedAgentId, {
+@@ -1531,6 +1565,8 @@ export class AgentManager {
        ...options,
+       launchEnv,
        persistence: handle,
 +      usageLimit: record?.usageLimit,
 +      lastError: record?.lastError ?? undefined,
        restoring: true,
      });
    }
-@@ -1726,6 +1762,7 @@ export class AgentManager {
+@@ -1734,6 +1770,7 @@ export class AgentManager {
          historyPrimed: rehydrateFromDisk ? false : preservedHistoryPrimed,
          lastUsage: preservedLastUsage,
          lastError: preservedLastError,
@@ -929,7 +879,7 @@ index 8cbdfc068..6793c6dc2 100644
          attention: preservedAttention,
          restoring: true,
        });
-@@ -1980,6 +2017,7 @@ export class AgentManager {
+@@ -1988,6 +2025,7 @@ export class AgentManager {
    }
  
    async archiveAgent(agentId: string): Promise<{ archivedAt: string }> {
@@ -937,7 +887,7 @@ index 8cbdfc068..6793c6dc2 100644
      return this.runLifecycleMutation(agentId, () => this.archiveAgentUnlocked(agentId));
    }
  
-@@ -2017,6 +2055,7 @@ export class AgentManager {
+@@ -2025,6 +2063,7 @@ export class AgentManager {
        throw new Error(`Agent ${agentId} not found in storage after snapshot`);
      }
  
@@ -945,7 +895,7 @@ index 8cbdfc068..6793c6dc2 100644
      const { archivedAt } = await this.markRecordArchived(stored, requestedArchivedAt);
      agent.updatedAt = new Date(archivedAt);
      await this.closeAgentRuntime(agentId);
-@@ -2170,6 +2209,7 @@ export class AgentManager {
+@@ -2178,6 +2217,7 @@ export class AgentManager {
          lastUserMessageAt: record.lastUserMessageAt ? new Date(record.lastUserMessageAt) : null,
          lastUsage: undefined,
          lastError: record.lastError ?? undefined,
@@ -953,7 +903,7 @@ index 8cbdfc068..6793c6dc2 100644
          attention,
          internal: record.internal,
          labels: record.labels,
-@@ -2279,6 +2319,7 @@ export class AgentManager {
+@@ -2287,6 +2327,7 @@ export class AgentManager {
    }
  
    async setLabels(agentId: string, labels: Record<string, string>): Promise<void> {
@@ -961,7 +911,7 @@ index 8cbdfc068..6793c6dc2 100644
      await this.runLifecycleMutation(agentId, async () => {
        const agent = this.requireAgent(agentId);
        await this.writeLabels(agent.id, labels);
-@@ -2428,6 +2469,7 @@ export class AgentManager {
+@@ -2436,6 +2477,7 @@ export class AgentManager {
    }
  
    async archiveSnapshot(agentId: string, archivedAt: string): Promise<StoredAgentRecord> {
@@ -969,7 +919,7 @@ index 8cbdfc068..6793c6dc2 100644
      return this.runLifecycleMutation(agentId, () =>
        this.archiveSnapshotUnlocked(agentId, archivedAt),
      );
-@@ -2525,6 +2567,7 @@ export class AgentManager {
+@@ -2533,6 +2575,7 @@ export class AgentManager {
        labels?: Record<string, string>;
      },
    ): Promise<void> {
@@ -977,7 +927,7 @@ index 8cbdfc068..6793c6dc2 100644
      await this.runLifecycleMutation(agentId, () =>
        this.updateAgentMetadataUnlocked(agentId, updates),
      );
-@@ -2569,6 +2612,120 @@ export class AgentManager {
+@@ -2577,6 +2620,120 @@ export class AgentManager {
      return result;
    }
  
@@ -1098,7 +1048,7 @@ index 8cbdfc068..6793c6dc2 100644
    async runAgent(
      agentId: string,
      prompt: AgentPromptInput,
-@@ -2807,6 +2964,7 @@ export class AgentManager {
+@@ -2819,6 +2976,7 @@ export class AgentManager {
      const agent = existingAgent;
      const isReplacement = agent.pendingReplacement;
      agent.lastError = undefined;
@@ -1106,7 +1056,7 @@ index 8cbdfc068..6793c6dc2 100644
  
      const pendingRun = this.runs.createPendingRun(agentId);
  
-@@ -3751,6 +3909,7 @@ export class AgentManager {
+@@ -3793,6 +3951,7 @@ export class AgentManager {
        persistence?: AgentPersistenceHandle;
        historyPrimed?: boolean;
        lastUsage?: AgentUsage;
@@ -1114,7 +1064,7 @@ index 8cbdfc068..6793c6dc2 100644
        lastError?: string;
        attention?: AttentionState;
        /**
-@@ -3943,6 +4102,7 @@ export class AgentManager {
+@@ -3986,6 +4145,7 @@ export class AgentManager {
            labels?: Record<string, string>;
            historyPrimed?: boolean;
            lastUsage?: AgentUsage;
@@ -1122,7 +1072,7 @@ index 8cbdfc068..6793c6dc2 100644
            lastError?: string;
            attention?: AttentionState;
            persistence?: AgentPersistenceHandle;
-@@ -3985,6 +4145,7 @@ export class AgentManager {
+@@ -4030,6 +4190,7 @@ export class AgentManager {
        lastUserMessageAt: options?.lastUserMessageAt ?? null,
        lastUsage: options?.lastUsage,
        lastError: options?.lastError,
@@ -1130,7 +1080,7 @@ index 8cbdfc068..6793c6dc2 100644
        attention: resolveInitialAttention(options?.attention),
        internal: config.internal ?? false,
        labels: options?.labels ?? {},
-@@ -4827,6 +4988,7 @@ export class AgentManager {
+@@ -4872,6 +5033,7 @@ export class AgentManager {
        agent.lifecycle = "error";
      }
      agent.lastError = event.error;
@@ -1139,10 +1089,10 @@ index 8cbdfc068..6793c6dc2 100644
        agent,
        event.provider,
 diff --git a/packages/server/src/server/agent/agent-projections.ts b/packages/server/src/server/agent/agent-projections.ts
-index 7d154e9c1..68bc07689 100644
+index b388143..4e75d13 100644
 --- a/packages/server/src/server/agent/agent-projections.ts
 +++ b/packages/server/src/server/agent/agent-projections.ts
-@@ -99,6 +99,7 @@ export function toStoredAgentRecord(
+@@ -100,6 +100,7 @@ export function toStoredAgentRecord(
      features: normalizeFeatures(agent.features),
      persistence,
      lastError: agent.lastError ?? undefined,
@@ -1150,7 +1100,7 @@ index 7d154e9c1..68bc07689 100644
      requiresAttention: agent.attention.requiresAttention,
      attentionReason: agent.attention.requiresAttention ? agent.attention.attentionReason : null,
      attentionTimestamp: agent.attention.requiresAttention
-@@ -148,6 +149,7 @@ export function toAgentPayload(
+@@ -149,6 +150,7 @@ export function toAgentPayload(
      title: options?.title ?? null,
      labels: agent.labels,
      archivedAt: options?.archivedAt ?? null,
@@ -1158,7 +1108,7 @@ index 7d154e9c1..68bc07689 100644
      ...(agent.internal ? { internal: true } : {}),
    };
  
-@@ -259,6 +261,7 @@ export function buildStoredAgentPayload(
+@@ -260,6 +262,7 @@ export function buildStoredAgentPayload(
      archivedAt: record.archivedAt ?? null,
      ...(record.internal ? { internal: true } : {}),
      labels: normalizeLabels(record.labels),
@@ -1167,7 +1117,7 @@ index 7d154e9c1..68bc07689 100644
      ...(providerAvailable ? {} : { providerUnavailable: true }),
    };
 diff --git a/packages/server/src/server/agent/agent-sdk-types.ts b/packages/server/src/server/agent/agent-sdk-types.ts
-index 507cfbceb..fab7bf115 100644
+index 903bbe5..1687a8e 100644
 --- a/packages/server/src/server/agent/agent-sdk-types.ts
 +++ b/packages/server/src/server/agent/agent-sdk-types.ts
 @@ -1,3 +1,4 @@
@@ -1175,7 +1125,7 @@ index 507cfbceb..fab7bf115 100644
  import type {
    AgentFeature,
    AgentFeatureSelect,
-@@ -428,6 +429,7 @@ export type AgentStreamEvent =
+@@ -435,6 +436,7 @@ export type AgentStreamEvent =
        error: string;
        code?: string;
        diagnostic?: string;
@@ -1184,7 +1134,7 @@ index 507cfbceb..fab7bf115 100644
      }
    | { type: "turn_canceled"; provider: AgentProvider; reason: string; turnId?: string }
 diff --git a/packages/server/src/server/agent/agent-storage.ts b/packages/server/src/server/agent/agent-storage.ts
-index be94a31d4..56c00ee3b 100644
+index a097bd7..5303155 100644
 --- a/packages/server/src/server/agent/agent-storage.ts
 +++ b/packages/server/src/server/agent/agent-storage.ts
 @@ -1,3 +1,4 @@
@@ -1192,7 +1142,7 @@ index be94a31d4..56c00ee3b 100644
  import { promises as fs, type Dirent } from "node:fs";
  import path from "node:path";
  import { z } from "zod";
-@@ -69,6 +70,7 @@ const STORED_AGENT_SCHEMA = z.object({
+@@ -71,6 +72,7 @@ const STORED_AGENT_SCHEMA = z.object({
    features: z.array(AgentFeatureSchema).optional(),
    persistence: PERSISTENCE_HANDLE_SCHEMA,
    lastError: z.string().nullable().optional(),
@@ -1201,7 +1151,7 @@ index be94a31d4..56c00ee3b 100644
    attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
    attentionTimestamp: z.string().nullable().optional(),
 diff --git a/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts b/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
-index 539392652..901170f69 100644
+index 5393926..901170f 100644
 --- a/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
 +++ b/packages/server/src/server/agent/providers/claude/agent.redesign.test.ts
 @@ -2060,3 +2060,141 @@ test("does not use stream_event uuid as assistant message identity when message_
@@ -1347,7 +1297,7 @@ index 539392652..901170f69 100644
 +  }
 +});
 diff --git a/packages/server/src/server/agent/providers/claude/agent.ts b/packages/server/src/server/agent/providers/claude/agent.ts
-index e5152559f..ae0e24739 100644
+index 0116b69..8aa73b9 100644
 --- a/packages/server/src/server/agent/providers/claude/agent.ts
 +++ b/packages/server/src/server/agent/providers/claude/agent.ts
 @@ -1,5 +1,6 @@
@@ -1357,7 +1307,7 @@ index e5152559f..ae0e24739 100644
  import { validateProviderOptions } from "../../provider-options.js";
  import type { ChildProcess } from "node:child_process";
  import { randomUUID } from "node:crypto";
-@@ -2355,6 +2356,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -2389,6 +2390,7 @@ class ClaudeAgentSession implements AgentSession {
    private mainTurnInFlight = false;
    private foregroundHasVisibleActivity = false;
    private activeTurnHasAssistantText = false;
@@ -1365,7 +1315,7 @@ index e5152559f..ae0e24739 100644
    private readonly contextUsage: ClaudeContextUsageState;
    private userMessageIds: string[] = [];
    private readonly emittedUserMessageIds = new Set<string>();
-@@ -2501,6 +2503,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -2535,6 +2537,7 @@ class ClaudeAgentSession implements AgentSession {
      this.activeForegroundTurnId = turnId;
      this.foregroundHasVisibleActivity = false;
      this.activeTurnHasAssistantText = false;
@@ -1373,7 +1323,7 @@ index e5152559f..ae0e24739 100644
      this.contextUsage.beginTurn();
      this.transitionTurnState("foreground", "foreground turn started");
      this.clearRecentStderr();
-@@ -3840,6 +3843,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -3895,6 +3898,7 @@ class ClaudeAgentSession implements AgentSession {
        error: normalized,
        ...(code ? { code } : {}),
        ...(diagnostic ? { diagnostic } : {}),
@@ -1381,7 +1331,7 @@ index e5152559f..ae0e24739 100644
      };
    }
  
-@@ -3956,6 +3960,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4011,6 +4015,7 @@ class ClaudeAgentSession implements AgentSession {
      this.activeForegroundTurnId = null;
      this.activeForegroundQuery = null;
      this.activeForegroundInput = null;
@@ -1389,7 +1339,7 @@ index e5152559f..ae0e24739 100644
      this.cancelCurrentTurn = null;
      this.activeTurnHasAssistantText = false;
      this.compactionMarkerOpen = false;
-@@ -3970,6 +3975,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4025,6 +4030,7 @@ class ClaudeAgentSession implements AgentSession {
      }
  
      if (terminalSeen) {
@@ -1397,7 +1347,7 @@ index e5152559f..ae0e24739 100644
        this.compactionMarkerOpen = false;
        if (this.activeForegroundTurnId) {
          this.activeForegroundTurnId = null;
-@@ -4008,6 +4014,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4063,6 +4069,7 @@ class ClaudeAgentSession implements AgentSession {
        return;
      }
      this.notifySubscribers({ type: "turn_completed", provider: "claude" });
@@ -1405,7 +1355,7 @@ index e5152559f..ae0e24739 100644
      this.autonomousTurn = null;
      this.activeForegroundQuery = null;
      this.activeForegroundInput = null;
-@@ -4507,6 +4514,7 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4562,6 +4569,7 @@ class ClaudeAgentSession implements AgentSession {
        return this.translateSidechainFrameToEvents(message, parentToolUseId);
      }
  
@@ -1413,7 +1363,7 @@ index e5152559f..ae0e24739 100644
      const events: AgentStreamEvent[] = [];
      this.appendTaskStateEvent(message, events);
  
-@@ -4587,6 +4595,24 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4642,6 +4650,24 @@ class ClaudeAgentSession implements AgentSession {
      this.permissionClearingSteerUuids.delete(lifecycle.commandUuid);
    }
  
@@ -1438,7 +1388,7 @@ index e5152559f..ae0e24739 100644
    private appendTaskStateEvent(message: SDKMessage, events: AgentStreamEvent[]): void {
      const item = this.taskState.observe(message);
      if (item) events.push({ type: "timeline", provider: "claude", item });
-@@ -4915,6 +4941,12 @@ class ClaudeAgentSession implements AgentSession {
+@@ -4970,6 +4996,12 @@ class ClaudeAgentSession implements AgentSession {
      events: AgentStreamEvent[],
    ): void {
      const usage = this.convertUsage(message);
@@ -1452,7 +1402,7 @@ index e5152559f..ae0e24739 100644
        events.push(...this.sidechainTracker.finishAll("completed"));
        // Built-in slash commands (e.g. /voice, /usage, "Unknown command: …")
 diff --git a/packages/server/src/server/agent/providers/mock-load-test-agent.ts b/packages/server/src/server/agent/providers/mock-load-test-agent.ts
-index 14322c6cc..8c550bc4e 100644
+index 14322c6..8c550bc 100644
 --- a/packages/server/src/server/agent/providers/mock-load-test-agent.ts
 +++ b/packages/server/src/server/agent/providers/mock-load-test-agent.ts
 @@ -1,3 +1,4 @@
@@ -1521,7 +1471,7 @@ index 14322c6cc..8c550bc4e 100644
          sessionId: this.id,
 diff --git a/packages/server/src/server/agent/usage-limit-resume.test.ts b/packages/server/src/server/agent/usage-limit-resume.test.ts
 new file mode 100644
-index 000000000..833d870f6
+index 0000000..833d870
 --- /dev/null
 +++ b/packages/server/src/server/agent/usage-limit-resume.test.ts
 @@ -0,0 +1,380 @@
@@ -1907,7 +1857,7 @@ index 000000000..833d870f6
 +});
 diff --git a/packages/server/src/server/agent/usage-limit-resume.ts b/packages/server/src/server/agent/usage-limit-resume.ts
 new file mode 100644
-index 000000000..964858dcd
+index 0000000..964858d
 --- /dev/null
 +++ b/packages/server/src/server/agent/usage-limit-resume.ts
 @@ -0,0 +1,63 @@
@@ -1975,10 +1925,10 @@ index 000000000..964858dcd
 +  }
 +}
 diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
-index 30a5fedff..30fd5ff93 100644
+index 7db8f50..e1051bd 100644
 --- a/packages/server/src/server/bootstrap.ts
 +++ b/packages/server/src/server/bootstrap.ts
-@@ -5,6 +5,7 @@ import {
+@@ -7,6 +7,7 @@ import {
    createJsonFinishSubscriptionStore,
  } from "./agent/finish-subscriptions/index.js";
  import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
@@ -1986,7 +1936,7 @@ index 30a5fedff..30fd5ff93 100644
  import type { PluginRegistries } from "@getpaseo/protocol/plugin-registry";
  import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
  import express from "express";
-@@ -1427,6 +1428,16 @@ export async function createPaseoDaemon(
+@@ -1454,6 +1455,16 @@ export async function createPaseoDaemon(
      createPaseoWorktreeWorkspace: createSchedulePaseoWorktreeExternal,
      archiveWorkspace: archiveScheduleWorkspaceExternal,
    });
@@ -2003,7 +1953,7 @@ index 30a5fedff..30fd5ff93 100644
    await scheduleService.start();
  
    agentManager.setAgentArchivedCallback(async (agentId) => {
-@@ -1920,6 +1931,7 @@ export async function createPaseoDaemon(
+@@ -1949,6 +1960,7 @@ export async function createPaseoDaemon(
        // model loading doesn't block the server from accepting connections.
        speechService.start();
        scriptHealthMonitor.start();
@@ -2011,28 +1961,28 @@ index 30a5fedff..30fd5ff93 100644
      } catch (error) {
        localCredential = null;
        await deleteLocalCredential(config.paseoHome);
-@@ -1955,6 +1967,7 @@ export async function createPaseoDaemon(
+@@ -1986,6 +1998,7 @@ export async function createPaseoDaemon(
      await finishSubscriptions.close();
      await wsServer?.agentMessages.close();
      agentManager.prepareForShutdown();
 +    await usageLimitResume.stop();
+     await restartRecovery.captureRunningAgents();
      await closeAllAgents(logger, agentManager);
      await withTimeout({
-       promise: pluginRuntime.drainEvents(),
 diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
-index a12fde761..ff8f51a43 100644
+index 5ffc2ec..1ca6980 100644
 --- a/packages/server/src/server/websocket-server.ts
 +++ b/packages/server/src/server/websocket-server.ts
-@@ -1953,6 +1953,7 @@ export class VoiceAssistantWebSocketServer {
-         // COMPAT(relayProtectedSecurity): added in v0.13.0, remove gate after 2027-04-21.
+@@ -2009,6 +2009,7 @@ export class VoiceAssistantWebSocketServer {
          relayProtectedSecurity: true,
+         usageSetting: true,
          usageSources: true,
 +        usageLimitResume: true,
          ownedSubscriptions: true,
+         binaryChunkingV1: true,
          agentRequestReceipts: true,
-         workspaceRequestReceipts: true,
 diff --git a/public-docs/providers.md b/public-docs/providers.md
-index fc23bff78..1f8b672c8 100644
+index fc23bff..1f8b672 100644
 --- a/public-docs/providers.md
 +++ b/public-docs/providers.md
 @@ -23,6 +23,14 @@ A provider is the contract between Paseo and one external agent CLI: how to laun
@@ -2050,6 +2000,3 @@ index fc23bff78..1f8b672c8 100644
  ## Where to go next
  
  - [Supported providers](/docs/supported-providers), the full list with install links.
--- 
-2.56.0
-
