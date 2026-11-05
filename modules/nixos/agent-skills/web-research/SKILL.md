@@ -9,7 +9,10 @@ description: How to read the web from torrent. Use when a site refuses you (a 40
 
 `web-fetch URL` prints a page's main text as markdown. It tries curl with
 browser headers, then curl-impersonate, then real Chromium through nodriver
-in a virtual display, which waits out Cloudflare-style challenges.
+in a virtual display, which waits out Cloudflare-style challenges and clicks
+Cloudflare's checkbox. The browser tier keeps one profile in
+`~/.cache/web-fetch`, so clearance cookies and Google's trust last, and takes
+one page at a time across all agents: expect to queue behind another.
 
 - `--html` prints the raw page; `-o FILE` saves a PDF or other file.
 - Save long pages to a file rather than printing them whole.
@@ -39,7 +42,9 @@ of a person reading.
 A wall `web-fetch` can't pass goes in `~/work/ENVIRONMENT.md` (date, agent,
 URL, the error per tier, what you did instead). Known hard walls:
 archive.today (429s), some Cloudflare "interactive" challenges
-(FastPeopleSearch detail pages, Planet Minecraft, Fimfiction). The Wayback
+(FastPeopleSearch detail pages), Imperva's hCaptcha (bizfile, Cal-Access) and
+Reddit's challenge, where repeat browser visits got "blocked by network
+security": use the feed route below and don't retry in a browser. The Wayback
 Machine (`web.archive.org/web/<ts>id_/<url>`) is often the fallback; its
 availability API (`archive.org/wayback/available`) 429s, so ask for
 snapshot URLs directly.
@@ -49,8 +54,9 @@ Routes that work where the obvious one doesn't:
 - **Reddit:** thread pages and `.json` are walled; append `.rss?limit=500`
   to the thread URL (`web-fetch --feed`, or `-o FILE` for the whole Atom).
   Images come from `i.redd.it/<id>.jpeg`.
-- **Search engines:** Google search and Lens 429 or CAPTCHA from torrent's
-  IP, and DuckDuckGo's HTML endpoint challenges. Google News RSS
+- **Search engines:** Google search through `web-fetch` is intermittent: it
+  passes on a well-used profile, but can give a 429 and a reCAPTCHA. Don't
+  retry it; repeat visits risk the household IP. Google News RSS
   (`news.google.com/rss/search?q=...`) and Bing through plain curl work.
 - **YouTube:** captions work: `yt-dlp --skip-download --write-auto-subs
   --sub-langs en-orig URL` (translated tracks 429). Video and audio get

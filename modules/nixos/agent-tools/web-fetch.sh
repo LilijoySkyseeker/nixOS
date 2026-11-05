@@ -79,11 +79,11 @@ if blocked "$code" || shell_only; then
     ;;
   esac
   code=200
-  # backstop for the browser's own 150s limit
+  # backstop for the browser's own limits: 180s for the lock, 245s of visits
   # at a desktop's size, not xvfb-run's default 640x480; browser-fetch's
   # own exit status, since xvfb-run's can fail in its cleanup after a good page
   # shellcheck disable=SC2016 # expanded by the inner sh
-  timeout --kill-after=10 170 xvfb-run -a -s '-screen 0 1920x1080x24' \
+  timeout --kill-after=10 440 xvfb-run -a -s '-screen 0 1920x1080x24' \
     sh -c 'browser-fetch "$1"; echo $? > "$2"' sh "$url" "$status" > "$body" || true
   [ "$(cat "$status")" = 0 ] || code=000
   type=text/html
