@@ -35,15 +35,20 @@ ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrom
 # (keep the phrases in step with browser-fetch.py's CHALLENGE)
 blocked() {
   case $1 in 2??) ;; *) return 0 ;; esac
-  grep -qiE '<title>[^<]*(just a moment|attention required|access denied|please wait|verifying|are you a robot|temporarily unavailable|prove your humanity|not a bot|client challenge|checking (you|your))' "$body"
+  grep -qiE '<title>[^<]*(just a moment|attention required|access denied|please wait|verifying( you|\.\.\.|…)|are you a robot|temporarily unavailable|prove your humanity|making sure you.{0,8}not a bot|client challenge|checking your browser|checking if the site)' "$body"
 }
 # the site's own origin as Referer: some serve PDFs only to their own pages
-referer=$(printf '%s' "$url" | grep -oE '^https?://[^/]+')/
+origin=$(printf '%s' "$url" | grep -oE '^https?://[^/?#]+' || true)
 
-# prints "STATUS TYPE"; 000 when the connection failed
+# prints "STATUS TYPE"; 000 when the transfer failed, even after a good status
 fetch() {
-  "$@" -sL --compressed --max-time 30 -o "$body" -e "$referer" \
-    -w '%{http_code} %{content_type}\n' "$url" || echo 000
+  local meta
+  if meta=$("$@" -sL --compressed --max-time 30 -o "$body" ${origin:+-e "$origin/"} \
+    -w '%{http_code} %{content_type}' "$url"); then
+    printf '%s\n' "$meta"
+  else
+    echo 000
+  fi
 }
 read -r code type < <(fetch curl -A "$ua" \
   -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
@@ -96,10 +101,12 @@ text)
   if is_page; then
     extract-text "$url" < "$body"
   else
-    case $type in
-    *pdf*) pdftotext -layout "$body" - ;;
-    *) cat "$body" ;;
-    esac
+    # by content: some hosts label PDFs application/octet-stream
+    if [ "$(head -c4 "$body")" = %PDF ]; then
+      pdftotext -layout "$body" -
+    else
+      cat "$body"
+    fi
   fi
   ;;
 feed)
