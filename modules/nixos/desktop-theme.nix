@@ -1,11 +1,15 @@
-_: {
+{ config, ... }:
+let
+  inherit (config.flake) theme;
+in
+{
   flake.modules.nixos."desktop-theme" = { pkgs-unstable, inputs, ... }: {
     imports = [ inputs.stylix.nixosModules.stylix ];
     stylix = {
       enable = true;
       autoEnable = true;
       # source path, not a package: the scheme itself needs no eval-time build
-      base16Scheme = "${inputs.stylix.inputs.tinted-schemes}/base16/gruvbox-dark-soft.yaml";
+      base16Scheme = theme.scheme;
       image = ../../files/gruvbox-dark-rainbow.png;
       polarity = "dark";
       cursor.package = pkgs-unstable.capitaine-cursors-themed;
@@ -30,6 +34,8 @@ _: {
       stylix.targets.firefox.profileNames = [ "default" ];
       # qtct set QT_STYLE_OVERRIDE=kvantum, which broke Plasma 6.7 QML (black desktop); Plasma themes Qt itself.
       stylix.targets.qt.enable = false;
+      # flake.theme gives the prompt its palette, on the servers too
+      stylix.targets.starship.enable = false;
     };
   };
 }

@@ -1,10 +1,16 @@
-_: {
+{ config, ... }:
+let
+  inherit (config.flake) theme;
+in
+{
   flake.modules.homeManager.tooling =
     {
       pkgs,
+      pkgs-unstable,
       config,
       lib,
       options,
+      osConfig,
       ...
     }:
     let
@@ -20,8 +26,23 @@ _: {
         branch = "f418";
         lock = "f023";
         gear = "f013";
-        hourglass = "f252";
+        recycle = "f1b8";
       };
+      host = osConfig.networking.hostName;
+      hostColour = theme.hostColours.${host} or "yellow";
+      # bash prompt escape, for the lines ble.sh draws itself
+      sgr = name: "\\[${theme.ansi name}\\]";
+      finalPrompt = lib.concatStrings [
+        "${sgr "bright-black"}[\\t] "
+        "${sgr (if config.home.username == "root" then "red" else "white")}\\u"
+        "${sgr "white"}@"
+        "${sgr hostColour}\\[\\e[1m\\]\\h"
+        "${sgr "white"}:"
+        "${sgr "blue"}\\w"
+        "${sgr "green"}\${_prompt_branch:+ (\$_prompt_branch)}"
+        "${sgr "white"}\\$ "
+        "\\[\\e[0m\\]"
+      ];
     in
     {
 
@@ -82,9 +103,10 @@ _: {
           # only on a real terminal, so Claude Code's and other tools' bash stays plain
           (lib.mkOrder 50 ''
             if [[ -t 0 && -t 1 && $TERM != dumb && -z ''${CLAUDECODE-} ]]; then
-              # without ~/.cache, ble.sh 0.4.0-devel3 (stable) tries to cache in its read-only store path
+              # without ~/.cache, ble.sh tries to cache in its read-only store path
               mkdir -p "''${XDG_CACHE_HOME:-$HOME/.cache}"
-              source -- ${pkgs.blesh}/share/blesh/ble.sh --attach=none
+              # unstable on every host: the servers' stable release lacks the marker options
+              source -- ${pkgs-unstable.blesh}/share/blesh/ble.sh --attach=none
             fi
           '')
           ''
@@ -97,6 +119,83 @@ _: {
               alias "$c=${pkgs.grc}/bin/grc -es $c"
             done
           ''
+          # prompt hooks, ahead of starship's so its modules see what they export
+          (lib.mkOrder 900 ''
+            if [[ ''${BLE_VERSION-} ]]; then
+              # ble.sh's sleep function ignores Ctrl-C
+              alias sleep='env sleep'
+              _prompt_osc() {
+                if [[ ''${TMUX-} ]]; then
+                  printf '\ePtmux;\e\e]%s\a\e\\' "$1"
+                else
+                  printf '\e]%s\a' "$1"
+                fi
+              }
+              _prompt_preexec() {
+                _prompt_start=$EPOCHREALTIME _prompt_cmd=$1
+                printf '\e]133;C\a'
+              }
+              _prompt_precmd() {
+                local st=$? ps=("''${BLE_PIPESTATUS[@]}")
+                _prompt_status=$st
+                # result line, only after a command ran (not an empty Enter or Ctrl-C)
+                if [[ ''${_prompt_start-} ]]; then
+                  local ms=$(((''${EPOCHREALTIME/[.,]/} - ''${_prompt_start/[.,]/}) / 1000)) t res= c
+                  _prompt_start=
+                  if ((ms < 60000)); then
+                    printf -v t '%d.%ds' $((ms / 1000)) $((ms % 1000 / 100))
+                  elif ((ms < 3600000)); then
+                    printf -v t '%dm%02ds' $((ms / 60000)) $((ms / 1000 % 60))
+                  else
+                    printf -v t '%dh%02dm' $((ms / 3600000)) $((ms / 60000 % 60))
+                  fi
+                  if ((st)); then
+                    # an interrupt can leave the pipeline's codes behind the exit status
+                    ((''${ps[-1]:-0} == st)) || ps=("$st")
+                    for c in "''${ps[@]}"; do
+                      ((c > 128 && c < 160)) && c+=" SIG$(kill -l $((c - 128)) 2>/dev/null)"
+                      res+=''${res:+|}$c
+                    done
+                    printf '${theme.ansi "red"}[exit %s · %s]\e[0m\n' "$res" "$t"
+                    res="exit $res"
+                  elif ((ms >= 3000)); then
+                    printf '${theme.ansi "bright-black"}[done · %s]\e[0m\n' "$t"
+                    res=done
+                  fi
+                  # Konsole pops this up only when its window isn't focused
+                  if ((ms >= 30000)); then
+                    local cmd=''${_prompt_cmd//[;$'\n\a\e']/ }
+                    _prompt_osc "777;notify;''${HOSTNAME%%.*}: $res · $t;''${cmd:0:200}"
+                  fi
+                fi
+                ${lib.optionalString (osConfig.environment.persistence or { } != { }) ''
+                  # wiped at boot: on the root filesystem, or on a tmpfs
+                  if [[ $PWD != "''${_prompt_pwd-}" ]]; then
+                    _prompt_pwd=$PWD
+                    local -a fs
+                    mapfile -t fs < <(stat -c %d -- . / 2>/dev/null; stat -f -c %T -- . 2>/dev/null)
+                    if [[ ''${fs[0]-} == "''${fs[1]-}" || ''${fs[2]-} == tmpfs ]]; then
+                      export PROMPT_WIPED=1
+                    else
+                      unset PROMPT_WIPED
+                    fi
+                  fi
+                ''}
+                _prompt_branch=$(git symbolic-ref --short -q HEAD 2>/dev/null)
+              }
+              blehook PREEXEC!=_prompt_preexec
+              blehook PRECMD!=_prompt_precmd
+            fi
+          '')
+          # prompt marks around starship's prompt, so it runs after starship's hook
+          (lib.mkOrder 2999 ''
+            if [[ ''${BLE_VERSION-} ]]; then
+              _prompt_marks() {
+                PS1='\[\e]133;D;'$_prompt_status'\a\e]133;A\a\]'$PS1'\[\e]133;B\a\]'
+              }
+              blehook PRECMD!=_prompt_marks
+            fi
+          '')
           # ble.sh attaches after every other integration has set up its hooks
           (lib.mkOrder 3000 ''
             [[ ! ''${BLE_VERSION-} ]] || ble-attach
@@ -106,6 +205,11 @@ _: {
 
       xdg.configFile."blesh/init.sh".text = ''
         bleopt history_share=1
+        bleopt exec_errexit_mark=
+        bleopt exec_elapsed_enabled=0
+        bleopt prompt_eol_mark=
+        bleopt prompt_ps1_final='\n\[\e]133;A\a\]${finalPrompt}\[\e]133;B\a\]'
+        bleopt prompt_rps1_transient=1
         bind 'set completion-ignore-case on'
 
         ble-sabbrev rsync='rsync --verbose --recursive --progress --human-readable'
@@ -139,20 +243,17 @@ _: {
         enable = true;
         settings = {
           add_newline = true;
+          palette = "theme";
+          palettes.theme = theme.palette;
           format = lib.concatStrings [
             "[╭─](bright-black)"
             "$os"
+            "\${env_var.PROMPT_WIPED}"
             "$directory"
             "($git_branch$git_commit$git_state$git_status[ ](bg:green)[${g.right}](fg:green))"
             " $fill "
-            "$status"
-            "$cmd_duration"
-            "$username"
-            "$hostname"
-            "$jobs"
-            "$direnv"
-            "$nix_shell"
-            "$time"
+            # one block: starship can't join segments whose neighbours come and go
+            "([${g.left}](fg:base02)$direnv$nix_shell$jobs$username$hostname[ ](bg:base02))"
             "[─╮](bright-black)"
             "$line_break"
             "[╰─](bright-black)"
@@ -170,6 +271,10 @@ _: {
             style = "fg:black bg:white";
             format = "[ $symbol ]($style)";
             symbols.NixOS = g.nixos;
+          };
+          env_var.PROMPT_WIPED = {
+            style = "fg:brown bg:white";
+            format = "[${g.recycle} ]($style)";
           };
           # repo_root_format is used inside a git repo, where the git segment closes the arrow
           directory = {
@@ -213,55 +318,39 @@ _: {
             untracked = " ?\${count}";
           };
 
-          status = {
-            disabled = false;
-            style = "fg:bright-yellow bg:red";
-            format = "[${g.left}](fg:red)[ ✘ $status ]($style)";
-          };
-          cmd_duration = {
-            min_time = 3000;
-            style = "fg:black bg:yellow";
-            format = "[${g.left}](fg:yellow)[ $duration ${g.hourglass} ]($style)";
-          };
-          username = {
-            style_user = "fg:yellow bg:black";
-            style_root = "fg:red bg:black";
-            format = "[${g.left}](fg:black)[ $user ]($style)";
-          };
-          hostname = {
-            style = "fg:yellow bg:black";
-            format = "[@$hostname ]($style)";
-          };
-          jobs = {
-            symbol = g.gear;
-            style = "fg:black bg:green";
-            format = "[${g.left}](fg:green)[ $symbol( $number) ]($style)";
-          };
           direnv = {
             disabled = false;
             symbol = "▼";
-            style = "fg:black bg:bright-yellow";
+            style = "fg:yellow bg:base02";
             loaded_msg = "";
             unloaded_msg = " not loaded";
             allowed_msg = "";
             not_allowed_msg = " not allowed";
             denied_msg = " denied";
-            format = "[${g.left}](fg:bright-yellow)[ $symbol$loaded$allowed ]($style)";
+            format = "[ $symbol$loaded$allowed]($style)";
           };
           nix_shell = {
             symbol = "${g.nixos} ";
-            style = "fg:black bg:bright-blue";
-            format = "[${g.left}](fg:bright-blue)[ $symbol$state( \\($name\\)) ]($style)";
+            style = "fg:blue bg:base02";
+            format = "[ $symbol$state( \\($name\\))]($style)";
           };
-          time = {
-            disabled = false;
-            time_format = "%T";
-            style = "fg:black bg:white";
-            format = "[${g.left}](fg:white)[ $time ]($style)";
+          jobs = {
+            symbol = g.gear;
+            style = "fg:green bg:base02";
+            format = "[ $symbol( $number)]($style)";
+          };
+          username = {
+            style_user = "fg:white bg:base02";
+            style_root = "bold fg:red bg:base02";
+            format = "[ $user]($style)";
+          };
+          hostname = {
+            style = "bold fg:${hostColour} bg:base02";
+            format = "[@](fg:white bg:base02)[$hostname]($style)";
           };
           character = {
-            success_symbol = "[❯](bold bright-green)";
-            error_symbol = "[❯](bold bright-red)";
+            success_symbol = "[❯](bold green)";
+            error_symbol = "[❯](bold red)";
           };
         };
       };
