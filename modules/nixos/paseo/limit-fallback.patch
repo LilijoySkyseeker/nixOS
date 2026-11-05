@@ -1,56 +1,5 @@
-From 1ff4345cfbab6bd083a10aaf082222bc85a8a5b8 Mon Sep 17 00:00:00 2001
-From: a <a@a>
-Date: Wed, 4 Nov 2026 17:55:45 -0800
-Subject: [PATCH] feat: continue a Claude chat on a limit-fallback profile, and
- show its API spend
-
-A profile with limitFallback: true (extending its base provider) is used
-while the base is at a usage limit: the limit callout offers to move the
-chat there in place and continue; new chats start there; chats move back
-when the limit resets, including chats whose idle runtime was collected
-(rewritten on disk, so their next load uses the base). Auto-resume after a
-limit is on unless a chat opts out. A profile with creditBudget records
-estimated spend per turn in $PASEO_HOME/credit-ledger.jsonl, shown per chat
-and per billing cycle.
----
- .../src/components/context-window-meter.tsx   |  27 +-
- .../app/src/composer/usage-limit-callout.tsx  |  53 +++-
- packages/app/src/i18n/resources/ar.ts         |   3 +
- packages/app/src/i18n/resources/en.ts         |   3 +
- packages/app/src/i18n/resources/es.ts         |   3 +
- packages/app/src/i18n/resources/fr.ts         |   3 +
- packages/app/src/i18n/resources/ja.ts         |   3 +
- packages/app/src/i18n/resources/ko.ts         |   3 +
- packages/app/src/i18n/resources/pt-BR.ts      |   3 +
- packages/app/src/i18n/resources/ru.ts         |   3 +
- packages/app/src/i18n/resources/zh-CN.ts      |   3 +
- packages/app/src/stores/session-store.ts      |   3 +-
- packages/app/src/utils/agent-snapshots.ts     |   2 +
- packages/client/src/daemon-client.ts          |  22 ++
- packages/protocol/src/agent-usage-limit.ts    |  34 +++
- packages/protocol/src/messages.ts             |  18 +-
- packages/protocol/src/provider-config.ts      |   5 +
- .../src/server/agent/agent-manager.test.ts    | 183 ++++++++++++
- .../server/src/server/agent/agent-manager.ts  | 262 +++++++++++++++++-
- .../src/server/agent/agent-projections.ts     |   5 +-
- .../src/server/agent/credit-ledger.test.ts    |  37 +++
- .../server/src/server/agent/credit-ledger.ts  |  90 ++++++
- .../src/server/agent/provider-registry.ts     |  10 +
- .../server/agent/provider-snapshot-manager.ts |   7 +-
- .../server/agent/usage-limit-resume.test.ts   |   5 +-
- .../src/server/agent/usage-limit-resume.ts    |  25 +-
- .../authorization/operation-permissions.ts    |   2 +
- packages/server/src/server/bootstrap.ts       |   2 +
- packages/server/src/server/session.ts         |   3 +
- .../agent-config/agent-config-session.ts      |  20 ++
- .../server/src/server/websocket-server.ts     |   1 +
- .../public/schemas/paseo.config.v1.json       | 136 +++++++--
- 32 files changed, 925 insertions(+), 54 deletions(-)
- create mode 100644 packages/server/src/server/agent/credit-ledger.test.ts
- create mode 100644 packages/server/src/server/agent/credit-ledger.ts
-
 diff --git a/packages/app/src/components/context-window-meter.tsx b/packages/app/src/components/context-window-meter.tsx
-index 32c739c07..f614aa6e7 100644
+index 32c739c..f614aa6 100644
 --- a/packages/app/src/components/context-window-meter.tsx
 +++ b/packages/app/src/components/context-window-meter.tsx
 @@ -3,11 +3,14 @@ import { Pressable, Text, View, useWindowDimensions } from "react-native";
@@ -107,7 +56,7 @@ index 32c739c07..f614aa6e7 100644
    const ring = (
      <ContextWindowRing
 diff --git a/packages/app/src/composer/usage-limit-callout.tsx b/packages/app/src/composer/usage-limit-callout.tsx
-index 7b6b19756..631c75f6b 100644
+index 7b6b197..631c75f 100644
 --- a/packages/app/src/composer/usage-limit-callout.tsx
 +++ b/packages/app/src/composer/usage-limit-callout.tsx
 @@ -1,11 +1,14 @@
@@ -209,7 +158,7 @@ index 7b6b19756..631c75f6b 100644
 +  button: { alignSelf: "flex-start" },
  }));
 diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
-index 4c97a4c60..3bf2abb54 100644
+index 5c566de..63d38e7 100644
 --- a/packages/app/src/i18n/resources/ar.ts
 +++ b/packages/app/src/i18n/resources/ar.ts
 @@ -254,6 +254,8 @@ export const ar: TranslationResources = {
@@ -230,7 +179,7 @@ index 4c97a4c60..3bf2abb54 100644
      accessibilityNoData: "نافذة السياق: لا توجد بيانات للسياق",
      title: "نافذة السياق",
 diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
-index 04b30360e..76d7a6b6e 100644
+index 4dd7416..ba1384c 100644
 --- a/packages/app/src/i18n/resources/en.ts
 +++ b/packages/app/src/i18n/resources/en.ts
 @@ -250,6 +250,8 @@ export const en = {
@@ -251,7 +200,7 @@ index 04b30360e..76d7a6b6e 100644
      accessibilityNoData: "Context window: No context data",
      title: "Context window",
 diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
-index ce302132a..eb4453ca6 100644
+index 762200b..c491402 100644
 --- a/packages/app/src/i18n/resources/es.ts
 +++ b/packages/app/src/i18n/resources/es.ts
 @@ -256,6 +256,8 @@ export const es: TranslationResources = {
@@ -272,7 +221,7 @@ index ce302132a..eb4453ca6 100644
      accessibilityNoData: "Ventana de contexto: No hay datos de contexto",
      title: "ventana contextual",
 diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
-index 7d6fff825..700e9f011 100644
+index b8c658b..f43ec62 100644
 --- a/packages/app/src/i18n/resources/fr.ts
 +++ b/packages/app/src/i18n/resources/fr.ts
 @@ -257,6 +257,8 @@ export const fr: TranslationResources = {
@@ -293,7 +242,7 @@ index 7d6fff825..700e9f011 100644
      accessibilityNoData: "Fenêtre de contexte : aucune donnée de contexte",
      title: "Fenêtre de contexte",
 diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
-index 9ceb6e79e..8dbf54c24 100644
+index 31f109f..1577cbc 100644
 --- a/packages/app/src/i18n/resources/ja.ts
 +++ b/packages/app/src/i18n/resources/ja.ts
 @@ -256,6 +256,8 @@ export const ja: TranslationResources = {
@@ -314,7 +263,7 @@ index 9ceb6e79e..8dbf54c24 100644
      accessibilityNoData: "コンテキストウィンドウ：コンテキストデータがありません",
      title: "コンテキストウィンドウ",
 diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
-index 5bf812b0c..feedbcb98 100644
+index 1707340..4d62ed2 100644
 --- a/packages/app/src/i18n/resources/ko.ts
 +++ b/packages/app/src/i18n/resources/ko.ts
 @@ -254,6 +254,8 @@ export const ko: TranslationResources = {
@@ -335,7 +284,7 @@ index 5bf812b0c..feedbcb98 100644
      accessibilityNoData: "컨텍스트 창: 컨텍스트 데이터 없음",
      title: "컨텍스트 윈도우",
 diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
-index d646e0df8..52a9cf7d3 100644
+index 7e91793..6381e53 100644
 --- a/packages/app/src/i18n/resources/pt-BR.ts
 +++ b/packages/app/src/i18n/resources/pt-BR.ts
 @@ -255,6 +255,8 @@ export const ptBR: TranslationResources = {
@@ -356,7 +305,7 @@ index d646e0df8..52a9cf7d3 100644
      accessibilityNoData: "Janela de contexto: sem dados de contexto",
      title: "Janela de contexto",
 diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
-index a0f36a357..4a88f1a2e 100644
+index 2ffdb4d..8002c2d 100644
 --- a/packages/app/src/i18n/resources/ru.ts
 +++ b/packages/app/src/i18n/resources/ru.ts
 @@ -256,6 +256,8 @@ export const ru: TranslationResources = {
@@ -377,7 +326,7 @@ index a0f36a357..4a88f1a2e 100644
      accessibilityNoData: "Контекстное окно: нет данных о контексте",
      title: "Контекстное окно",
 diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
-index 49aa12160..7a9beb230 100644
+index 0c01e92..f4c28fb 100644
 --- a/packages/app/src/i18n/resources/zh-CN.ts
 +++ b/packages/app/src/i18n/resources/zh-CN.ts
 @@ -254,6 +254,8 @@ export const zhCN: TranslationResources = {
@@ -398,7 +347,7 @@ index 49aa12160..7a9beb230 100644
      accessibilityNoData: "上下文窗口：暂无上下文数据",
      title: "上下文窗口",
 diff --git a/packages/app/src/stores/session-store.ts b/packages/app/src/stores/session-store.ts
-index 41531d089..490617924 100644
+index 41531d0..4906179 100644
 --- a/packages/app/src/stores/session-store.ts
 +++ b/packages/app/src/stores/session-store.ts
 @@ -1,4 +1,4 @@
@@ -416,7 +365,7 @@ index 41531d089..490617924 100644
    cwd: string;
    workspaceId?: string;
 diff --git a/packages/app/src/utils/agent-snapshots.ts b/packages/app/src/utils/agent-snapshots.ts
-index a72bbc6b0..9507abca1 100644
+index a72bbc6..9507abc 100644
 --- a/packages/app/src/utils/agent-snapshots.ts
 +++ b/packages/app/src/utils/agent-snapshots.ts
 @@ -80,6 +80,7 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
@@ -436,10 +385,10 @@ index a72bbc6b0..9507abca1 100644
      cwd: snapshot.cwd,
      workspaceId: snapshot.workspaceId,
 diff --git a/packages/client/src/daemon-client.ts b/packages/client/src/daemon-client.ts
-index ab597cef3..b64dc977b 100644
+index 490c645..a145b30 100644
 --- a/packages/client/src/daemon-client.ts
 +++ b/packages/client/src/daemon-client.ts
-@@ -3945,6 +3945,28 @@ export class DaemonClient {
+@@ -4039,6 +4039,28 @@ export class DaemonClient {
      }
    }
  
@@ -469,7 +418,7 @@ index ab597cef3..b64dc977b 100644
      const requestId = this.createRequestId();
      const message = SessionInboundMessageSchema.parse({
 diff --git a/packages/protocol/src/agent-usage-limit.ts b/packages/protocol/src/agent-usage-limit.ts
-index 1853b788c..933dd8c94 100644
+index 1853b78..933dd8c 100644
 --- a/packages/protocol/src/agent-usage-limit.ts
 +++ b/packages/protocol/src/agent-usage-limit.ts
 @@ -2,6 +2,8 @@ import { z } from "zod";
@@ -523,7 +472,7 @@ index 1853b788c..933dd8c94 100644
 +  return { start, end };
 +}
 diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
-index 44b6c9e9a..f8e4efbbb 100644
+index 9bfb300..978f430 100644
 --- a/packages/protocol/src/messages.ts
 +++ b/packages/protocol/src/messages.ts
 @@ -1,4 +1,4 @@
@@ -532,7 +481,7 @@ index 44b6c9e9a..f8e4efbbb 100644
  import { AgentMessageSchema } from "./agent-message.js";
  import {
    HostsListRequestSchema,
-@@ -875,6 +875,7 @@ export const AgentSnapshotPayloadSchema = z.object({
+@@ -885,6 +885,7 @@ export const AgentSnapshotPayloadSchema = z.object({
    lastUsage: AgentUsageSchema.optional(),
    lastError: z.string().optional(),
    usageLimit: AgentUsageLimitSchema.optional(),
@@ -540,7 +489,7 @@ index 44b6c9e9a..f8e4efbbb 100644
    title: z.string().nullable(),
    labels: z.record(z.string(), z.string()).default({}),
    requiresAttention: z.boolean().optional(),
-@@ -2001,6 +2002,18 @@ export const SetAgentModelRequestMessageSchema = z.object({
+@@ -2021,6 +2022,18 @@ export const SetAgentModelRequestMessageSchema = z.object({
    requestId: z.string(),
  });
  
@@ -559,7 +508,7 @@ index 44b6c9e9a..f8e4efbbb 100644
  export const SetAgentModelResponseMessageSchema = z.object({
    type: z.literal("set_agent_model_response"),
    payload: AgentActionResponsePayloadSchema,
-@@ -3364,6 +3377,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
+@@ -3384,6 +3397,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
    AgentForkContextRequestMessageSchema,
    SetAgentModeRequestMessageSchema,
    SetAgentModelRequestMessageSchema,
@@ -567,15 +516,15 @@ index 44b6c9e9a..f8e4efbbb 100644
    SetAgentThinkingRequestMessageSchema,
    SetAgentFeatureRequestMessageSchema,
    AgentConfigApplyRequestMessageSchema,
-@@ -3665,6 +3679,7 @@ export const ServerInfoStatusPayloadSchema = z
-         hostMultiplexing: z.boolean().optional(),
+@@ -3687,6 +3701,7 @@ export const ServerInfoStatusPayloadSchema = z
+         usageSetting: z.boolean().optional(),
          usageSources: z.boolean().optional(),
          usageLimitResume: z.boolean().optional(),
 +        limitFallback: z.boolean().optional(),
          // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
          providersSnapshotCwd: z.boolean().optional(),
          // COMPAT(directorySync): added in v0.3.x, remove gate after 2027-02-12.
-@@ -7083,6 +7098,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
+@@ -7131,6 +7146,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
    WriteProjectConfigResponseMessageSchema,
    SetAgentModeResponseMessageSchema,
    SetAgentModelResponseMessageSchema,
@@ -584,7 +533,7 @@ index 44b6c9e9a..f8e4efbbb 100644
    SetAgentFeatureResponseMessageSchema,
    AgentConfigApplyResponseMessageSchema,
 diff --git a/packages/protocol/src/provider-config.ts b/packages/protocol/src/provider-config.ts
-index c94f8ca96..e21d07ff1 100644
+index c94f8ca..e21d07f 100644
 --- a/packages/protocol/src/provider-config.ts
 +++ b/packages/protocol/src/provider-config.ts
 @@ -1,4 +1,5 @@
@@ -605,10 +554,10 @@ index c94f8ca96..e21d07ff1 100644
    description: z.string().optional(),
    command: z.array(z.string().min(1)).min(1).optional(),
 diff --git a/packages/server/src/server/agent/agent-manager.test.ts b/packages/server/src/server/agent/agent-manager.test.ts
-index 2d21bdc63..857239c26 100644
+index ccf29b1..0f35fd6 100644
 --- a/packages/server/src/server/agent/agent-manager.test.ts
 +++ b/packages/server/src/server/agent/agent-manager.test.ts
-@@ -12364,3 +12364,186 @@ test("an out-of-band command racing idle cleanup waits for the resumed runtime",
+@@ -12695,3 +12695,186 @@ test("an out-of-band command racing idle cleanup waits for the resumed runtime",
    expect(h.commands).toEqual(["/maintenance"]);
    expect(h.prompts).toEqual([]);
  });
@@ -796,7 +745,7 @@ index 2d21bdc63..857239c26 100644
 +  expect(agent.provider).toBe("claude");
 +});
 diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
-index 6793c6dc2..57f6e1872 100644
+index f859c97..a6d44a4 100644
 --- a/packages/server/src/server/agent/agent-manager.ts
 +++ b/packages/server/src/server/agent/agent-manager.ts
 @@ -4,10 +4,15 @@ import type { RuntimeCleanupCandidate } from "./idle-runtime-cleanup/index.js";
@@ -831,7 +780,7 @@ index 6793c6dc2..57f6e1872 100644
  export class AgentManagerShuttingDownError extends Error {
    constructor() {
      super("Agent manager is shutting down");
-@@ -316,6 +330,8 @@ interface AgentManagerRescueTimeouts {
+@@ -317,6 +331,8 @@ interface AgentManagerRescueTimeouts {
  interface ProviderEnabledFlag {
    enabled: boolean;
    derivedFromProviderId?: string | null;
@@ -840,7 +789,7 @@ index 6793c6dc2..57f6e1872 100644
    applyToolPolicy?: (
      config: AgentSessionConfig,
      toolPolicy: ToolPolicy | undefined,
-@@ -337,6 +353,7 @@ export interface CreateAgentOptions {
+@@ -338,6 +354,7 @@ export interface CreateAgentOptions {
  
  export interface AgentManagerOptions {
    pluginLifecycle?: PluginLifecycle;
@@ -848,7 +797,7 @@ index 6793c6dc2..57f6e1872 100644
    /** An internal workspace makes every agent created inside it internal. */
    clients?: ProviderClientMap;
    providerDefinitions?: ProviderEnabledMap;
-@@ -450,6 +467,7 @@ interface ManagedAgentBase {
+@@ -453,6 +470,7 @@ interface ManagedAgentBase {
    activeTurnId: string | null;
    activeTurnStartedAt: Date | null;
    lastUsage?: AgentUsage;
@@ -856,7 +805,7 @@ index 6793c6dc2..57f6e1872 100644
    usageLimit?: AgentUsageLimit;
    lastError?: string;
    attention: AttentionState;
-@@ -785,6 +803,9 @@ export class AgentManager {
+@@ -788,6 +806,9 @@ export class AgentManager {
    private readonly clients = new Map<AgentProvider, AgentClient>();
    private readonly providerEnabled = new Map<AgentProvider, boolean>();
    private readonly providerDefinitions = new Map<AgentProvider, ProviderEnabledFlag>();
@@ -866,7 +815,7 @@ index 6793c6dc2..57f6e1872 100644
    private readonly agents = new Map<string, LiveManagedAgent>();
    private readonly timelineStore: InMemoryAgentTimelineStore;
    private readonly providerSubagents = new ProviderSubagentStore();
-@@ -804,6 +825,7 @@ export class AgentManager {
+@@ -807,6 +828,7 @@ export class AgentManager {
    private readonly reloadedSessionCloses = new WeakMap<AgentSession, Promise<void>>();
    private readonly runtimeCleanupIdentities = new WeakMap<AgentSession, object>();
    private readonly collectingRuntimes = new Set<string>();
@@ -874,7 +823,7 @@ index 6793c6dc2..57f6e1872 100644
    private readonly lifecycleMutationTails = new Map<string, Promise<void>>();
    private readonly usageLimitResumeAttempts = new Map<string, AbortController>();
    private readonly agentStreamCoalescer: AgentStreamCoalescer;
-@@ -831,6 +853,7 @@ export class AgentManager {
+@@ -834,6 +856,7 @@ export class AgentManager {
    constructor(options: AgentManagerOptions) {
      this.pluginLifecycle = options.pluginLifecycle;
      this.pluginAgentTools = options.pluginAgentTools;
@@ -882,7 +831,7 @@ index 6793c6dc2..57f6e1872 100644
      this.timelineStore = options.timelineStore ?? new InMemoryAgentTimelineStore();
      this.idFactory = options.idFactory ?? (() => randomUUID());
      this.registry = options?.registry;
-@@ -1400,6 +1423,14 @@ export class AgentManager {
+@@ -1403,6 +1426,14 @@ export class AgentManager {
        options = { ...options, env: request.env };
      }
      await this.deleteAgentState(resolvedAgentId);
@@ -897,7 +846,7 @@ index 6793c6dc2..57f6e1872 100644
      const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
        config,
        resolvedAgentId,
-@@ -1673,7 +1704,7 @@ export class AgentManager {
+@@ -1679,7 +1710,7 @@ export class AgentManager {
    private async reloadAgentSessionInternal(
      agentId: string,
      overrides?: Partial<AgentSessionConfig>,
@@ -906,7 +855,7 @@ index 6793c6dc2..57f6e1872 100644
    ): Promise<ManagedAgent> {
      this.assertAcceptingAgentRegistrations();
      let existing = this.requireSessionAgent(agentId);
-@@ -1686,8 +1717,7 @@ export class AgentManager {
+@@ -1692,8 +1723,7 @@ export class AgentManager {
      const preservedLastUsage = existing.lastUsage;
      const preservedLastError = existing.lastError;
      const preservedAttention = existing.attention;
@@ -916,7 +865,7 @@ index 6793c6dc2..57f6e1872 100644
      const client = this.requireClient(provider);
      const refreshConfig = {
        ...existing.config,
-@@ -2620,6 +2650,188 @@ export class AgentManager {
+@@ -2628,6 +2658,188 @@ export class AgentManager {
      }
    }
  
@@ -1105,7 +1054,7 @@ index 6793c6dc2..57f6e1872 100644
    async resumeAfterUsageLimit({ agentId, expected }: ResumeAfterUsageLimitInput): Promise<void> {
      if (this.usageLimitResumeAttempts.has(agentId)) return;
      const attempt = new AbortController();
-@@ -2636,7 +2848,7 @@ export class AgentManager {
+@@ -2644,7 +2856,7 @@ export class AgentManager {
          const labels = existing ? existing.labels : record.labels;
          const limit = existing ? existing.usageLimit : record.usageLimit;
          if (
@@ -1114,7 +1063,7 @@ index 6793c6dc2..57f6e1872 100644
            limit?.resetsAt !== expected.resetsAt ||
            resumeAt === null ||
            resumeAt > Date.now() ||
-@@ -2679,7 +2891,7 @@ export class AgentManager {
+@@ -2687,7 +2899,7 @@ export class AgentManager {
        !signal.aborted &&
        this.acceptingAgentRegistrations &&
        agent &&
@@ -1123,7 +1072,7 @@ index 6793c6dc2..57f6e1872 100644
        !this.hasInFlightRun(agentId) &&
        agent.pendingPermissions.size === 0 &&
        agent.lastUserMessageAt === lastUserMessageAt,
-@@ -2777,7 +2989,7 @@ export class AgentManager {
+@@ -2785,7 +2997,7 @@ export class AgentManager {
      prompt: AgentPromptInput,
      options?: AgentRunOptions,
    ): Promise<boolean> {
@@ -1132,7 +1081,7 @@ index 6793c6dc2..57f6e1872 100644
        await this.waitForAgentClose(agentId);
        await ensureAgentLoaded(agentId, {
          agentManager: this,
-@@ -2910,6 +3122,19 @@ export class AgentManager {
+@@ -2922,6 +3134,19 @@ export class AgentManager {
      }
    }
  
@@ -1152,7 +1101,7 @@ index 6793c6dc2..57f6e1872 100644
    private async *streamAfterRuntimeCollection(
      agentId: string,
      prompt: AgentPromptInput,
-@@ -2928,10 +3153,17 @@ export class AgentManager {
+@@ -2940,10 +3165,17 @@ export class AgentManager {
      agentId: string,
      prompt: AgentPromptInput,
      options?: AgentRunOptions,
@@ -1171,7 +1120,7 @@ index 6793c6dc2..57f6e1872 100644
      this.logger.trace(
        {
          agentId,
-@@ -4833,6 +5065,7 @@ export class AgentManager {
+@@ -4878,6 +5110,7 @@ export class AgentManager {
            eventTurnId,
            isForegroundEvent,
            terminalDisposition,
@@ -1179,7 +1128,7 @@ index 6793c6dc2..57f6e1872 100644
          });
          return undefined;
        case "turn_failed":
-@@ -4926,6 +5159,7 @@ export class AgentManager {
+@@ -4971,6 +5204,7 @@ export class AgentManager {
      eventTurnId: string | undefined;
      isForegroundEvent: boolean;
      terminalDisposition: ActiveTurnTerminalDisposition;
@@ -1187,7 +1136,7 @@ index 6793c6dc2..57f6e1872 100644
    }): void {
      const { agent, event, eventTurnId, isForegroundEvent, terminalDisposition } = params;
      this.logger.trace(
-@@ -4942,6 +5176,14 @@ export class AgentManager {
+@@ -4987,6 +5221,14 @@ export class AgentManager {
      if (terminalDisposition === "stale") return;
      if (event.usage) {
        agent.lastUsage = { ...agent.lastUsage, ...event.usage };
@@ -1202,7 +1151,7 @@ index 6793c6dc2..57f6e1872 100644
      }
      // If no usage on turn_completed, keep lastUsage as-is so context window
      // data accumulated during streaming isn't lost when the provider omits
-@@ -4988,7 +5230,10 @@ export class AgentManager {
+@@ -5033,7 +5275,10 @@ export class AgentManager {
        agent.lifecycle = "error";
      }
      agent.lastError = event.error;
@@ -1214,7 +1163,7 @@ index 6793c6dc2..57f6e1872 100644
      await this.appendSystemErrorTimelineMessage(
        agent,
        event.provider,
-@@ -5296,6 +5541,7 @@ export class AgentManager {
+@@ -5341,6 +5586,7 @@ export class AgentManager {
    private emitState(agent: ManagedAgent, options?: { persist?: boolean }): void {
      // Keep attention as an edge-triggered unread signal, not a level signal.
      this.checkAndSetAttention(agent);
@@ -1223,10 +1172,10 @@ index 6793c6dc2..57f6e1872 100644
        this.enqueueBackgroundPersist(agent);
      }
 diff --git a/packages/server/src/server/agent/agent-projections.ts b/packages/server/src/server/agent/agent-projections.ts
-index 68bc07689..1a6dcf673 100644
+index 4e75d13..3908c87 100644
 --- a/packages/server/src/server/agent/agent-projections.ts
 +++ b/packages/server/src/server/agent/agent-projections.ts
-@@ -149,7 +149,8 @@ export function toAgentPayload(
+@@ -150,7 +150,8 @@ export function toAgentPayload(
      title: options?.title ?? null,
      labels: agent.labels,
      archivedAt: options?.archivedAt ?? null,
@@ -1236,7 +1185,7 @@ index 68bc07689..1a6dcf673 100644
      ...(agent.internal ? { internal: true } : {}),
    };
  
-@@ -261,7 +262,7 @@ export function buildStoredAgentPayload(
+@@ -262,7 +263,7 @@ export function buildStoredAgentPayload(
      archivedAt: record.archivedAt ?? null,
      ...(record.internal ? { internal: true } : {}),
      labels: normalizeLabels(record.labels),
@@ -1247,7 +1196,7 @@ index 68bc07689..1a6dcf673 100644
    };
 diff --git a/packages/server/src/server/agent/credit-ledger.test.ts b/packages/server/src/server/agent/credit-ledger.test.ts
 new file mode 100644
-index 000000000..fa50686dc
+index 0000000..fa50686
 --- /dev/null
 +++ b/packages/server/src/server/agent/credit-ledger.test.ts
 @@ -0,0 +1,37 @@
@@ -1290,7 +1239,7 @@ index 000000000..fa50686dc
 +});
 diff --git a/packages/server/src/server/agent/credit-ledger.ts b/packages/server/src/server/agent/credit-ledger.ts
 new file mode 100644
-index 000000000..26e8bd55b
+index 0000000..26e8bd5
 --- /dev/null
 +++ b/packages/server/src/server/agent/credit-ledger.ts
 @@ -0,0 +1,90 @@
@@ -1385,7 +1334,7 @@ index 000000000..26e8bd55b
 +  }
 +}
 diff --git a/packages/server/src/server/agent/provider-registry.ts b/packages/server/src/server/agent/provider-registry.ts
-index 0f3c39868..802d68a64 100644
+index 0f3c398..802d68a 100644
 --- a/packages/server/src/server/agent/provider-registry.ts
 +++ b/packages/server/src/server/agent/provider-registry.ts
 @@ -1,3 +1,4 @@
@@ -1431,7 +1380,7 @@ index 0f3c39868..802d68a64 100644
        createBaseClient: (logger) =>
          baseFactory(logger, mergedRuntimeSettings, {
 diff --git a/packages/server/src/server/agent/provider-snapshot-manager.ts b/packages/server/src/server/agent/provider-snapshot-manager.ts
-index b10a4f8e0..922854d91 100644
+index b10a4f8..922854d 100644
 --- a/packages/server/src/server/agent/provider-snapshot-manager.ts
 +++ b/packages/server/src/server/agent/provider-snapshot-manager.ts
 @@ -185,7 +185,10 @@ export interface AgentManagerProviderState {
@@ -1456,7 +1405,7 @@ index b10a4f8e0..922854d91 100644
        };
        if (definition.enabled) {
 diff --git a/packages/server/src/server/agent/usage-limit-resume.test.ts b/packages/server/src/server/agent/usage-limit-resume.test.ts
-index 833d870f6..a30bd38b8 100644
+index 833d870..a30bd38 100644
 --- a/packages/server/src/server/agent/usage-limit-resume.test.ts
 +++ b/packages/server/src/server/agent/usage-limit-resume.test.ts
 @@ -167,12 +167,9 @@ function resumedMessages({ manager, agentId }: UsageLimitFixture) {
@@ -1474,7 +1423,7 @@ index 833d870f6..a30bd38b8 100644
    await expect
      .poll(() => fixture.manager.getLastAssistantMessage(fixture.agentId))
 diff --git a/packages/server/src/server/agent/usage-limit-resume.ts b/packages/server/src/server/agent/usage-limit-resume.ts
-index 964858dcd..53bb51997 100644
+index 964858d..53bb519 100644
 --- a/packages/server/src/server/agent/usage-limit-resume.ts
 +++ b/packages/server/src/server/agent/usage-limit-resume.ts
 @@ -1,37 +1,50 @@
@@ -1543,7 +1492,7 @@ index 964858dcd..53bb51997 100644
        if (resumeAt === null || resumeAt > Date.now()) continue;
        try {
 diff --git a/packages/server/src/server/authorization/operation-permissions.ts b/packages/server/src/server/authorization/operation-permissions.ts
-index f7a5b1785..59a2b457b 100644
+index f7a5b17..59a2b45 100644
 --- a/packages/server/src/server/authorization/operation-permissions.ts
 +++ b/packages/server/src/server/authorization/operation-permissions.ts
 @@ -180,6 +180,7 @@ const INBOUND_PERMISSION = {
@@ -1563,10 +1512,10 @@ index f7a5b1785..59a2b457b 100644
    set_daemon_config_response: "daemon.manage",
    "speech.local_models.list.response": "daemon.read",
 diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
-index 30fd5ff93..266f130a7 100644
+index e1051bd..9e730db 100644
 --- a/packages/server/src/server/bootstrap.ts
 +++ b/packages/server/src/server/bootstrap.ts
-@@ -6,6 +6,7 @@ import {
+@@ -8,6 +8,7 @@ import {
  } from "./agent/finish-subscriptions/index.js";
  import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
  import { UsageLimitResumeService } from "./agent/usage-limit-resume.js";
@@ -1574,7 +1523,7 @@ index 30fd5ff93..266f130a7 100644
  import type { PluginRegistries } from "@getpaseo/protocol/plugin-registry";
  import { describeHookWorkspace } from "./plugins/lifecycle/index.js";
  import express from "express";
-@@ -1001,6 +1002,7 @@ export async function createPaseoDaemon(
+@@ -1015,6 +1016,7 @@ export async function createPaseoDaemon(
    const agentManager = new AgentManager({
      pluginLifecycle: pluginRuntime,
      pluginAgentTools: pluginRuntime,
@@ -1583,10 +1532,10 @@ index 30fd5ff93..266f130a7 100644
      providerDefinitions: initialAgentManagerState.providerDefinitions,
      registry: agentStorage,
 diff --git a/packages/server/src/server/session.ts b/packages/server/src/server/session.ts
-index fc5d0ec2f..1205fb571 100644
+index 8bfd1f0..df0807f 100644
 --- a/packages/server/src/server/session.ts
 +++ b/packages/server/src/server/session.ts
-@@ -1066,6 +1066,7 @@ export class Session {
+@@ -1070,6 +1070,7 @@ export class Session {
          setMode: async (agentId, modeId) =>
            (await setAgentModeCommand({ agentManager }, { agentId, modeId })).notice,
          setModel: (agentId, modelId) => agentManager.setAgentModel(agentId, modelId),
@@ -1594,7 +1543,7 @@ index fc5d0ec2f..1205fb571 100644
          setFeature: (agentId, featureId, value) =>
            agentManager.setAgentFeature(agentId, featureId, value),
          setThinking: (agentId, thinkingOptionId) =>
-@@ -2913,6 +2914,8 @@ export class Session {
+@@ -2945,6 +2946,8 @@ export class Session {
          return this.agentConfigSession.handleSetAgentModeRequest(msg);
        case "set_agent_model_request":
          return this.agentConfigSession.handleSetAgentModelRequest(msg);
@@ -1604,7 +1553,7 @@ index fc5d0ec2f..1205fb571 100644
          return this.agentConfigSession.handleSetAgentFeatureRequest(msg);
        case "set_agent_thinking_request":
 diff --git a/packages/server/src/server/session/agent-config/agent-config-session.ts b/packages/server/src/server/session/agent-config/agent-config-session.ts
-index 8cf239419..998ccdb47 100644
+index 8cf2394..998ccdb 100644
 --- a/packages/server/src/server/session/agent-config/agent-config-session.ts
 +++ b/packages/server/src/server/session/agent-config/agent-config-session.ts
 @@ -28,6 +28,7 @@ export interface AgentConfigOperations {
@@ -1642,22 +1591,22 @@ index 8cf239419..998ccdb47 100644
      msg: Extract<SessionInboundMessage, { type: "set_agent_feature_request" }>,
    ): Promise<void> {
 diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
-index ff8f51a43..f16a53803 100644
+index 1ca6980..47da383 100644
 --- a/packages/server/src/server/websocket-server.ts
 +++ b/packages/server/src/server/websocket-server.ts
-@@ -1954,6 +1954,7 @@ export class VoiceAssistantWebSocketServer {
-         relayProtectedSecurity: true,
+@@ -2010,6 +2010,7 @@ export class VoiceAssistantWebSocketServer {
+         usageSetting: true,
          usageSources: true,
          usageLimitResume: true,
 +        limitFallback: true,
          ownedSubscriptions: true,
+         binaryChunkingV1: true,
          agentRequestReceipts: true,
-         workspaceRequestReceipts: true,
 diff --git a/packages/website/public/schemas/paseo.config.v1.json b/packages/website/public/schemas/paseo.config.v1.json
-index c1c32ed20..0ddca82e6 100644
+index bae380d..4bedf8d 100644
 --- a/packages/website/public/schemas/paseo.config.v1.json
 +++ b/packages/website/public/schemas/paseo.config.v1.json
-@@ -128,7 +128,11 @@
+@@ -136,7 +136,11 @@
                  "type": "string"
                }
              },
@@ -1670,7 +1619,7 @@ index c1c32ed20..0ddca82e6 100644
              "additionalProperties": {}
            }
          },
-@@ -172,7 +176,11 @@
+@@ -180,7 +184,11 @@
                  "type": "string"
                }
              },
@@ -1683,7 +1632,7 @@ index c1c32ed20..0ddca82e6 100644
              "additionalProperties": {}
            }
          },
-@@ -283,7 +291,9 @@
+@@ -291,7 +299,9 @@
              "minLength": 1
            }
          },
@@ -1694,7 +1643,7 @@ index c1c32ed20..0ddca82e6 100644
        }
      },
      "pluginsEnabled": {
-@@ -312,7 +322,10 @@
+@@ -320,7 +330,10 @@
                  "type": "boolean"
                }
              },
@@ -1706,7 +1655,7 @@ index c1c32ed20..0ddca82e6 100644
              "additionalProperties": false
            }
          ]
-@@ -356,6 +369,27 @@
+@@ -364,6 +377,27 @@
                "extends": {
                  "type": "string"
                },
@@ -1734,7 +1683,7 @@ index c1c32ed20..0ddca82e6 100644
                "label": {
                  "type": "string"
                },
-@@ -430,11 +464,17 @@
+@@ -438,11 +472,17 @@
                              "type": "boolean"
                            }
                          },
@@ -1754,7 +1703,7 @@ index c1c32ed20..0ddca82e6 100644
                  }
                },
                "additionalModels": {
-@@ -474,11 +514,17 @@
+@@ -482,11 +522,17 @@
                              "type": "boolean"
                            }
                          },
@@ -1774,7 +1723,7 @@ index c1c32ed20..0ddca82e6 100644
                  }
                },
                "disallowedTools": {
-@@ -539,7 +585,9 @@
+@@ -553,7 +599,9 @@
                      "minLength": 1
                    }
                  },
@@ -1785,7 +1734,7 @@ index c1c32ed20..0ddca82e6 100644
                  "additionalProperties": false
                }
              }
-@@ -559,7 +607,9 @@
+@@ -573,7 +621,9 @@
                        "const": "all"
                      }
                    },
@@ -1796,7 +1745,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  },
                  {
-@@ -576,7 +626,10 @@
+@@ -590,7 +640,10 @@
                        }
                      }
                    },
@@ -1808,7 +1757,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  }
                ]
-@@ -614,7 +667,9 @@
+@@ -628,7 +681,9 @@
                        "minLength": 1
                      }
                    },
@@ -1819,7 +1768,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  },
                  {
-@@ -644,7 +699,9 @@
+@@ -658,7 +713,9 @@
                        "type": "number"
                      }
                    },
@@ -1830,7 +1779,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  }
                ]
-@@ -689,7 +746,9 @@
+@@ -703,7 +760,9 @@
                        "minLength": 1
                      }
                    },
@@ -1841,7 +1790,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  },
                  {
-@@ -719,7 +778,9 @@
+@@ -733,7 +792,9 @@
                        "type": "number"
                      }
                    },
@@ -1852,7 +1801,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  }
                ]
-@@ -755,7 +816,9 @@
+@@ -769,7 +830,9 @@
                        "type": "number"
                      }
                    },
@@ -1863,7 +1812,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  },
                  {
-@@ -782,7 +845,9 @@
+@@ -796,7 +859,9 @@
                        "minLength": 1
                      }
                    },
@@ -1874,7 +1823,7 @@ index c1c32ed20..0ddca82e6 100644
                    "additionalProperties": false
                  }
                ]
-@@ -811,22 +876,42 @@
+@@ -825,22 +890,42 @@
        "properties": {
          "level": {
            "type": "string",
@@ -1921,7 +1870,7 @@ index c1c32ed20..0ddca82e6 100644
              }
            },
            "additionalProperties": false
-@@ -836,7 +921,14 @@
+@@ -850,7 +935,14 @@
            "properties": {
              "level": {
                "type": "string",
@@ -1937,6 +1886,3 @@ index c1c32ed20..0ddca82e6 100644
              },
              "path": {
                "type": "string",
--- 
-2.56.0
-

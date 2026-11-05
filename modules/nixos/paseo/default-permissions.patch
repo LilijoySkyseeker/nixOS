@@ -1,19 +1,20 @@
+diff --git a/packages/server/src/server/agent/providers/claude/agent.ts b/packages/server/src/server/agent/providers/claude/agent.ts
+index d232185..0116b69 100644
 --- a/packages/server/src/server/agent/providers/claude/agent.ts
 +++ b/packages/server/src/server/agent/providers/claude/agent.ts
-@@ -1019,9 +1019,9 @@
+@@ -1055,9 +1055,9 @@ function claudeModeCatalog(env: NodeJS.ProcessEnv): {
    defaultModeId: PermissionMode;
  } {
    if (claudeAutoModeUnavailableOn(env)) {
 -    return { modes: DEFAULT_MODES.filter((mode) => mode.id !== "auto"), defaultModeId: "default" };
--  }
--  return { modes: DEFAULT_MODES, defaultModeId: "auto" };
 +    return { modes: DEFAULT_MODES.filter((mode) => mode.id !== "auto"), defaultModeId: "bypassPermissions" };
-+  }
+   }
+-  return { modes: DEFAULT_MODES, defaultModeId: "auto" };
 +  return { modes: DEFAULT_MODES, defaultModeId: "bypassPermissions" };
  }
  
  function coerceSessionMetadata(metadata: AgentMetadata | undefined): Partial<AgentSessionConfig> {
-@@ -2336,7 +2336,11 @@
+@@ -2436,7 +2436,11 @@ class ClaudeAgentSession implements AgentSession {
        );
      }
  
@@ -26,9 +27,11 @@
      if (this.currentMode !== "plan") {
        this.planResumeMode = this.currentMode;
      }
+diff --git a/packages/server/src/server/agent/providers/codex-app-server-agent.ts b/packages/server/src/server/agent/providers/codex-app-server-agent.ts
+index 2aecd18..bbd4742 100644
 --- a/packages/server/src/server/agent/providers/codex-app-server-agent.ts
 +++ b/packages/server/src/server/agent/providers/codex-app-server-agent.ts
-@@ -260,7 +260,7 @@
+@@ -276,7 +276,7 @@ const CODEX_MODES: AgentMode[] = [
    },
  ];
  
@@ -37,7 +40,7 @@
  
  interface CodexAppServerClientLike {
    request(method: string, params?: unknown): Promise<unknown>;
-@@ -3555,8 +3555,11 @@
+@@ -3559,8 +3559,11 @@ export class CodexAppServerAgentSession implements AgentSession {
      if (config.modeId !== undefined) {
        validateCodexMode(config.modeId);
      }
@@ -51,10 +54,10 @@
      this.providerOptions =
        validateProviderOptions("codex", CodexProviderOptionsSchema, config.providerOptions) ?? {};
      this.config = config;
-@@ -4064,6 +4067,14 @@
-   private async ensureThreadLoaded(): Promise<void> {
+@@ -4077,6 +4080,14 @@ export class CodexAppServerAgentSession implements AgentSession {
      if (!this.client || !this.currentThreadId) return;
-     const params: Record<string, unknown> = { threadId: this.currentThreadId };
+     // Paseo reads history only when it replays it; the resume response needs no turns.
+     const params: Record<string, unknown> = { threadId: this.currentThreadId, excludeTurns: true };
 +    const preset = MODE_PRESETS[this.currentMode] ?? MODE_PRESETS[DEFAULT_CODEX_MODE_ID];
 +    if (this.providerOptions.approval_policy === undefined) {
 +      params.approvalPolicy = preset.approvalPolicy;
@@ -63,10 +66,10 @@
 +      params.sandbox = preset.sandbox;
 +    }
 +    params.approvalsReviewer = preset.approvalsReviewer;
-     const developerInstructions = composeSystemPromptParts(
-       this.config.systemPrompt,
-       this.config.daemonAppendSystemPrompt,
-@@ -7413,17 +7424,15 @@
+     if (this.deps.customCodexConfig) {
+       // Resume otherwise prefers the provider stored on the thread, including
+       // the unnamespaced key emitted by earlier Paseo versions.
+@@ -7482,17 +7493,15 @@ export class CodexAppServerAgentClient implements AgentClient {
      ]);
      return {
        models,

@@ -21,6 +21,8 @@ pkgs.testers.runNixOSTest {
         localAiModule
       ];
       users.users.lilijoy.isNormalUser = true;
+      # paseo 0.15's daemon, its worker and each CLI call outgrow the default 1 GiB
+      virtualisation.memorySize = 2048;
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
       # mirror torrent: the agent jobs' schedules use it
