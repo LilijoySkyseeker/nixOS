@@ -25,6 +25,13 @@ _: {
       thinkpad = "100.95.127.26";
     };
     persistRoot = "/nix/state";
+    # root's shell state on the servers, under each host's persistence root
+    rootShellState = [
+      ".local/state/bash"
+      ".local/share/atuin"
+      ".local/share/zoxide"
+      ".local/share/direnv"
+    ];
 
     zfsRootFsOptions = {
       acltype = "posixacl";
