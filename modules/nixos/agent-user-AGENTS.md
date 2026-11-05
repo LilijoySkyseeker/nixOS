@@ -55,6 +55,8 @@ the `other-agents` skill.
   Keep it organised as you go: file things, move and rename them, fix links,
   and say what you moved. It only has to make sense to the owner and be easy
   for them to find by hand.
+  When saving or finding things for the owner (quotes and memes included),
+  read `Areas/Vault/README.md` first.
   Before researching a topic, search the vault, `Old/` included (`rg`), for an
   earlier note: use it as a dated starting source, re-check anything
   time-sensitive, and extend that note rather than writing a new one.
