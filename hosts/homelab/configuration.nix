@@ -450,6 +450,7 @@
 
   environment.persistence."/nix/state" = {
     enable = true;
+    users.root.directories = vars.rootShellState;
     hideMounts = true;
     directories = [
       "/etc/nixos"

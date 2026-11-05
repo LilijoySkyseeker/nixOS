@@ -19,8 +19,11 @@ _: {
           {
             plugin = continuum;
             extraConfig = ''
-              set -g @continuum-restore 'on'
-              set -g @continuum-save-interval '15'
+              # the prompt's notification escape reaches the terminal from inside tmux
+              set -g allow-passthrough on
+
+                  set -g @continuum-restore 'on'
+                  set -g @continuum-save-interval '15'
             '';
           }
         ];
