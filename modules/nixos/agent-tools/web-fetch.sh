@@ -40,10 +40,14 @@ blocked() {
 # the site's own origin as Referer: some serve PDFs only to their own pages
 origin=$(printf '%s' "$url" | grep -oE '^https?://[^/?#]+' || true)
 
+# Fimfiction's "View Mature": see browser-fetch.py
+site_cookie=()
+case $origin in https://www.fimfiction.net | https://fimfiction.net) site_cookie=(-b view_mature=true) ;; esac
+
 # prints "STATUS TYPE"; 000 when the transfer failed, even after a good status
 fetch() {
   local meta
-  if meta=$("$@" -sL --compressed --max-time 30 -o "$body" ${origin:+-e "$origin/"} \
+  if meta=$("$@" -sL --compressed --max-time 30 -o "$body" ${origin:+-e "$origin/"} "${site_cookie[@]}" \
     -w '%{http_code} %{content_type}' "$url"); then
     printf '%s\n' "$meta"
   else

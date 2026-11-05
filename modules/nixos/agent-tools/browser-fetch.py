@@ -190,6 +190,14 @@ async def visit(url, wait_out):
 
 
 async def fetch(browser, url, wait_out):
+    # the owner's choice: much on Fimfiction is mistagged mature, and without
+    # this its searches silently leave those stories out
+    blank = await browser.get("about:blank")
+    await blank.send(
+        uc.cdp.network.set_cookie(
+            "view_mature", "true", domain="www.fimfiction.net", path="/", secure=True
+        )
+    )
     tab = await browser.get(url)
     text = 0
     # Cloudflare's challenge can take 40s or more

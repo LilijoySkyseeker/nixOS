@@ -70,6 +70,7 @@ Routes that work where the obvious one doesn't:
 - **Fimfiction:** take whole stories from its downloads, not the pages:
   `web-fetch -o FILE https://www.fimfiction.net/story/download/<id>/txt` (or
   `html`, `epub`). Chapter pages read fine; story index pages extract badly.
+  "View Mature" is on, since much is mistagged, so results include mature stories.
 - **Tailscale:** the security bulletins page loads only its first entries;
   read `tailscale.com/changelog`.
 
