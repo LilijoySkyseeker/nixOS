@@ -1,5 +1,32 @@
 # VM test: agent-user's boundary, asserted from the agent's side
 { pkgs, agentUserModule }:
+let
+  # a one-page PDF for web-fetch's non-HTML path
+  markerPdf = pkgs.runCommand "marker-pdf" { } ''
+    mkdir $out
+    ${pkgs.python3}/bin/python3 - > $out/marker.pdf <<'PY'
+    import sys
+    text = b"BT /F1 12 Tf 10 50 Td (PDF-MARKER-9c2e) Tj ET"
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 100] /Contents 4 0 R"
+        b" /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n%s\nendstream" % (len(text), text),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out, offsets = b"%PDF-1.4\n", []
+    for n, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (n, body)
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    sys.stdout.buffer.write(out)
+    PY
+  '';
+in
 pkgs.testers.runNixOSTest {
   name = "agent-user";
 
@@ -26,6 +53,11 @@ pkgs.testers.runNixOSTest {
       pkgs.jq
     ];
     services.openssh.enable = true;
+    # serves markerPdf on loopback, which the agent may reach
+    systemd.services.pdf-server = {
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8001 --bind 127.0.0.1 --directory ${markerPdf}";
+    };
     # a fixed-output build: runs as nixbld with host networking
     environment.etc."fod.nix".text = ''
       { url }:
@@ -214,6 +246,10 @@ pkgs.testers.runNixOSTest {
         machine.succeed(as_agent("command -v web-fetch"))
         rc, out = machine.execute(as_agent("web-fetch 2>&1"))
         assert rc == 2 and "usage: web-fetch" in out, f"web-fetch usage: rc={rc} {out!r}"
+        # a PDF comes back as its text from the curl tier, not sent to the browser
+        machine.wait_for_open_port(8001)
+        rc, out = machine.execute(as_agent("web-fetch http://127.0.0.1:8001/marker.pdf 2>&1"))
+        assert rc == 0 and "PDF-MARKER-9c2e" in out and "web-fetch: curl" in out, f"web-fetch PDF: rc={rc} {out!r}"
         # account-level tools stay out: remote session/routine tools would run
         # cloud work with the user's GitHub App and connectors
         machine.wait_for_unit("claude-agent-settings.service")
@@ -260,6 +296,8 @@ pkgs.testers.runNixOSTest {
         email = machine.succeed(as_agent("git config user.email")).strip()
         assert name == "LilijoySkyseeker-agent", f"user.name: {name!r}"
         assert email == "338765425+LilijoySkyseeker-agent@users.noreply.github.com", f"user.email: {email!r}"
+        hooks = machine.succeed(as_agent("git hook list prepare-commit-msg"))
+        assert "agent-trailer" in hooks, f"the commit trailer hook isn't declared: {hooks!r}"
 
     with subtest("agent-setup --check"):
         rc, out = machine.execute(as_agent("agent-setup --check 2>&1"))

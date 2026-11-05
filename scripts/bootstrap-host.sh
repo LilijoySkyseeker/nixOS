@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installs or reinstalls a host via nixos-anywhere, breaking the
-# sops/tailscale chicken-and-egg: pre-generates the host's SSH host
-# key, enrolls its age key in .sops.yaml, and re-encrypts secrets
-# before the box ever boots, so sops-nix can decrypt on first boot.
-#
-# Usage: scripts/bootstrap-host.sh <host> <target-ip|--vm-test> [--persist-root <path>] [-y|--yes] [-- <extra nixos-anywhere args>]
-#
 # --persist-root is required for impermanence hosts (e.g. vps's
 # /persist): with root on tmpfs, a host key written to plain /etc/ssh
 # vanishes on the very first real boot. It must land wherever the
 # host's `environment.persistence."<path>"` module reads it from —
 # check the host's configuration.nix if unsure.
-#
-# Pass --vm-test instead of a target IP to exercise the real disko +
-# extra-files/--persist-root placement in a throwaway local VM before
-# touching any real target — no SSH, no .sops.yaml/secrets.yaml
-# changes, no confirmation prompt.
 #
 # -y/--yes skips the "this will WIPE ..." confirmation prompt, for
 # scripted/backgrounded invocations. Piping a "y" into stdin instead is
@@ -25,16 +13,6 @@ set -euo pipefail
 # `&` can leave `read` seeing EOF regardless of what was piped in
 # (confirmed live), which aborts the whole script under `set -e`
 # without ever showing the prompt.
-#
-# kexec needs genuinely free, kernel-pinned physical RAM for the new
-# kernel+initrd -- confirmed live (twice) that a tiny/RAM-constrained
-# target can OOM-kill it even with swap added, since swap only helps
-# reclaim swappable pages and kexec's own allocation isn't one. Refuses
-# to proceed against a real target with less than MIN_MEM_MB total RAM
-# (see below) rather than run headlong into the same OOM again --
-# resize the target up for more real RAM before installing if it's
-# tight, then back down after. See docs/procedures/new-host.md and
-# hosts/vps/README.md.
 #
 # Example (DigitalOcean, impermanence, needs --kexec-extra-flags -c):
 #   scripts/bootstrap-host.sh vps 164.90.1.2 --persist-root /persist -- --kexec-extra-flags -c

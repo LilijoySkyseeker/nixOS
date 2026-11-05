@@ -49,8 +49,7 @@
 
   virtualisation.oci-containers.backend = "docker";
 
-  # container uid 0 != host uid 0; per-path uid migrations live in
-  # modules/services/minecraft.nix next to its path
+  # container uid 0 != host uid 0
   myDockerUserns.enable = true;
 
   time.timeZone = "America/Los_Angeles";
@@ -255,28 +254,26 @@
         "zdata/storage/storage"
         "zdata/storage/storage-bulk"
         "zroot/local/state"
-      ]
-      ++ config.myDatasetsReplicated;
+      ];
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
-
-    preserveLegacySnapshots = false;
   };
 
   systemd.enableEmergencyMode = false;
 
+  # accounts are only what this config declares; `passwd` or `useradd` here does not outlive a switch
+  users.mutableUsers = false;
+
   networking.hostName = "homelab";
 
-  # weekly deploy of master, servers first: homelab Tue, vps Wed, PCs Thu,
-  # so an update that breaks the servers hasn't yet reached the PCs used
-  # to fix them. homelab is slow to build, hence a day each.
+  # nightly deploy of master; vps follows homelab's revision, so homelab
+  # goes first (03:00) and vps after it (04:00)
   myPullDeploy = {
     enable = true;
     hostAttr = "homelab";
-    dates = "Tue 03:00";
+    dates = "03:00";
     operation = "switch";
-    autoReboot = true;
     # the weekly restic->Backblaze run can take days (~2.9TiB), and a switch
     # restarts any changed unit, so defer rather than kill it
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
@@ -291,8 +288,10 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
-    dates = "Wed 03:00";
+    dates = "04:00";
   };
+  # a homelab deploy still running at 04:00 holds vps's push until it ends
+  systemd.services.push-deploy-vps.after = [ "pull-deploy.service" ];
   # heartbeat: check in with vps every 5m through the deploy key's
   # dispatcher. vps alerts when homelab goes silent; vps-ok below goes stale
   # when vps does. own known_hosts in the state dir: ProtectHome hides /root
@@ -334,14 +333,13 @@
   };
 
   # no catch-up run at boot after an outage: it would contend with zrepl's
-  # own post-boot catch-up replication; next week's run is soon enough
+  # own post-boot catch-up replication; the next night's run is soon enough
   systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
   systemd.timers.push-deploy-vps.timerConfig.Persistent = lib.mkForce false;
 
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
-    interval = "*:0/15";
     # hours; zrepl replicates every 15m
     backupStaleness = {
       "zbackup/backup/homelab/zdata/storage/storage" = 6;
@@ -360,7 +358,7 @@
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
       # a failed deploy pages via the failed-units check; these catch one
       # that stops running or keeps deferring (restic). 504h = 21 days:
-      # weekly deploys, plus room for a restic deferral and a week of slack
+      # room for a restic run of days, which defers every night's deploy
       "/var/lib/pull-deploy/deployed" = 504;
       "/var/lib/push-deploy/deployed-vps" = 504;
       # mtime is the deployed nixpkgs' date: no input update has reached
@@ -382,6 +380,7 @@
     enable = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
+    settings.PermitRootLogin = "prohibit-password";
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -425,19 +424,8 @@
 
   # a new entry needs a manual zfs create on the live host before deploy
   myDatasets = {
-    # managePersistence = false: entries already exist elsewhere
-    # (jellyfin.nix's cacheDir, the /var/lib/docker line below)
-    # no owner/group either, they'd have no effect
-    "zroot/persist/jellyfin-cache" = {
-      tier = "persist";
-      mountpoint = config.services.jellyfin.cacheDir;
-      managePersistence = false;
-    };
-    "zroot/persist/docker" = {
-      tier = "persist";
-      mountpoint = "/var/lib/docker";
-      managePersistence = false;
-    };
+    "zroot/persist/jellyfin-cache".mountpoint = config.services.jellyfin.cacheDir;
+    "zroot/persist/docker".mountpoint = "/var/lib/docker";
   };
 
   fileSystems."/nix/state".neededForBoot = true;

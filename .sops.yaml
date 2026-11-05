@@ -8,8 +8,7 @@ keys:
   - &homelab3 age18t8txucgt02y3c0p8c2m2gmmqvs9zkvp0uzmtmmac6ezewjs8shq9h73ad
   - &torrent-age age1gsmfmtvd97d9x52d2hpgx5qppna5admpf6ch5l0hcn58cv7dp5ws9fhu2t
   # pre-generated vps host key, enrolled before install so sops works
-  # on first boot — see hosts/vps/README.md step 1. Rotated 2026-08-25
-  # for the post-brick reinstall (old key's droplet was destroyed).
+  # on first boot — see hosts/vps/README.md step 1.
   - &vps age13y33z6n68r0f96p3ts4mqr4zvvlfxsxp8wtu025zqacmgc42l9kq7qegc8
   # YubiKey PIV identities (age-plugin-yubikey): a way back in that doesn't
   # depend on any host. `age-plugin-yubikey --identity` rebuilds the
@@ -28,7 +27,7 @@ creation_rules:
         - *thinkpad-ssh
         - *yubikey-keychain
         - *yubikey-torrent
-  - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: secrets/[^/]+\.yaml$
     key_groups:
       - age:
         - *nixos-thinkpad

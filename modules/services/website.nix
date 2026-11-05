@@ -30,9 +30,6 @@ in
       # caddy: the public site, ACME through the vps's 80/443 DNAT
       services.caddy = {
         enable = true;
-        # Go 1.27: stable's go 1.26.8 lacks 1.26.9's net/http and net/textproto fixes
-        # TODO: drop when NixOS/nixpkgs#571809 (go 1.26.9) is in nixos-26.05
-        package = pkgs-stable.caddy.override { buildGoModule = pkgs-stable.buildGo127Module; };
         # no HTTP/3: the vps doesn't forward UDP 443
         # no HTTP/2: caddy 2.11.7's vendored x/net 0.59 has the HTTP/2 server DoS bugs
         # TODO: drop when a caddy release with caddyserver/caddy#8179 (x/net 0.60) is in nixos-26.05, and restore h2
@@ -46,6 +43,7 @@ in
         virtualHosts.${domain}.extraConfig = ''
           bind ${wgAddress}
           encode zstd gzip
+          header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
           # written by website-status, read by the page's status stickers
           handle /status.json {
             root * ${statusDir}
@@ -225,6 +223,17 @@ in
           StateDirectory = "website-status";
           # caddy serves status.json from here
           StateDirectoryMode = "0755";
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          PrivateNetwork = true;
+          ProtectSystem = "strict";
+          ReadWritePaths = [ statusDir ];
+          ProtectHome = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectKernelLogs = true;
+          ProtectControlGroups = true;
+          RestrictNamespaces = true;
         };
       };
       systemd.timers.website-status = {

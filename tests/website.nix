@@ -126,6 +126,9 @@ pkgs.testers.runNixOSTest {
         assert "lid-home-page" in get("/")
         assert "lid-projects-page" in get("/projects/")
 
+    with subtest("the site sends its Content-Security-Policy"):
+        assert "content-security-policy: default-src 'self'" in get("/").lower()
+
     with subtest("a missing page gets the site's own 404"):
         r = get("/nope/")
         assert r.startswith("HTTP/1.1 404"), r

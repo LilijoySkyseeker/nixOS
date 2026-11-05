@@ -2,17 +2,18 @@
 # out a JavaScript challenge, and print the final HTML; exits 1 when no
 # page loaded or the one that did is an HTTP error
 import asyncio
+import re
 import sys
 import tempfile
 
 import nodriver as uc
 
-CHALLENGE = (
-    "just a moment",
-    "attention required",
-    "please wait",
-    "verifying",
-    "temporarily unavailable",
+# keep in step with web-fetch.sh's blocked()
+CHALLENGE = re.compile(
+    r"just a moment|attention required|please wait|verifying( you|\.\.\.|…)"
+    r"|temporarily unavailable|prove your humanity|making sure you.{0,8}not a bot"
+    r"|client challenge|checking your browser|checking if the site",
+    re.IGNORECASE,
 )
 
 
@@ -52,12 +53,12 @@ async def fetch(browser, url):
             title
             and ready == "complete"
             and (text or 0) > 200
-            and not any(c in title.lower() for c in CHALLENGE)
+            and not CHALLENGE.search(title)
         ):
             break
     # out of time on a challenge, untitled, or still loading: not the
     # page (a real but short page still passes)
-    if not title or ready != "complete" or any(c in title.lower() for c in CHALLENGE):
+    if not title or ready != "complete" or CHALLENGE.search(title):
         print(f"browser-fetch: unresolved ({title!r}, {ready})", file=sys.stderr)
         sys.exit(1)
     # the status of the document that finally loaded, after any

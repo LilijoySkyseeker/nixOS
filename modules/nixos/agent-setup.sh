@@ -91,14 +91,15 @@ fix_codex_cold() {
 chk_collab() {
   local repo
   for repo in $BOT_REPOS; do
-    as_user gh api "repos/$OWNER/$repo/collaborators/$BOT" >/dev/null 2>&1 || return 1
+    [ "$(as_agent gh api "repos/$OWNER/$repo" -q .permissions.push 2>/dev/null)" = true ] || return 1
   done
 }
 
 chk_protection() {
   local n
-  n=$(as_user gh api "repos/$OWNER/nixOS/branches/master/protection" \
-    -q '.required_pull_request_reviews.required_approving_review_count' 2>/dev/null) || return 1
+  # master is protected by a ruleset, which the classic protection endpoint doesn't show
+  n=$(as_agent gh api "repos/$OWNER/nixOS/rules/branches/master" \
+    -q '[.[] | select(.type == "pull_request") | .parameters.required_approving_review_count] | max // 0' 2>/dev/null) || return 1
   [ "${n:-0}" -ge 1 ]
 }
 
@@ -117,7 +118,7 @@ item "Claude login and workspace trust" chk_claude "run claude once in ~agent/wo
 item "codex logged in" chk_codex_login "log the agent's codex in with your ChatGPT account" fix_codex_login
 item "cold codex logged in" chk_codex_cold "log the cold-read codex in with your ChatGPT account" fix_codex_cold
 item "bot is a collaborator on: $BOT_REPOS" chk_collab "invite $BOT in each repo's Settings → Collaborators" ""
-item "nixOS master needs a PR + review" chk_protection "Settings → Branches → protect master (1 approval, admin bypass on)" ""
+item "nixOS master needs a PR + review" chk_protection "Settings → Rules → Rulesets: a ruleset on master needing a PR with 1 approval, admin bypass on" ""
 
 if [ "$failed" -eq 0 ]; then
   echo "all good"

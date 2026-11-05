@@ -27,7 +27,7 @@ _: {
 
       programs.git = {
         enable = true;
-        # sops template rendered here by profiles/PC.nix / profiles/server.nix
+        # sops template rendered here by nixos/desktop-user.nix
         includes = [ { path = "${config.home.homeDirectory}/.config/git/identity"; } ];
       };
 

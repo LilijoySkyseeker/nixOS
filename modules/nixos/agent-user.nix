@@ -1,7 +1,12 @@
 # agent-user: unprivileged `agent` user on torrent for prompt-free agent work
 {
   flake.modules.nixos."agent-user" =
-    { lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       bot = "LilijoySkyseeker-agent";
       # every agent harness: where it reads user-level instructions and
@@ -77,6 +82,7 @@
           fetchCurl
           fetchCurlImpersonate
           pkgs.xvfb-run
+          pkgs.poppler-utils
           (pkgs.writeShellScriptBin "browser-fetch" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium
           '')
@@ -89,6 +95,19 @@
         ];
         text = builtins.readFile ./agent-tools/web-fetch.sh;
       };
+      # a config hook, not core.hooksPath: repos keep their own hooks, and it
+      # still runs where a repo sets core.hooksPath (nixOS). paseo comes from
+      # the caller's PATH, like every agent session's
+      commitTrailer = pkgs.writeShellApplication {
+        name = "agent-commit-trailer";
+        bashOptions = [ ];
+        runtimeInputs = with pkgs; [
+          coreutils
+          gnugrep
+          jq
+        ];
+        text = builtins.readFile ./agent-tools/commit-trailer.sh;
+      };
       # git identity: the bot's noreply address (its public GitHub id); gh
       # from PATH as the credential helper, since `gh auth setup-git` writes a
       # store path that the GC later removes
@@ -99,14 +118,24 @@
         [credential "https://github.com"]
           helper =
           helper = !gh auth git-credential
+        [hook "agent-trailer"]
+          event = prepare-commit-msg
+          command = ${lib.getExe commitTrailer}
       '';
       # trust the nixOS repo's .envrc in every clone and worktree of it
       # (a string prefix: nixOS-* matches too), so each new worktree has its
-      # dev shell and hook tools without a `direnv allow`
-      direnvConfig = pkgs.writeText "agent-direnv.toml" ''
-        [whitelist]
-        prefix = [ "/home/agent/work/repos/nixOS" ]
-      '';
+      # dev shell and hook tools without a `direnv allow`. The system sets
+      # DIRENV_CONFIG=/etc/direnv, so ~/.config/direnv is never read: the agent
+      # gets its own config dir, with nix-direnv as /etc/direnv has it
+      direnvConfig = pkgs.linkFarm "agent-direnv" {
+        "direnv.toml" = pkgs.writeText "agent-direnv.toml" ''
+          [whitelist]
+          prefix = [ "/home/agent/work/repos/nixOS" ]
+        '';
+        direnvrc = pkgs.writeText "agent-direnvrc" ''
+          source ${config.programs.direnv.nix-direnv.package}/share/nix-direnv/direnvrc
+        '';
+      };
       # git's user-wide ignore file: local notes stay out of every repo
       gitIgnore = pkgs.writeText "agent-git-ignore" ''
         AGENTS.local.md
@@ -234,6 +263,11 @@
 
       # nix daemon access, not trusted-users
       environment.systemPackages = [ agentSetup ];
+
+      # after /etc/set-environment's DIRENV_CONFIG, for the agent's shells only
+      environment.extraInit = ''
+        if [ "$(id -un)" = agent ]; then export DIRENV_CONFIG=${direnvConfig}; fi
+      '';
 
       nix.settings.allowed-users = [ "agent" ];
 
@@ -407,8 +441,6 @@
           "d /home/agent/.config/git 0700 agent agent -"
           "L+ /home/agent/.config/git/config - - - - ${gitIdentity}"
           "L+ /home/agent/.config/git/ignore - - - - ${gitIgnore}"
-          "d /home/agent/.config/direnv 0700 agent agent -"
-          "L+ /home/agent/.config/direnv/direnv.toml - - - - ${direnvConfig}"
           "d /home/agent/.codex 0700 agent agent -"
           # codex's user skill directory lives under it
           "d /home/agent/.agents 0755 agent agent -"

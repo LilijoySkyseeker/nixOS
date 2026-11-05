@@ -13,8 +13,7 @@
   myPullDeploy = {
     enable = true;
     hostAttr = "torrent";
-    dates = "Thu 03:00";
-    autoReboot = false;
+    dates = "03:00";
     operation = "boot";
   };
 
@@ -50,7 +49,6 @@
   # delete backup history. the local snap job prunes even if homelab is away
   myZrepl = {
     enable = true;
-    preserveLegacySnapshots = false;
     serve = {
       enable = true;
       datasets = [
@@ -86,15 +84,6 @@
     };
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
-
-  myZfsSpaceGuard = {
-    enable = true;
-    datasets = [
-      "zroot/local/home"
-      "zroot/local/root"
-      "zroot/local/models"
-    ];
-  };
 
   # backup restore-test canaries: content must match homelab's
   # myBackupRestoreTest.zbackup.targets byte for byte
@@ -139,9 +128,9 @@
     # the fleet-wide smartd already reaches a human via the graphical session
     checkSmart = false;
     # a pull-deploy that stops running; a failed one pages as a failed
-    # unit. 504h = 21 days, weekly deploys plus two weeks of slack
+    # unit. 72h: three nightly deploys missed
     staleMarkerFiles = {
-      "/var/lib/pull-deploy/deployed" = 504;
+      "/var/lib/pull-deploy/deployed" = 72;
     };
   };
 }

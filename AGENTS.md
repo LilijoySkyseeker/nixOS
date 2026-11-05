@@ -30,11 +30,11 @@ sets `core.hooksPath` so the git hooks run.
   never on the target (`vps` can run out of memory building its own
   closure). See `docs/procedures/new-host.md`.
 - **Security review:** a change that touches firewall rules, open ports,
-  secrets wiring, authentication, or adds or exposes a service gets
-  a security review before the PR opens (Claude's `/security-review`),
-  and in parallel a
-  review of the branch against `master` by an agent of another model
-  family, started with `paseo run` (the `other-agents` skill).
+  secrets wiring, authentication, or adds or exposes a service counts as
+  sensitive, so it gets the review in the `other-agents` skill. The brief
+  names `~/research/Fleet/Security.md` to read first: what the fleet is
+  exposed to today and the risks the owner accepted (private, in the
+  vault; the daily update run keeps it).
 
 ## Git and PRs
 

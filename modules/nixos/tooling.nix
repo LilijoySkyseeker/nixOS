@@ -1,7 +1,9 @@
 _: {
   flake.modules.nixos.tooling =
-    { lib, ... }:
+    { lib, inputs, ... }:
     {
+      imports = [ inputs.nvf.nixosModules.default ];
+
       environment.shellAliases = lib.mkForce { }; # clear NixOS's default aliases; ours live in home-manager
 
       programs.nvf = {

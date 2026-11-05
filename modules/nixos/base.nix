@@ -5,7 +5,7 @@ let
   debugTools = config.flake.debugTools;
 in
 {
-  flake.modules.nixos."profile-default" =
+  flake.modules.nixos.base =
     {
       config,
       pkgs-unstable,
@@ -162,6 +162,8 @@ in
       programs.command-not-found.enable = false;
 
       environment.defaultPackages = lib.mkForce [ ];
+
+      networking.firewall.enable = true;
 
       nix.settings.experimental-features = [
         "nix-command"

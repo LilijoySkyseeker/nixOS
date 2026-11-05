@@ -18,15 +18,6 @@ in
         }
       ];
 
-      # docker userns-remap ownership migration; 1000 is itzg's baked-in uid
-      myDockerUserns.migrations = [
-        {
-          path = "/srv/minecraft/vanilla-plus";
-          uid = 1000;
-          gid = 1000;
-        }
-      ];
-
       virtualisation.oci-containers.containers.minecraft-vanilla-plus = {
         autoStart = true;
         image = "itzg/minecraft-server";

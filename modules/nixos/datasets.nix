@@ -1,8 +1,3 @@
-# myDatasets: the per-service ZFS dataset registry.
-#
-# one entry, keyed by full dataset name, generates the disko entry, the ZFS
-# properties (via myZfsDatasetProperties) and, unless already persisted, the
-# environment.persistence entry. `tier` has no default on purpose
 _: {
   flake.modules.nixos."datasets" =
     {
@@ -13,15 +8,6 @@ _: {
     }:
     let
       cfg = config.myDatasets;
-
-      # com.sun:auto-snapshot follows from the tier alone;
-      # other per-dataset properties stay plain myZfsDatasetProperties entries
-      tierAutoSnapshot = {
-        offsite = "true";
-        onsite = "true";
-        persist = "false";
-        volatile = "false";
-      };
 
       poolOf = name: builtins.head (lib.splitString "/" name);
       relOf = name: lib.concatStringsSep "/" (lib.tail (lib.splitString "/" name));
@@ -34,28 +20,12 @@ _: {
           ds.mountpoint
         else
           "${vars.persistRoot}${ds.mountpoint}";
-
-      needsPersistenceEntry = ds: ds.managePersistence && diskoMountpoint ds != ds.mountpoint;
-
-      datasetSubmodule =
-        { config, ... }:
-        {
-          options = {
-            tier = lib.mkOption {
-              type = lib.types.enum [
-                "offsite"
-                "onsite"
-                "persist"
-                "volatile"
-              ];
-              description = ''
-                Protection tier.
-                No default on purpose: an eval-time error is safer than a
-                dataset silently getting a policy nobody chose.
-              '';
-            };
-
-            mountpoint = lib.mkOption {
+    in
+    {
+      options.myDatasets = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options.mountpoint = lib.mkOption {
               type = lib.types.str;
               description = ''
                 Absolute path the service actually reads/writes.
@@ -68,98 +38,28 @@ _: {
                 find it.
               '';
             };
-
-            owner = lib.mkOption {
-              type = lib.types.str;
-              default = "root";
-              description = "User owning this dataset's generated persistence entry, if any.";
-            };
-
-            group = lib.mkOption {
-              type = lib.types.str;
-              default = config.owner;
-              defaultText = lib.literalExpression "config.owner";
-              description = "Group owning this dataset's generated persistence entry, if any.";
-            };
-
-            managePersistence = lib.mkOption {
-              type = lib.types.bool;
-              default = true;
-              description = ''
-                Generate an environment.persistence directory entry for
-                this dataset. Turn off when a service module already
-                declares its own entry for this exact path -- e.g.
-                modules/services/jellyfin.nix's cacheDir -- so the
-                registry doesn't add a second, conflicting one. Service
-                modules stay tier-unaware either way; this only controls
-                who owns the persistence declaration.
-              '';
-            };
-          };
-        };
-    in
-    {
-      options.myDatasets = lib.mkOption {
-        type = lib.types.attrsOf (lib.types.submodule datasetSubmodule);
+          }
+        );
         default = { };
-        example = {
-          "zroot/persist/myservice" = {
-            tier = "persist";
-            mountpoint = "/nix/state/myservice";
-            owner = "myservice";
-          };
-        };
         description = ''
           Per-service ZFS dataset registry -- one entry per dataset,
           keyed by its full name.
         '';
       };
 
-      # every onsite/offsite myDatasets entry, "<"-suffixed for zrepl
-      # recursion; each host feeds it into its own zrepl role
-      options.myDatasetsReplicated = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = map (name: "${name}<") (
-          lib.attrNames (lib.filterAttrs (_: ds: ds.tier == "onsite" || ds.tier == "offsite") cfg)
-        );
-        defaultText = lib.literalExpression ''every "onsite"/"offsite" myDatasets entry, "<"-suffixed for zrepl recursion'';
-        description = ''
-          Dataset names of every `onsite`/`offsite` myDatasets entry, each
-          suffixed with zrepl's recursive "<" marker -- feed this into
-          whichever zrepl role (`myZrepl.local.datasets`,
-          `myZrepl.serve.datasets`, ...) covers this host's own datasets.
-        '';
-      };
-
-      # NB: this attrset's top-level shape (disko/myZfsDatasetProperties/
-      # environment) must stay static regardless of `cfg` -- only the
-      # *values* depend on it, lazily, or evaluation hits infinite recursion
+      # NB: this attrset's top-level shape (disko) must stay static
+      # regardless of `cfg` -- only the *values* depend on it, lazily, or
+      # evaluation hits infinite recursion
       config = lib.mkIf (cfg != { }) {
-        myZfsDatasetProperties = lib.mapAttrs (_: ds: {
-          "com.sun:auto-snapshot" = tierAutoSnapshot.${ds.tier};
-        }) cfg;
-
         disko.devices.zpool = lib.foldl' (
           acc: name:
-          let
-            ds = cfg.${name};
-            pool = poolOf name;
-            rel = relOf name;
-          in
           lib.recursiveUpdate acc {
-            ${pool}.datasets.${rel} = {
+            ${poolOf name}.datasets.${relOf name} = {
               type = "zfs_fs";
-              mountpoint = diskoMountpoint ds;
-              options = vars.zfsProps config pool rel;
+              mountpoint = diskoMountpoint cfg.${name};
             };
           }
         ) { } (lib.attrNames cfg);
-
-        environment.persistence.${vars.persistRoot}.directories = lib.mapAttrsToList (_: ds: {
-          directory = ds.mountpoint;
-          user = ds.owner;
-          inherit (ds) group;
-        }) (lib.filterAttrs (_: needsPersistenceEntry) cfg);
       };
     };
 }
