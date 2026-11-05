@@ -45,9 +45,15 @@ conversation at each start, then the agent's answers, the kinds of steps it take
 and permission tool names.
 
 Only the user's speech can start work: the daemon refuses a hand-off unless
-GPT-Live recognised the user's words in the last 20 seconds, because text the agent
-read reaches the voice as context. Voice mode is on unless switched off in
-Settings > Voice, which also closes a running session.
+GPT-Live recognised the user's words in the last 20 seconds, and each stretch of
+speech allows one, because text the agent read reaches the voice as context. This
+checks that the user spoke, not what they said: an instruction hidden in a page the
+agent read could still get through if the voice follows it just after the user
+speaks. Approving each hand-off would close that, and was turned down because it
+breaks the conversation (owner, 2026-11-05).
+
+Voice mode is on unless switched off in Settings > Voice, which also closes a
+running session.
 
 Cost: GPT-Live bills about $0.05 per minute while voice is on, plus the hand-off
 model (`gpt-6-luna`) and the agent's own usage. Settings > Voice has **Close when
