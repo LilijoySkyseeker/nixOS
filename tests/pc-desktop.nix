@@ -1,7 +1,8 @@
 # VM test: the PCs' desktop session starts whole: profile-pc (with
 # lilijoy's Home Manager, Stylix and KDE), logged in through SDDM.
 # Plasma's shell, KWin and the polkit agent run and stay up, none of them
-# logs a QML module or type it can't load. A build can't show any of this.
+# logs a QML module or type it can't load. KDE Connect's daemon runs without
+# any of its code in the shell. A build can't show any of this.
 {
   pkgs,
   specialArgs,
@@ -58,6 +59,15 @@ pkgs.testers.runNixOSTest {
         bad = [l for l in log.splitlines()
                if re.search(r'module "[^"]+" is not installed|Type \S+ unavailable', l)]
         assert not bad, "QML load errors in the session:\n" + "\n".join(bad[:20])
+
+    with subtest("KDE Connect runs, and none of it is loaded into the shell"):
+        machine.wait_until_succeeds("pgrep -u lilijoy -f kdeconnectd", timeout=120)
+        machine.wait_until_succeeds("pgrep -u lilijoy -f kdeconnect-indicator", timeout=120)
+        machine.succeed(
+            "runuser -u lilijoy -- env DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus "
+            "kdeconnect-cli --list-available"
+        )
+        machine.fail("grep -i kdeconnect /proc/$(pgrep -o -u lilijoy plasmashell)/maps")
 
     machine.screenshot("desktop")
   '';

@@ -22,6 +22,23 @@ in
       enable = true;
     };
 
+    # the tray widget reads the daemon over blocking D-Bus on Plasma's main thread,
+    # which froze the panel; the indicator and the daemon stay
+    # TODO: drop when KDE bug 527798 is fixed in kdeconnect-kde
+    nixpkgs.overlays = [
+      (_: prev: {
+        kdePackages = prev.kdePackages.overrideScope (
+          _: kprev: {
+            kdeconnect-kde = kprev.kdeconnect-kde.overrideAttrs (old: {
+              postInstall = (old.postInstall or "") + ''
+                rm -r "$out/share/plasma/plasmoids/org.kde.kdeconnect"
+              '';
+            });
+          }
+        );
+      })
+    ];
+
     # scope kde connect to the tailnet: its module opens 1714-1764 host-wide with
     # no openFirewall toggle, so force the host-wide lists empty and re-add per interface
     # mkForce empties the *whole* list: a range another module adds vanishes silently;
