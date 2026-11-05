@@ -213,6 +213,7 @@ in
 
   environment.persistence."/persist" = {
     enable = true;
+    users.root.directories = vars.rootShellState;
     directories = [
       "/var/log"
       "/var/lib/nixos" # avoids uid/gid complaints on reboot
