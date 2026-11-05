@@ -14,7 +14,8 @@ Cloudflare's checkbox. The browser tier keeps one profile in
 `~/.cache/web-fetch`, so clearance cookies and Google's trust last, and takes
 one page at a time across all agents: expect to queue behind another.
 
-- `--html` prints the raw page; `-o FILE` saves a PDF or other file.
+- `--html` prints the raw page; `-o FILE` saves a PDF or other file, through
+  the browser's cookies if the curl tiers are walled.
 - Save long pages to a file rather than printing them whole.
 - `web-fetch --feed URL` prints an RSS or Atom feed's entries, dated and
   linked. Given a site's page, it finds the feed the page links to. For
@@ -66,6 +67,10 @@ Routes that work where the obvious one doesn't:
   (`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi`).
 - **PDFs:** WebFetch returns them as binary; save them with
   `web-fetch -o` and run `pdftotext`.
+- **Fimfiction:** take whole stories from its downloads, not the pages:
+  `web-fetch -o FILE https://www.fimfiction.net/story/download/<id>/txt` (or
+  `html`, `epub`). Chapter pages read fine; story index pages extract badly.
+  "View Mature" is on, since much is mistagged, so results include mature stories.
 - **Tailscale:** the security bulletins page loads only its first entries;
   read `tailscale.com/changelog`.
 
