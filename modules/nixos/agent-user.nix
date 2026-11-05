@@ -84,7 +84,7 @@
           pkgs.xvfb-run
           pkgs.poppler-utils
           (pkgs.writeShellScriptBin "browser-fetch" ''
-            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium
+            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool
           '')
           (pkgs.writeShellScriptBin "extract-text" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
