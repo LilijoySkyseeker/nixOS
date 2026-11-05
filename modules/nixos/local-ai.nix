@@ -22,8 +22,20 @@ _: {
           ./paseo/default-permissions.patch
           # TODO: drop when https://github.com/getpaseo/paseo/issues/3248 is fixed
           ./paseo/cli-notify.patch
+          # TODO: drop when getpaseo/paseo#7193 is in the packaged Paseo
+          ./paseo/usage-limit-resume.patch
+          # a limit-fallback profile (Claude API credits) while a provider is at its limit
+          ./paseo/limit-fallback.patch
         ];
       });
+      claudeApiCredits = pkgs.writeShellApplication {
+        name = "claude-api-credits";
+        runtimeInputs = [ pkgs.coreutils ];
+        text = builtins.readFile ./paseo/claude-api-credits.sh;
+      };
+      paseoContinueOnCredits = pkgs.writeShellScriptBin "paseo-continue-on-credits" ''
+        exec ${lib.getExe pkgs.nodejs} ${./paseo/continue-on-credits.mjs} ${paseo}/lib/paseo "$@"
+      '';
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
       swapUrl = "http://127.0.0.1:${toString config.services.llama-swap.port}";
@@ -65,6 +77,27 @@ _: {
           agents.providers = {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
+            claude-api-credits = {
+              extends = "claude";
+              label = "Claude — API credits";
+              description = "Use the included Console credits, separately from subscription usage";
+              # Paseo patch limit-fallback.patch: used while the subscription is at
+              # its limit, and its spend tracked against the plan's monthly credit
+              limitFallback = true;
+              creditBudget = {
+                monthlyUsd = 100;
+                # credits renew a day after the plan's billing date (owner, 2026-11-01)
+                cycleDay = 2;
+              };
+              # Read only in the child process: no key in the Nix store or
+              # Paseo's configuration, and no fallback to subscription login.
+              command = [
+                (lib.getExe claudeApiCredits)
+                (lib.getExe pkgs.claude-code)
+                # The service VM test has no sops module or host key.
+                (config.sops.secrets.claude_api_key.path or "/run/secrets/claude_api_key")
+              ];
+            };
             codex.command = [ (lib.getExe pkgs.codex) ];
             local-codex = {
               extends = "codex";
@@ -315,6 +348,7 @@ _: {
           ];
           text = builtins.readFile ./paseo/job-done.sh;
         })
+        paseoContinueOnCredits
       ];
 
       # the scheduled jobs live in the daemon, so each run shows in the app;
@@ -334,10 +368,11 @@ _: {
         };
       };
 
-      # sends "continue" to an agent stopped on a usage limit once its quota is back
-      # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
+      # sends "continue" to a Codex agent stopped on a usage limit once its quota is
+      # back; Claude agents resume in the daemon (usage-limit-resume.patch)
+      # TODO: drop when Paseo resumes Codex agents after a usage limit itself
       systemd.services.paseo-resume = {
-        description = "Resume Paseo agents after their usage limit resets";
+        description = "Resume Paseo Codex agents after their usage limit resets";
         # multi-user.target, so activation starts it while paseo is already running
         wantedBy = [ "multi-user.target" ];
         after = [ "paseo.service" ];
