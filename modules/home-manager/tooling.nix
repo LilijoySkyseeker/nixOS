@@ -124,15 +124,8 @@ in
             if [[ ''${BLE_VERSION-} ]]; then
               # ble.sh's sleep function ignores Ctrl-C
               alias sleep='env sleep'
-              _prompt_osc() {
-                if [[ ''${TMUX-} ]]; then
-                  printf '\ePtmux;\e\e]%s\a\e\\' "$1"
-                else
-                  printf '\e]%s\a' "$1"
-                fi
-              }
               _prompt_preexec() {
-                _prompt_start=$EPOCHREALTIME _prompt_cmd=$1
+                _prompt_start=$EPOCHREALTIME
                 printf '\e]133;C\a'
               }
               _prompt_precmd() {
@@ -162,10 +155,10 @@ in
                     printf '${theme.ansi "bright-black"}[done · %s]\e[0m\n' "$t"
                     res=done
                   fi
-                  # Konsole pops this up only when its window isn't focused
+                  # Konsole pops this up only when its window isn't focused; no command
+                  # text, which can hold a secret typed with a leading space to skip history
                   if ((ms >= 30000)); then
-                    local cmd=''${_prompt_cmd//[;$'\n\a\e']/ }
-                    _prompt_osc "777;notify;''${HOSTNAME%%.*}: $res · $t;''${cmd:0:200}"
+                    printf '\e]777;notify;%s\a' "''${HOSTNAME%%.*}: $res · $t"
                   fi
                 fi
                 ${lib.optionalString (osConfig.environment.persistence or { } != { }) ''
