@@ -1,10 +1,7 @@
-# VM test: the DOCKER-USER allowlist constrains a docker-published port
-# a `-p` publish is DNAT'd and forwarded, never hitting INPUT, so
-# `firewall.interfaces.<iface>.allowed*Ports` look right and do nothing;
-# only real netfilter state and real packets prove the guard
 { pkgs, dockerPublishGuardModule }:
 let
   # built locally so the test needs no network; answers one line on 8080
+  # and 8081
   listenerImage = pkgs.dockerTools.buildImage {
     name = "guard-test-listener";
     tag = "latest";
@@ -17,7 +14,7 @@ let
     config.Cmd = [
       "/bin/sh"
       "-c"
-      "while true; do echo reached | nc -l -p 8080; done"
+      "while true; do echo reached | nc -l -p 8081; done & while true; do echo reached | nc -l -p 8080; done"
     ];
   };
 in
@@ -26,6 +23,13 @@ pkgs.testers.runNixOSTest {
 
   nodes.client = _: {
     environment.systemPackages = [ pkgs.netcat ];
+    # a LAN host the container must not be able to open connections to
+    networking.firewall.allowedTCPPorts = [ 9000 ];
+    systemd.services.lan-listener = {
+      wantedBy = [ "multi-user.target" ];
+      path = [ pkgs.netcat ];
+      script = "nc -lk 9000";
+    };
   };
 
   nodes.machine =
@@ -36,12 +40,15 @@ pkgs.testers.runNixOSTest {
       virtualisation.docker.enable = true;
       virtualisation.docker.daemon.settings.userland-proxy = false;
 
-      # preload the local image: no registry, no network
       virtualisation.oci-containers.backend = "docker";
       virtualisation.oci-containers.containers.listener = {
         image = "guard-test-listener:latest";
         imageFile = listenerImage;
-        ports = [ "8080:8080" ];
+        ports = [
+          "8080:8080"
+          # unguarded: stands in for a player's connection the guard admits
+          "8081:8081"
+        ];
       };
 
       # dummy stand-ins for wg0 and tailscale0, so rules assert by name
@@ -140,14 +147,10 @@ pkgs.testers.runNixOSTest {
                 f"DROP precedes RETURN for {proto}/{port} — allowed traffic would be dropped"
 
     with subtest("nothing else is filtered — the chain falls through"):
-        # An unrelated forwarded port must not be touched, or this would
-        # be a blanket firewall rather than a guard on named ports.
         rules = machine.succeed(f"iptables -S {chain}")
         assert "--dport 8096" not in rules, \
             "guard chain matched a port it was never given"
 
-    # ---- the actual claim: a real packet, to a real container --------
-    # rules existing proves nothing; prove behaviour, both directions
 
     with subtest("a client off an unlisted interface cannot reach the container"):
         # The client is on the test LAN (eth1), which is not in
@@ -167,9 +170,57 @@ pkgs.testers.runNixOSTest {
         machine.succeed("systemctl start docker-publish-guard.service")
         client.fail("nc -w 5 -z machine 8080")
 
+    egress = "docker-egress-guard"
+
+    with subtest("egress to every private and special range is dropped, v4 and v6"):
+        for cmd, nets in [
+            ("iptables", ["0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10",
+                          "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12",
+                          "192.168.0.0/16", "224.0.0.0/3"]),
+            ("ip6tables", ["::1/128", "fc00::/7", "fe80::/10", "ff00::/8"]),
+        ]:
+            rules = machine.succeed(f"{cmd} -t mangle -S {egress}")
+            for net in nets:
+                assert any(f"-d {net}" in r and "-i docker0" in r
+                           and "--ctstate NEW" in r and "-j DROP" in r
+                           for r in rules.splitlines()), \
+                    f"{cmd}: no egress drop for {net}:\n{rules}"
+            fwd = machine.succeed(f"{cmd} -t mangle -S FORWARD").splitlines()
+            assert fwd[1] == f"-A FORWARD -j {egress}", \
+                f"{cmd}: mangle FORWARD does not jump to the egress guard first:\n{fwd}"
+
+    # the client sits on 192.168.1.0/24, standing in for the home LAN
+    client_ip = client.succeed(
+        "ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1"
+    ).strip()
+    client.wait_for_open_port(9000)
+
+    with subtest("the container cannot open a connection to a LAN host"):
+        # stand-in for tailscaled's ts-forward, which lands ahead of
+        # DOCKER-USER and ACCEPTs everything out of tailscale0
+        machine.succeed("iptables -I FORWARD 1 -o eth1 -j ACCEPT")
+        machine.fail(
+            f"docker exec listener sh -c 'echo hi | nc -w 3 {client_ip} 9000'"
+        )
+
+    with subtest("and it is the egress guard doing it"):
+        machine.succeed("systemctl stop docker-publish-guard.service")
+        machine.succeed(
+            f"docker exec listener sh -c 'echo hi | nc -w 3 {client_ip} 9000'"
+        )
+        machine.succeed("systemctl start docker-publish-guard.service")
+        machine.fail(
+            f"docker exec listener sh -c 'echo hi | nc -w 3 {client_ip} 9000'"
+        )
+        machine.succeed("iptables -D FORWARD -o eth1 -j ACCEPT")
+
+    with subtest("replies to an admitted connection from a private address pass"):
+        # players' replies are ESTABLISHED, not NEW; the client's address is
+        # private, so a stateless rule would break this
+        out = client.succeed("nc -w 5 machine 8081")
+        assert "reached" in out, f"reply to an admitted connection lost: {out!r}"
+
     with subtest("guard rules only apply to traffic entering the bridge"):
-        # --dport alone also matches a container's outbound same-port traffic
-        # (factorio heartbeat, 34197 -> 34197); every rule needs -o docker0
         rules = machine.succeed(f"iptables -S {chain}").splitlines()
         for r in rules:
             if "--dport" not in r:
@@ -178,8 +229,6 @@ pkgs.testers.runNixOSTest {
                 f"rule not pinned to the bridge, will match outbound traffic too:\n{r}"
 
     with subtest("a container's own outbound same-port traffic is not dropped"):
-        # Send from inside the container to an outside address using the
-        # guarded port as *source* and destination
         before = machine.succeed(
             f"iptables -vnL {chain} | grep 'dpt:34197' | tail -1"
         ).split()[0]

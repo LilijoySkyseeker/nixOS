@@ -8,14 +8,9 @@ _: {
       ...
     }:
     let
-      enable = true;
-
-      # zone data and octoDNS config are both rendered from these, no checked-in YAML
       inherit (vars) domain;
       vpsPublicIp = "137.184.45.18";
 
-      # public: the game servers and the website (hosts/vps/README.md);
-      # mail records point at Google Workspace, not the vps
       zoneRecords = {
         "" = [
           {
@@ -23,7 +18,6 @@ _: {
             ttl = 300;
             value = vpsPublicIp;
           }
-          # Google Workspace mail, single-MX form
           {
             type = "MX";
             ttl = 300;
@@ -32,7 +26,6 @@ _: {
               exchange = "smtp.google.com.";
             };
           }
-          # SPF and the site-verification token as one TXT with two values
           {
             type = "TXT";
             ttl = 300;
@@ -51,7 +44,6 @@ _: {
             value = "v=DKIM1\\;k=rsa\\;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsonrfzXTCC2+UEvz952v6fJgq6V/dUzIzORTEogwWdoBQHotImyklUGvhGhimwx49P4jDd+IezTeA7spO+EZpepXPidYPrDyzOnqtYyjgCM6z4SrD4RFGIcmtAIcVxYw8uy0LQ/L1L4JHxNf83LGQSRQpGo5HFwbwvAPsVCsE+t4CjFCIbWOlZuvHIuOLApKjrmYT2OBiu6jScKZvAiFTB98c9zJe7Arsws7SrSC41O0S5P/4v6bLCMq524TGiuVWPAJnvrJYJqXzj8nWfkqkZ5tVe/KeJi32pCGevfh1eGXU+IThT27Wcgl6QferAtYs10U/KiVMNRUV/Zeu+4IXwIDAQAB";
           }
         ];
-        # DMARC, monitor-only (`p=none`)
         "_dmarc" = [
           {
             type = "TXT";
@@ -59,7 +51,6 @@ _: {
             value = "v=DMARC1\\; p=none\\; rua=mailto:postmaster@${domainNoDot}";
           }
         ];
-        # the website lives at the apex; www redirects there
         www = [
           {
             type = "CNAME";
@@ -70,15 +61,6 @@ _: {
         # IPv4-only on purpose: game ports are only DNAT'd over IPv4 on the vps,
         # so an AAAA would break IPv6-preferring clients
         minecraft = [
-          {
-            type = "A";
-            ttl = 300;
-            value = vpsPublicIp;
-          }
-        ];
-        # no SRV: Hytale clients don't look them up (server manual, "Future
-        # Additions"), so the port stays the default 5520
-        hytale = [
           {
             type = "A";
             ttl = 300;
@@ -124,62 +106,59 @@ _: {
       octodnsEnv = pkgs-unstable.python3.withPackages (_: [ pkgs-unstable.octodns-providers.cloudflare ]);
     in
     {
-      config = lib.mkIf enable {
-        users.users.octodns = {
-          isSystemUser = true;
-          group = "octodns";
-        };
-        users.groups.octodns = { };
+      users.users.octodns = {
+        isSystemUser = true;
+        group = "octodns";
+      };
+      users.groups.octodns = { };
 
-        sops.secrets.cloudflare_octodns_token = {
-          owner = "octodns";
-          group = "octodns";
-        };
-        sops.templates."octodns-env" = {
-          owner = "octodns";
-          group = "octodns";
-          content = ''
-            CLOUDFLARE_TOKEN=${config.sops.placeholder.cloudflare_octodns_token}
-          '';
-        };
+      sops.secrets.cloudflare_octodns_token = {
+        owner = "octodns";
+        group = "octodns";
+      };
+      sops.templates."octodns-env" = {
+        owner = "octodns";
+        group = "octodns";
+        content = ''
+          CLOUDFLARE_TOKEN=${config.sops.placeholder.cloudflare_octodns_token}
+        '';
+      };
 
-        systemd.services.octodns-sync = {
-          description = "octoDNS: sync declared DNS records to Cloudflare";
-          serviceConfig = {
-            Type = "oneshot";
-            User = "octodns";
-            Group = "octodns";
-            EnvironmentFile = config.sops.templates."octodns-env".path;
-            ExecStart = "${octodnsEnv}/bin/octodns-sync --config-file=${octodnsConfig} --doit";
-            NoNewPrivileges = true;
-            ProtectSystem = "strict";
-            ProtectHome = true;
-            ProtectKernelModules = true;
-            ProtectKernelTunables = true;
-            ProtectKernelLogs = true;
-            ProtectClock = true;
-            ProtectControlGroups = true;
-            RestrictNamespaces = true;
-            PrivateTmp = true;
-            # this unit holds the token controlling the whole zone
-            PrivateDevices = true;
-            CapabilityBoundingSet = "";
-            RestrictRealtime = true;
-            RestrictSUIDSGID = true;
-            LockPersonality = true;
-            MemoryDenyWriteExecute = true;
-            SystemCallArchitectures = "native";
-          };
+      systemd.services.octodns-sync = {
+        description = "octoDNS: sync declared DNS records to Cloudflare";
+        serviceConfig = {
+          Type = "oneshot";
+          User = "octodns";
+          Group = "octodns";
+          EnvironmentFile = config.sops.templates."octodns-env".path;
+          ExecStart = "${octodnsEnv}/bin/octodns-sync --config-file=${octodnsConfig} --doit";
+          NoNewPrivileges = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectKernelLogs = true;
+          ProtectClock = true;
+          ProtectControlGroups = true;
+          RestrictNamespaces = true;
+          PrivateTmp = true;
+          # this unit holds the token controlling the whole zone
+          PrivateDevices = true;
+          CapabilityBoundingSet = "";
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          LockPersonality = true;
+          MemoryDenyWriteExecute = true;
+          SystemCallArchitectures = "native";
         };
+      };
 
-        systemd.timers.octodns-sync = {
-          description = "Run octodns-sync periodically";
-          wantedBy = [ "timers.target" ];
-          timerConfig = {
-            OnBootSec = "5m";
-            OnUnitActiveSec = "1h";
-            Persistent = true;
-          };
+      systemd.timers.octodns-sync = {
+        description = "Run octodns-sync periodically";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "5m";
+          OnUnitActiveSec = "1h";
         };
       };
     };

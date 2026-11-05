@@ -1,14 +1,12 @@
 # Restoring from backup
 
-Getting data back out of `zbackup` (zrepl) or Backblaze (restic). For how
-the backups are produced, see [`docs/backups.md`](../backups.md).
+Getting data back out of `zbackup` (zrepl) or Backblaze (restic).
 
 **`scripts/restore-drill` is the restore tooling, and this document is
 its runbook.** The same script is both the periodic fire drill and the
 real recovery procedure — drill mode is just the real commands pointed at
 scratch destinations with verification and cleanup added, so exercising
-the drill exercises the real thing and the two can't drift apart
-(plan: 2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md).
+the drill exercises the real thing and the two can't drift apart.
 It runs from an operator machine and does everything over
 `ssh root@homelab` (`RESTORE_DRILL_HOST=root@<addr>` overrides the
 target — useful when the sink is rebuilt or only reachable by IP), where
@@ -95,8 +93,7 @@ host's own datasets, e.g. recovering from torrent's local snapshots.)
 ## Rolling a host's dataset back in place
 
 Destroys everything written since the snapshot. Deliberately not wrapped
-in the script
-(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#D1) —
+in the script —
 make sure this is what you want, then on the affected host:
 
 ```
@@ -140,8 +137,7 @@ scripts/restore-drill stream --src zbackup/backup/torrent/zroot/local/home \
 
 `stream` is a raw `zfs send` on stdout over SSH from homelab. The `-o`
 overrides matter: a send stream's bytes come entirely from the sink, so
-never let one choose where or how the received dataset mounts
-(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#F3) —
+never let one choose where or how the received dataset mounts —
 inspect first, then deliberately `zfs set canmount=on readonly=off` and
 a real `mountpoint`. Restoring alongside the original (`-restored`)
 rather than over it is the safe
@@ -154,14 +150,12 @@ dataset has diverged from what `zbackup` holds, zrepl reports a conflict
 and waits for a decision rather than clobbering, which is intended
 behaviour, not a fault.
 
-Timing, measured
-(2026-08-25-build-and-test-a-full-restore-suite-scripts-proced.md#G7):
+Timing, measured:
 5.0G in ~2.5min (drill default); 873G in 11h17m at a flat ~23 MB/s for
 a **same-pool** restore (zbackup reading and writing at once — the
 worst case; restoring to a different pool or host runs faster, e.g.
 the same data streams off zbackup at 90–100 MB/s when only read). A
-multi-terabyte cross-host send has previously taken ~40 hours (see
-`2026-08-21-torrent-s-initial-full-backup-send-to-homelab-is-t.md`) —
+multi-terabyte cross-host send has previously taken ~40 hours —
 run big ones under `tmux`.
 
 ## Restoring from the offsite restic backup
@@ -207,5 +201,3 @@ weeks of offsite history, not two days.
 - If you rolled back or replaced a dataset that zrepl replicates, confirm
   the next pull succeeds rather than reporting a conflict:
   `journalctl -u zrepl -n 50` on homelab.
-- Record what happened in the affected host's `hosts/<name>/README.md` if
-  it revealed anything worth knowing next time.

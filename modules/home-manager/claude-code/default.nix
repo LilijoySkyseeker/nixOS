@@ -1,7 +1,7 @@
 _: {
   # the CLI writes ~/.claude/settings.json itself (/model, /effort), so no store
   # symlink: managed keys are merged into the mutable file on activation
-  # package comes from profile-pc's systemPackages
+  # package comes from nixos/desktop-apps.nix's systemPackages
   flake.modules.homeManager.claude-code =
     {
       config,
@@ -126,7 +126,7 @@ _: {
         };
         # tips shown next to the spinner
         spinnerTipsEnabled = false;
-        # no AI attribution in commits or PRs (docs/GIT_WORKFLOW.md); sub-keys
+        # no AI attribution in commits or PRs; sub-keys
         # rather than `attribution = false` so older CLI versions read it too
         attribution = {
           commit = "";

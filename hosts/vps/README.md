@@ -1,23 +1,5 @@
 # vps
 
-Public-facing tunnel endpoint for CGNAT'd `homelab` on DigitalOcean droplet.
-Its only public ports are the ones it DNATs to homelab over WireGuard:
-the game ports (Minecraft 25565/tcp and 19132/udp, Hytale 5520/udp)
-and the website (80/tcp and 443/tcp, served by Caddy on homelab's wg0
-address), each rate-limited per source IP, plus WireGuard's
-own 51820/udp. SSH and everything else is tailnet-only. Jellyfin is
-tailnet-only on homelab.
-
-## Hardware
-
-DigitalOcean droplet (KVM, `vda`/virtio disk):
-
-- **CPU**: 1 vCPU (`DO-Regular`)
-- **RAM**: 1GB, plus a 482MB zram swap device
-- **Disk**: 25GB virtio (`vda`)
-- **Network**: `ens3` (public IP + a private DigitalOcean VPC address), `ens4`
-  (a second private network), plus `wg0` and `tailscale0`
-
 ## Reinstall
 
 No local state worth preserving: wireguard/NAT/tailscale config is all
@@ -35,10 +17,6 @@ IPv4/IPv6 before assuming either changed. If it's the same IP, clear
 the old droplet's now-stale entry first (`ssh-keygen -R <ip>`) — the
 new box has a different SSH host key, and `ssh` will otherwise refuse
 to connect with a "REMOTE HOST IDENTIFICATION HAS CHANGED" warning.
-
-The 482MB zram swap noted above only exists once NixOS is actually
-running — the stock pre-install image has none at all, which matters
-for the next step.
 
 **Temporarily resize the droplet up before installing.** Confirmed
 live, twice: `kexec` gets OOM-killed on the stock 1GB droplet even

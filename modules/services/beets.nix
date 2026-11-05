@@ -16,13 +16,11 @@ in
       # deliberately separate from the pre-existing Picard/ tree
       libraryDir = "/storage/Music/Library";
 
-      # shared by every bucket in `paths`; they differ only in the prefix
       pathSuffix = "$year_bracket $album%if{$albumdisambig, ($albumdisambig)}%aunique{}/$disc_prefix$track_padded $title$feat_bracket";
 
       beetsConfigName = "beets-config";
     in
     {
-      # single-purpose account, only runs beets-import.service
       users.users.beets = {
         isSystemUser = true;
         group = "beets";
@@ -33,8 +31,6 @@ in
 
       sops.secrets.homelab_beets_acoustid_apikey = { };
 
-      # renders to /run/secrets/rendered/<name> with the apikey spliced in,
-      # never the nix store; ported from files/PicardNamingScript.txt
       sops.templates.${beetsConfigName} = {
         owner = "beets";
         group = "beets";
@@ -117,7 +113,6 @@ in
         '';
       };
 
-      # drop/review folders and the library root (2770, setgid, root:multimedia)
       systemd.tmpfiles.rules = [
         "d ${importDir} 2770 root multimedia -"
         "d ${reviewDir} 2770 root multimedia -"

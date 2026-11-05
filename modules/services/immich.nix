@@ -6,29 +6,10 @@ in
   flake.modules.nixos.immich =
     { config, lib, ... }:
     {
-      # immich: self-hosted photo/video backup, tailnet-only
 
       # version-exact so a bump re-breaks the build instead of silently
-      # inheriting the exemption; accepted risk: docs/accepted-risks.md AR-9
+      # inheriting the exemption
       nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ];
-
-      # immich-machine-learning pulls in imageio, and pillow 13 fails two of
-      # imageio's 16-bit PNG tests
-      # TODO: drop when python313Packages.imageio builds on release-26.05 again (https://hydra.nixos.org/job/nixos/release-26.05/nixpkgs.python313Packages.imageio.x86_64-linux)
-      nixpkgs.overlays = [
-        (_: prev: {
-          pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-            (_: pyprev: {
-              imageio = pyprev.imageio.overridePythonAttrs (old: {
-                disabledTestPaths = (old.disabledTestPaths or [ ]) ++ [
-                  "tests/test_pillow.py::test_png_16bit"
-                  "tests/test_pillow_legacy.py::test_png"
-                ];
-              });
-            })
-          ];
-        })
-      ];
 
       services.immich = {
         enable = true;
@@ -37,26 +18,9 @@ in
         host = "0.0.0.0";
         # on jellyfin's zdata/storage/storage dataset (zrepl + restic backed)
         mediaLocation = "/storage/immich";
-        # video transcoding only (not ML); backend is picked in immich's admin UI.
-        # explicit rw: a bare path means DeviceAllow's wider rwm
-        accelerationDevices = [
-          "/dev/dri/renderD128 rw" # Nvidia GTX 1050 Mobile (NVENC)
-          "/dev/dri/renderD129 rw" # Intel HD 630 (QSV/VAAPI fallback)
-        ];
       };
 
-      # GPU access for immich-server only: render group on the unit, not the
-      # user (shared with the ML worker, which parses untrusted media), and
-      # accelerationDevices lands on both units, so force the ML unit back off
       systemd = {
-        services = {
-          immich-server.serviceConfig.SupplementaryGroups = [ "render" ];
-          immich-machine-learning.serviceConfig = {
-            PrivateDevices = lib.mkForce true;
-            DeviceAllow = lib.mkForce [ ];
-          };
-        };
-
         # upstream's `e` rule never creates a non-default mediaLocation
         tmpfiles.settings.immich.${config.services.immich.mediaLocation}.d = {
           user = config.services.immich.user;
@@ -70,7 +34,7 @@ in
         #
         # SECURITY-LOAD-BEARING: the recursive multimedia grant on /storage
         # re-applies every boot and would leak into the 0700 mediaLocation; the
-        # `A` below re-locks it each time (plan: 2026-09-03-add-immich-tailscale-only-to-homelab.md#F5)
+        # `A` below re-locks it each time
         #
         # torrent/thinkpad (multimedia gid via NFS) get read-only library/:
         # immich tracks paths/checksums in its db, so external writes desync it

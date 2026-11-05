@@ -1,30 +1,19 @@
 _: {
   flake.modules.nixos.kde =
-    { pkgs-stable, pkgs-unstable, ... }:
+    { pkgs-stable, ... }:
     {
-      # KDE Plasma
       services.xserver.enable = true;
       services.displayManager.sddm.enable = true;
       services.displayManager.sddm.wayland.enable = true;
       services.desktopManager.plasma6.enable = true;
 
-      # System installed pkgs
-      environment.systemPackages =
-        (with pkgs-unstable; [
-          xdg-desktop-portal
-          kdePackages.xdg-desktop-portal-kde
-        ])
-        ++ (with pkgs-stable; [
-          kdePackages.filelight # kde disk usage
-          qalculate-qt
-          kile
-        ]);
+      environment.systemPackages = with pkgs-stable; [
+        kdePackages.filelight
+        qalculate-qt
+      ];
 
-      # kde partition manager
       programs.partition-manager.enable = true;
 
-      # polkit-kde-agent: show the command line of the process asking, since
-      # run0's prompt only names a randomly named transient unit
       # TODO: drop when polkit-kde-agent-1 shows the requesting command upstream
       nixpkgs.overlays = [
         (_: prev: {

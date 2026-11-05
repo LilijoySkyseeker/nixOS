@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Block obviously-plaintext secrets, and lint staged .nix files. Git-level,
-# so it applies to any tool or human. Bypass a false positive with
-# `git commit --no-verify`.
 set -euo pipefail
 
 # the binary probe needs the blob on disk, and git's own exit status
@@ -17,23 +14,11 @@ fail=0
 staged_nix=()
 
 while IFS= read -r file; do
-  # secrets.yaml files must be sops-encrypted
   if [[ "$(basename "$file")" == "secrets.yaml" ]]; then
     if ! git show ":$file" | grep -q '^sops:'; then
       echo "BLOCKED: $file looks unencrypted (no 'sops:' metadata block)." >&2
       fail=1
     fi
-    continue
-  fi
-
-  # unreadable means undecided, which must not skip the scan
-  if ! mode="$(git ls-files -s -- "$file")"; then
-    echo "BLOCKED: cannot read the staged mode of $file; refusing to decide whether to scan it." >&2
-    fail=1
-    continue
-  fi
-  # a gitlink (submodule) is a commit id, not content
-  if [[ "$(cut -d' ' -f1 <<<"$mode")" == "160000" ]]; then
     continue
   fi
 

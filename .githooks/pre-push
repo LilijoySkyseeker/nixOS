@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Evaluate the flake and build (never switch) every NixOS host whose config
-# changed in the commits being pushed, so breakage is caught before it
-# reaches another machine. Bypass with `git push --no-verify`.
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -11,7 +8,7 @@ zero="0000000000000000000000000000000000000000"
 changed_files=""
 
 while read -r _local_ref local_sha _remote_ref remote_sha; do
-  [[ "$local_sha" == "$zero" ]] && continue # deleting a ref, nothing to build
+  [[ "$local_sha" == "$zero" ]] && continue
 
   if [[ "$remote_sha" == "$zero" ]]; then
     # new branch: diff against its merge base with master, or the empty tree
@@ -42,7 +39,6 @@ done
 changed_files="$(echo "$changed_files" | sed '/^$/d' | sort -u)"
 [[ -z "$changed_files" ]] && exit 0
 
-# anything outside hosts/ (modules/, files/, flake.*) affects every host
 hosts="$(find hosts -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
 global=0
 if echo "$changed_files" | grep -qv '^hosts/'; then global=1; fi
@@ -52,10 +48,6 @@ for host in $hosts; do
     to_build+=" $host"
   fi
 done
-
-# push-deploy-sandbox reads a built file at eval time, which --no-build
-# can't rebuild once the GC has taken it; evaluating it alone builds it
-nix eval --raw .#checks.x86_64-linux.push-deploy-sandbox.drvPath > /dev/null
 
 echo "pre-push: nix flake check --no-build"
 if ! nix flake check --no-build; then

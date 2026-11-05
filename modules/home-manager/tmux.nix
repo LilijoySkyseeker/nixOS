@@ -2,7 +2,6 @@ _: {
   flake.modules.homeManager.tmux =
     { pkgs-unstable, ... }:
     {
-      # tmux: vi keybinds, sessions persisted/restored across reboots
       programs.tmux = {
         enable = true;
         keyMode = "vi";
@@ -11,7 +10,7 @@ _: {
         baseIndex = 1;
         escapeTime = 0;
         plugins = with pkgs-unstable.tmuxPlugins; [
-          vim-tmux-navigator # C-h/j/k/l moves seamlessly between tmux panes and vim splits
+          vim-tmux-navigator
           sensible
           {
             plugin = resurrect;
@@ -26,7 +25,6 @@ _: {
           }
         ];
         extraConfig = ''
-          # vi-style pane navigation (also handled by vim-tmux-navigator across nvim splits)
           bind -T copy-mode-vi v send -X begin-selection
           bind -T copy-mode-vi y send -X copy-selection-and-cancel
         '';

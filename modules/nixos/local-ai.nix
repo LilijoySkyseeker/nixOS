@@ -4,40 +4,35 @@
 # - /srv/models: the model store (zroot/local/models, replicated to homelab)
 # - gamemode hook: a game unloads every model and blocks loads until it exits
 # - paseo: one remote way into the agent sandbox for Claude, Codex or a local
-#   model, tailnet-only through tailscale serve
+#   model, tailnet-only through tailscale serve; the agents' subagents and
+#   scheduled jobs run in it too, so the owner sees them there
 _: {
   flake.modules.nixos."local-ai" =
     {
       config,
       lib,
       pkgs,
+      agentUnit,
       ...
     }:
     let
       # TODO: drop when Paseo supports provider default modes: https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md
       paseo = pkgs.paseo.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./paseo/default-permissions.patch ];
+        patches = (old.patches or [ ]) ++ [
+          ./paseo/default-permissions.patch
+          # TODO: drop when https://github.com/getpaseo/paseo/issues/3248 is fixed
+          ./paseo/cli-notify.patch
+        ];
       });
       models = "/srv/models";
       llamaServer = lib.getExe' pkgs.llama-cpp-vulkan "llama-server";
       swapUrl = "http://127.0.0.1:${toString config.services.llama-swap.port}";
-      # same card as agent-user's agentGpu: DRM numbering follows probe order
-      gpu = "/dev/dri/by-path/pci-0000:03:00.0-render";
 
-      # qwen's template raises on a system message after the first, which
-      # claude code sends mid-conversation; this one renders it as a system turn
+      # qwen's template raises on a system message after the first; this one
+      # renders it as a system turn
       qwenTemplate = ./local-ai/qwen3.8-mid-system.jinja;
 
-      modelIds = [
-        "qwen3.8-27b"
-      ];
-
-      # gaming marker: survives a llama-swap restart mid-game, gone on reboot
       gamingMarker = "/run/local-ai/gaming";
-      setGaming = pkgs.writeShellScript "local-ai-set-gaming" ''
-        ${lib.getExe pkgs.curl} -s -m 4 -X PUT -H 'Content-Type: application/json' \
-          -d '{"name":"gaming"}' ${swapUrl}/api/profiles/active
-      '';
 
       # gamemode runs these as the user who started the game
       gamingStart = pkgs.writeShellScript "local-ai-gaming-start" ''
@@ -57,36 +52,49 @@ _: {
       # daemon password's bcrypt hash comes from the host's sops secret, never here
       paseoManaged = pkgs.writeText "paseo-managed.json" (
         builtins.toJSON {
-          "$schema" = "https://paseo.sh/schemas/paseo.config.v1.json";
-          version = 1;
           daemon = {
             listen = "127.0.0.1:6767";
             # tailscale serve forwards this Host; ip and localhost are allowed by default
             hostnames = [ "torrent.taila4ae6c.ts.net" ];
             # explicit: a config that omits it keeps the legacy relay-on behavior
             relay.enabled = false;
+            # agents delegate with the `paseo` cli, one way for every harness
+            mcp.injectIntoAgents = false;
           };
-          features.webUi.enabled = true;
-          log.file.level = "info";
+          features.webUi.enabled = false;
           agents.providers = {
             # the same binaries the other agent units run
             claude.command = [ (lib.getExe pkgs.claude-code) ];
             codex.command = [ (lib.getExe pkgs.codex) ];
-            # enabled outright: the merge keeps an earlier `enabled = false`
-            opencode = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.opencode) ];
-            };
-            antigravity = {
-              enabled = true;
-              command = [ (lib.getExe pkgs.antigravity-cli) ];
-            };
             local-codex = {
               extends = "codex";
               label = "Local";
               description = "A local model on torrent's GPU (llama-swap), in the Codex harness";
+              # Scope these overrides to the local harness: cloud models keep
+              # their own context budgets and timeouts. Compact well before
+              # long image histories make prompt processing take minutes.
+              # Allow 15 idle minutes for cold prefill instead of cancelling
+              # and retrying it every five minutes.
+              command = [
+                (lib.getExe pkgs.codex)
+                "-c"
+                "model_context_window=131072"
+                "-c"
+                "model_auto_compact_token_limit=32768"
+                "-c"
+                "model_provider=local"
+                "-c"
+                "model_providers.local.name=Local"
+                "-c"
+                "model_providers.local.base_url=${swapUrl}/v1"
+                "-c"
+                "model_providers.local.wire_api=responses"
+                "-c"
+                "model_providers.local.env_key=OPENAI_API_KEY"
+                "-c"
+                "model_providers.local.stream_idle_timeout_ms=900000"
+              ];
               env = {
-                OPENAI_BASE_URL = swapUrl;
                 OPENAI_API_KEY = "local";
               };
               models = [
@@ -98,14 +106,13 @@ _: {
               ];
             };
           }
-          # bundled providers with no install here
+          # providers removed from torrent: the merge keeps old keys, so their
+          # live `enabled = true` must be overwritten
           //
             lib.genAttrs
               [
-                "copilot"
-                "pi"
-                "muse"
-                "omp"
+                "opencode"
+                "antigravity"
               ]
               (_: {
                 enabled = false;
@@ -123,90 +130,125 @@ _: {
         ReadWritePaths = [ models ];
         SupplementaryGroups = [ "models" ];
       };
-      # paseo copies this unit's sandbox
-      crc = config.systemd.services.claude-remote-control;
+      # the agents' scheduled jobs; a prompt changes only through a reviewed PR,
+      # and reaches paseo at torrent's next boot or switch (agent-schedules).
+      # Maintenance runs at noon, well after the update, and reads its runs.
+      agentJobs = [
+        {
+          name = "job:update";
+          cron = "15 0 * * *";
+          prompt = ./agent-jobs/update.md;
+        }
+        {
+          name = "job:maintenance";
+          cron = "0 12 * * 1";
+          prompt = ./agent-jobs/maintenance.md;
+        }
+      ];
+      agentJobsFile = pkgs.writeText "agent-jobs.json" (
+        builtins.toJSON (
+          map (
+            j: j // { prompt = builtins.readFile j.prompt + builtins.readFile ./agent-jobs/ending.md; }
+          ) agentJobs
+        )
+      );
+      # makes the daemon's job:* schedules match agentJobs. It updates only
+      # what differs, since a new cadence resets the next run and would drop
+      # one missed while torrent was off. The owner's pause from the app stays;
+      # an edited prompt, time, provider, folder or archive switch goes back
+      agentSchedulesSync = pkgs.writeShellApplication {
+        name = "agent-schedules-sync";
+        runtimeInputs = [
+          paseo
+          pkgs.jq
+          pkgs.nodejs
+        ];
+        text = ''
+          want=${agentJobsFile}
+          tz=${config.time.timeZone}
+          have=""
+          for _ in $(seq 60); do
+            have=$(paseo schedule ls --json 2>/dev/null) && break
+            sleep 2
+          done
+          [ -n "$have" ] || { echo "paseo daemon not reachable" >&2; exit 1; }
+
+          # job:* schedules no longer declared, and duplicates of declared ones
+          jq -r --slurpfile want "$want" '
+            [.[] | select((.name // "") | startswith("job:"))] | group_by(.name)[]
+            | .[0].name as $n
+            | if any($want[0][]; .name == $n) then .[1:][] else .[] end
+            | .id' <<<"$have" | while read -r id; do
+            paseo schedule delete "$id" >/dev/null
+          done
+
+          jq -c '.[]' "$want" | while read -r job; do
+            name=$(jq -r .name <<<"$job")
+            cron=$(jq -r .cron <<<"$job")
+            prompt=$(jq -r .prompt <<<"$job")
+            id=$(jq -r --arg n "$name" 'map(select(.name == $n))[0].id // empty' <<<"$have")
+            if [ -z "$id" ]; then
+              id=$(paseo schedule create --name "$name" --cron "$cron" --timezone "$tz" \
+                --provider claude --cwd /home/agent/work "$prompt" --json | jq -r .id)
+            fi
+            cur=$(paseo schedule inspect "$id" --json)
+            args=()
+            [ "$(jq -r '.cadence.expression + " " + .cadence.timezone' <<<"$cur")" = "$cron $tz" ] \
+              || args+=(--cron "$cron" --timezone "$tz")
+            [ "$(jq -r .prompt <<<"$cur")" = "$prompt" ] || args+=(--prompt "$prompt")
+            [ "$(jq -r '.target.config | .provider + " " + .cwd' <<<"$cur")" = "claude /home/agent/work" ] \
+              || args+=(--provider claude --cwd /home/agent/work)
+            [ ''${#args[@]} -eq 0 ] || paseo schedule update "$id" "''${args[@]}" >/dev/null
+            # a run archives itself unless it needs the owner (agent-jobs/ending.md),
+            # so paseo must not archive every run when it ends
+            [ "$(jq -r .target.config.archiveOnFinish <<<"$cur")" = false ] \
+              || node ${./paseo/keep-runs.mjs} ${paseo}/lib/paseo "$id"
+          done
+        '';
+      };
     in
     {
-      # model store: the agent and lilijoy download into it, llama-swap reads it
+      # model store: the agent downloads into it, llama-swap reads it
       users.groups.models = { };
-      users.users.lilijoy.extraGroups = [ "models" ];
       systemd.tmpfiles.rules = [
-        "d ${models} 2775 root models -"
-        # group-writable whoever creates a file, world-readable for llama-swap's dynamic user
-        "a+ ${models} - - - - default:user::rwx,default:group::rwx,default:mask::rwx,default:other::r-x"
+        "d ${models} 0775 root models -"
         # the gamemode hooks run as whoever plays
         "d /run/local-ai 1777 root root -"
       ];
 
-      systemd.services.claude-remote-control.serviceConfig = agentModelAccess;
-      systemd.services.codex-remote-control.serviceConfig = agentModelAccess;
-
       services.llama-swap = {
         enable = true;
+        # swapUrl and the gaming hooks call this address; the module default is `localhost`
         listenAddress = "127.0.0.1";
         port = 8080;
         settings = {
           # no stored request/response bodies: private prompts stay out of its api
           captureBuffer = 0;
-          # only llama-swap's own ui may read responses in a browser; the
-          # permissive default lets any web page read loopback (firefox has
-          # no private network access check)
-          security.cors.allowedOrigins = [
-            "http://127.0.0.1:8080"
-            "http://localhost:8080"
-          ];
           globalTTL = 300;
           models = {
             "qwen3.8-27b" = {
-              description = "Qwen3.8-27B, fully on the GPU, vision on the CPU";
               cmd = lib.concatStringsSep " " [
                 llamaServer
                 "--port \${PORT}"
                 "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD-Q4_K_M.gguf"
-                "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf --no-mmproj-offload"
-                "-ngl 99 -fa on -c 131072"
+                "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf"
+                "-ngl 99 -c 131072"
                 "--jinja --chat-template-file ${qwenTemplate}"
               ];
             };
           };
-          # one model on the GPU at a time
-          routing.router = {
-            use = "group";
-            settings.groups.gpu = {
-              swap = true;
-              exclusive = true;
-              members = modelIds;
-            };
-          };
           # the gamemode hook's profile: every model answers 404, so nothing loads
           profiles.gaming = {
-            description = "a game has the GPU: no model loads";
-            pins = lib.genAttrs modelIds (_: null);
+            pins = lib.genAttrs (lib.attrNames config.services.llama-swap.settings.models) (_: null);
           };
         };
       };
 
       systemd.services.llama-swap = {
-        # the module leaves all of /dev open for GPU access; narrow it to the render node
         serviceConfig = {
-          PrivateDevices = lib.mkForce true;
-          BindPaths = [ "-/dev/dri" ];
-          DeviceAllow = [ "${gpu} rw" ];
-          SupplementaryGroups = [ "render" ];
-          # bound model loading and CPU vision memory alongside the desktop
-          MemoryMax = "80G";
           # loopback only: models come from /srv/models, never the network
           IPAddressAllow = "localhost";
           IPAddressDeny = "any";
-          # a restart mid-game starts with no profile: reapply the block
-          ExecStartPost = pkgs.writeShellScript "local-ai-restore-gaming" ''
-            [ -e ${gamingMarker} ] || exit 0
-            for _ in $(${pkgs.coreutils}/bin/seq 50); do
-              ${setGaming} >/dev/null && exit 0
-              ${pkgs.coreutils}/bin/sleep 0.2
-            done
-            exit 1
-          '';
         };
       };
 
@@ -214,53 +256,81 @@ _: {
       programs.gamemode.settings.custom = {
         start = "${gamingStart}";
         end = "${gamingEnd}";
-        script_timeout = 20;
       };
 
       # paseo: merge the keys this repo owns into the agent's CLI-owned config
       systemd.services.paseo-agent-config = {
         description = "Merge repo-owned keys into the agent's Paseo config";
-        wantedBy = [ "multi-user.target" ];
-        before = [ "paseo.service" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
           User = "agent";
-          Group = "agent";
         };
         script = ''
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          # the local model runs only in the codex harness: drop the old claude one
-          ${lib.getExe pkgs.jq} -s '(.[0] | del(.agents.providers.local)) * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
-          # loads from sops; without one the file keeps whatever it has
+          # loads from sops
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
-          if [ -r "$hash" ]; then
-            ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
-            mv "$f.tmp2" "$f.tmp"
-          fi
-          chmod 600 "$f.tmp"
+          ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
+          mv "$f.tmp2" "$f.tmp"
           mv "$f.tmp" "$f"
         '';
       };
 
-      # the paseo daemon, in the same sandbox as the agents' remote-control units
+      # the paseo daemon, in the same sandbox as the agents' units
       systemd.services.paseo = {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
-        inherit (crc) wantedBy wants bindsTo;
-        after = crc.after ++ [ "paseo-agent-config.service" ];
+        inherit (agentUnit)
+          wantedBy
+          wants
+          bindsTo
+          environment
+          ;
+        after = agentUnit.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
-        environment = {
-          inherit (crc.environment) HOME ENABLE_CLAUDEAI_MCP_SERVERS;
-          PATH = lib.mkForce crc.environment.PATH;
-        };
-        serviceConfig = crc.serviceConfig // {
-          # without a password paseo grants owner rights to any client, and a
-          # web page's websocket to loopback needs no cors: no password, no daemon
-          ExecCondition = "${paseoHasPassword}";
-          ExecStart = "${lib.getExe paseo} daemon run";
+        serviceConfig = lib.mkMerge [
+          agentUnit.serviceConfig
+          agentModelAccess
+          {
+            # without a password paseo grants owner rights to any client, and a
+            # web page's websocket to loopback needs no cors: no password, no daemon
+            ExecCondition = "${paseoHasPassword}";
+            ExecStart = "${lib.getExe paseo} daemon run";
+          }
+        ];
+      };
+
+      # agents start subagents with `paseo run`; job runs end with job-done
+      users.users.agent.packages = [
+        paseo
+        (pkgs.writeShellApplication {
+          name = "job-done";
+          runtimeInputs = [
+            paseo
+            pkgs.jq
+            pkgs.util-linux
+          ];
+          text = builtins.readFile ./paseo/job-done.sh;
+        })
+      ];
+
+      # the scheduled jobs live in the daemon, so each run shows in the app;
+      # this unit declares them there again whenever they change
+      systemd.services.agent-schedules = {
+        description = "Declare the agents' scheduled jobs as Paseo schedules";
+        wantedBy = [ "multi-user.target" ];
+        wants = [ "paseo.service" ];
+        after = [ "paseo.service" ];
+        environment.HOME = "/home/agent";
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "agent";
+          Group = "agent";
+          ExecStart = lib.getExe agentSchedulesSync;
         };
       };
 
@@ -268,27 +338,14 @@ _: {
       # TODO: drop when Paseo resumes Claude and Codex agents after a usage limit itself: https://github.com/getpaseo/paseo/pull/7193
       systemd.services.paseo-resume = {
         description = "Resume Paseo agents after their usage limit resets";
-        wantedBy = [
-          "multi-user.target"
-          "paseo.service"
-        ];
+        # multi-user.target, so activation starts it while paseo is already running
+        wantedBy = [ "multi-user.target" ];
         after = [ "paseo.service" ];
-        bindsTo = [ "paseo.service" ];
-        environment.HOME = "/home/agent";
         serviceConfig = {
           ExecStart = "${lib.getExe pkgs.nodejs} ${./paseo/resume-after-limit.mjs} ${paseo}/lib/paseo";
           Restart = "always";
           RestartSec = 30;
           User = "agent";
-          Group = "agent";
-          Slice = "agent.slice";
-          # the daemon's local credential and the cli's client id
-          ProtectSystem = "strict";
-          ProtectHome = "read-only";
-          ReadWritePaths = [ "/home/agent/.paseo" ];
-          PrivateTmp = true;
-          PrivateDevices = true;
-          NoNewPrivileges = true;
         };
       };
 
@@ -299,13 +356,9 @@ _: {
         # after the config step has written the password, or the condition below
         # fails on a first boot and nothing retries it
         after = [
-          "tailscaled.service"
           "tailscaled-autoconnect.service"
           "paseo-agent-config.service"
-          "paseo.service"
         ];
-        requires = [ "paseo-agent-config.service" ];
-        wants = [ "tailscaled.service" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
           Type = "oneshot";

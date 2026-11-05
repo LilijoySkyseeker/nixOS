@@ -1,5 +1,3 @@
-# the deploy fragment's mirror and revision logic against a local origin;
-# git only, so a plain derivation rather than a VM
 { pkgs, deployRevisionScript }:
 pkgs.runCommand "deploy-revision"
   {
@@ -15,7 +13,7 @@ pkgs.runCommand "deploy-revision"
     git config --global init.defaultBranch master
 
     fail() { echo "FAIL: $*" >&2; exit 1; }
-    expect() { # $1 expected relation, $2 running, $3 target, $4 label
+    expect() {
       local got
       got=$(revision_relation "$mirror" "$2" "$3")
       [ "$got" = "$1" ] || fail "$4: expected $1, got $got"
@@ -36,7 +34,6 @@ pkgs.runCommand "deploy-revision"
 
     mirror=$TMPDIR/mirror.git
 
-    # first use creates the mirror; master resolves to origin's master
     mirror_fetch "$mirror" "file://$TMPDIR/origin"
     [ "$(mirror_master "$mirror")" = "$two" ] || fail "mirror master is not origin's"
     echo "ok: mirror created at master"
@@ -51,7 +48,7 @@ pkgs.runCommand "deploy-revision"
     expect manual '$(touch pwned)' "$two" "shell in the revision"
     [ ! -e pwned ] || fail "revision string was executed"
 
-    decide() { # $1 expected, $2 running, $3 profile, $4 target, $5 label
+    decide() {
       local got
       got=$(deploy_decision "$mirror" "$2" "$3" "$4")
       [ "$got" = "$1" ] || fail "$5: expected $1, got $got"
@@ -64,8 +61,6 @@ pkgs.runCommand "deploy-revision"
     decide manual "$side" "$two" "$two" "running a manual switch"
     decide manual "" "$two" "$two" "running revision unknown"
 
-    # a clean branch commit deployed by hand resumes once a real merge
-    # makes it an ancestor of master
     git -C origin merge -q --no-ff -m merge side
     merged=$(git -C origin rev-parse HEAD)
     mirror_fetch "$mirror" "file://$TMPDIR/origin"
@@ -76,7 +71,6 @@ pkgs.runCommand "deploy-revision"
     ! is_revision "$two-dirty" || fail "a dirty rev is not a revision"
     echo "ok: is_revision"
 
-    # a second fetch picks up new commits on an existing mirror
     git -C origin commit -q --allow-empty -m three
     three=$(git -C origin rev-parse HEAD)
     mirror_fetch "$mirror" "file://$TMPDIR/origin"

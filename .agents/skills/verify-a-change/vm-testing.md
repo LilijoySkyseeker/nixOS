@@ -107,11 +107,6 @@ checks.<name> = import ../../tests/<name>.nix {
 Pass the module under test in explicitly rather than importing the whole
 host — the point is to exercise the module, not to rebuild a host.
 
-`checks.nix` is for VM tests only. A check that boots nothing —
-`tests/gate-script-check.nix`, which runs the repo's own gate scripts —
-registers in `modules/flake/gate-checks.nix` instead, so one `checks` key
-lives in one file.
-
 ## Things that will bite you
 
 - **`nixos-anywhere --vm-test` can't validate a real disko layout or
@@ -186,7 +181,7 @@ lives in one file.
   (`environment.etc.<name>.source = thatToplevel;` is enough — nothing
   needs to read the file, existing in the closure is the point) so its
   whole closure, glibc included, is already registered when the VM
-  boots. `tests/push-deploy-sandbox.nix` is the worked example.
+  boots.
 - **`ReadWritePaths` does not create the directory it grants access to.**
   On a fresh root user with no prior `.cache`, `ProtectSystem=strict` +
   `ReadWritePaths=[...]` fails mount-namespace setup outright with ENOENT
@@ -200,7 +195,7 @@ lives in one file.
 - **`security.run0.enableSudoAlias` needs `security.run0.enable = true`
   *and* `security.sudo.enable = false` set together**, or you get an
   assertion failure. Check the combination already in real use (e.g.
-  `modules/profiles/default.nix`) rather than guessing it.
+  `modules/nixos/base.nix`) rather than guessing it.
 - **A VM test node boots straight from its built closure and never runs a
   real install or `nixos-rebuild switch`.**
   `/nix/var/nix/profiles/system` won't exist unless the test creates it —
@@ -234,8 +229,7 @@ lives in one file.
   correctly (a near-exact `fileSystems`/`networking.interfaces` copy of
   the real config still isn't enough — see the next few points).
   `evalResult.config.nodes.<name>` is the resolved config directly (no
-  extra `.config` beneath that). `tests/push-deploy-sandbox.nix` is the
-  worked example.
+  extra `.config` beneath that).
 - **Even inheriting the right wiring, a few defaults still need forcing
   back on for a node that's actually meant to be switched into:**
   - `system.switch.enable` (`nixos/modules/system/activation/
@@ -287,11 +281,10 @@ lives in one file.
   `docker info --format '{{.SecurityOptions}}'` (or another
   `docker info`/`docker inspect` field) instead — dockerd's own
   live-effective-config view, which doesn't care where the config came
-  from. (`2026-09-03-vm-verify-docker-userns-remap-for-the-game-server-containers.md`, G8.)
+  from.
 - **`nix build ... | tee log.txt` can report exit 0 while the real
   command failed.** The pipeline's exit status is `tee`'s, always 0 —
-  the exact same `if cmd | tail` trap `docs/audits/2026-08-26/RESUME.md`'s
-  "Rules and traps" already names for `tail`, just with `tee`. Bit
+  the exact same `if cmd | tail` trap, just with `tee`. Bit
   hardest right after adding a brand-new test/module file: the actual
   error was "Path '...' is not tracked by Git" (flakes only see
   git-tracked files), silently swallowed by the pipe. Redirect with `>`

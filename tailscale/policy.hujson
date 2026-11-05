@@ -8,22 +8,16 @@
 //   not as a logged-in user. autogroup:member only covers user identities,
 //   so tagged devices need their own tags listed explicitly in any
 //   grants/acls src that should include device-to-device access.
-// - Exit node routing requires dst: autogroup:internet — granting access
-//   to the tag itself only allows reaching the device (e.g. SSH), not
-//   routing internet traffic through it.
-// - autoApprovers references tag:homelab (not a user) so re-advertising
-//   the exit node / subnet route auto-approves without manual admin
-//   approval, and doesn't break if a user account is later suspended.
 // - There is deliberately NO tag:isoimage. Removed 2026-08-27 by the
-//   security audit (F-P8-19). It described a device that cannot exist:
-//   hosts/isoimage's module list omits profile-default, so
+//   security audit. It described a device that cannot exist:
+//   hosts/isoimage's module list omits base, so
 //   services.tailscale.enable = false and config.sops is not even an
 //   option there. An ISO is a bootable artifact that can be copied
 //   anywhere and must not carry a tailnet identity — that is the design,
 //   not an oversight. The matching tailscale_authkey_isoimage secret and
 //   the never-used auth key behind it were retired at the same time.
 //   Do not re-add the tag; if isoimage is ever genuinely meant to join,
-//   that is a config change first (profile-default + sops-nix) and a new
+//   that is a config change first (base + sops-nix) and a new
 //   non-reusable, pre-authorized, tagged key second.
 {
     "tagOwners": {
@@ -31,13 +25,6 @@
         "tag:torrent":  ["autogroup:admin"],
         "tag:homelab":  ["autogroup:admin"],
         "tag:vps":      ["autogroup:admin"],
-    },
-
-    "autoApprovers": {
-        "exitNode": ["tag:homelab"],
-        "routes": {
-            "192.168.1.0/24": ["tag:homelab"],
-        },
     },
 
     "grants": [
@@ -48,9 +35,7 @@
             "ip":  ["*"],
         },
         // vps is reachable for admin SSH by you and by all your other
-        // tailnet devices (all tagged devices here belong to you) — it
-        // doesn't need outbound access to anything beyond what the
-        // internet grant below already covers
+        // tailnet devices (all tagged devices here belong to you)
         {
             "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
             "dst": ["tag:vps"],
@@ -61,18 +46,6 @@
             "src": ["tag:torrent", "tag:thinkpad"],
             "dst": ["autogroup:member"],
             "ip":  ["1714-1764"],
-        },
-        // let members and tagged devices use homelab as an exit node
-        {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
-            "dst": ["autogroup:internet"],
-            "ip":  ["*"],
-        },
-        // let members and tagged devices reach homelab's advertised LAN subnet
-        {
-            "src": ["autogroup:member", "tag:thinkpad", "tag:torrent", "tag:homelab"],
-            "dst": ["192.168.1.0/24"],
-            "ip":  ["*"],
         },
     ],
 
@@ -106,7 +79,7 @@
 
     // There is deliberately NO "ssh" block here any more.
     //
-    // Removed 2026-08-26 by the security audit (F-P0-05 / F-P8-12). It had
+    // Removed 2026-08-26 by the security audit. It had
     // no effect, because Tailscale SSH is not enabled on any host — verified
     // three independent ways: no --ssh in any host's evaluated
     // extraUpFlags, no `tailscale set --ssh` anywhere in the repo, and

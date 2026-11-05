@@ -17,12 +17,6 @@ in
       options.myPushDeploy = {
         enable = lib.mkEnableOption "build locally and push+activate this host's own revision on a remote target host on a schedule";
 
-        repoUrl = lib.mkOption {
-          type = lib.types.str;
-          default = "https://github.com/LilijoySkyseeker/nixOS.git";
-          description = "Git URL to mirror master from. Public, so no credentials.";
-        };
-
         hostAttr = lib.mkOption {
           type = lib.types.str;
           description = "nixosConfigurations attribute name to build/switch (e.g. \"vps\") — this is the remote target's own config, not this machine's.";
@@ -38,57 +32,9 @@ in
           description = "Path to the SSH private key authenticating to targetHost (e.g. a sops secret path).";
         };
 
-        elevate = lib.mkOption {
-          type = lib.types.enum [
-            "none"
-            "sudo"
-          ];
-          default = "sudo";
-          description = ''
-            Whether to pass nixos-rebuild's --sudo flag for the target's remote
-            activation steps. nixos-rebuild-ng only wraps remote commands in
-            the literal `sudo` binary, which on the target is the run0 alias
-            (security.run0.enableSudoAlias). Default "sudo" since the target
-            user (vps-deploy) is unprivileged and needs it for both the
-            profile-set and switch-to-configuration steps.
-          '';
-        };
-
         dates = lib.mkOption {
           type = lib.types.str;
-          default = "Thu 03:15";
           description = "systemd OnCalendar spec for the push/switch job.";
-        };
-
-        scheduleEnable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = ''
-            Whether the periodic `push-deploy-<hostAttr>` **timer** is
-            installed. False keeps the service defined and manually
-            startable (`systemctl start push-deploy-vps`) — which is how
-            the target gets deployed by hand — while stopping it
-            happening on a schedule.
-
-            The timer is removed rather than merely un-wanted, so a
-            `switch` actually stops a running timer instead of leaving it
-            armed until the next reboot.
-          '';
-        };
-
-        operation = lib.mkOption {
-          type = lib.types.enum [
-            "switch"
-            "boot"
-          ];
-          default = "switch";
-          description = "nixos-rebuild operation to run on the target: \"switch\" activates immediately, \"boot\" only sets the default boot entry for next reboot.";
-        };
-
-        rebootIfKernelChanged = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "After switching, reboot the target if the switch changed its running kernel/initrd (checked and triggered remotely over SSH).";
         };
       };
 
@@ -111,7 +57,7 @@ in
             ${deployRevisionScript}
 
             mirror="$STATE_DIRECTORY/mirror.git"
-            mirror_fetch "$mirror" ${lib.escapeShellArg cfg.repoUrl}
+            mirror_fetch "$mirror" https://github.com/LilijoySkyseeker/nixOS.git
 
             # the target follows this host: it only gets a revision this
             # host has already switched to itself
@@ -140,36 +86,29 @@ in
                 ;;
             esac
 
-            ${lib.optionalString cfg.rebootIfKernelChanged ''
-              kernel_before=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
-            ''}
-            nixos-rebuild ${cfg.operation} \
+            kernel_before=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+            nixos-rebuild switch \
               --flake "git+file://$mirror?rev=$target#${cfg.hostAttr}" \
               --target-host ${cfg.targetHost} \
-              ${lib.optionalString (cfg.elevate == "sudo") "--sudo"}
+              --sudo
             touch "$STATE_DIRECTORY/deployed-${cfg.hostAttr}"
 
-            ${lib.optionalString cfg.rebootIfKernelChanged ''
-              # reboot goes through the same sudo/run0 alias as the switch;
-              # hosts/vps/configuration.nix's vps-deploy dispatcher matches
-              # this exact string
-              # only a kernel this switch brought in, not one a manual
-              # switch left unbooted
-              booted=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/booted-system/kernel)
-              kernel_after=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
-              if [ "$kernel_after" != "$kernel_before" ] && [ "$kernel_after" != "$booted" ]; then
-                echo "Kernel changed on ${cfg.targetHost}, rebooting."
-                ssh $NIX_SSHOPTS ${cfg.targetHost} "sudo systemctl reboot"
-              fi
-            ''}
+            # reboot goes through the same sudo/run0 alias as the switch;
+            # hosts/vps/configuration.nix's vps-deploy dispatcher matches
+            # this exact string
+            # only a kernel this switch brought in, not one a manual
+            # switch left unbooted
+            booted=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/booted-system/kernel)
+            kernel_after=$(ssh $NIX_SSHOPTS ${cfg.targetHost} readlink /run/current-system/kernel)
+            if [ "$kernel_after" != "$kernel_before" ] && [ "$kernel_after" != "$booted" ]; then
+              echo "Kernel changed on ${cfg.targetHost}, rebooting."
+              ssh $NIX_SSHOPTS ${cfg.targetHost} "sudo systemctl reboot"
+            fi
           '';
           serviceConfig = {
             Type = "oneshot";
             User = "root";
             StateDirectory = "push-deploy";
-            # sandbox VM-tested in tests/push-deploy-sandbox.nix. PrivateTmp:
-            # nixos-rebuild-ng's ssh ControlMaster socket; /root/.cache: nix
-            # eval scratch, created by tmpfiles below (ReadWritePaths won't)
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             PrivateTmp = true;
@@ -180,9 +119,10 @@ in
           };
         };
 
-        # ReadWritePaths targets must exist before the unit's mount namespace
-        # is set up; the staleness marker exists from activation, so
-        # health-alerts doesn't page "missing" before the first run
+        # ReadWritePaths targets must exist before the unit starts, or it
+        # fails to set up its mount namespace; the staleness marker exists
+        # from activation, so health-alerts doesn't page "missing" before
+        # the first run
         systemd.tmpfiles.rules = [
           "d /root/.cache 0700 root root -"
           "d /root/.ssh 0700 root root -"
@@ -190,7 +130,7 @@ in
           "f /var/lib/push-deploy/deployed-${cfg.hostAttr} 0644 root root -"
         ];
 
-        systemd.timers."push-deploy-${cfg.hostAttr}" = lib.mkIf cfg.scheduleEnable {
+        systemd.timers."push-deploy-${cfg.hostAttr}" = {
           wantedBy = [ "timers.target" ];
           timerConfig = {
             OnCalendar = cfg.dates;

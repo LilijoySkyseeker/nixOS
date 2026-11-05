@@ -25,27 +25,11 @@ in
         bind ${wgAddress}
         redir https://${domain}/oops/${game}/ 302
       '';
-
-      # the site loads nothing from third parties
-      securityHeaders = ''
-        header {
-          Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-          X-Content-Type-Options nosniff
-          Referrer-Policy strict-origin-when-cross-origin
-          Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
-          # no includeSubDomains: the game hostnames aren't HTTPS
-          Strict-Transport-Security "max-age=86400"
-          -Server
-        }
-      '';
     in
     {
       # caddy: the public site, ACME through the vps's 80/443 DNAT
       services.caddy = {
         enable = true;
-        # Go 1.27: stable's go 1.26.8 lacks 1.26.9's net/http and net/textproto fixes
-        # TODO: drop when NixOS/nixpkgs#571809 (go 1.26.9) is in nixos-26.05
-        package = pkgs-stable.caddy.override { buildGoModule = pkgs-stable.buildGo127Module; };
         # no HTTP/3: the vps doesn't forward UDP 443
         # no HTTP/2: caddy 2.11.7's vendored x/net 0.59 has the HTTP/2 server DoS bugs
         # TODO: drop when a caddy release with caddyserver/caddy#8179 (x/net 0.60) is in nixos-26.05, and restore h2
@@ -59,7 +43,7 @@ in
         virtualHosts.${domain}.extraConfig = ''
           bind ${wgAddress}
           encode zstd gzip
-          ${securityHeaders}
+          header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
           # written by website-status, read by the page's status stickers
           handle /status.json {
             root * ${statusDir}
@@ -81,7 +65,6 @@ in
           redir https://${domain}{uri} permanent
         '';
         virtualHosts."minecraft.${domain}".extraConfig = gameOops "minecraft";
-        virtualHosts."hytale.${domain}".extraConfig = gameOops "hytale";
       };
       # the bind address only exists once wg0 is up
       systemd.services.caddy = {
@@ -138,15 +121,12 @@ in
         443
       ];
 
-      # website-deploy: build main's newest commit and swap it in
       # its own user, so evaluating the site's flake can't read anything root-only
       users.users.website = {
         isSystemUser = true;
         group = "website";
       };
       users.groups.website = { };
-      # profile-server allows root only; this adds the deploy user (the lists merge)
-      nix.settings.allowed-users = [ "website" ];
       systemd.services.website-deploy = {
         description = "Build skyseekerlabs.net from main and publish it";
         after = [ "network-online.target" ];
@@ -222,7 +202,6 @@ in
         };
       };
 
-      # website-status: the numbers behind the status stickers
       systemd.services.website-status = {
         description = "Write the site's status.json";
         path = with pkgs-stable; [ coreutils ];

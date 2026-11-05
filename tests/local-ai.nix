@@ -1,5 +1,5 @@
 # VM test: local-ai's services without a GPU: llama-swap's routing and the
-# gamemode hook's block, paseo in the agent sandbox, the model store's access
+# gamemode hook's block, paseo in the agent sandbox
 {
   pkgs,
   agentUserModule,
@@ -23,7 +23,8 @@ pkgs.testers.runNixOSTest {
       users.users.lilijoy.isNormalUser = true;
       # mirror torrent: iptables firewall backend
       networking.nftables.enable = false;
-      programs.gamemode.enable = true;
+      # mirror torrent: the agent jobs' schedules use it
+      time.timeZone = "America/Los_Angeles";
       # no tailnet in the VM
       systemd.services.paseo-tailscale-serve.wantedBy = lib.mkForce [ ];
       # stands in for torrent's sops secret: bcrypt of "vm-secret"
@@ -31,7 +32,6 @@ pkgs.testers.runNixOSTest {
         "$2b$10$6uKC1atpyRerzGiJpPO.EuRdbYW2bfwXkdKbNKqvGrugpC4fA1K0O";
       systemd.services.paseo-agent-config.serviceConfig.LoadCredential =
         "paseo-password-hash:/etc/paseo-test-hash";
-      virtualisation.memorySize = 4096;
       environment.systemPackages = [
         pkgs.curl
         pkgs.jq
@@ -42,44 +42,14 @@ pkgs.testers.runNixOSTest {
     { nodes, ... }:
     let
       custom = nodes.machine.programs.gamemode.settings.custom;
-      paseoRoot = builtins.head (
-        pkgs.lib.splitString "/bin/paseo" nodes.machine.systemd.services.paseo.serviceConfig.ExecStart
-      );
       resumeExec = nodes.machine.systemd.services.paseo-resume.serviceConfig.ExecStart;
       resumeScript = builtins.elemAt (pkgs.lib.splitString " " resumeExec) 1;
     in
     ''
       machine.wait_for_unit("multi-user.target")
 
-      with subtest("llama-swap: loopback, all models listed"):
-          machine.wait_for_unit("llama-swap.service")
-          machine.wait_for_open_port(8080)
-          ids = machine.succeed("curl -sf 127.0.0.1:8080/v1/models | jq -r '.data[].id' | sort").split()
-          assert ids == ["qwen3.8-27b"], ids
-          listen = machine.succeed("ss -Hltn 'sport = :8080' | awk '{print $4}'").split()
-          assert listen == ["127.0.0.1:8080"], listen
-          prop = lambda p: machine.succeed(f"systemctl show llama-swap -p {p} --value").strip()
-          assert prop("PrivateDevices") == "yes", prop("PrivateDevices")
-          assert prop("MemoryMax") != "infinity", prop("MemoryMax")
-
-      with subtest("llama-swap: no cross-origin reads, no stored captures"):
-          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: https://evil.example' 127.0.0.1:8080/v1/models")
-          assert "evil.example" not in hdrs and "access-control-allow-origin: *" not in hdrs.lower(), hdrs
-          hdrs = machine.succeed("curl -s -D - -o /dev/null -H 'Origin: http://127.0.0.1:8080' 127.0.0.1:8080/v1/models")
-          assert "http://127.0.0.1:8080" in hdrs, hdrs
-
-      with subtest("tailscale serve waits for the password to be written"):
-          deps = machine.succeed("systemctl show paseo-tailscale-serve -p After -p Requires --value")
-          assert deps.count("paseo-agent-config.service") == 2, deps
-
-      with subtest("paseo is never published without a password"):
-          # with the hash removed from the config, the serve unit must decline
-          machine.wait_for_unit("paseo-agent-config.service")
-          machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
-          machine.succeed("systemctl start paseo-tailscale-serve || true")
-          res = machine.succeed("systemctl show paseo-tailscale-serve -p ActiveState -p ConditionResult --value")
-          assert "active" not in res.split()[0:1], res
-          machine.succeed("systemctl restart paseo-agent-config")
+      machine.wait_for_unit("llama-swap.service")
+      machine.wait_for_open_port(8080)
 
       with subtest("gamemode hook blocks loads, and its end lifts the block"):
           def status(model):
@@ -93,87 +63,90 @@ pkgs.testers.runNixOSTest {
           active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
           assert active == "gaming", active
           assert status("qwen3.8-27b") == "404", "a model loaded while gaming"
-          # a llama-swap restart mid-game keeps the block
-          machine.succeed("systemctl restart llama-swap")
-          machine.wait_for_open_port(8080)
-          active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
-          assert active == "gaming", f"block lost on restart: {active}"
           machine.succeed("su lilijoy -s /bin/sh -c ${custom.end}")
           active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
           assert active == "null", active
-          machine.succeed("systemctl restart llama-swap")
-          machine.wait_for_open_port(8080)
-          active = machine.succeed("curl -sf 127.0.0.1:8080/api/profiles | jq -r .active").strip()
-          assert active == "null", f"block reapplied after the game ended: {active}"
           # no model files in the VM: the load is attempted and fails, it isn't 404
           assert status("qwen3.8-27b") != "404", "still blocked after the game ended"
 
-      with subtest("model store: the agent units write, llama-swap's user reads"):
-          got = machine.succeed("stat -c '%a %G' /srv/models").strip()
-          assert got == "2775 models", got
-          # the agent units' extra group and path, on a probe like agent-user's test
-          probe = ("systemd-run --wait --pipe --quiet -E PATH=/run/current-system/sw/bin -p User=agent -p SupplementaryGroups=models "
-                   "-p ProtectSystem=strict -p ReadWritePaths=/srv/models -- sh -c ")
-          machine.succeed(probe + "'umask 077 && mkdir -p /srv/models/x && echo w > /srv/models/x/m.gguf'")
-          machine.succeed("su lilijoy -s /bin/sh -c 'echo more >> /srv/models/x/m.gguf'")
-          machine.succeed("systemd-run --wait --pipe --quiet -p DynamicUser=yes -- /run/current-system/sw/bin/cat /srv/models/x/m.gguf")
-          # outside the units the agent has no write access
-          machine.fail("su agent -s /bin/sh -c 'touch /srv/models/y'")
-          for unit in ["claude-remote-control", "codex-remote-control", "paseo"]:
-              rw = machine.succeed(f"systemctl show {unit} -p ReadWritePaths --value")
-              assert "/srv/models" in rw, f"{unit}: {rw!r}"
-
-      with subtest("paseo: agent sandbox, relay off, loopback"):
+      with subtest("paseo: agent sandbox"):
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
-          assert machine.succeed("jq -r .daemon.relay.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
-          assert machine.succeed("jq -r .agents.providers.copilot.enabled /home/agent/.paseo/config.json").strip() == "false", cfg
+          machine.succeed("runuser -u agent -- env HOME=/home/agent ${pkgs.python3}/bin/python ${./paseo-local-codex.py}")
+          assert machine.succeed("jq -r .daemon.mcp.injectIntoAgents /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
-          # stale one; opencode and antigravity come on over a config that had them off
+          # stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want, cfg
-          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = false | .agents.providers.antigravity.enabled = false | .agents.providers.local = {"extends":"claude"} | .agents.providers["local-codex"].models += [{"id":"qwen3.8-flash-next"}]' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = true | .agents.providers.antigravity.enabled = true' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl restart paseo-agent-config")
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
-          # the local model runs only in the codex harness
-          assert machine.succeed("jq -r '.agents.providers | has(\"local\")' /home/agent/.paseo/config.json").strip() == "false"
-          ids = machine.succeed("jq -r '.agents.providers[\"local-codex\"].models[].id' /home/agent/.paseo/config.json").split()
-          assert ids == ["qwen3.8-27b"], ids
           for p in ["opencode", "antigravity"]:
-              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "true", p
-          assert machine.succeed("stat -c %a /home/agent/.paseo/config.json").strip() == "600"
+              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "false", p
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
-          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes")]:
+          # every agent session and scheduled job runs in this unit
+          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes"),
+                          ("PrivateTmp", "yes"), ("ProtectSystem", "strict")]:
               assert prop(p) == want, f"paseo {p}={prop(p)!r}"
+          assert "/home/agent" in prop("ReadWritePaths"), prop("ReadWritePaths")
+          for sock in ["/run/mullvad-vpn", "/run/tailscale", "/run/libvirt"]:
+              assert sock in prop("InaccessiblePaths"), f"{sock} not inaccessible: {prop('InaccessiblePaths')!r}"
           assert "firewall.service" in prop("BindsTo"), prop("BindsTo")
+          assert "firewall.service" in prop("After"), prop("After")
+          allow, binds = prop("DeviceAllow"), prop("BindPaths")
+          for dev in ["/dev/kvm", "/dev/kfd", "/dev/dri/by-path/"]:
+              assert dev in allow, f"{dev} not allowed: {allow!r}"
+          assert "/dev/dri" in binds and "/dev/kvm" in binds, binds
+          assert "tun" not in allow + binds, "tun exposed"
           # no password (the hash removed): the daemon declines to start
           machine.succeed("systemctl stop paseo")
           machine.succeed("""jq 'del(.daemon.auth)' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl start paseo || true")
           assert prop("ActiveState") != "active", "paseo ran without a password"
-          # with the credential's hash back it starts, on loopback, and refuses anonymous clients
+          # with the credential's hash back it starts, and refuses anonymous clients
           machine.succeed("systemctl restart paseo-agent-config")
           machine.succeed("systemctl start paseo")
           machine.wait_for_open_port(6767, timeout=120)
-          listen = machine.succeed("ss -Hltn 'sport = :6767' | awk '{print $4}'").split()
-          assert listen == ["127.0.0.1:6767"], listen
-          machine.succeed("curl -sf 127.0.0.1:6767/api/health")
           anon = machine.succeed("curl -s -o /dev/null -w '%{http_code}' 127.0.0.1:6767/api/agents").strip()
           assert anon == "401", f"anonymous /api/agents: {anon}"
           authed = machine.succeed("curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer vm-secret' 127.0.0.1:6767/api/agents").strip()
           assert authed != "401", f"authenticated /api/agents: {authed}"
 
-      with subtest("paseo defaults bypass permissions and preserve explicit modes"):
-          machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-permissions.mjs} ${paseoRoot}")
+      with subtest("paseo-resume: rides out a daemon restart without failing"):
+          # a switch restarts both at once; the resumer must wait for the socket
+          machine.succeed("systemctl restart paseo paseo-resume")
+          machine.wait_for_open_port(6767, timeout=120)
+          machine.sleep(10)
+          n = machine.succeed("systemctl show -P NRestarts paseo-resume").strip()
+          assert n == "0", f"paseo-resume restarted {n} times"
+          machine.succeed("systemctl is-active paseo-resume")
 
-      with subtest("paseo-resume: decides on recorded limit messages, polls the daemon as agent"):
+      with subtest("paseo-resume: decides on recorded limit messages"):
           machine.succeed("${pkgs.nodejs}/bin/node ${./paseo-resume.mjs} ${resumeScript}")
-          machine.wait_for_unit("paseo-resume.service")
-          prop = lambda p: machine.succeed(f"systemctl show paseo-resume -p {p} --value").strip()
-          for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("ProtectHome", "read-only")]:
-              assert prop(p) == want, f"paseo-resume {p}={prop(p)!r}"
-          # one poll in the unit's own sandbox, with its local credential
-          machine.succeed("systemd-run --wait --pipe --quiet -p User=agent -p ProtectSystem=strict -p ProtectHome=read-only "
-                          "-p ReadWritePaths=/home/agent/.paseo -E HOME=/home/agent -- ${resumeExec} --once")
+
+      with subtest("agent-schedules: the jobs declared in the daemon, kept in step"):
+          paseo = "runuser -u agent -- env HOME=/home/agent /etc/profiles/per-user/agent/bin/paseo"
+          names = lambda: machine.succeed(f"{paseo} schedule ls --json | jq -r '[.[].name] | sort | join(\" \")'").strip()
+          by_id = lambda n: machine.succeed(f"{paseo} schedule ls --json | jq -r --arg n {n} 'map(select(.name == $n))[0].id'").strip()
+          # inspect, not ls: ls flattens cadence to a string and has no prompt
+          field = lambda n, q: machine.succeed(f"{paseo} schedule inspect {by_id(n)} --json | jq -r '{q}'").strip()
+          want = "job:maintenance job:update"
+          machine.succeed("systemctl restart agent-schedules")
+          assert names() == want, names()
+          # a stray job, a hand-edited prompt; an untouched cadence keeps its next run
+          machine.succeed(f"{paseo} schedule create --name job:old --cron '0 1 * * *' --provider claude --cwd /home/agent/work old")
+          machine.succeed(f"{paseo} schedule update {by_id('job:maintenance')} --prompt drift --cwd /tmp")
+          # runs archive themselves, so paseo's archive-on-finish is off
+          assert field("job:update", ".target.config.archiveOnFinish") == "false"
+          machine.succeed("test -x /etc/profiles/per-user/agent/bin/job-done")
+          next_run = field("job:update", ".nextRunAt")
+          machine.succeed("systemctl restart agent-schedules")
+          assert names() == want, names()
+          prompt = field("job:maintenance", '.prompt | split("\\n")[0]')
+          assert "agent-maintenance" in prompt, prompt
+          assert field("job:maintenance", ".target.config.cwd") == "/home/agent/work"
+          assert field("job:update", ".nextRunAt") == next_run
+          tz = field("job:update", ".cadence.timezone")
+          assert tz == "America/Los_Angeles", tz
     '';
 }

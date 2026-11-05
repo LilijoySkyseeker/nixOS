@@ -66,6 +66,6 @@ For a change going to a live host (`vps`, `homelab`):
 - `modules/nixos/zrepl.nix` or any `myZrepl` block: also run
   `nix build .#checks.x86_64-linux.zrepl-replication`. Retention rules
   fail silently in a build: a keep rule that condemns the wrong snapshots
-  is a perfectly valid config file. See `docs/backups.md`, "Gotchas".
+  is a perfectly valid config file.
 - A change to a shared module or profile: build every affected host
   locally before pushing; the pre-push hook will, but slower to fail.

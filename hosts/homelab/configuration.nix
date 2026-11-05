@@ -11,37 +11,12 @@
     ./disko.nix
   ];
 
-  # System installed pkgs
-  environment.systemPackages = with pkgs-stable; [
-    zfs
-    restic
-    backblaze-b2
-    btop
-  ];
-
   boot = {
-    # disable staggered hdd spin up
-    extraModprobeConfig = ''
-      options libahci ignore_sss=1
-    '';
-
     # force BOT instead of UAS for the TerraMaster enclosure's ASMedia bridge
     # (174c:55aa), which silently corrupts in-flight data under UAS load
     kernelParams = [ "usb-storage.quirks=174c:55aa:u" ];
   };
 
-  # tailscale UDP GRO forwarding compatibility, enp3s0 is this host's real NIC
-  services.networkd-dispatcher = {
-    enable = true;
-    rules."50-tailscale" = {
-      onState = [ "routable" ];
-      script = ''
-        ${lib.getExe pkgs-stable.ethtool} -K enp3s0 rx-udp-gro-forwarding on rx-gro-list off
-      '';
-    };
-  };
-
-  # docker settings
   # SECURITY: the LAN NIC has a public IPv6 and myDockerPublishGuard is
   # IPv4-only; do not set `ipv6 = true` or restore userland-proxy without
   # extending the guard to ip6tables, or the game ports go internet-facing
@@ -56,7 +31,7 @@
     enable = true;
     allowedInterfaces = [
       "wg0" # public players, DNAT'd in by vps (its networking.nat.forwardPorts)
-      "tailscale0" # our own devices
+      "tailscale0"
     ];
     ports = [
       {
@@ -72,39 +47,13 @@
     ];
   };
 
-  # oci containers
   virtualisation.oci-containers.backend = "docker";
 
-  # container uid 0 != host uid 0; per-path uid migrations live in
-  # modules/services/minecraft.nix next to its path
+  # container uid 0 != host uid 0
   myDockerUserns.enable = true;
 
-  # update microcode
-  hardware.cpu.intel.updateMicrocode = true;
-
-  # GPU hardware acceleration for Jellyfin
-  hardware.graphics = {
-    enable = true;
-    extraPackages = with pkgs-stable; [
-      intel-media-driver # VAAPI/QSV for Kaby Lake HD 630
-      vpl-gpu-rt
-    ];
-  };
-  services.xserver.videoDrivers = [ "nvidia" ];
-  hardware.nvidia = {
-    # nvidiaPackages.stable (production) dropped Pascal support upstream
-    # plan: 2026-09-03-fix-homelab-jellyfin-ffmpeg-high-cpu-nvidia-driver-dropped-gtx-1050.md
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
-    # GP107 (Pascal) predates Nvidia's open-source kernel modules (Turing+ only)
-    open = false;
-    modesetting.enable = true;
-    nvidiaSettings = false; # headless, no GUI settings app needed
-  };
-
-  # Set your time zone.
   time.timeZone = "America/Los_Angeles";
 
-  # networking
   networking.networkmanager = {
     enable = true;
     insertNameservers = [
@@ -113,7 +62,6 @@
     ];
   };
 
-  # directory permissions
   # don't lock down /srv itself (0770 root breaks traversal for its non-root
   # services); its secrets are protected at the leaves, in each service module
   systemd.tmpfiles.rules = [
@@ -121,7 +69,6 @@
     "A /storage-bulk - - - - group:multimedia:rwx"
   ];
 
-  # sops
   sops.secrets = {
     homelab_backblaze_rclone_config = { };
     homelab_backblaze_restic_password = { };
@@ -131,11 +78,10 @@
     };
   };
 
-  # restic to backblaze with rclone https://restic.readthedocs.io/en/latest/050_restore.html
   services.restic.backups = {
     backblazeWeekly = {
       initialize = true;
-      createWrapper = true; # usable with restic-backblazeWeekly
+      createWrapper = true;
       passwordFile = "${config.sops.secrets.homelab_backblaze_restic_password.path}";
       # using rclone because the normal restic s3 b2 integration did not work with both the service and the wrapper, "Daily" name is legacy
       repository = "rclone:backblazeDaily:restic21029709384";
@@ -199,7 +145,6 @@
   };
   systemd.services.restic-backups-backblazeWeekly = {
     path = with pkgs-stable; [
-      # necessary for pre and post scripts
       zfs
       coreutils-full
       mount
@@ -215,7 +160,6 @@
       # 0700: holds the mounted snapshots of the persisted-state and media trees
       RuntimeDirectory = "restic-backups-backblazeWeekly";
       RuntimeDirectoryMode = "0700";
-      # backblaze bucket config
       ExecStartPre = "${pkgs-stable.rclone}/bin/rclone backend lifecycle backblazeDaily:restic21029709384 --config ${config.sops.secrets.homelab_backblaze_rclone_config.path} -o daysFromHidingToDeleting=1";
       # time since last success timer for alerting
       ExecStartPost = "${pkgs-stable.coreutils}/bin/touch /var/lib/restic-backups-backblazeWeekly/last-success";
@@ -270,7 +214,6 @@
   # mountpoint=none), so nixpkgs otherwise generates no import unit
   boot.zfs.extraPools = [ "zbackup" ];
 
-  # zfs snapshots + replication (zrepl)
   # pull, never push: zrepl's receiver exposes DestroySnapshots, so a
   # compromised source must have no handle on this host's backup history
   # restart on key rotation; a killed pull just retries next interval
@@ -311,40 +254,26 @@
         "zdata/storage/storage"
         "zdata/storage/storage-bulk"
         "zroot/local/state"
-      ]
-      # onsite/offsite myDatasets entries join local replication
-      # automatically; homelab is the "local" role for its own datasets.
-      ++ config.myDatasetsReplicated;
+      ];
       rootFs = "zbackup/backup";
       clientIdentity = "homelab";
     };
-
-    preserveLegacySnapshots = false;
   };
 
-  # cpu power management
-  powerManagement.cpuFreqGovernor = "performance";
-
-  # disable emergencymode
   systemd.enableEmergencyMode = false;
 
-  # lock down users
+  # accounts are only what this config declares; `passwd` or `useradd` here does not outlive a switch
   users.mutableUsers = false;
-  #users.users.root.hashedPassword = "!";
 
-  # Define your hostname.
   networking.hostName = "homelab";
 
-  # weekly deploy of master, servers first: homelab Tue, vps Wed, PCs Thu,
-  # so an update that breaks the servers hasn't yet reached the PCs used
-  # to fix them. homelab is slow to build, hence a day each.
-  # by hand: cd /etc/nixos && git pull && nh os switch
+  # nightly deploy of master; vps follows homelab's revision, so homelab
+  # goes first (03:00) and vps after it (04:00)
   myPullDeploy = {
     enable = true;
     hostAttr = "homelab";
-    dates = "Tue 03:00";
+    dates = "03:00";
     operation = "switch";
-    autoReboot = true;
     # the weekly restic->Backblaze run can take days (~2.9TiB), and a switch
     # restarts any changed unit, so defer rather than kill it
     protectedUnits = [ "restic-backups-backblazeWeekly.service" ];
@@ -359,8 +288,10 @@
     hostAttr = "vps";
     targetHost = "vps-deploy@vps";
     identityFile = config.sops.secrets.homelab_vps_deploy_key.path;
-    dates = "Wed 03:00";
+    dates = "04:00";
   };
+  # a homelab deploy still running at 04:00 holds vps's push until it ends
+  systemd.services.push-deploy-vps.after = [ "pull-deploy.service" ];
   # heartbeat: check in with vps every 5m through the deploy key's
   # dispatcher. vps alerts when homelab goes silent; vps-ok below goes stale
   # when vps does. own known_hosts in the state dir: ProtectHome hides /root
@@ -383,7 +314,7 @@
       # under the 5m interval: a hung run would block every later tick
       TimeoutStartSec = "2min";
       StateDirectory = "heartbeat";
-      # docs/hardening.md sandboxing baseline; root only to read the key
+      # root only to read the key
       NoNewPrivileges = true;
       ProtectSystem = "strict";
       ProtectHome = true;
@@ -402,15 +333,13 @@
   };
 
   # no catch-up run at boot after an outage: it would contend with zrepl's
-  # own post-boot catch-up replication; next week's run is soon enough
+  # own post-boot catch-up replication; the next night's run is soon enough
   systemd.timers.pull-deploy.timerConfig.Persistent = lib.mkForce false;
   systemd.timers.push-deploy-vps.timerConfig.Persistent = lib.mkForce false;
 
-  # discord alerts for ZFS/SMART/failed-unit/stuck-switch issues
   myHealthAlerts = {
     enable = true;
     webhookUrlFile = config.sops.secrets.discord_webhook.path;
-    interval = "*:0/15";
     # hours; zrepl replicates every 15m
     backupStaleness = {
       "zbackup/backup/homelab/zdata/storage/storage" = 6;
@@ -429,7 +358,7 @@
       "/var/lib/restic-backups-backblazeWeekly/last-success" = 312;
       # a failed deploy pages via the failed-units check; these catch one
       # that stops running or keeps deferring (restic). 504h = 21 days:
-      # weekly deploys, plus room for a restic deferral and a week of slack
+      # room for a restic run of days, which defers every night's deploy
       "/var/lib/pull-deploy/deployed" = 504;
       "/var/lib/push-deploy/deployed-vps" = 504;
       # mtime is the deployed nixpkgs' date: no input update has reached
@@ -446,28 +375,12 @@
     };
   };
 
-  # ssh server
   users.users.root.openssh.authorizedKeys.keys = vars.publicSshKeys;
   services.openssh = {
     enable = true;
-    allowSFTP = true;
     # LAN NIC has a public IPv6; port 22 is opened on tailscale0 only, below
     openFirewall = false;
-    settings.KbdInteractiveAuthentication = false;
-    # must be a structured option: sshd is first-directive-wins and the
-    # module renders its own default before extraConfig
-    settings.PasswordAuthentication = false;
-    extraConfig = ''
-      PermitRootLogin = prohibit-password
-      AllowTcpForwarding no
-      X11Forwarding no
-      AllowAgentForwarding no
-      AllowStreamLocalForwarding no
-      AuthenticationMethods publickey
-      PermitTunnel no
-      ClientAliveInterval 60
-      ClientAliveCountMax 5
-    '';
+    settings.PermitRootLogin = "prohibit-password";
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -477,29 +390,13 @@
   };
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
 
-  # zfs support
-  boot.supportedFilesystems = [ "zfs" ];
-  services.zfs = {
-    autoScrub.enable = true;
-    trim.enable = true;
-  };
+  services.zfs.autoScrub.enable = true;
   networking.hostId = "e0019fd8";
-
-  # tailscale: advertise the LAN subnet and act as an exit node
-  # overrides the fleet's "client" default (also sets ip forwarding); without
-  # it the advertise flags below silently stop working
-  services.tailscale.useRoutingFeatures = lib.mkForce "both";
-  services.tailscale.extraUpFlags = lib.mkAfter [
-    "--advertise-routes=192.168.1.0/24"
-    "--advertise-exit-node"
-  ];
 
   # wireguard: dial out to the vps as our public endpoint from behind CGNAT
   # wireguard-wg0 is a RemainAfterExit oneshot that reads the key once, so a
   # rotation needs an explicit restart (cycles the peer units too)
   sops.secrets.homelab_wireguard_private_key.restartUnits = [ "wireguard-wg0.service" ];
-  # same PSK as vps's wireguard_vps_homelab_psk
-  sops.secrets.wireguard_vps_homelab_psk.restartUnits = [ "wireguard-wg0.service" ];
   networking.wireguard.interfaces.wg0 = {
     ips = [ "10.100.0.2/24" ];
     privateKeyFile = config.sops.secrets.homelab_wireguard_private_key.path;
@@ -507,7 +404,6 @@
       {
         # vps
         publicKey = "ngxeCJV7bMtJQS1x93UhEuiWdLNXbCAsESrN4bcOrxk=";
-        presharedKeyFile = config.sops.secrets.wireguard_vps_homelab_psk.path;
         # IPv4, not IPv6: homelab's rotating IPv6 privacy addresses leave
         # vps's learned endpoint stale and the tunnel silently dies
         endpoint = "137.184.45.18:51820";
@@ -522,32 +418,16 @@
   # modes; takes full effect only after a mount cycle, not just a switch
   myZfsDatasetProperties."zroot/local/state".snapdir = "disabled";
 
-  # pool root datasets' properties, applied live as well as at disko install
   myZfsDatasetProperties."zroot" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zdata" = vars.zfsRootFsOptions;
   myZfsDatasetProperties."zbackup" = vars.zfsRootFsOptions;
 
-  # myDatasets: per-service ZFS datasets, tiered.
   # a new entry needs a manual zfs create on the live host before deploy
-  # (docs/procedures/new-service.md)
   myDatasets = {
-    # jellyfin cacheDir + /var/lib/docker reclassified persist
-    # managePersistence = false: entries already exist elsewhere
-    # (jellyfin.nix's cacheDir, the /var/lib/docker line below)
-    # no owner/group either, they'd have no effect
-    "zroot/persist/jellyfin-cache" = {
-      tier = "persist";
-      mountpoint = config.services.jellyfin.cacheDir;
-      managePersistence = false;
-    };
-    "zroot/persist/docker" = {
-      tier = "persist";
-      mountpoint = "/var/lib/docker";
-      managePersistence = false;
-    };
+    "zroot/persist/jellyfin-cache".mountpoint = config.services.jellyfin.cacheDir;
+    "zroot/persist/docker".mountpoint = "/var/lib/docker";
   };
 
-  # impermanance
   fileSystems."/nix/state".neededForBoot = true;
   fileSystems."/nix".neededForBoot = true;
   boot.initrd = {
@@ -568,9 +448,7 @@
     };
   };
 
-  # persistence
   environment.persistence."/nix/state" = {
-    # https://github.com/nix-community/impermanence?tab=readme-ov-file#module-usage
     enable = true;
     hideMounts = true;
     directories = [

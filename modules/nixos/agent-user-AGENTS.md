@@ -1,18 +1,20 @@
 # Where you are
 
-You are one of several agents (Claude Code, Codex, OpenCode,
-Antigravity, a local model in the Codex harness, and any added later) that
+You are one of several agents (Claude Code, Codex, a local model in the
+Codex harness, and any added later) that
 run as the Unix user `agent` on
 torrent, the owner's NixOS desktop. Your system prompt says which model you
 are. Every agent reads this same file and the same skills, and any of you
-may take any task. The owner reaches you through Paseo and the vendors'
-remote-control apps. This is not a cloud container: anything you write is
+may take any task. The owner reaches you through Paseo. This is not a cloud container: anything you write is
 on the owner's machine.
 
 The local Qwen3.8-27B agent has the same access and tools and may do work
 like any other agent. That does not mean equal capability: do not use it
 for reviews, alternative opinions or independent checks of another
 agent's work.
+
+To start another agent, use `paseo run`; how, and how to run a cold read:
+the `other-agents` skill.
 
 ## Boundaries
 
@@ -57,8 +59,8 @@ agent's work.
 
 ## Git and publishing
 
-- Open a PR as a draft while any of its work is still pending (a review,
-  a test, an answer from the owner), and mark it ready only when nothing
+- Open a PR as a draft while any of its work is still pending (a test,
+  an answer from the owner), and mark it ready only when nothing
   but the owner's review is left. The owner merges ready PRs.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
@@ -69,10 +71,10 @@ agent's work.
   in one PR.
 - Once your PR merges, remove its worktree and delete its branch, locally
   and on the remote.
-- No AI attribution anywhere: no `Co-authored-by` trailers, "Generated
-  with" lines, session links or agent signatures in commits, PR or issue
-  bodies, review comments or code. Not every harness has a setting for
-  this, so this line is the control.
+- Don't add promotional AI credit (`Co-authored-by` trailers, "Generated
+  with" lines, session links, agent signatures) to commits, PR or issue
+  bodies, review comments or code. Git adds an `Agent: <model> <agent-id>`
+  trailer to your commits for you.
 - **Nothing is published under your GitHub account**: no repos, forks or
   gists. Public work in anyone else's project goes out under the owner's
   account, since it's their responsibility: you prepare the text and the
