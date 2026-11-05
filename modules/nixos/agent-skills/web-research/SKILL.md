@@ -11,21 +11,12 @@ description: How to read the web from torrent. Use when a site refuses you (a 40
 browser headers, then curl-impersonate, then real Chromium through nodriver
 in a virtual display, which waits out Cloudflare-style challenges.
 
-- `--html` prints the raw page; `-o FILE` saves a PDF or other file.
-- Save long pages to a file rather than printing them whole.
 - `web-fetch --feed URL` prints an RSS or Atom feed's entries, dated and
   linked. Given a site's page, it finds the feed the page links to. For
   "what's new on this site", a feed is quicker than the pages and is rarely
   walled.
 - It discards 4xx bodies. Some sites answer "no record" as a 404 with a
   page; when that matters, use curl-impersonate yourself and keep the body.
-- Plain `curl` works on many docs sites (code.claude.com's `.md` URLs) where
-  the browser tier is slower.
-
-## Papers
-
-The open routes are often quicker than the publisher: arXiv, Europe PMC,
-and the Unpaywall, OpenAlex and Crossref APIs.
 
 ## The line
 
@@ -35,9 +26,7 @@ is access control: don't get around paywalls or logins, don't use
 CAPTCHA-solving services or proxy networks, and keep to the pace of a person
 reading.
 
-A wall `web-fetch` can't pass goes in `~/work/ENVIRONMENT.md` (date, agent,
-URL, the error per tier, what you did instead). Known hard walls:
-archive.today (429s), some Cloudflare "interactive" challenges
+Known hard walls: archive.today (429s), some Cloudflare "interactive" challenges
 (FastPeopleSearch detail pages, Planet Minecraft, Fimfiction). The Wayback
 Machine (`web.archive.org/web/<ts>id_/<url>`) is often the fallback; its
 availability API (`archive.org/wayback/available`) 429s, so ask for
