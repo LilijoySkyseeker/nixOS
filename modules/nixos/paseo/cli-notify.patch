@@ -1,0 +1,194 @@
+diff --git a/packages/cli/src/commands/agent/run.ts b/packages/cli/src/commands/agent/run.ts
+index 86cca5f75..be1476bcf 100644
+--- a/packages/cli/src/commands/agent/run.ts
++++ b/packages/cli/src/commands/agent/run.ts
+@@ -28,6 +28,10 @@ export function addRunOptions(cmd: Command): Command {
+       .description("Create and start an agent with a task")
+       .argument("<prompt>", "The task/prompt for the agent")
+       .option("--no-wait", "Return immediately without waiting for completion")
++      .option(
++        "--no-notify",
++        "Don't message the calling agent when this agent finishes, errors or needs permission",
++      )
+       // COMPAT(backgroundRunFlag): --background was the documented spelling of
+       // --no-wait. Added in v0.2.0; remove after 2027-04-01.
+       .addOption(new Option("-d, --background", "Legacy alias for --no-wait").hideHelp())
+@@ -115,6 +119,7 @@ export const agentRunSchema: OutputSchema<AgentRunResult> = {
+ 
+ export interface AgentRunOptions extends CommandOptions {
+   wait?: boolean;
++  notify?: boolean;
+   background?: boolean;
+   detach?: boolean;
+   title?: string;
+@@ -710,6 +715,7 @@ export async function runRunCommand(
+       cwd: runCwd,
+       workspaceId,
+       callerAgentId,
++      notifyOnFinish: options.notify !== false,
+       title: resolvedTitle,
+       modeId: options.mode,
+       model: resolvedProviderModel.model,
+diff --git a/packages/client/src/daemon-client.ts b/packages/client/src/daemon-client.ts
+index 524c3e264..ab597cef3 100644
+--- a/packages/client/src/daemon-client.ts
++++ b/packages/client/src/daemon-client.ts
+@@ -472,6 +472,7 @@ export interface CreateAgentRequestOptions extends AgentConfigOverrides {
+   env?: CreateAgentRequestMessage["env"];
+   workspaceId?: string;
+   callerAgentId?: string;
++  notifyOnFinish?: boolean;
+   initialPrompt?: string;
+   idempotencyKey?: string;
+   clientMessageId?: string;
+@@ -3194,6 +3195,7 @@ export class DaemonClient {
+       ...(options.env ? { env: options.env } : {}),
+       ...(options.workspaceId !== undefined ? { workspaceId: options.workspaceId } : {}),
+       ...(options.callerAgentId !== undefined ? { callerAgentId: options.callerAgentId } : {}),
++      ...(options.notifyOnFinish !== undefined ? { notifyOnFinish: options.notifyOnFinish } : {}),
+       ...(options.initialPrompt ? { initialPrompt: options.initialPrompt } : {}),
+       idempotencyKey: options.idempotencyKey,
+       ...(options.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
+@@ -7408,6 +7410,7 @@ function resolveAgentConfig(options: CreateAgentRequestOptions): AgentSessionCon
+     idempotencyKey: _idempotencyKey,
+     clientMessageId: _clientMessageId,
+     callerAgentId: _callerAgentId,
++    notifyOnFinish: _notifyOnFinish,
+     outputSchema: _outputSchema,
+     attachments: _attachments,
+     worktree: _worktree,
+diff --git a/packages/protocol/src/messages.ts b/packages/protocol/src/messages.ts
+index 704c7ad27..e04750beb 100644
+--- a/packages/protocol/src/messages.ts
++++ b/packages/protocol/src/messages.ts
+@@ -1757,6 +1757,8 @@ export const CreateAgentRequestMessageSchema = z.object({
+   // Optional caller context lets managed CLI invocations use the same daemon-owned
+   // workspace and parentage policy as agent-scoped MCP creation.
+   callerAgentId: z.string().optional(),
++  // Message callerAgentId when this agent finishes, errors or needs permission.
++  notifyOnFinish: z.boolean().optional(),
+   worktreeName: z.string().optional(),
+   initialPrompt: z.string().optional(),
+   clientMessageId: z.string().optional(),
+diff --git a/packages/server/src/server/agent/create-agent/create.ts b/packages/server/src/server/agent/create-agent/create.ts
+index 77cdde673..0545bc86d 100644
+--- a/packages/server/src/server/agent/create-agent/create.ts
++++ b/packages/server/src/server/agent/create-agent/create.ts
+@@ -59,6 +59,8 @@ export interface CreateAgentFromSessionInput {
+   env?: Record<string, string>;
+   provisionalTitle: string | null;
+   firstAgentContext: FirstAgentContext;
++  notifyOnFinish?: boolean;
++  callerAgentId?: string;
+ }
+ 
+ export interface CreateAgentFromMcpInput {
+@@ -177,7 +179,6 @@ export async function createAgentCommand(
+     input.onCreated?.({ agentId: snapshot.id, createdWorktree: resolved.createdWorktree ?? null });
+   }
+   const notification =
+-    input.kind === "mcp" &&
+     input.notifyOnFinish &&
+     input.callerAgentId &&
+     resolved.prompt !== undefined
+@@ -185,7 +186,7 @@ export async function createAgentCommand(
+           {
+             childAgentId: snapshot.id,
+             callerAgentId: input.callerAgentId,
+-            requireParentOwnership: !(input.detached ?? false),
++            requireParentOwnership: !(input.kind === "mcp" && input.detached),
+           },
+           true,
+         )
+diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
+index 83ef2acb8..30a5fedff 100644
+--- a/packages/server/src/server/bootstrap.ts
++++ b/packages/server/src/server/bootstrap.ts
+@@ -1858,6 +1858,7 @@ export async function createPaseoDaemon(
+               pluginRuntime,
+               orchestrationSkills,
+               workspaceLabelService,
++              finishSubscriptions,
+             );
+             pluginRuntime.bindPaseoSessionHost(wsServer);
+             await pluginRuntime.start();
+diff --git a/packages/server/src/server/session.ts b/packages/server/src/server/session.ts
+index 3e7898279..fc5d0ec2f 100644
+--- a/packages/server/src/server/session.ts
++++ b/packages/server/src/server/session.ts
+@@ -1,5 +1,6 @@
+ import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
+ import type { AgentMessageDelivery } from "./agent/agent-messages/index.js";
++import type { FinishSubscriptions } from "./agent/finish-subscriptions/index.js";
+ import { AgentDirectory } from "./agent/directory.js";
+ import { ConnectedHostSession } from "./connected-hosts/index.js";
+ import type { ConnectedHosts } from "./connected-hosts/index.js";
+@@ -467,6 +468,7 @@ export interface SessionOptions {
+   agentStorage: AgentStorage;
+   messageReceipts: Pick<MessageReceipts, "send">;
+   agentMessages: AgentMessageDelivery;
++  finishSubscriptions?: FinishSubscriptions;
+   creationService: Pick<CreationService, "create" | "subscribe">;
+   projectRegistry: ProjectRegistry;
+   workspaceRegistry: WorkspaceRegistry;
+@@ -824,6 +826,7 @@ export class Session {
+   private readonly workspaceScripts: WorkspaceScriptsService;
+   private readonly messageReceipts: Pick<MessageReceipts, "send">;
+   private readonly agentMessages: AgentMessageDelivery;
++  private readonly finishSubscriptions?: FinishSubscriptions;
+   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
+   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
+ 
+@@ -910,6 +913,7 @@ export class Session {
+     this.paseoHome = paseoHome;
+     this.messageReceipts = options.messageReceipts;
+     this.agentMessages = options.agentMessages;
++    this.finishSubscriptions = options.finishSubscriptions;
+     this.creationService = options.creationService;
+     this.projectIcons = new ProjectIconReader(paseoHome);
+     this.worktreesRoot = worktreesRoot;
+@@ -4442,6 +4446,7 @@ export class Session {
+         {
+           agentManager: this.agentManager,
+           agentStorage: this.agentStorage,
++          finishSubscriptions: this.finishSubscriptions,
+           logger: this.sessionLogger,
+           paseoHome: this.paseoHome,
+           worktreesRoot: this.worktreesRoot,
+@@ -4449,6 +4454,8 @@ export class Session {
+         },
+         {
+           kind: "session",
++          notifyOnFinish: msg.notifyOnFinish,
++          callerAgentId: msg.callerAgentId,
+           onAgentReady: async (agent) => {
+             createdAgentId = agent.id;
+             await onAgentReady?.(await this.buildAgentPayload(agent));
+diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
+index dfa324315..a12fde761 100644
+--- a/packages/server/src/server/websocket-server.ts
++++ b/packages/server/src/server/websocket-server.ts
+@@ -3,6 +3,7 @@ import {
+   createAgentMessageDelivery,
+   type AgentMessageDelivery,
+ } from "./agent/agent-messages/index.js";
++import type { FinishSubscriptions } from "./agent/finish-subscriptions/index.js";
+ import {
+   sendPreparedPromptToAgent,
+   waitForAgentRunStartWithTimeout,
+@@ -688,6 +689,7 @@ export class VoiceAssistantWebSocketServer {
+     pluginRuntime?: SessionOptions["pluginRuntime"],
+     orchestrationSkills?: SessionOptions["orchestrationSkills"],
+     workspaceLabelService?: WorkspaceLabelService,
++    private readonly finishSubscriptions?: FinishSubscriptions,
+   ) {
+     this.logger = logger.child({ module: "websocket-server" });
+     this.workspaceSetupRuntime = workspaceSetupRuntime;
+@@ -1602,6 +1604,7 @@ export class VoiceAssistantWebSocketServer {
+       agentStorage: this.agentStorage,
+       messageReceipts: this.messageReceipts,
+       agentMessages: this.agentMessages,
++      finishSubscriptions: this.finishSubscriptions,
+       creationService: this.creationService,
+       projectRegistry: this.projectRegistry,
+       workspaceRegistry: this.workspaceRegistry,

@@ -7,7 +7,7 @@ description: How to start another agent (a subagent of any family) through Paseo
 
 **Another agent.** `paseo run --provider claude "<brief>"` runs it as your
 subagent, so the owner sees it in Paseo; use `codex` for the other family.
-The defaults are right; don't add flags.
+The defaults are right; don't add flags. Subagents report back by themselves: when a child's turn ends, errors or needs permission, its last reply reaches you as a message, so never poll; only add `--no-wait`, to carry on meanwhile.
 
 **Briefs.** Say what it's for (the goal, one level above the task itself),
 what's in, what's out and when it's done.
