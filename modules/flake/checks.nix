@@ -42,7 +42,6 @@
         };
         impermanenceModule = inputs.impermanence.nixosModules.impermanence;
         homeManagerModule = inputs.home-manager.nixosModules.home-manager;
-        loginSummaryModule = config.flake.modules.nixos."login-summary";
         toolingModule = config.flake.modules.homeManager.tooling;
       };
 

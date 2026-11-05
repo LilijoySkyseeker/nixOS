@@ -26,7 +26,6 @@ in
         branch = "f418";
         lock = "f023";
         gear = "f013";
-        recycle = "f1b8";
       };
       host = osConfig.networking.hostName;
       hostColour = theme.hostColours.${host} or "yellow";
@@ -105,7 +104,7 @@ in
             if [[ -t 0 && -t 1 && $TERM != dumb && -z ''${CLAUDECODE-} ]]; then
               # without ~/.cache, ble.sh tries to cache in its read-only store path
               mkdir -p "''${XDG_CACHE_HOME:-$HOME/.cache}"
-              # unstable on every host: the servers' stable release lacks the marker options
+              # unstable on every host: the prompt was tested against this version
               source -- ${pkgs-unstable.blesh}/share/blesh/ble.sh --attach=none
             fi
           '')
@@ -119,7 +118,7 @@ in
               alias "$c=${pkgs.grc}/bin/grc -es $c"
             done
           ''
-          # prompt hooks, ahead of starship's so its modules see what they export
+          # prompt hooks, ahead of _prompt_marks, which reads their status
           (lib.mkOrder 900 ''
             if [[ ''${BLE_VERSION-} ]]; then
               # ble.sh's sleep function ignores Ctrl-C
@@ -161,19 +160,6 @@ in
                     printf '\e]777;notify;%s\a' "''${HOSTNAME%%.*}: $res · $t"
                   fi
                 fi
-                ${lib.optionalString (osConfig.environment.persistence or { } != { }) ''
-                  # wiped at boot: on the root filesystem, or on a tmpfs
-                  if [[ $PWD != "''${_prompt_pwd-}" ]]; then
-                    _prompt_pwd=$PWD
-                    local -a fs
-                    mapfile -t fs < <(stat -c %d -- . / 2>/dev/null; stat -f -c %T -- . 2>/dev/null)
-                    if [[ ''${fs[0]-} == "''${fs[1]-}" || ''${fs[2]-} == tmpfs ]]; then
-                      export PROMPT_WIPED=1
-                    else
-                      unset PROMPT_WIPED
-                    fi
-                  fi
-                ''}
                 _prompt_branch=$(git symbolic-ref --short -q HEAD 2>/dev/null)
               }
               blehook PREEXEC!=_prompt_preexec
@@ -207,6 +193,21 @@ in
 
         ble-sabbrev rsync='rsync --verbose --recursive --progress --human-readable'
 
+        # up/down: through history, or through matches for what was typed when the walk
+        # began, with the cursor at the end. ble.sh's own search takes its term from the
+        # text left of the cursor, so at the end of a line a second press would search
+        # for that whole line
+        function ble/widget/blerc/history-walk {
+          [[ $LASTWIDGET == *blerc/history-walk* ]] || _ble_edit_nsearch_input=$_ble_edit_str
+          if [[ $_ble_edit_nsearch_input ]]; then
+            ble/widget/history-search "again:substr:$1:hide-status:immediate-accept:point=end"
+          elif [[ $1 == backward ]]; then
+            ble/widget/history-prev
+          else
+            ble/widget/history-next
+          fi
+        }
+
         function blerc/vim-mode-hook {
           # no "-- INSERT --" line; the cursor shape shows the mode
           bleopt keymap_vi_mode_show=
@@ -215,8 +216,11 @@ in
           ble-bind -m vi_omap --cursor 4
           ble-bind -m vi_xmap --cursor 2
           ble-bind -m vi_cmap --cursor 0
-          ble-bind -m vi_imap -f up 'history-substring-search-backward hide-status:immediate-accept:point=end:empty=history-move'
-          ble-bind -m vi_imap -f down 'history-substring-search-forward hide-status:immediate-accept:point=end:empty=history-move'
+          ble-bind -m vi_imap -f up 'blerc/history-walk backward'
+          ble-bind -m vi_imap -f down 'blerc/history-walk forward'
+          # clears the line as in plain bash; ble.sh's default drops to normal mode,
+          # and Ctrl+Shift+C reaches the shell as this key when nothing is selected
+          ble-bind -m vi_imap -f C-c discard-line
         }
         blehook/eval-after-load keymap_vi blerc/vim-mode-hook
 
@@ -241,7 +245,6 @@ in
           format = lib.concatStrings [
             "[╭─](bright-black)"
             "$os"
-            "\${env_var.PROMPT_WIPED}"
             "$directory"
             "($git_branch$git_commit$git_state$git_status[ ](bg:green)[${g.right}](fg:green))"
             " $fill "
@@ -264,10 +267,6 @@ in
             style = "fg:black bg:white";
             format = "[ $symbol ]($style)";
             symbols.NixOS = g.nixos;
-          };
-          env_var.PROMPT_WIPED = {
-            style = "fg:brown bg:white";
-            format = "[${g.recycle} ]($style)";
           };
           # repo_root_format is used inside a git repo, where the git segment closes the arrow
           directory = {

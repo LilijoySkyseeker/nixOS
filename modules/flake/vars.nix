@@ -30,7 +30,6 @@ _: {
       ".local/state/bash"
       ".local/share/atuin"
       ".local/share/zoxide"
-      ".local/share/direnv"
     ];
 
     zfsRootFsOptions = {
