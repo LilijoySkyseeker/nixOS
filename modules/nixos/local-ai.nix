@@ -26,6 +26,8 @@ _: {
           ./paseo/usage-limit-resume.patch
           # a limit-fallback profile (Claude API credits) while a provider is at its limit
           ./paseo/limit-fallback.patch
+          # voice mode through OpenAI GPT-Live: docs/procedures/paseo-voice.md
+          ./paseo/gpt-live.patch
         ];
       });
       claudeApiCredits = pkgs.writeShellApplication {
@@ -304,6 +306,10 @@ _: {
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
           ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          # voice on unless it was turned off in the app; in the managed keys, a
+          # restart would undo the app's switch
+          ${lib.getExe pkgs.jq} 'if .features.voiceMode.enabled == null then .features.voiceMode.enabled = true else . end' "$f.tmp" > "$f.tmp2"
+          mv "$f.tmp2" "$f.tmp"
           # the password hash, from a paseo-password-hash credential the host
           # loads from sops
           hash="''${CREDENTIALS_DIRECTORY:-}/paseo-password-hash"
@@ -320,8 +326,13 @@ _: {
           wantedBy
           wants
           bindsTo
-          environment
           ;
+        environment = agentUnit.environment // {
+          # switches voice mode to GPT-Live; read at each voice start, so rotating
+          # the key needs no restart
+          PASEO_GPT_LIVE_API_KEY_FILE =
+            config.sops.secrets.gpt_live_api_key.path or "/run/secrets/gpt_live_api_key";
+        };
         after = agentUnit.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
         serviceConfig = lib.mkMerge [

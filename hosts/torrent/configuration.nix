@@ -114,6 +114,13 @@
     owner = "agent";
   };
 
+  # OpenAI project key for Paseo voice mode (GPT-Live). Every agent runs as
+  # `agent` and can read it: the project's spend limit is the limit on misuse.
+  sops.secrets.gpt_live_api_key = {
+    sopsFile = ../../secrets/torrent.yaml;
+    owner = "agent";
+  };
+
   # failed-unit / stuck-switch alerts to Discord; one fleet-wide webhook,
   # shared on purpose (write-only sink, worst case is forged alerts)
   sops.secrets.discord_webhook = {
