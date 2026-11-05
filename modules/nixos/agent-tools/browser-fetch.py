@@ -109,8 +109,9 @@ def window_title():
 
 
 def clear_checkbox(url, widget):
-    # Cloudflare rejects the checkbox while a debugging connection is open, even
-    # with a real click, so this visit is a plain Chromium and X input only. Its
+    # Cloudflare rejects the checkbox under nodriver, even with a real click;
+    # its debugging connection is the suspect, not proven. So this visit is a
+    # plain Chromium and X input only. Its
     # clearance cookie stays in the profile for nodriver's visit afterwards.
     x = round(widget["x"] + 21)
     y = round(widget["top"] + widget["y"] + widget["h"] / 2)
