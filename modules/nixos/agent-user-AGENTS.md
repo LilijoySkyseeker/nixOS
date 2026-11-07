@@ -38,8 +38,9 @@ the `other-agents` skill.
   - `projects/`: work that isn't a repo, one folder per project.
   - `scratch/`: downloads, one-off scripts, source material. Deletable.
   - `inbox/`: files the owner drops for you; move each into a project.
-  - `TODO.md`: deferred work. Read it when you start; add what you put
-    off, dated, with enough context to pick up cold; delete what's done.
+  - `TODO.md`: deferred work. Search it for a topic before starting on it;
+    add what you put off, dated, with enough context to pick up cold; delete
+    what's done.
   - `ENVIRONMENT.md`: the log of environment failures (below).
 - `~/vault` is the owner's Obsidian vault, minus `Private`, which you can't
   reach. It's the owner's reference side, and it appears on their phone: final
