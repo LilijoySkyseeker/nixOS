@@ -223,7 +223,7 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # agent-egress rules per family; IPv6 rejects all but loopback
+      # agent-egress rules per family; IPv6 rejects all but loopback and Google
       egress = [
         {
           cmd = "iptables";
@@ -239,10 +239,33 @@
         }
         {
           cmd = "ip6tables";
+          # Google over IPv6 only: YouTube refuses the household's shared IPv4
+          # but serves its IPv6 (owner's test, 2026-11-07). A blocklist can't
+          # keep out the LAN, whose public prefix the ISP may change; Google's
+          # published ranges (www.gstatic.com/ipranges/goog.json, 2026-11-07)
+          # can't include it
           rules = [
             "-o lo -j RETURN"
-            "-j REJECT"
-          ];
+          ]
+          ++ map (net: "-d ${net} -j RETURN") [
+            "2001:4860::/32"
+            "2404:6800::/32"
+            "2404:f340::/32"
+            "2600:1900::/29"
+            "2605:ef80::/32"
+            "2606:40::/32"
+            "2606:73c0::/32"
+            "2607:1c0:241:40::/60"
+            "2607:1c0:300::/40"
+            "2607:f8b0::/32"
+            "2620:11a:a000::/40"
+            "2620:120:e000::/40"
+            "2800:3f0::/32"
+            "2a00:1450::/32"
+            "2a03:ace0::/32"
+            "2c0f:fb50::/32"
+          ]
+          ++ [ "-j REJECT" ];
         }
       ];
     in

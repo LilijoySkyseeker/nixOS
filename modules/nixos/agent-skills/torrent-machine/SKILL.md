@@ -61,8 +61,9 @@ leaves as you, through the same egress firewall.
 
 ## Network
 
-- No route to the LAN or the tailnet (the egress firewall rejects them),
-  and no IPv6 egress.
+- No route to the LAN or the tailnet (the egress firewall rejects them).
+  IPv6 reaches Google's ranges only (YouTube among them); everything else
+  goes over IPv4.
 - torrent's DNS blocks some sites (some people-search brokers resolve to
   nothing or to 127.0.0.1). Don't route around the resolver.
 - Localhost works: local services (the model server, Paseo) are reachable

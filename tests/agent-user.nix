@@ -183,10 +183,31 @@ pkgs.testers.runNixOSTest {
         machine.fail(as_agent("curl --fail --max-time 5 http://lan:8000/hostname"))
 
     with subtest("review fixes: egress, builds, reload, sandbox, sshd"):
-        # IPv6: all but loopback rejected
+        # IPv6: all but loopback and Google's ranges rejected
         machine.succeed("curl -6 --fail --max-time 5 http://lan:8000/marker")
         rc, _ = machine.execute(as_agent("curl -6 --fail --max-time 5 http://lan:8000/marker"))
         check(rc != 0, "agent reached the LAN over IPv6")
+        # stand-in for Google: an address in one of its ranges, added only for
+        # this check (in the node's config it would also become `lan` in /etc/hosts)
+        lan.succeed("ip -6 addr add 2607:f8b0:4001::8000/64 dev eth1 nodad")
+        machine.succeed("ip -6 route replace 2607:f8b0:4001::/64 dev eth1")
+        rc, out = machine.execute(as_agent("curl -6 --fail --max-time 5 http://[2607:f8b0:4001::8000]:8000/marker"))
+        check(rc == 0 and "LAN-MARKER-7f3a" in out, f"agent can't reach a Google IPv6 range: rc={rc} {out!r}")
+        # builds go through the same chain: in for Google, out for the rest
+        rc, out = machine.execute(as_agent("nix-build /etc/fod.nix --argstr url http://[2607:f8b0:4001::8000]:8000/marker 2>&1"))
+        check("LAN-MARKER-7f3a" in out, f"a fixed-output build can't reach a Google IPv6 range: {out[-300:]!r}")
+        lan.succeed("ip -6 addr del 2607:f8b0:4001::8000/64 dev eth1")
+        machine.succeed("ip -6 route del 2607:f8b0:4001::/64 dev eth1")
+        # a public address outside Google's ranges, like the household LAN's
+        lan.succeed("ip -6 addr add 2a01:4f8:1::8000/64 dev eth1 nodad")
+        machine.succeed("ip -6 route replace 2a01:4f8:1::/64 dev eth1")
+        machine.succeed("curl -6 --fail --max-time 5 http://[2a01:4f8:1::8000]:8000/marker")
+        rc, _ = machine.execute(as_agent("curl -6 --fail --max-time 5 http://[2a01:4f8:1::8000]:8000/marker"))
+        check(rc != 0, "agent reached a public non-Google IPv6 address")
+        rc, out = machine.execute(as_agent("nix-build /etc/fod.nix --argstr url http://[2a01:4f8:1::8000]:8000/marker 2>&1"))
+        check("LAN-MARKER-7f3a" not in out, "a fixed-output build reached a public non-Google IPv6 address")
+        lan.succeed("ip -6 addr del 2a01:4f8:1::8000/64 dev eth1")
+        machine.succeed("ip -6 route del 2a01:4f8:1::/64 dev eth1")
         v4 = machine.succeed("iptables -S agent-egress")
         for net in ["224.0.0.0/4", "255.255.255.255/32"]:
             check(f"-d {net} -j REJECT" in v4, f"v4 missing {net}")
