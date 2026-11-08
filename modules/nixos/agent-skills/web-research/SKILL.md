@@ -56,13 +56,16 @@ Routes that work where the obvious one doesn't:
   to the thread URL (`web-fetch --feed`, or `-o FILE` for the whole Atom).
   Images come from `i.redd.it/<id>.jpeg`.
 - **Search engines:** Google search through `web-fetch` is intermittent: it
-  passes on a well-used profile, but can give a 429 and a reCAPTCHA. Don't
+  passes on a well-used profile, but can give a 429 and a reCAPTCHA (seen over
+  IPv4; over IPv6 untested). Don't
   retry it; repeat visits risk the household IP. Google News RSS
   (`news.google.com/rss/search?q=...`) and Bing through plain curl work.
-- **YouTube:** captions work: `yt-dlp --skip-download --write-auto-subs
-  --sub-langs en-orig URL` (translated tracks 429). Video and audio get
-  "Sign in to confirm you're not a bot"; for those, ask the owner for the
-  file and transcribe it locally (the `local-ai` skill).
+- **YouTube:** refuses this household's IPv4 ("Sign in to confirm you're not
+  a bot") but serves its IPv6, which agents may use to Google's ranges only.
+  yt-dlp picks IPv6 by itself; add `-6` if a run still asks you to sign in.
+  Captions: `yt-dlp -6 --skip-download --write-auto-subs --sub-langs en-orig
+  URL` (translated tracks 429). The household shares that IPv6 reputation,
+  so keep to what the task needs.
 - **PubMed:** pages want cookies; use the E-utilities API
   (`eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi`).
 - **PDFs:** WebFetch returns them as binary; save them with
