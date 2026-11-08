@@ -17,13 +17,14 @@ _: {
       );
     in
     {
-      # the daemon's patches, for their limit callout and credit spend in the UI
+      # the daemon's patches, for their limit callout, credit spend and voice mode in the UI
       home.packages = [
         (pkgs-unstable.paseo-desktop.overrideAttrs (old: {
           patches = (old.patches or [ ]) ++ [
             # TODO: drop when getpaseo/paseo#7193 is in the packaged Paseo
             ../nixos/paseo/usage-limit-resume.patch
             ../nixos/paseo/limit-fallback.patch
+            ../nixos/paseo/gpt-live.patch
           ];
         }))
       ];
