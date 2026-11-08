@@ -1,7 +1,9 @@
-# browser-fetch URL CHROMIUM XDOTOOL: load URL in Chromium through nodriver,
-# get past a Cloudflare checkbox if there is one, and print the final HTML;
-# exits 1 when no page loaded or the one that did is an HTTP error
+# browser-fetch URL CHROMIUM XDOTOOL [file]: load URL in Chromium through
+# nodriver, get past a Cloudflare checkbox if there is one, and print the final
+# HTML; exits 1 when no page loaded or the one that did is an HTTP error. With
+# "file", loads the URL's site instead and prints the URL's raw bytes.
 import asyncio
+import base64
 import fcntl
 import glob
 import json
@@ -22,6 +24,7 @@ CHALLENGE = re.compile(
     re.IGNORECASE,
 )
 CHROMIUM, XDOTOOL = sys.argv[2], sys.argv[3]
+FILE_URL = sys.argv[1] if sys.argv[4:] == ["file"] else None
 STATE = os.path.expanduser("~/.cache/web-fetch")
 PROFILE = f"{STATE}/profile"
 # the virtual display is 1920x1080 (web-fetch.sh), and a screen smaller than
@@ -40,6 +43,21 @@ WIDGET = """JSON.stringify((() => {
   const r = n.getBoundingClientRect();
   return {x: r.x, y: r.y, h: r.height, top: outerHeight - innerHeight};
 })())"""
+
+
+# a download starts no page of its own to read, so ask from inside the site
+DOWNLOAD = """(async () => {
+  const r = await fetch(%s, {credentials: 'include'});
+  if (!r.ok) return 'HTTP ' + r.status;
+  // a download that lands on a page is a login or an error, not the file
+  if (r.redirected && (r.headers.get('content-type') || '').includes('html'))
+    return 'redirected to a page: ' + r.url;
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 32768)
+    text += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return 'OK' + btoa(text);
+})()"""
 
 
 def lock():
@@ -172,6 +190,14 @@ async def visit(url, wait_out):
 
 
 async def fetch(browser, url, wait_out):
+    # the owner's choice: much on Fimfiction is mistagged mature, and without
+    # this its searches silently leave those stories out
+    blank = await browser.get("about:blank")
+    await blank.send(
+        uc.cdp.network.set_cookie(
+            "view_mature", "true", domain="www.fimfiction.net", path="/", secure=True
+        )
+    )
     tab = await browser.get(url)
     text = 0
     # Cloudflare's challenge can take 40s or more
@@ -199,6 +225,8 @@ async def fetch(browser, url, wait_out):
     if not title or not loaded or CHALLENGE.search(title):
         print(f"browser-fetch: unresolved ({title!r}, {ready})", file=sys.stderr)
         sys.exit(1)
+    if FILE_URL:
+        return await download(tab)
     # the status of the document that finally loaded, after any
     # challenge's redirect
     status = await tab.evaluate(
@@ -213,4 +241,16 @@ async def fetch(browser, url, wait_out):
     return None
 
 
-uc.loop().run_until_complete(main(sys.argv[1]))
+async def download(tab):
+    answer = await tab.evaluate(DOWNLOAD % json.dumps(FILE_URL), await_promise=True)
+    if not (isinstance(answer, str) and answer.startswith("OK")):
+        print(f"browser-fetch: {str(answer)[:100]}", file=sys.stderr)
+        sys.exit(1)
+    sys.stdout.buffer.write(base64.b64decode(answer[2:]))
+    return None
+
+
+target = sys.argv[1]
+if FILE_URL:
+    target = re.match(r"https?://[^/?#]+", FILE_URL).group(0) + "/"
+uc.loop().run_until_complete(main(target))

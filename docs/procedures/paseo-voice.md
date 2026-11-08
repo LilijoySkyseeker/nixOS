@@ -68,9 +68,11 @@ hand-off that never happens, with the error in `~/.paseo/daemon.log`.
   their spoken lines from them, because provider history doesn't hold them.
 - Errors: `grep GPT-Live ~/.paseo/daemon.log`.
 - Patch source: `~/work/repos/external/paseo-credits`, worktree
-  `paseo-live-0.14`, branch `feat/gpt-live-0.14`, on top of the other Paseo
-  patches. Regenerate with
-  `git diff feat/claude-credit-fallback-0.14..feat/gpt-live-0.14`.
+  `paseo-live-0.15`, branch `feat/gpt-live-0.15`: Paseo 0.15.0 with the other
+  four patches committed in order, then this one. Regenerate with
+  `git diff <limit-fallback commit>..feat/gpt-live-0.15`. When nixpkgs moves Paseo
+  to a new version, rebuild that base from the new tag and the repo's patches,
+  then replay the voice commits on it.
 
 ## Rollback
 

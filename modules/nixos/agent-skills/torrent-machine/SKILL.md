@@ -9,6 +9,10 @@ You run as the Unix user `agent` on torrent, the owner's NixOS desktop, in
 systemd units with a sandbox. The user, its units and the egress firewall
 are the boundary; the agents' own sandboxes are off (no permission prompts).
 
+It often runs the owner's work for days at a time. Don't ask for a reboot
+unless an issue needs dealing with ASAP; use judgment, and an update waiting
+for the next boot isn't one.
+
 ## Hardware (as of 2026-10-17)
 
 - CPU: AMD Ryzen 7 9800X3D, 8 cores / 16 threads, up to 5.27 GHz, 96 MiB L3
@@ -57,8 +61,9 @@ leaves as you, through the same egress firewall.
 
 ## Network
 
-- No route to the LAN or the tailnet (the egress firewall rejects them),
-  and no IPv6 egress.
+- No route to the LAN or the tailnet (the egress firewall rejects them).
+  IPv6 reaches Google's ranges only (YouTube among them); everything else
+  goes over IPv4.
 - torrent's DNS blocks some sites (some people-search brokers resolve to
   nothing or to 127.0.0.1). Don't route around the resolver.
 - Localhost works: local services (the model server, Paseo) are reachable

@@ -117,7 +117,7 @@ index 9650c12ff..e4b0e31dc 100644
      item.kind === "tool_call" && item.payload.source === "agent"
        ? { type: item.kind, ...item.payload.data }
 diff --git a/packages/app/src/agent-stream/view.tsx b/packages/app/src/agent-stream/view.tsx
-index cb9999745..cc3a9bdde 100644
+index 72923b421..d288a5412 100644
 --- a/packages/app/src/agent-stream/view.tsx
 +++ b/packages/app/src/agent-stream/view.tsx
 @@ -111,6 +111,9 @@ import { recordRenderProfileReasons } from "@/utils/render-profiler";
@@ -130,7 +130,7 @@ index cb9999745..cc3a9bdde 100644
  
  function renderLiveAuxiliaryNode(input: {
    pendingPermissions: ReactNode;
-@@ -931,6 +934,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -932,6 +935,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
          const item = layoutItem.item;
          switch (item.kind) {
            case "user_message":
@@ -138,7 +138,7 @@ index cb9999745..cc3a9bdde 100644
              return renderUserMessageItem(layoutItem, item);
  
            case "assistant_message":
-@@ -967,10 +971,33 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
+@@ -968,10 +972,33 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                />
              );
  
@@ -825,7 +825,7 @@ index c4ef45cb3..12106dbe4 100644
              blurOnSubmit={true}
              textSource={draftInput.textSource}
 diff --git a/packages/app/src/composer/index.tsx b/packages/app/src/composer/index.tsx
-index 3eddeb59f..78993410e 100644
+index 606d74c39..cd9ac5557 100644
 --- a/packages/app/src/composer/index.tsx
 +++ b/packages/app/src/composer/index.tsx
 @@ -924,6 +924,8 @@ interface ComposerProps {
@@ -916,10 +916,10 @@ index 3eddeb59f..78993410e 100644
        t,
        voiceToggleKeys,
 diff --git a/packages/app/src/composer/input/input.tsx b/packages/app/src/composer/input/input.tsx
-index 16acede7e..8a9ac4bb5 100644
+index 8cb8cd4c3..76120845f 100644
 --- a/packages/app/src/composer/input/input.tsx
 +++ b/packages/app/src/composer/input/input.tsx
-@@ -1622,13 +1622,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
+@@ -1632,13 +1632,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
  
      const handleStopRealtimeVoice = useCallback(async () => {
        try {
@@ -934,7 +934,7 @@ index 16acede7e..8a9ac4bb5 100644
        } catch (error) {
          console.error("[MessageInput] Failed to stop realtime voice", error);
          const message = extractErrorMessage(error);
-@@ -1636,7 +1630,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
+@@ -1646,7 +1640,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
            toast.error(message);
          }
        }
@@ -1042,7 +1042,7 @@ index cb46412de..71759361d 100644
  
  /**
 diff --git a/packages/app/src/contexts/session-context.tsx b/packages/app/src/contexts/session-context.tsx
-index bccd4d3ee..86d379d29 100644
+index 89c32c0bd..78d259af6 100644
 --- a/packages/app/src/contexts/session-context.tsx
 +++ b/packages/app/src/contexts/session-context.tsx
 @@ -49,6 +49,10 @@ import { useToast } from "@/contexts/toast-context";
@@ -1056,7 +1056,7 @@ index bccd4d3ee..86d379d29 100644
  import { resyncProviderSubagents, useProviderSubagentStore } from "@/subagents/provider-store";
  
  // Re-export types from session-store and draft-store for backward compatibility
-@@ -659,6 +663,17 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
+@@ -655,6 +659,17 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
        voiceRuntime?.onServerSpeechStateChanged(serverId, message.payload.isSpeaking);
      });
  
@@ -1074,7 +1074,7 @@ index bccd4d3ee..86d379d29 100644
      const unsubTerminalAttention = onFeed("terminal_attention_required", (message) => {
        if (message.type !== "terminal_attention_required") {
          return;
-@@ -694,6 +709,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
+@@ -690,6 +705,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
        unsubActivity();
        unsubTranscription();
        unsubVoiceInputState();
@@ -1083,7 +1083,7 @@ index bccd4d3ee..86d379d29 100644
      };
    }, [
 diff --git a/packages/app/src/i18n/resources/ar.ts b/packages/app/src/i18n/resources/ar.ts
-index 3bf2abb54..ead244dba 100644
+index 63d38e7b4..44e00b8fd 100644
 --- a/packages/app/src/i18n/resources/ar.ts
 +++ b/packages/app/src/i18n/resources/ar.ts
 @@ -331,6 +331,7 @@ export const ar: TranslationResources = {
@@ -1094,7 +1094,7 @@ index 3bf2abb54..ead244dba 100644
      diagram: {
        diagram: "مخطط",
        zoomIn: "تكبير",
-@@ -2329,6 +2330,36 @@ export const ar: TranslationResources = {
+@@ -2337,6 +2338,36 @@ export const ar: TranslationResources = {
          info: "يحوّل وضع الصوت كلامك إلى نص ويقرأ ردود الوكيل بصوت عالٍ.",
          enabled: "وضع الصوت",
          enabledHint: "تحدّث مع وكلائك دون استخدام يديك",
@@ -1132,7 +1132,7 @@ index 3bf2abb54..ead244dba 100644
        openai: {
          apiKey: "مفتاح API",
 diff --git a/packages/app/src/i18n/resources/en.ts b/packages/app/src/i18n/resources/en.ts
-index 76d7a6b6e..19e6e875c 100644
+index ba1384ccb..b0d5e19b5 100644
 --- a/packages/app/src/i18n/resources/en.ts
 +++ b/packages/app/src/i18n/resources/en.ts
 @@ -328,6 +328,7 @@ export const en = {
@@ -1143,7 +1143,7 @@ index 76d7a6b6e..19e6e875c 100644
      diagram: {
        diagram: "Diagram",
        zoomIn: "Zoom in",
-@@ -2418,6 +2419,36 @@ export const en = {
+@@ -2426,6 +2427,36 @@ export const en = {
          info: "Voice mode transcribes what you say and reads agent replies aloud.",
          enabled: "Voice mode",
          enabledHint: "Talk with your agents hands-free",
@@ -1181,7 +1181,7 @@ index 76d7a6b6e..19e6e875c 100644
        openai: {
          apiKey: "API key",
 diff --git a/packages/app/src/i18n/resources/es.ts b/packages/app/src/i18n/resources/es.ts
-index eb4453ca6..3942d8997 100644
+index c4914026b..890cb9dca 100644
 --- a/packages/app/src/i18n/resources/es.ts
 +++ b/packages/app/src/i18n/resources/es.ts
 @@ -336,6 +336,7 @@ export const es: TranslationResources = {
@@ -1192,7 +1192,7 @@ index eb4453ca6..3942d8997 100644
      diagram: {
        diagram: "Diagrama",
        zoomIn: "Acercar",
-@@ -2341,6 +2342,36 @@ export const es: TranslationResources = {
+@@ -2349,6 +2350,36 @@ export const es: TranslationResources = {
          info: "El modo de voz transcribe lo que dices y lee en voz alta las respuestas del agente.",
          enabled: "Modo de voz",
          enabledHint: "Habla con tus agentes sin usar las manos",
@@ -1230,7 +1230,7 @@ index eb4453ca6..3942d8997 100644
        openai: {
          apiKey: "Clave de API",
 diff --git a/packages/app/src/i18n/resources/fr.ts b/packages/app/src/i18n/resources/fr.ts
-index 700e9f011..cfd7456a7 100644
+index f43ec62a1..69abdf025 100644
 --- a/packages/app/src/i18n/resources/fr.ts
 +++ b/packages/app/src/i18n/resources/fr.ts
 @@ -337,6 +337,7 @@ export const fr: TranslationResources = {
@@ -1241,7 +1241,7 @@ index 700e9f011..cfd7456a7 100644
      diagram: {
        diagram: "Diagramme",
        zoomIn: "Zoomer",
-@@ -2342,6 +2343,36 @@ export const fr: TranslationResources = {
+@@ -2350,6 +2351,36 @@ export const fr: TranslationResources = {
          info: "Le mode vocal transcrit ce que vous dites et lit à voix haute les réponses de l'agent.",
          enabled: "Mode vocal",
          enabledHint: "Parlez à vos agents sans les mains",
@@ -1279,7 +1279,7 @@ index 700e9f011..cfd7456a7 100644
        openai: {
          apiKey: "Clé d'API",
 diff --git a/packages/app/src/i18n/resources/ja.ts b/packages/app/src/i18n/resources/ja.ts
-index 8dbf54c24..cfd534e64 100644
+index 1577cbc95..e050c7741 100644
 --- a/packages/app/src/i18n/resources/ja.ts
 +++ b/packages/app/src/i18n/resources/ja.ts
 @@ -336,6 +336,7 @@ export const ja: TranslationResources = {
@@ -1290,7 +1290,7 @@ index 8dbf54c24..cfd534e64 100644
      diagram: {
        diagram: "図",
        zoomIn: "拡大",
-@@ -2314,6 +2315,36 @@ export const ja: TranslationResources = {
+@@ -2322,6 +2323,36 @@ export const ja: TranslationResources = {
          info: "ボイスモードは話した内容を文字起こしし、エージェントの返答を読み上げます。",
          enabled: "ボイスモード",
          enabledHint: "ハンズフリーでエージェントと会話します",
@@ -1328,7 +1328,7 @@ index 8dbf54c24..cfd534e64 100644
        openai: {
          apiKey: "API キー",
 diff --git a/packages/app/src/i18n/resources/ko.ts b/packages/app/src/i18n/resources/ko.ts
-index feedbcb98..934555d4e 100644
+index 4d62ed266..45c001ce6 100644
 --- a/packages/app/src/i18n/resources/ko.ts
 +++ b/packages/app/src/i18n/resources/ko.ts
 @@ -332,6 +332,7 @@ export const ko: TranslationResources = {
@@ -1339,7 +1339,7 @@ index feedbcb98..934555d4e 100644
      diagram: {
        diagram: "다이어그램",
        zoomIn: "확대",
-@@ -2303,6 +2304,36 @@ export const ko: TranslationResources = {
+@@ -2311,6 +2312,36 @@ export const ko: TranslationResources = {
          info: "음성 모드는 말한 내용을 텍스트로 옮기고 에이전트의 답변을 소리 내어 읽어 줍니다.",
          enabled: "음성 모드",
          enabledHint: "손을 쓰지 않고 에이전트와 대화하세요",
@@ -1377,7 +1377,7 @@ index feedbcb98..934555d4e 100644
        openai: {
          apiKey: "API 키",
 diff --git a/packages/app/src/i18n/resources/pt-BR.ts b/packages/app/src/i18n/resources/pt-BR.ts
-index 52a9cf7d3..8a9827ea0 100644
+index 6381e53af..03c773789 100644
 --- a/packages/app/src/i18n/resources/pt-BR.ts
 +++ b/packages/app/src/i18n/resources/pt-BR.ts
 @@ -335,6 +335,7 @@ export const ptBR: TranslationResources = {
@@ -1388,7 +1388,7 @@ index 52a9cf7d3..8a9827ea0 100644
      diagram: {
        diagram: "Diagrama",
        zoomIn: "Aproximar",
-@@ -2326,6 +2327,36 @@ export const ptBR: TranslationResources = {
+@@ -2334,6 +2335,36 @@ export const ptBR: TranslationResources = {
          info: "O modo de voz transcreve o que você diz e lê em voz alta as respostas do agente.",
          enabled: "Modo de voz",
          enabledHint: "Converse com seus agentes sem usar as mãos",
@@ -1426,7 +1426,7 @@ index 52a9cf7d3..8a9827ea0 100644
        openai: {
          apiKey: "Chave de API",
 diff --git a/packages/app/src/i18n/resources/ru.ts b/packages/app/src/i18n/resources/ru.ts
-index 4a88f1a2e..29a38e055 100644
+index 8002c2d8b..c06f088f4 100644
 --- a/packages/app/src/i18n/resources/ru.ts
 +++ b/packages/app/src/i18n/resources/ru.ts
 @@ -335,6 +335,7 @@ export const ru: TranslationResources = {
@@ -1437,7 +1437,7 @@ index 4a88f1a2e..29a38e055 100644
      diagram: {
        diagram: "Диаграмма",
        zoomIn: "Увеличить масштаб",
-@@ -2327,6 +2328,36 @@ export const ru: TranslationResources = {
+@@ -2335,6 +2336,36 @@ export const ru: TranslationResources = {
          info: "Голосовой режим расшифровывает вашу речь и зачитывает ответы агента вслух.",
          enabled: "Голосовой режим",
          enabledHint: "Общайтесь с агентами без рук",
@@ -1475,7 +1475,7 @@ index 4a88f1a2e..29a38e055 100644
        openai: {
          apiKey: "API-ключ",
 diff --git a/packages/app/src/i18n/resources/zh-CN.ts b/packages/app/src/i18n/resources/zh-CN.ts
-index 7a9beb230..386a6f82e 100644
+index f4c28fb8a..79fd1f0a1 100644
 --- a/packages/app/src/i18n/resources/zh-CN.ts
 +++ b/packages/app/src/i18n/resources/zh-CN.ts
 @@ -331,6 +331,7 @@ export const zhCN: TranslationResources = {
@@ -1486,7 +1486,7 @@ index 7a9beb230..386a6f82e 100644
      diagram: {
        diagram: "图表",
        zoomIn: "放大",
-@@ -2270,6 +2271,36 @@ export const zhCN: TranslationResources = {
+@@ -2278,6 +2279,36 @@ export const zhCN: TranslationResources = {
          info: "语音模式会转写你说的话，并朗读智能体的回复。",
          enabled: "语音模式",
          enabledHint: "免手动与智能体对话",
@@ -2118,10 +2118,10 @@ index 3b7843e2f..99d38cf50 100644
        if (
          !state.snapshot.isVoiceMode ||
 diff --git a/packages/client/src/connection/index.ts b/packages/client/src/connection/index.ts
-index eda2fec26..e82b79514 100644
+index 62753bca5..3ef666375 100644
 --- a/packages/client/src/connection/index.ts
 +++ b/packages/client/src/connection/index.ts
-@@ -140,6 +140,7 @@ export const DEFAULT_CLIENT_CAPABILITIES = {
+@@ -142,6 +142,7 @@ export const DEFAULT_CLIENT_CAPABILITIES = {
    [CLIENT_CAPS.timelineReplacementInvalidation]: true,
    [CLIENT_CAPS.timelineNotifications]: true,
    [CLIENT_CAPS.pluginTimelineItems]: true,
@@ -2130,10 +2130,10 @@ index eda2fec26..e82b79514 100644
    [CLIENT_CAPS.workspaceSetupObservation]: true,
    [CLIENT_CAPS.explicitEventSubscriptions]: true,
 diff --git a/packages/protocol/src/client-capabilities.ts b/packages/protocol/src/client-capabilities.ts
-index a35852cc0..e7b46c02e 100644
+index 3ae02671e..b6c0f20a7 100644
 --- a/packages/protocol/src/client-capabilities.ts
 +++ b/packages/protocol/src/client-capabilities.ts
-@@ -43,6 +43,9 @@ export const CLIENT_CAPS = {
+@@ -45,6 +45,9 @@ export const CLIENT_CAPS = {
    timelineNotifications: "timeline_notifications",
    // COMPAT(pluginTimelineItems): added in v0.8.0, remove after 2027-03-07 once client floor >= v0.8.0.
    pluginTimelineItems: "plugin_timeline_items",
@@ -2174,10 +2174,10 @@ index 437560c7e..166d832bc 100644
        .optional(),
 diff --git a/packages/server/scripts/gpt-live-routing-check.ts b/packages/server/scripts/gpt-live-routing-check.ts
 new file mode 100644
-index 000000000..2731bc83d
+index 000000000..a44a1339f
 --- /dev/null
 +++ b/packages/server/scripts/gpt-live-routing-check.ts
-@@ -0,0 +1,349 @@
+@@ -0,0 +1,351 @@
 +/**
 + * Plays spoken phrases into a real GPT-Live session through the voice bridge, with a stand-in agent,
 + * and reports for each phrase whether the voice answered it or handed it off, what it sent and
@@ -2364,7 +2364,9 @@ index 000000000..2731bc83d
 +        if (!text) {
 +          const word = CODE_WORDS[this.answers++ % CODE_WORDS.length]!;
 +          this.outcome.codeWords.push(word);
-+          text = `Before anything else, tell the user the code word "${word}". (Stand-in agent; the request was: ${request.split("\n\n(")[0]})`;
++          // A statement, not an instruction: answers are information to the voice, so it
++          // must not act on one, only report it.
++          text = `The answer is ${word}.`;
 +        }
 +        this.publish({
 +          type: "timeline",
@@ -2528,10 +2530,10 @@ index 000000000..2731bc83d
 +
 +await main();
 diff --git a/packages/server/src/server/agent/agent-manager.ts b/packages/server/src/server/agent/agent-manager.ts
-index 57f6e1872..691399e96 100644
+index a6d44a486..02cf9e49f 100644
 --- a/packages/server/src/server/agent/agent-manager.ts
 +++ b/packages/server/src/server/agent/agent-manager.ts
-@@ -351,6 +351,12 @@ export interface CreateAgentOptions {
+@@ -352,6 +352,12 @@ export interface CreateAgentOptions {
    owner?: AgentOwner;
  }
  
@@ -2544,7 +2546,7 @@ index 57f6e1872..691399e96 100644
  export interface AgentManagerOptions {
    pluginLifecycle?: PluginLifecycle;
    creditLedger?: CreditLedger;
-@@ -363,6 +369,11 @@ export interface AgentManagerOptions {
+@@ -364,6 +370,11 @@ export interface AgentManagerOptions {
    onWorkspaceStateMayHaveChanged?: (params: { cwd: string }) => void;
    timelineStore?: InMemoryAgentTimelineStore;
    durableTimelineStore?: AgentTimelineStore;
@@ -2556,7 +2558,7 @@ index 57f6e1872..691399e96 100644
    terminalManager?: TerminalManager | null;
    mcpBaseUrl?: string;
    mcpAuthToken?: string;
-@@ -818,6 +829,7 @@ export class AgentManager {
+@@ -821,6 +832,7 @@ export class AgentManager {
    private readonly idFactory: () => string;
    private readonly registry?: AgentStorage;
    private readonly durableTimelineStore?: AgentTimelineStore;
@@ -2564,7 +2566,7 @@ index 57f6e1872..691399e96 100644
    private readonly previousStatuses = new Map<string, AgentLifecycleStatus>();
    private readonly backgroundTasks = new Set<Promise<void>>();
    private readonly agentRegistrationTasks = new Set<Promise<void>>();
-@@ -858,6 +870,7 @@ export class AgentManager {
+@@ -861,6 +873,7 @@ export class AgentManager {
      this.idFactory = options.idFactory ?? (() => randomUUID());
      this.registry = options?.registry;
      this.durableTimelineStore = options?.durableTimelineStore;
@@ -2572,7 +2574,7 @@ index 57f6e1872..691399e96 100644
      this.onAgentAttention = options?.onAgentAttention;
      this.onWorkspaceStateMayHaveChanged = options?.onWorkspaceStateMayHaveChanged;
      this.mcpBaseUrl = options?.mcpBaseUrl ?? null;
-@@ -3419,6 +3432,20 @@ export class AgentManager {
+@@ -3437,6 +3450,20 @@ export class AgentManager {
      return result;
    }
  
@@ -2593,7 +2595,7 @@ index 57f6e1872..691399e96 100644
    async steerOrReplaceActiveTurn(
      agentId: string,
      prompt: AgentPromptInput,
-@@ -4690,6 +4717,20 @@ export class AgentManager {
+@@ -4735,6 +4762,20 @@ export class AgentManager {
      }
    }
  
@@ -2614,7 +2616,7 @@ index 57f6e1872..691399e96 100644
    private async hydrateTimelineFromLegacyProviderHistory(
      agent: ActiveManagedAgent,
      options?: HydrateTimelineOptions,
-@@ -4730,6 +4771,7 @@ export class AgentManager {
+@@ -4775,6 +4816,7 @@ export class AgentManager {
          providerSubagentEvents.push(event);
        }
      }
@@ -2622,7 +2624,7 @@ index 57f6e1872..691399e96 100644
  
      this.agentStreamCoalescer.flushAndDiscard(agent.id);
      await this.deleteCommittedTimeline(agent.id);
-@@ -4748,7 +4790,7 @@ export class AgentManager {
+@@ -4793,7 +4835,7 @@ export class AgentManager {
          this.dispatch({ type: "provider_subagent", event: update });
        }
      }
@@ -2631,7 +2633,7 @@ index 57f6e1872..691399e96 100644
        const row = this.recordTimeline(
          agent.id,
          event.item,
-@@ -4798,6 +4840,11 @@ export class AgentManager {
+@@ -4843,6 +4885,11 @@ export class AgentManager {
        this.logger.warn({ err: error, agentId: agent.id }, "Failed to hydrate provider history");
        throw error;
      }
@@ -2644,16 +2646,18 @@ index 57f6e1872..691399e96 100644
      // The replay is the timeline, so drop the rows a previous hydration committed.
      // Keeping them would leave getTimelineRows reading one copy per hydration.
 diff --git a/packages/server/src/server/bootstrap.ts b/packages/server/src/server/bootstrap.ts
-index 266f130a7..c38d4a346 100644
+index 9e730db53..bbe23cfeb 100644
 --- a/packages/server/src/server/bootstrap.ts
 +++ b/packages/server/src/server/bootstrap.ts
-@@ -1,3 +1,5 @@
+@@ -1,5 +1,7 @@
+ import { createRestartRecovery } from "./agent/restart-recovery/index.js";
+ import { sendPromptToAgent } from "./agent/agent-prompt.js";
 +import { restoreVoiceHistory } from "./session/voice/gpt-live-history.js";
 +import { voiceTranscriptDir } from "./session/voice/gpt-live-session.js";
  import { createIdleRuntimeCleanup } from "./agent/idle-runtime-cleanup/index.js";
  import {
    createFinishSubscriptions,
-@@ -1013,6 +1015,9 @@ export async function createPaseoDaemon(
+@@ -1027,6 +1029,9 @@ export async function createPaseoDaemon(
      mcpAuthToken: agentMcpAuthToken,
      resolvePaseoToolPolicy: (provider) =>
        resolvePaseoToolPolicy(provider, daemonConfigStore.get().providers),
@@ -2802,7 +2806,7 @@ index 000000000..1af2d557d
 +  300_000,
 +);
 diff --git a/packages/server/src/server/persisted-config.ts b/packages/server/src/server/persisted-config.ts
-index 51bfb3d3a..8d7b81292 100644
+index 3138ec913..98d2be232 100644
 --- a/packages/server/src/server/persisted-config.ts
 +++ b/packages/server/src/server/persisted-config.ts
 @@ -159,6 +159,12 @@ const FeatureVoiceModeSchema = z
@@ -2888,7 +2892,7 @@ index f47b30ce8..b6c536564 100644
    await daemon.close();
    daemon = await createTestPaseoDaemon({
 diff --git a/packages/server/src/server/session.ts b/packages/server/src/server/session.ts
-index 1205fb571..ed06dab09 100644
+index df0807fa8..2af60d952 100644
 --- a/packages/server/src/server/session.ts
 +++ b/packages/server/src/server/session.ts
 @@ -170,6 +170,12 @@ import {
@@ -2904,7 +2908,7 @@ index 1205fb571..ed06dab09 100644
  import { CheckoutSession } from "./session/checkout/checkout-session.js";
  import {
    createWorkspaceGitObserverService,
-@@ -566,6 +572,8 @@ export interface SessionOptions {
+@@ -567,6 +573,8 @@ export interface SessionOptions {
      sttLanguage?: string;
      getSpeechReadiness?: () => SpeechReadinessSnapshot;
    };
@@ -2913,7 +2917,7 @@ index 1205fb571..ed06dab09 100644
    serverId?: string;
    daemonVersion?: string;
    daemonRuntimeConfig?: DaemonRuntimeConfig;
-@@ -1284,6 +1292,65 @@ export class Session {
+@@ -1289,6 +1297,65 @@ export class Session {
          voice,
          voiceBridge,
          dictation,
@@ -2979,7 +2983,7 @@ index 1205fb571..ed06dab09 100644
        },
        this.delivery,
        () => this.refreshObservationProducers(),
-@@ -1356,11 +1423,18 @@ export class Session {
+@@ -1361,11 +1428,18 @@ export class Session {
  
    // COMPAT(timelineItemCapabilities): plugin items added in v0.8.0, notifications in v0.7.2.
    // Remove after 2027-03-07 once the supported client floor is >= v0.8.0.
@@ -3410,10 +3414,10 @@ index 000000000..0aa7e3bd4
 +}
 diff --git a/packages/server/src/server/session/voice/gpt-live-session.test.ts b/packages/server/src/server/session/voice/gpt-live-session.test.ts
 new file mode 100644
-index 000000000..0933f9b87
+index 000000000..85fe45e89
 --- /dev/null
 +++ b/packages/server/src/server/session/voice/gpt-live-session.test.ts
-@@ -0,0 +1,1212 @@
+@@ -0,0 +1,1230 @@
 +import { mkdtemp, readdir, readFile } from "node:fs/promises";
 +import { tmpdir } from "node:os";
 +import path from "node:path";
@@ -3813,6 +3817,24 @@ index 000000000..0933f9b87
 +    });
 +    await new Promise((resolve) => setTimeout(resolve, 3500));
 +    expect(host.sent).toHaveLength(1);
++    await voice.cleanup();
++  });
++
++  test("a question the voice answered in one word is not sent after the next hand-off", async () => {
++    const { voice, host, live } = await startVoice();
++    live.send({ type: "session.input_transcript.delta", delta: "What codename did you say?" });
++    live.send({ type: "session.output_transcript.delta", delta: "Heliotrope." });
++    live.send({ type: "session.input_transcript.delta", delta: "What's the capital of Sweden?" });
++    live.send({ type: "session.output_transcript.delta", delta: "Let me check." });
++    await vi.waitFor(() =>
++      expect(host.spokenTurns).toContain("user: What's the capital of Sweden?"),
++    );
++    live.send(functionCall("send_to_agent", { message: "What's the capital of Sweden?" }));
++    await live.waitFor("response.item.create");
++    await new Promise((resolve) => setTimeout(resolve, 3500));
++    expect(host.sent.map((text) => text.split("\n\n(")[0])).toEqual([
++      "What's the capital of Sweden?",
++    ]);
 +    await voice.cleanup();
 +  });
 +
@@ -4628,10 +4650,10 @@ index 000000000..0933f9b87
 +});
 diff --git a/packages/server/src/server/session/voice/gpt-live-session.ts b/packages/server/src/server/session/voice/gpt-live-session.ts
 new file mode 100644
-index 000000000..5f080d9a6
+index 000000000..2ed84b153
 --- /dev/null
 +++ b/packages/server/src/server/session/voice/gpt-live-session.ts
-@@ -0,0 +1,1591 @@
+@@ -0,0 +1,1602 @@
 +import { once } from "node:events";
 +import { readFile } from "node:fs/promises";
 +import path from "node:path";
@@ -5546,7 +5568,9 @@ index 000000000..5f080d9a6
 +        // One hand-off per stretch of speech: any further one needs the user to speak again.
 +        this.lastUserWordsAt = 0;
 +        this.handoffsThisWait.push(message);
-+        for (const line of this.requestLines) this.watchQuestion(agentId, line, line);
++        for (const line of linesAfterCovered(this.requestLines, message)) {
++          this.watchQuestion(agentId, line, line);
++        }
 +        return JSON.stringify({
 +          status: disposition === "steered" ? "added_to_current_work" : "agent_started",
 +          note: "Delivered. The agent has not finished; its result arrives as a later update.",
@@ -6074,6 +6098,15 @@ index 000000000..5f080d9a6
 + * far more tokens per character than prose, so trim by a cautious token estimate.
 + */
 +/**
++ * The lines after the last one a hand-off carries. Before it, a short reply such as "Heliotrope."
++ * looks like an acknowledgement, and the question it answered must not be sent again.
++ */
++function linesAfterCovered(lines: string[], message: string): string[] {
++  const covered = lines.findLastIndex((line) => coversLine(message, line));
++  return lines.slice(covered + 1);
++}
++
++/**
 + * The user's lines leading up to a hand-off, looking past the voice's short acknowledgements and
 + * stopping at its first real reply: what came before that was already answered.
 + */
@@ -6225,10 +6258,10 @@ index 000000000..5f080d9a6
 +}
 diff --git a/packages/server/src/server/session/voice/gpt-live-transcript.test.ts b/packages/server/src/server/session/voice/gpt-live-transcript.test.ts
 new file mode 100644
-index 000000000..63cc3d8f5
+index 000000000..b14603ea0
 --- /dev/null
 +++ b/packages/server/src/server/session/voice/gpt-live-transcript.test.ts
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,154 @@
 +import { mkdtemp, readFile } from "node:fs/promises";
 +import { tmpdir } from "node:os";
 +import path from "node:path";
@@ -6373,16 +6406,22 @@ index 000000000..63cc3d8f5
 +  transcript.fragment("user", "now");
 +  transcript.fragment("voice", ".");
 +  transcript.fragment("user", "? Never mind");
++  transcript.fragment("voice", "\uFFFD\uFFFD>\r\nAll done.");
 +  await transcript.close("voice_off", 1);
 +
-+  expect(finished).toEqual(["voice: Sure thing", "user: now", "user: Never mind"]);
++  expect(finished).toEqual([
++    "voice: Sure thing",
++    "user: now",
++    "user: Never mind",
++    "voice: All done.",
++  ]);
 +});
 diff --git a/packages/server/src/server/session/voice/gpt-live-transcript.ts b/packages/server/src/server/session/voice/gpt-live-transcript.ts
 new file mode 100644
-index 000000000..d04a2146a
+index 000000000..605e19809
 --- /dev/null
 +++ b/packages/server/src/server/session/voice/gpt-live-transcript.ts
-@@ -0,0 +1,281 @@
+@@ -0,0 +1,285 @@
 +import { randomUUID } from "node:crypto";
 +import { appendFile, mkdir, readdir, readFile } from "node:fs/promises";
 +import path from "node:path";
@@ -6485,8 +6524,12 @@ index 000000000..d04a2146a
 +    if (open && (open.speaker !== speaker || at - open.lastAt > pauseLimit(open))) this.flushTurn();
 +    if (!this.turn) this.turn = this.openTurn(speaker, at, startMs);
 +    const turn = this.turn;
-+    // A turn can open with the end of the previous one's punctuation ("? Never mind").
-+    turn.text = turn.text ? joinFragment(turn.text, text) : text.replace(/^[\s.,!?…;:]+/, "");
++    // Live sometimes sends broken characters (U+FFFD), and a turn can open with stray symbols or
++    // the end of the previous one's punctuation ("? Never mind", "��>").
++    const clean = text.replace(/\uFFFD/g, "");
++    turn.text = turn.text
++      ? joinFragment(turn.text, clean)
++      : clean.replace(/^[^\p{L}\p{N}"'“‘(]+/u, "");
 +    turn.endMs = endMs ?? turn.endMs;
 +    turn.lastAt = at;
 +    if (turn.text.trim()) this.emit(turn, false);
@@ -7152,10 +7195,10 @@ index 000000000..2f93424eb
 +  await ctx.client.setVoiceMode(false);
 +});
 diff --git a/packages/server/src/server/websocket-server.ts b/packages/server/src/server/websocket-server.ts
-index f16a53803..2007feffd 100644
+index 47da383a4..49f09f38f 100644
 --- a/packages/server/src/server/websocket-server.ts
 +++ b/packages/server/src/server/websocket-server.ts
-@@ -81,6 +81,12 @@ import type { ScriptHealthState } from "./script-health-monitor.js";
+@@ -85,6 +85,12 @@ import type { ScriptHealthState } from "./script-health-monitor.js";
  import type { ServiceProxySubsystem } from "./service-proxy.js";
  import type { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
  import type { SpeechReadinessSnapshot, SpeechService } from "./speech/speech-runtime.js";
@@ -7168,7 +7211,7 @@ index f16a53803..2007feffd 100644
  import type { VoiceCallerContext, VoiceSpeakHandler } from "./voice-types.js";
  import {
    computeNotificationPlan,
-@@ -585,6 +591,7 @@ export class VoiceAssistantWebSocketServer {
+@@ -590,6 +596,7 @@ export class VoiceAssistantWebSocketServer {
    private readonly pushNotificationSender: PushNotificationSender;
    private readonly mcpBaseUrl: string | null;
    private speech!: SpeechService | null;
@@ -7176,7 +7219,7 @@ index f16a53803..2007feffd 100644
    private terminalManager!: TerminalManager | null;
    private serviceProxy!: ServiceProxySubsystem | null;
    private scriptRuntimeStore!: WorkspaceScriptRuntimeStore | null;
-@@ -832,7 +839,15 @@ export class VoiceAssistantWebSocketServer {
+@@ -837,7 +844,15 @@ export class VoiceAssistantWebSocketServer {
      serviceProxyPublicBaseUrl: string | null | undefined;
      resolveScriptHealth: ((hostname: string) => ScriptHealthState | null) | undefined;
    }): void {
@@ -7193,7 +7236,7 @@ index f16a53803..2007feffd 100644
      this.terminalManager = params.terminalManager ?? null;
      if (this.terminalManager) {
        this.unsubscribeTerminalActivity = this.terminalManager.subscribeTerminalActivity((event) => {
-@@ -1665,6 +1680,7 @@ export class VoiceAssistantWebSocketServer {
+@@ -1720,6 +1735,7 @@ export class VoiceAssistantWebSocketServer {
                getSpeechReadiness: () => this.speech!.getReadiness(),
              }
            : undefined,

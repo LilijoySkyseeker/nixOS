@@ -6,7 +6,7 @@ description: Use when the owner first proposes an idea, project, feature or chan
 # Goal setting
 
 This is rule 0 of the six, run before work rather than in review. The
-rule's definition and reasons: `/home/agent/research/Projects/Golden
+rule's definition and reasons: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`.
 
 Before any work on a new idea, settle three lines with me:

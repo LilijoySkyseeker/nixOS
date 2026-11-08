@@ -9,6 +9,15 @@
     }:
     let
       bot = "LilijoySkyseeker-agent";
+      # the vault folders agents share, each mounted at ~/vault/<name>. Mounted
+      # one by one so anything else at the vault root, Private included, stays
+      # out of reach by default.
+      vaultFolders = [
+        "Areas"
+        "Library"
+        "Projects"
+        "Old"
+      ];
       # every agent harness: where it reads user-level instructions and
       # skills; adding or dropping an agent is one entry here
       harnesses = {
@@ -84,7 +93,7 @@
           pkgs.xvfb-run
           pkgs.poppler-utils
           (pkgs.writeShellScriptBin "browser-fetch" ''
-            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool
+            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool ''${2:-}
           '')
           (pkgs.writeShellScriptBin "extract-text" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
@@ -214,7 +223,7 @@
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
       };
-      # agent-egress rules per family; IPv6 rejects all but loopback
+      # agent-egress rules per family; IPv6 rejects all but loopback and Google
       egress = [
         {
           cmd = "iptables";
@@ -230,10 +239,33 @@
         }
         {
           cmd = "ip6tables";
+          # Google over IPv6 only: YouTube refuses the household's shared IPv4
+          # but serves its IPv6 (owner's test, 2026-11-07). A blocklist can't
+          # keep out the LAN, whose public prefix the ISP may change; Google's
+          # published ranges (www.gstatic.com/ipranges/goog.json, 2026-11-07)
+          # can't include it
           rules = [
             "-o lo -j RETURN"
-            "-j REJECT"
-          ];
+          ]
+          ++ map (net: "-d ${net} -j RETURN") [
+            "2001:4860::/32"
+            "2404:6800::/32"
+            "2404:f340::/32"
+            "2600:1900::/29"
+            "2605:ef80::/32"
+            "2606:40::/32"
+            "2606:73c0::/32"
+            "2607:1c0:241:40::/60"
+            "2607:1c0:300::/40"
+            "2607:f8b0::/32"
+            "2620:11a:a000::/40"
+            "2620:120:e000::/40"
+            "2800:3f0::/32"
+            "2a00:1450::/32"
+            "2a03:ace0::/32"
+            "2c0f:fb50::/32"
+          ]
+          ++ [ "-j REJECT" ];
         }
       ];
     in
@@ -289,7 +321,7 @@
         ) egress}
       '';
 
-      # bindfs: Vault/Research only, agent-owned on its side, lilijoy:users on disk
+      # bindfs: the shared vault folders only, agent-owned on its side, lilijoy:users on disk
       system.fsPackages = [ pkgs.bindfs ];
       systemd = {
         # merge the keys this repo owns into the agent's CLI-owned settings.json
@@ -463,22 +495,18 @@
         );
 
         # systemd mount + automount, not fileSystems
-        mounts = [
-          {
-            what = "/home/lilijoy/Documents/Vault/Research";
-            where = "/home/agent/research";
-            type = "fuse.bindfs";
-            options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
-            # no start limit: a missing source must not wedge the automount
-            unitConfig.StartLimitIntervalSec = 0;
-          }
-        ];
-        automounts = [
-          {
-            where = "/home/agent/research";
-            wantedBy = [ "multi-user.target" ];
-          }
-        ];
+        mounts = map (folder: {
+          what = "/home/lilijoy/Documents/Vault/${folder}";
+          where = "/home/agent/vault/${folder}";
+          type = "fuse.bindfs";
+          options = "force-user=agent,force-group=agent,create-for-user=lilijoy,create-for-group=users";
+          # no start limit: a missing source must not wedge the automount
+          unitConfig.StartLimitIntervalSec = 0;
+        }) vaultFolders;
+        automounts = map (folder: {
+          where = "/home/agent/vault/${folder}";
+          wantedBy = [ "multi-user.target" ];
+        }) vaultFolders;
       };
     };
 }

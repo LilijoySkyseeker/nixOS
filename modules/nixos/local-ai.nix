@@ -305,7 +305,13 @@ _: {
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$f" ${paseoManaged} > "$f.tmp"
+          # the merge keeps old keys; local-codex is wholly the repo's, so a key
+          # removed from it here also goes from the live config
+          ${lib.getExe pkgs.jq} -s '
+            .[1].agents.providers."local-codex" as $local
+            | (.[0] * .[1])
+            | .agents.providers."local-codex" = $local
+          ' "$f" ${paseoManaged} > "$f.tmp"
           # voice on unless it was turned off in the app; in the managed keys, a
           # restart would undo the app's switch
           ${lib.getExe pkgs.jq} 'if .features.voiceMode.enabled == null then .features.voiceMode.enabled = true else . end' "$f.tmp" > "$f.tmp2"
