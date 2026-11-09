@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794118342,
-        "narHash": "sha256-wC7iHZfFRkzCI4wurhrl3rzxKbK4OSIG5vj7Qm1gnBk=",
+        "lastModified": 1794201891,
+        "narHash": "sha256-irPN56j9CIYmlge0xEQD/fA4qn7OlvYIYHa/m4vXYdI=",
         "owner": "0xShug0",
         "repo": "audio.cpp",
-        "rev": "408935bfe6ffc52aba6ecc08fdf31ce017d46a6d",
+        "rev": "7d20b414da088c3ffe56bd8803398d9d158cb847",
         "type": "github"
       },
       "original": {
@@ -433,11 +433,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1794116168,
-        "narHash": "sha256-Dsc08opiicQ3fnDfNdobPwp1ciLO24lhj+cioQ7NN1E=",
+        "lastModified": 1794201582,
+        "narHash": "sha256-ejT2Q+iCRP2/oL+58pb5/UGZ53cWVLqU5ob58EucyZk=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "cc555ccdfc76237727ce7ceccdc40fde61dae577",
+        "rev": "3327b7d82f31f2444533e935f06caf1a1b4da18c",
         "type": "github"
       },
       "original": {
@@ -483,11 +483,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793543282,
-        "narHash": "sha256-PHtGxKYM99f8WhGR5YD7iiCiwemKa2wUD4yVI2oALFg=",
+        "lastModified": 1794132860,
+        "narHash": "sha256-iGNtQnUZsi+v6/4NbtYr+dsmASa6GkzXtUcTpE8F3mE=",
         "owner": "nix-community",
         "repo": "nix-index-database",
-        "rev": "cee0f879d338cf08f814210fa6c2b280594ade0a",
+        "rev": "af9249ca33bc2efaae5d071e4c67ddef19dcb681",
         "type": "github"
       },
       "original": {
@@ -557,11 +557,11 @@
     },
     "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1793876309,
-        "narHash": "sha256-Q62pssAT9r01POiSyXW0IPXBWhntiKqMhzlsp3bsl5I=",
-        "rev": "f9a75f41be3a74eab55d3a7679d34ad6cc0da977",
+        "lastModified": 1794042290,
+        "narHash": "sha256-VZ8WvA9m3XN36juXyg/GwbDRU2OezOHJlXpJCXkccv0=",
+        "rev": "f4a03c008967841f2a0b3cb7c436fc6fc31671f6",
         "type": "tarball",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1108983.f9a75f41be3a/nixexprs.tar.zst"
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1113206.f4a03c008967/nixexprs.tar.zst"
       },
       "original": {
         "id": "nixpkgs",
@@ -603,11 +603,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794049908,
-        "narHash": "sha256-K1rzAlksFZWJ0JQfB9kIEFIp9N+pzZs9881Va5LmytY=",
+        "lastModified": 1794159704,
+        "narHash": "sha256-2xkGsyT1C6+z9fx72VeRdmExCIOibm4q0Rk7mfKBCj0=",
         "owner": "notashelf",
         "repo": "nvf",
-        "rev": "d36cd373c5636f9a97c228ffaaec857383d88cbc",
+        "rev": "c5a635adcd638bc1d5bc31098a2ba4b89bfe787b",
         "type": "github"
       },
       "original": {
