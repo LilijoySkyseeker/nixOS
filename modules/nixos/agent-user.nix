@@ -54,20 +54,6 @@
         ps.trafilatura
         ps.html2text
       ]);
-      # web-fetch's curls decode whatever brotli a fetched server sends, and
-      # brotli 1.2.0's decoder has an out-of-bounds write (CVE-2026-111497)
-      # TODO: drop when NixOS/nixpkgs#577208 (brotli 1.2.1) is in nixos-unstable
-      fetchCurl = pkgs.curl.override {
-        brotli = pkgs.brotli.overrideAttrs {
-          version = "1.2.1";
-          src = pkgs.fetchFromGitHub {
-            owner = "google";
-            repo = "brotli";
-            tag = "v1.2.1";
-            hash = "sha256-llY72cYffDv0ugsH0p89xIPEbElV4L8u7U/Fe8hT3gI=";
-          };
-        };
-      };
       # curl-impersonate builds its own static brotli from a tarball
       # TODO: drop when nixos-unstable's curl-impersonate is 2.3.1 or later (lexiforest/curl-impersonate#357)
       fetchCurlImpersonate = pkgs.curl-impersonate.overrideAttrs (old: {
@@ -88,7 +74,7 @@
         runtimeInputs = [
           pkgs.coreutils
           pkgs.gnugrep
-          fetchCurl
+          pkgs.curl
           fetchCurlImpersonate
           pkgs.xvfb-run
           pkgs.poppler-utils
