@@ -88,3 +88,13 @@ leaves as you, through the same egress firewall.
   (use `-mmin -15`). Codex shells have the GNU tools.
 - **Python on downloaded data:** run it with `-I`, from a directory that
   holds only your own scripts.
+- **Python packages:** `nix shell nixpkgs#python3Packages.<pkg>` doesn't
+  put the module on python's path, and `-I` ignores `PYTHONPATH`; use
+  `nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux.python3.withPackages (p: [p.<pkg>])'`.
+  For Python Playwright, add `p.playwright` there and launch with
+  `executable_path="/run/current-system/sw/bin/chromium"`.
+- **`pkill -f` / `pgrep -f`:** Claude Code runs your whole command inside
+  `bash -c`, so a pattern that appears anywhere in the command matches
+  your own shell, kills it (exit 144) or never stops waiting. The `[x]yz`
+  trick fails too if the plain word is elsewhere in the command. Use PIDs:
+  save `$!` to a file when starting a job, and `kill $(cat job.pid)`.
