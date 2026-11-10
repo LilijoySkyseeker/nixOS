@@ -76,7 +76,8 @@ the `other-agents` skill.
 
 - Open a PR as a draft while any of its work is still pending (a test,
   an answer from the owner), and mark it ready only when nothing
-  but the owner's review is left. The owner merges ready PRs.
+  but the owner's review is left. The owner merges ready PRs; only the daily
+  update PR merges itself, when it changes nothing but `flake.lock`.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
 - **Never stack branches or PRs**, in any repo: every branch starts from
