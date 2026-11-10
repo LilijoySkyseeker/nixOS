@@ -29,10 +29,8 @@ sets `core.hooksPath` so the git hooks run.
 - **Remote installs:** boot it in a local VM first, and build locally,
   never on the target (`vps` can run out of memory building its own
   closure). See `docs/procedures/new-host.md`.
-- **Security review:** a change that touches firewall rules, open ports,
-  secrets wiring, authentication, or adds or exposes a service counts as
-  sensitive, so it gets the review in the `other-agents` skill. The brief
-  names `~/vault/Areas/Fleet/Security.md` to read first: what the fleet is
+- **Security changes:** the review brief names
+  `~/vault/Areas/Fleet/Security.md` to read first: what the fleet is
   exposed to today and the risks the owner accepted (private, in the
   vault; the daily update run keeps it).
 

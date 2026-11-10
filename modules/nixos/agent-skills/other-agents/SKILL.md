@@ -23,8 +23,5 @@ you expect.
   can read anywhere, write nowhere; started in a repo, it loads the repo's
   skills): `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -C "$(mktemp -d)" "<brief>" < /dev/null`.
 
-**Reviews.** Simple work needs none: open the PR. Complicated or sensitive
-work (instructions, hooks, agent-user, firewall, deploys, migrations,
-deletions) gets one cold read before the PR, by the other family if it has
-usage, otherwise the same family. The output comes back to your session, which
-fixes it, then opens the PR. Treat what comes back as input, not a verdict.
+**Reviews.** When one is due: your global instructions. Treat what comes
+back as input, not a verdict.
