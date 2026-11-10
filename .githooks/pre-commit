@@ -58,8 +58,16 @@ done <<<"$staged_files"
 if [[ "${#staged_nix[@]}" -gt 0 ]]; then
   for tool in nixfmt statix deadnix; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-      echo "BLOCKED: $tool not on PATH. The PCs install it (modules/nixos/desktop-apps.nix); elsewhere: nix shell nixpkgs#nixfmt nixpkgs#statix nixpkgs#deadnix" >&2
-      exit 1
+      # the PCs install them (modules/nixos/desktop-apps.nix), but only from
+      # the next boot; until then, and anywhere else, rerun with them from the
+      # system's nixpkgs registry entry
+      if [[ -n "${NIXOS_HOOK_TOOLS_FETCHED:-}" ]]; then
+        echo "BLOCKED: $tool not on PATH, even under nix shell." >&2
+        exit 1
+      fi
+      echo "pre-commit: $tool not on PATH; fetching the lint tools with nix shell" >&2
+      rm -f "$blob"
+      NIXOS_HOOK_TOOLS_FETCHED=1 exec nix shell nixpkgs#nixfmt nixpkgs#statix nixpkgs#deadnix -c "$0" "$@"
     fi
   done
   if ! nixfmt --check "${staged_nix[@]}"; then
