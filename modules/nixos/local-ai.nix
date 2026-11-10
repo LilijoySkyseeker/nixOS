@@ -341,6 +341,11 @@ _: {
         };
         after = agentUnit.after ++ [ "paseo-agent-config.service" ];
         requires = [ "paseo-agent-config.service" ];
+        # a switch leaves every agent session and its jobs running (owner,
+        # 2026-11-09); a new Paseo or its config takes effect at the next boot
+        # or `systemctl restart paseo`. Sessions start Claude Code and Codex
+        # from the profile, so those update at once
+        restartIfChanged = false;
         serviceConfig = lib.mkMerge [
           agentUnit.serviceConfig
           agentModelAccess
