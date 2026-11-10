@@ -23,6 +23,10 @@ one page at a time across all agents: expect to queue behind another.
   walled.
 - It discards 4xx bodies. Some sites answer "no record" as a 404 with a
   page; when that matters, use curl-impersonate yourself and keep the body.
+- The WebFetch tool (and the `web-fetch` subagent built on it) is refused
+  by many sites with a 403 or 429 (DigiKey, buydisplay, leginfo, apiiro,
+  ppic) and stops at 10 MB; the `web-fetch` command read every one of
+  those. On a refusal, try the command before giving up on the page.
 - Plain `curl` works on many docs sites (code.claude.com's `.md` URLs) where
   the browser tier is slower.
 
@@ -56,10 +60,11 @@ Routes that work where the obvious one doesn't:
   to the thread URL (`web-fetch --feed`, or `-o FILE` for the whole Atom).
   Images come from `i.redd.it/<id>.jpeg`.
 - **Search engines:** Google search through `web-fetch` is intermittent: it
-  passes on a well-used profile, but can give a 429 and a reCAPTCHA (seen over
-  IPv4; over IPv6 untested). Don't
+  passes on a well-used profile (it did over IPv6 on 2026-11-09), but can
+  give a 429 and a reCAPTCHA (seen over IPv4). Don't
   retry it; repeat visits risk the household IP. Google News RSS
-  (`news.google.com/rss/search?q=...`) and Bing through plain curl work.
+  (`news.google.com/rss/search?q=...`) and Bing through plain curl work;
+  Bing ignores quote marks, so it can't do exact-phrase searches.
 - **YouTube:** refuses this household's IPv4 ("Sign in to confirm you're not
   a bot") but serves its IPv6, which agents may use to Google's ranges only.
   yt-dlp picks IPv6 by itself; add `-6` if a run still asks you to sign in.

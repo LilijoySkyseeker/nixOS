@@ -62,7 +62,9 @@ fleet and against what the update fixes, and keep `Security.md` true.
 9. **Look** at everything since that date (the past 7 days if there is
    none):
    - NixOS: nixpkgs issues and PRs labelled `1.severity: security`, the
-     NixOS Discourse security category, and whether fixes have reached
+     NixOS Discourse security categories
+     (`https://discourse.nixos.org/c/announcements/security/56.rss`,
+     `https://discourse.nixos.org/c/dev/security/21.rss`), and whether fixes have reached
      the channels the fleet follows (status.nixos.org);
    - advisories: oss-security (`https://seclists.org/rss/oss-sec.rss`),
      the CISA Known Exploited Vulnerabilities catalog, GitHub security
@@ -72,7 +74,9 @@ fleet and against what the update fixes, and keep `Security.md` true.
    - upstream announcements: the Linux kernel, OpenSSH, systemd,
      Tailscale, Mullvad, and each self-hosted service;
    - news: LWN (`https://lwn.net/headlines/rss`; its daily distro-update
-     lists too), Ars Technica, BleepingComputer, Hacker News, for big
+     lists too), Ars Technica (`https://arstechnica.com/security/feed/`),
+     BleepingComputer, Hacker News (hnrss.org often 502s; use
+     `https://hn.algolia.com/api/v1/search_by_date?tags=front_page`), for big
      events like #140's (a compromised CA, found in the news, fixed with a
      small stopgap that names its own removal condition).
    Read a source through its feed where it has one (`web-fetch --feed`).
