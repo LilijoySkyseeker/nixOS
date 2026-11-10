@@ -47,7 +47,7 @@ in
           flac
           tmux
         ]
-        # shared with the devshell (modules/flake/debug-tools.nix); always unstable,
+        # modules/flake/debug-tools.nix; always unstable,
         # even on stable-pinned homelab, so debug tools match fleet-wide
         ++ debugTools pkgs-unstable;
 

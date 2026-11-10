@@ -58,7 +58,7 @@ done <<<"$staged_files"
 if [[ "${#staged_nix[@]}" -gt 0 ]]; then
   for tool in nixfmt statix deadnix; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-      echo "BLOCKED: $tool not on PATH. Commit from the dev shell (direnv, or 'direnv exec . git commit ...')." >&2
+      echo "BLOCKED: $tool not on PATH. The PCs install it (modules/nixos/desktop-apps.nix); elsewhere: nix shell nixpkgs#nixfmt nixpkgs#statix nixpkgs#deadnix" >&2
       exit 1
     fi
   done
