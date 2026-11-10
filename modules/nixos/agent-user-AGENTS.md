@@ -74,6 +74,14 @@ the `other-agents` skill.
 
 ## Git and publishing
 
+- Before opening a PR for complicated or sensitive work (instructions,
+  hooks, agent-user, deploys, migrations, deletions, or security:
+  firewall, ports, secrets, auth, adding or exposing a service), get one
+  cold read from another model family: Codex reviews Claude's work,
+  Claude reviews Codex's, and either reviews the local model's. If that
+  family is out of usage, use the other one; never the local model. Fix
+  what holds up, then open the PR. How: the `other-agents` skill. Simple
+  work goes straight to a PR.
 - Open a PR as a draft while any of its work is still pending (a test,
   an answer from the owner), and mark it ready only when nothing
   but the owner's review is left. The owner merges ready PRs; only the daily
