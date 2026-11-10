@@ -8,10 +8,12 @@ usage() {
   cat >&2 <<'EOF'
 usage: agent-task start NAME -- COMMAND [ARG...]   run COMMAND in the current directory
        agent-task ls                               the running tasks
-       agent-task log NAME [-f]                    its output, ending "exited N" (-f: follow)
+       agent-task log NAME [-f]                    its output, ending "=== ... exited" (-f: follow)
        agent-task stop NAME                        stop it and everything it started
        agent-task status NAME                      its unit's state
 NAME: letters, digits, '.', '_' and '-', not starting with '.' or '-'.
+The task gets this shell's environment (credential-named variables
+dropped) but its own /tmp: keep its files elsewhere, ~/work/scratch say.
 Output goes to
 ~/.local/state/agent-task/NAME/log.
 EOF
@@ -44,6 +46,14 @@ start)
   shift 2
   [ "${1:-}" = -- ] && shift
   [ $# -gt 0 ] || usage
+  # the task has its own /tmp: a path in this one wouldn't be there
+  for a in "$PWD" "$@"; do
+    case $a in /tmp | /tmp/* | /var/tmp | /var/tmp/*)
+      echo "agent-task: '$a' is in /tmp, which the task can't see; move it under ~/work/scratch" >&2
+      exit 2
+      ;;
+    esac
+  done
   dir=$state/$name
   mkdir -p "$dir"
   # one start per name at a time, from the check to the unit's start
@@ -53,10 +63,21 @@ start)
     echo "agent-task: $name is already running; stop it or pick another name" >&2
     exit 1
   fi
-  # the unit runs this script: the command, in the directory it was started from
+  # the unit runs this script: the command, in the directory and environment
+  # it was started from (a dev shell's PATH, say), minus credentials and
+  # this shell's own bookkeeping
   tmp=$(mktemp "$dir/.run.XXXXXX")
   {
     echo '#!/usr/bin/env bash'
+    # env -0, not compgen: writeShellApplication's bash has no compgen
+    while IFS= read -r -d '' kv; do
+      v=${kv%%=*}
+      [[ $v =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+      case $v in
+      *KEY* | *TOKEN* | *SECRET* | *PASSWORD* | PWD | OLDPWD | SHLVL | _ | INVOCATION_ID | JOURNAL_STREAM | SYSTEMD_EXEC_PID) ;;
+      *) printf 'export %s=%q\n' "$v" "${kv#*=}" ;;
+      esac
+    done < <(env -0)
     printf 'cd %q || exit 1\n' "$PWD"
     printf 'exec'
     printf ' %q' "$@"

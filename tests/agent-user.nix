@@ -54,6 +54,11 @@ pkgs.testers.runNixOSTest {
       pkgs.socat
     ];
     services.openssh.enable = true;
+    # a switch that changes the task unit and an egress rule
+    specialisation.update.configuration = {
+      systemd.services."agent-task@".environment.SWITCH_PROBE = "1";
+      networking.firewall.extraCommands = pkgs.lib.mkAfter "# changed";
+    };
     # serves markerPdf on loopback, which the agent may reach
     systemd.services.pdf-server = {
       wantedBy = [ "multi-user.target" ];
@@ -95,6 +100,10 @@ pkgs.testers.runNixOSTest {
 
     def as_agent(cmd):
         return f"su agent -s /bin/sh -c '{cmd}'"
+
+    # agent-task refuses a cwd in /tmp, where the driver runs
+    def task(cmd):
+        return as_agent(f"cd /home/agent/work && agent-task {cmd}")
 
     # report every failure, not just the first
     failures = []
@@ -329,7 +338,7 @@ pkgs.testers.runNixOSTest {
         st = "/home/agent/.local/state/agent-task"
         sock = "UNIX-CONNECT:/run/agent-task.sock"
         machine.wait_for_unit("agent-task-broker.socket")
-        machine.succeed(as_agent("cd /home/agent/work && agent-task start t1 -- sh -c \"echo task-hi; pwd; id -un; setsid sleep 700 & sleep 600\""))
+        machine.succeed(task("start t1 -- sh -c \"echo task-hi; pwd; id -un; setsid sleep 700 & sleep 600\""))
         machine.wait_until_succeeds(f"grep -qx task-hi {st}/t1/log")
         out = machine.succeed(f"cat {st}/t1/log").split()
         check("/home/agent/work" in out and "agent" in out, f"cwd or user: {out!r}")
@@ -337,10 +346,10 @@ pkgs.testers.runNixOSTest {
         got = machine.succeed(f"systemctl show -p ActiveState,Slice,User,ProtectSystem,PrivateDevices {unit}")
         for want in ["ActiveState=active", "Slice=agent.slice", "User=agent", "ProtectSystem=strict", "PrivateDevices=yes"]:
             check(want in got, f"{unit}: no {want} in {got!r}")
-        check("t1" in machine.succeed(as_agent("agent-task ls")), "agent-task ls doesn't list t1")
+        check("t1" in machine.succeed(task("ls")), "agent-task ls doesn't list t1")
 
         # the agent's boundary holds inside a task: no root files, no LAN
-        machine.succeed(as_agent("agent-task start t2 -- sh -c \"touch /etc/agent-task-probe 2>/dev/null; echo ETC-RC=\\$?; curl -sS --max-time 5 http://lan:8000/marker >/dev/null 2>&1; echo LAN-RC=\\$?\""))
+        machine.succeed(task("start t2 -- sh -c \"touch /etc/agent-task-probe 2>/dev/null; echo ETC-RC=\\$?; curl -sS --max-time 5 http://lan:8000/marker >/dev/null 2>&1; echo LAN-RC=\\$?\""))
         machine.wait_until_succeeds(f"grep -q ^LAN-RC= {st}/t2/log")
         out = machine.succeed(f"grep -E '^(ETC|LAN)-RC=' {st}/t2/log")
         check("ETC-RC=0" not in out and "LAN-RC=0" not in out, f"a task got out: {out!r}")
@@ -352,24 +361,41 @@ pkgs.testers.runNixOSTest {
         # broker directly, past the CLI's own header write)
         machine.succeed("echo root-only > /root/target && chmod 600 /root/target")
         machine.succeed(as_agent(f"mkdir -p {st}/t3 && printf \"echo pwned\\n\" > {st}/t3/run && ln -sf /root/target {st}/t3/log"))
-        machine.succeed(as_agent(f"printf \"start t3\\n\" | socat - {sock}"))
+        out = machine.succeed(as_agent(f"printf \"start t3\\n\" | socat - {sock}"))
+        check(out.strip().splitlines()[-1:] == ["ok"], f"the broker didn't start t3: {out!r}")
         machine.wait_until_succeeds("! systemctl is-active -q agent-task@t3.service")
         check(machine.succeed("cat /root/target").strip() == "root-only", "a task's log reached a root-owned file")
 
-        # only start, stop and restart of a task, through the broker
-        for req in ["mask t1", "start ../x", "start sshd.service x", "start t1;id"]:
+        # only start and stop of a task, through the broker
+        for req in ["mask t1", "restart t1", "start ../x", "start sshd.service x", "start t1;id"]:
             out = machine.succeed(as_agent(f"printf \"{req}\\n\" | socat - {sock}"))
             check(out.strip().splitlines()[-1:] != ["ok"], f"broker accepted {req!r}: {out!r}")
         # and no way to systemd's job queue past it (--job-mode=flush cancels others' jobs)
         machine.fail(as_agent("systemctl --job-mode=flush start agent-task@t4.service"))
         machine.fail(as_agent("systemctl start agent-task@t4.service"))
         machine.fail(as_agent("systemctl restart sshd.service"))
-        machine.fail(as_agent("agent-task start ../x -- true"))
-        machine.fail(as_agent("agent-task start t1 -- true"))  # already running
+        machine.fail(task("start ../x -- true"))
+        machine.fail(task("start t1 -- true"))  # already running
+        # a task has its own /tmp, so a path in the caller's is refused
+        machine.fail(as_agent("cd /tmp && agent-task start t8 -- true"))
+        machine.fail(task("start t8 -- bash /tmp/x.sh"))
+
+        # the caller's environment goes with the task, its credentials don't
+        machine.succeed(as_agent("cd /home/agent/work && FOO=bar MY_API_KEY=x agent-task start t7 -- sh -c \"echo FOO=\$FOO K=[\$MY_API_KEY]\""))
+        machine.wait_until_succeeds(f"grep -q ^FOO= {st}/t7/log")
+        out = machine.succeed(f"grep ^FOO= {st}/t7/log").strip()
+        check(out == "FOO=bar K=[]", f"task environment: {out!r}")
+
+        # from inside the sandbox, as a live session would: a task starts a task
+        machine.succeed(task("start t9 -- agent-task start t10 -- echo inner-hi"))
+        machine.wait_until_succeeds(f"grep -qx inner-hi {st}/t10/log", timeout=30)
 
         # a stop ends the task and everything it started, detached or not
-        machine.succeed(as_agent("agent-task stop t1"))
+        machine.succeed(task("stop t1"))
         machine.wait_until_fails("pgrep -u agent -x sleep")
+        # and the log still gets its last line
+        last = machine.succeed(f"tail -n 1 {st}/t1/log").strip()
+        check(last.startswith("=== ") and " exited TERM " in last, f"no exit line after stop: {last!r}")
         check(machine.succeed(f"systemctl show -p ActiveState --value {unit}").strip() == "inactive",
               f"{unit} still running after stop")
         # an oversized request gets nothing from root
@@ -391,14 +417,27 @@ pkgs.testers.runNixOSTest {
             assert missing in out, f"missing {missing!r} in:\n{out}"
         machine.fail("test -e /home/agent/.config/gh/hosts.yml")
 
+    with subtest("agent-task: a switch leaves it running, stopping agent.slice ends it"):
+        machine.succeed(task("start t6 -- sleep 800"))
+        machine.wait_for_unit("agent-task@t6.service")
+        pid = lambda: machine.succeed("systemctl show -P MainPID agent-task@t6.service").strip()
+        before = pid()
+        out = machine.succeed("/run/current-system/specialisation/update/bin/switch-to-configuration test 2>&1")
+        machine.sleep(5)
+        assert pid() == before, f"agent-task@t6 restarted by a switch: {before} -> {pid()}\n{out}"
+        # the owner's kill switch for every agent session and task
+        machine.succeed("systemctl stop agent.slice")
+        machine.wait_until_fails("pgrep -u agent -x sleep")
+
     with subtest("agent-task stays stopped after a reboot"):
-        machine.succeed(as_agent("agent-task start t5 -- sleep 900"))
+        machine.succeed(task("start t5 -- sleep 900"))
         machine.wait_for_unit("agent-task@t5.service")
         machine.shutdown()
         machine.start()
         machine.wait_for_unit("multi-user.target")
-        machine.sleep(5)
-        state = machine.succeed("systemctl show -p ActiveState --value agent-task@t5.service").strip()
-        assert state == "inactive", f"agent-task@t5 after reboot: {state}"
+        machine.sleep(10)
+        # nothing started it again this boot
+        machine.fail("pgrep -u agent -f \"sleep 900\"")
+        machine.fail("journalctl -b 0 -u agent-task@t5.service -o cat | grep -q Started")
   '';
 }

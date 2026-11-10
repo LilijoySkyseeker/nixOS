@@ -48,11 +48,14 @@ longer than a few minutes (training, a dev server, a long build or
 download), run it as its own unit:
 `agent-task start NAME -- COMMAND...` (in the directory it should run in),
 then `agent-task ls` (running ones), `agent-task log NAME [-f]` (ends
-`=== ... exited N` when it finishes), `agent-task stop NAME`.
-It runs in the same sandbox and memory cap, outlives your session and
+`=== ... exited N (RESULT)` when it ends, stopped or killed included),
+`agent-task stop NAME`.
+It runs in the same sandbox and memory cap with your shell's environment
+(minus variables named like credentials), outlives your session and
 switches, and stops for good at a reboot: make long jobs resumable from
-their own checkpoints. The owner sees tasks with
-`systemctl list-units 'agent-task@*'`.
+their own checkpoints. It has its own `/tmp`, so keep its script and files
+elsewhere (`~/work/scratch`); `agent-task` refuses `/tmp` paths. The owner
+sees tasks with `systemctl list-units 'agent-task@*'`.
 
 ## The GPU is the owner's desktop card
 

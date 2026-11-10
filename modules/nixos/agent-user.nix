@@ -85,19 +85,22 @@
       agentTaskRun = pkgs.writeShellScript "agent-task-run" ''
         d=/home/agent/.local/state/agent-task/$1
         exec >>"$d/log" 2>&1
-        ${pkgs.bash}/bin/bash "$d/run"
-        rc=$?
-        echo "=== $(${pkgs.coreutils}/bin/date -Is) exited $rc"
-        exit "$rc"
+        exec ${pkgs.bash}/bin/bash "$d/run"
+      '';
+      # the log's last line, as agent too; from ExecStopPost, so a stop or an
+      # OOM kill gets one as well: "exited 0 (success)", "exited TERM (signal)"
+      agentTaskDone = pkgs.writeShellScript "agent-task-done" ''
+        echo "=== $(${pkgs.coreutils}/bin/date -Is) exited $EXIT_STATUS ($SERVICE_RESULT)" \
+          >>"/home/agent/.local/state/agent-task/$1/log" 2>/dev/null || true
       '';
       # root's half: one request per connection on /run/agent-task.sock, which
-      # only group agent can reach; it takes start, stop or restart and a
-      # task name, nothing else, and calls systemctl with the default job
+      # only group agent can reach; it takes start or stop and a task name,
+      # nothing else, and calls systemctl with the default job
       # mode (polkit can't hold an agent to that: --job-mode=flush would
       # cancel other units' jobs)
       agentTaskBroker = pkgs.writeShellScript "agent-task-broker" ''
         IFS=' ' read -r -t 5 -n 200 verb name rest || exit 0
-        case $verb in start | stop | restart) ;; *) echo "agent-task: bad request"; exit 0 ;; esac
+        case $verb in start | stop) ;; *) echo "agent-task: bad request"; exit 0 ;; esac
         if [ -n "$rest" ] || ! [[ $name =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]]; then
           echo "agent-task: bad name"
           exit 0
@@ -487,6 +490,7 @@
             Type = "exec";
             Restart = "no";
             ExecStart = "${agentTaskRun} %i";
+            ExecStopPost = "${agentTaskDone} %i";
           };
         };
 
@@ -500,6 +504,9 @@
             SocketMode = "0660";
             Accept = true;
             MaxConnections = 8;
+            # no trigger limit: a loop of requests would otherwise fail the
+            # socket until root restarts it; MaxConnections bounds the load
+            TriggerLimitIntervalSec = 0;
           };
         };
         services."agent-task-broker@" = {

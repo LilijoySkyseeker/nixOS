@@ -5,6 +5,11 @@
   agentUserModule,
   localAiModule,
 }:
+let
+  # a Claude Code update, as the switch test sees it: a new store path in
+  # Paseo's managed config
+  newClaude = pkgs.writeShellScriptBin "claude" "echo 9.9.9";
+in
 pkgs.testers.runNixOSTest {
   name = "local-ai";
 
@@ -39,6 +44,11 @@ pkgs.testers.runNixOSTest {
         pkgs.curl
         pkgs.jq
       ];
+      # what a switch most often brings: a new Claude Code and an egress rule
+      specialisation.update.configuration = {
+        nixpkgs.overlays = [ (_: _: { claude-code = newClaude; }) ];
+        networking.firewall.extraCommands = lib.mkAfter "# changed";
+      };
     };
 
   testScript =
@@ -153,5 +163,19 @@ pkgs.testers.runNixOSTest {
           assert field("job:update", ".nextRunAt") == next_run
           tz = field("job:update", ".cadence.timezone")
           assert tz == "America/Los_Angeles", tz
+
+      with subtest("a switch leaves Paseo running and hands it the new config"):
+          machine.wait_for_open_port(6767, timeout=120)
+          pid = lambda: machine.succeed("systemctl show -P MainPID paseo").strip()
+          before = pid()
+          out = machine.succeed("/run/current-system/specialisation/update/bin/switch-to-configuration test 2>&1")
+          assert "paseo-agent-config.service" in out, f"the switch didn't re-run the config step:\n{out}"
+          machine.sleep(5)
+          assert pid() == before, f"paseo was restarted: {before} -> {pid()}\n{out}"
+          got = machine.succeed("jq -r '.agents.providers.claude.command[0]' /home/agent/.paseo/config.json").strip()
+          assert got == "${pkgs.lib.getExe newClaude}", f"config.json has {got}"
+          # the daemon took the new providers without a restart
+          journal = machine.succeed("journalctl -b -u paseo-agent-config -o cat")
+          assert '"agents.providers"' in journal, f"no reload of agents.providers:\n{journal}"
     '';
 }

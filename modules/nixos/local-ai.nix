@@ -322,6 +322,12 @@ _: {
           ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
           mv "$f.tmp2" "$f.tmp"
           mv "$f.tmp" "$f"
+          # a switch re-runs this step but leaves Paseo running: hand it the
+          # new config (new sessions get the new Claude Code and Codex). Not
+          # running yet at boot; Paseo reads the file when it starts
+          if ${pkgs.systemd}/bin/systemctl is-active -q paseo.service; then
+            HOME=/home/agent ${lib.getExe paseo} daemon reload --json || true
+          fi
         '';
       };
 
@@ -330,7 +336,6 @@ _: {
         description = "Paseo daemon: Claude, Codex and local-model sessions in the agent sandbox";
         inherit (agentUnit)
           wantedBy
-          wants
           bindsTo
           ;
         environment = agentUnit.environment // {
@@ -339,12 +344,13 @@ _: {
           PASEO_GPT_LIVE_API_KEY_FILE =
             config.sops.secrets.gpt_live_api_key.path or "/run/secrets/gpt_live_api_key";
         };
+        # wants, not requires: the switch's restart of the config step would
+        # stop Paseo with it
+        wants = agentUnit.wants ++ [ "paseo-agent-config.service" ];
         after = agentUnit.after ++ [ "paseo-agent-config.service" ];
-        requires = [ "paseo-agent-config.service" ];
         # a switch leaves every agent session and its jobs running (owner,
-        # 2026-11-09); a new Paseo or its config takes effect at the next boot
-        # or `systemctl restart paseo`. Sessions start Claude Code and Codex
-        # from the profile, so those update at once
+        # 2026-11-09); a new Paseo takes effect at the next boot or
+        # `systemctl restart paseo`, its config at once (paseo-agent-config)
         restartIfChanged = false;
         serviceConfig = lib.mkMerge [
           agentUnit.serviceConfig
