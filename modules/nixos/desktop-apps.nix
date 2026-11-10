@@ -14,6 +14,13 @@ _: {
         nodejs
         nixos-anywhere
         ssh-to-age
+        age-plugin-yubikey
+
+        # the nixOS repo's pre-commit hook
+        nixfmt
+        statix
+        deadnix
+
         caligula
         scrcpy
         vipsdisp

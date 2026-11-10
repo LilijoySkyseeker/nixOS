@@ -119,7 +119,7 @@
       '';
       # trust the nixOS repo's .envrc in every clone and worktree of it
       # (a string prefix: nixOS-* matches too), so each new worktree has its
-      # dev shell and hook tools without a `direnv allow`. The system sets
+      # git hooks turned on without a `direnv allow`. The system sets
       # DIRENV_CONFIG=/etc/direnv, so ~/.config/direnv is never read: the agent
       # gets its own config dir, with nix-direnv as /etc/direnv has it
       direnvConfig = pkgs.linkFarm "agent-direnv" {

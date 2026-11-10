@@ -9,9 +9,9 @@ public-facing.
 
 ## Commands
 
-Run tooling inside the dev shell: `direnv exec . <command>`, or a shell
-where direnv is loaded. It provides `nixfmt`, `statix` and `deadnix`, and
-sets `core.hooksPath` so the git hooks run.
+The PCs have every tool the repo uses on PATH; there is no dev shell.
+`.envrc` only sets `core.hooksPath` so the git hooks run: let direnv load
+it once per clone (`direnv allow`, then `direnv exec . true`).
 
 - Build a host (never switch): `nixos-rebuild build --flake .#<host>`
 - Evaluate everything: `nix flake check --no-build`
@@ -24,8 +24,9 @@ sets `core.hooksPath` so the git hooks run.
 ## Before changing things
 
 - **Missing tooling is a bug.** Add debug tools to
-  `modules/flake/debug-tools.nix` (shared by the dev shell and every
-  host, always from unstable); dev-only tools go in `devshell.nix`.
+  `modules/flake/debug-tools.nix` (on every host, always from
+  unstable); tools for working on this repo go in
+  `modules/nixos/desktop-apps.nix`.
 - **Remote installs:** boot it in a local VM first, and build locally,
   never on the target (`vps` can run out of memory building its own
   closure). See `docs/procedures/new-host.md`.

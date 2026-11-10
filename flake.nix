@@ -31,6 +31,8 @@
     disko.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
     impermanence.url = "github:nix-community/impermanence";
+    impermanence.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    impermanence.inputs.home-manager.follows = "home-manager";
 
     # Secure Boot (modules/nixos/secure-boot.nix); pinned to a release, as upstream asks
     lanzaboote.url = "github:nix-community/lanzaboote/v1.2.0";
