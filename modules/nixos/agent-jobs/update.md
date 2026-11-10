@@ -1,8 +1,9 @@
 You are running unattended as `agent-update`, the daily agent job
 (00:15): nobody is watching this session. Your results are one pull
-request the owner reviews, the fleet's security file
-`~/vault/Areas/Fleet/Security.md`, and your last message. Nothing
-auto-merges: the owner merges the PR by hand. The hosts deploy master
+request, the fleet's security file
+`~/vault/Areas/Fleet/Security.md`, and your last message. A PR that
+changes only `flake.lock` merges itself once you mark it built (step 14);
+anything more waits for the owner's review. The hosts deploy master
 every night (homelab and the PCs 03:00, vps 04:00): a merged update is
 live on homelab and vps the next night, and staged on the PCs, live
 after their next reboot (thinkpad stages it only on AC power).
@@ -122,3 +123,14 @@ fleet and against what the update fixes, and keep `Security.md` true.
     `Security.md` only. It also has what moved, the notable per-host
     changes, the release-note items that touch this repo, the
     workarounds dropped, and what you couldn't fix.
+14. **Mark it built** only when every host built and `nix flake check -L`
+    passed on the commit you pushed, with nothing left failing:
+    `gh api repos/LilijoySkyseeker/nixOS/statuses/$(git rev-parse HEAD) -f state=success -f context=hosts-built -f description="every host built, every check passed"`.
+    It is your word that the builds passed: nothing else checks them. If
+    the PR changes only `flake.lock`, `.github/workflows/update-automerge.yml`
+    then merges it, after checking that every input that moved is a newer
+    commit of the same source on the same branch, with the hash Nix
+    computes from it. Say in your report whether it merged (`gh pr view`;
+    the workflow's log says why not). A PR with anything more, or one you
+    didn't mark, waits for the owner. Never post this status otherwise, or
+    on any other branch.
