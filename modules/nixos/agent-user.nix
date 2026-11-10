@@ -69,6 +69,41 @@
               98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f
         '';
       });
+      # long jobs as their own unit (agent-task@NAME): see agent-tools/agent-task.sh
+      agentTask = pkgs.writeShellApplication {
+        name = "agent-task";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.systemd
+          pkgs.socat
+          pkgs.util-linux # flock
+        ];
+        text = builtins.readFile ./agent-tools/agent-task.sh;
+      };
+      # the unit's entry point: logs from inside, as agent, so systemd (root)
+      # never opens a path the agent controls
+      agentTaskRun = pkgs.writeShellScript "agent-task-run" ''
+        d=/home/agent/.local/state/agent-task/$1
+        exec >>"$d/log" 2>&1
+        ${pkgs.bash}/bin/bash "$d/run"
+        rc=$?
+        echo "=== $(${pkgs.coreutils}/bin/date -Is) exited $rc"
+        exit "$rc"
+      '';
+      # root's half: one request per connection on /run/agent-task.sock, which
+      # only group agent can reach; it takes start, stop or restart and a
+      # task name, nothing else, and calls systemctl with the default job
+      # mode (polkit can't hold an agent to that: --job-mode=flush would
+      # cancel other units' jobs)
+      agentTaskBroker = pkgs.writeShellScript "agent-task-broker" ''
+        IFS=' ' read -r -t 5 -n 200 verb name rest || exit 0
+        case $verb in start | stop | restart) ;; *) echo "agent-task: bad request"; exit 0 ;; esac
+        if [ -n "$rest" ] || ! [[ $name =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]]; then
+          echo "agent-task: bad name"
+          exit 0
+        fi
+        if ${pkgs.systemd}/bin/systemctl "$verb" -- "agent-task@$name.service" 2>&1; then echo ok; fi
+      '';
       webFetch = pkgs.writeShellApplication {
         name = "web-fetch";
         runtimeInputs = [
@@ -273,6 +308,7 @@
         homeMode = "711";
         packages = [
           webFetch
+          agentTask
         ];
       };
 
@@ -435,6 +471,56 @@
               chmod 600 "$f.tmp"
               mv "$f.tmp" "$f"
             '';
+        };
+
+        # agent-task@NAME: a long job in the agents' sandbox and cap that
+        # outlives its session and Paseo; a switch leaves it running, a reboot
+        # stops it for good (nothing wants it at boot)
+        services."agent-task@" = {
+          description = "Agent task %i (agent-task)";
+          inherit (agentUnitDeps) wants bindsTo after;
+          environment = agentEnvironment;
+          restartIfChanged = false;
+          # a finished task's unit unloads; its log keeps the exit code
+          unitConfig.CollectMode = "inactive-or-failed";
+          serviceConfig = agentSandbox // {
+            Type = "exec";
+            Restart = "no";
+            ExecStart = "${agentTaskRun} %i";
+          };
+        };
+
+        sockets.agent-task-broker = {
+          description = "Start and stop agent tasks for the agent";
+          wantedBy = [ "sockets.target" ];
+          socketConfig = {
+            ListenStream = "/run/agent-task.sock";
+            SocketUser = "root";
+            SocketGroup = "agent";
+            SocketMode = "0660";
+            Accept = true;
+            MaxConnections = 8;
+          };
+        };
+        services."agent-task-broker@" = {
+          description = "agent-task request";
+          serviceConfig = {
+            ExecStart = agentTaskBroker;
+            StandardInput = "socket";
+            StandardOutput = "socket";
+            StandardError = "journal";
+            # it only talks to systemd over D-Bus
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            PrivateNetwork = true;
+            NoNewPrivileges = true;
+            RuntimeMaxSec = 120;
+            MemoryMax = "64M";
+            TasksMax = 16;
+          };
+          # a connection's unit goes once it ends, failed or not
+          unitConfig.CollectMode = "inactive-or-failed";
         };
 
         # one cap for every agent's sessions: a runaway agent can't take the

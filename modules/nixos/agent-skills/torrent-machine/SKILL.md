@@ -40,6 +40,20 @@ can't hurt the desktop.
   outputs you no longer need. `zfs list` doesn't work in the sandbox; use
   `df`.
 
+## Long jobs
+
+Anything you start, `setsid` included, lives in Paseo's unit and dies when
+Paseo restarts or the session's command hits its time limit. For a job
+longer than a few minutes (training, a dev server, a long build or
+download), run it as its own unit:
+`agent-task start NAME -- COMMAND...` (in the directory it should run in),
+then `agent-task ls` (running ones), `agent-task log NAME [-f]` (ends
+`=== ... exited N` when it finishes), `agent-task stop NAME`.
+It runs in the same sandbox and memory cap, outlives your session and
+switches, and stops for good at a reboot: make long jobs resumable from
+their own checkpoints. The owner sees tasks with
+`systemctl list-units 'agent-task@*'`.
+
 ## The GPU is the owner's desktop card
 
 Nothing caps VRAM, and the owner's desktop and games use the same card;
