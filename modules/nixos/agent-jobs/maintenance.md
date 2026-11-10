@@ -59,7 +59,7 @@ half-done as the fleet moves on.
      where it's on);
    - never touch the `update` or `maintenance` branches or their
      worktrees, or any worktree with a file modified in the last 6 hours
-     (`find <worktree> -newermt '6 hours ago' -not -path '*/.git/*' | head -1`);
+     (`find <worktree> -mmin -360 -not -path '*/.git/*' | head -1`);
    - never delete an unmerged branch or a dirty worktree. List unmerged
      branches with no open PR and no commit in four weeks under "Needs
      the owner", with their last commit date, for the owner to decide.
