@@ -1,0 +1,71 @@
+# Merge the daily update PR when it changes nothing but flake.lock's
+# revisions and the update job has asked for it (status hosts-built). The
+# checks are in .github/update-automerge.sh; anything else waits for the
+# owner.
+#
+# Its safety rests on two things outside this file:
+# - the agents' GitHub token has no `workflow` scope, so they can't add a
+#   workflow that approves PRs (needed because "Allow GitHub Actions to
+#   create and approve pull requests" is on for the whole repo);
+# - master's ruleset dismisses an approval when the PR gets a new push.
+name: update auto-merge
+
+on:
+  # pull_request_target and status run master's copy of this workflow and
+  # script, never the PR's, so a PR can't change what it is checked against
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [master]
+  # the job posts hosts-built after its builds; this catches one that lands
+  # after the PR opened
+  status:
+
+permissions: {}
+
+concurrency:
+  group: update-automerge
+
+jobs:
+  # read-only: fetches every moved input with Nix and checks the lock
+  check:
+    if: >-
+      (github.event_name == 'pull_request_target'
+        && github.event.pull_request.head.ref == 'update'
+        && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name == 'status'
+        && github.event.context == 'hosts-built'
+        && github.event.state == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      # master, not the PR head: the default ref for both events
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+      - id: check
+        run: .github/update-automerge.sh check
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # approves exactly the commit check passed, and merges it
+  merge:
+    needs: check
+    if: needs.check.outputs.sha != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: .github/update-automerge.sh merge "$SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.check.outputs.sha }}
