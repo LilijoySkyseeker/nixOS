@@ -111,16 +111,18 @@ let
     };
 
   # generation 2: the same system on a newer kernel, as after an update
-  newKernelSystem = pkgs.nixos [
-    targetModule
-    # newest kernel zfs supports; TODO: drop when zfs supports linuxPackages_latest (7.3) again
-    { boot.kernelPackages = pkgs.linuxPackages_7_2; }
-  ];
+  newKernelSystem = pkgs.nixos [ targetModule ];
 
-  # generation 1, carrying generation 2 so the target's own nix can --set it
+  # generation 1, carrying generation 2 so the target's own nix can --set it.
+  # No kernel newer than the default (6.18) has zfs support today (7.2 is
+  # gone, 7.3 unsupported), so generation 1 steps back to the previous LTS.
+  # TODO: drop when zfs supports linuxPackages_latest (7.3); then generation 2 takes it
   targetSystem = pkgs.nixos [
     targetModule
-    { system.extraDependencies = [ newKernelSystem.toplevel ]; }
+    {
+      boot.kernelPackages = pkgs.linuxPackages_6_12;
+      system.extraDependencies = [ newKernelSystem.toplevel ];
+    }
   ];
 
   oldKernel = targetSystem.config.boot.kernelPackages.kernel.version;

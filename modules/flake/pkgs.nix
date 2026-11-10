@@ -1,23 +1,30 @@
-{ inputs, ... }:
+{ config, inputs, ... }:
 {
+  # build fixes for nixos-unstable, used by pkgsUnstable and torrent's own pkgs
+  flake.overlays.unstable-build-fixes = _: prev: {
+    # aws-lc-sys now wants a system AWS-LC, which these didn't have
+    # (chatgpt pulls in both)
+    # TODO: drop when NixOS/nixpkgs#584783 is in nixos-unstable
+    tectonic-unwrapped = prev.tectonic-unwrapped.overrideAttrs (old: {
+      buildInputs = old.buildInputs ++ [ prev.aws-lc ];
+    });
+    # TODO: drop when NixOS/nixpkgs#585124 is fixed in nixos-unstable
+    codex = prev.codex.overrideAttrs (old: {
+      buildInputs = (old.buildInputs or [ ]) ++ [
+        prev.aws-lc
+        prev.oniguruma
+        prev.sqlite
+        prev.zstd
+      ];
+    });
+  };
+
   flake.pkgsUnstable = import inputs.nixpkgs-unstable {
     system = "x86_64-linux";
     config = {
       allowUnfree = true;
     };
-    overlays = [
-      (_: prev: {
-        # speechd-minimal stopped installing its python module, which
-        # calibre's tests import. Scoped to calibre to avoid rebuilding
-        # speechd's other dependents.
-        # TODO: drop when NixOS/nixpkgs#576062 is in nixos-unstable
-        calibre = prev.calibre.override {
-          speechd-minimal = prev.speechd-minimal.overrideAttrs (old: {
-            nativeBuildInputs = old.nativeBuildInputs ++ [ prev.python3Packages.python ];
-          });
-        };
-      })
-    ];
+    overlays = [ config.flake.overlays.unstable-build-fixes ];
   };
 
   flake.pkgsStable = import inputs.nixpkgs-stable {
