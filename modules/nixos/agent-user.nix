@@ -69,6 +69,35 @@
               98d35d11a78dc453aebb7d10c3748f3f73ff78c8267c0dc697b8631f67bf7e8f
         '';
       });
+      # plan limits (and Codex's context) for the model, as hook context: see
+      # agent-usage-line.py; Claude's own context is CLAUDE_CODE_ENABLE_TOKEN_USAGE_ATTACHMENT
+      usageLine = pkgs.writers.writePython3 "agent-usage-line" {
+        flakeIgnore = [ "E501" ];
+      } (builtins.readFile ./agent-usage-line.py);
+      usageHooks = {
+        UserPromptSubmit = [
+          {
+            hooks = [
+              {
+                type = "command";
+                command = "${usageLine}";
+                timeout = 30;
+              }
+            ];
+          }
+        ];
+        PostToolUse = [
+          {
+            hooks = [
+              {
+                type = "command";
+                command = "${usageLine}";
+                timeout = 30;
+              }
+            ];
+          }
+        ];
+      };
       # long jobs as their own unit (agent-task@NAME): see agent-tools/agent-task.sh
       agentTask = pkgs.writeShellApplication {
         name = "agent-task";
@@ -246,6 +275,10 @@
       claudeEnvironment = agentEnvironment // {
         # keep the account's claude.ai connectors (and their data) out
         ENABLE_CLAUDEAI_MCP_SERVERS = "false";
+        # undocumented: after each step the model sees "Token usage: used/total;
+        # remaining". On Fable 5.2 showing the remaining context raised a
+        # long-context score from 85.6% to 91.6% (system card, p. 216)
+        CLAUDE_CODE_ENABLE_TOKEN_USAGE_ATTACHMENT = "1";
       };
       # agent-egress rules per family; IPv6 rejects all but loopback and Google
       egress = [
@@ -317,6 +350,13 @@
 
       # no inbound ssh
       services.openssh.settings.DenyUsers = [ "agent" ];
+
+      # Codex hooks from requirements.toml are managed: trusted by policy, so
+      # no per-hash review in the agent's config.toml. They apply to every user;
+      # the script answers only for the agent
+      environment.etc."codex/requirements.toml".source =
+        (pkgs.formats.toml { }).generate "codex-requirements.toml"
+          { hooks = usageHooks; };
 
       # nix daemon access, not trusted-users
       environment.systemPackages = [ agentSetup ];
@@ -394,6 +434,9 @@
                   ];
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
+                  # the plan-limits line for the model (agent-usage-line.py)
+                  hooks.UserPromptSubmit = usageHooks.UserPromptSubmit;
+                  hooks.PostToolUse = usageHooks.PostToolUse;
                   # bypass mode still asks before an rm it can't rule out as
                   # dangerous; in Paseo that prompt stalls unattended work
                   hooks.PermissionRequest = [

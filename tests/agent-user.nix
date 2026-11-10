@@ -26,6 +26,39 @@ let
     sys.stdout.buffer.write(out)
     PY
   '';
+  # a Codex session file's usage record, and the hook event pointing at it
+  codexSession = pkgs.writeText "rollout-t.jsonl" (
+    builtins.toJSON {
+      payload = {
+        type = "token_count";
+        info = {
+          last_token_usage = {
+            input_tokens = 95000;
+            output_tokens = 0;
+          };
+          model_context_window = 475000;
+        };
+        rate_limits = {
+          primary = {
+            used_percent = 12.0;
+            resets_at = 4102444800;
+          };
+          secondary = {
+            used_percent = 40.0;
+            resets_at = 4102444800;
+          };
+        };
+      };
+    }
+    + "\n"
+  );
+  usageEvent = pkgs.writeText "usage-event.json" (
+    builtins.toJSON {
+      hook_event_name = "UserPromptSubmit";
+      session_id = "t";
+      transcript_path = "/home/agent/.codex/sessions/2026/01/01/rollout-t.jsonl";
+    }
+  );
 in
 pkgs.testers.runNixOSTest {
   name = "agent-user";
@@ -306,6 +339,19 @@ pkgs.testers.runNixOSTest {
         assert out == '{"hookSpecificOutput":{"decision":{"behavior":"allow"},"hookEventName":"PermissionRequest"}}', f"bypass: {out!r}"
         out = machine.succeed(f"echo '{{\"permission_mode\":\"default\",\"tool_name\":\"Bash\"}}' | {hook[2]}").strip()
         assert out == "", f"default mode got an answer: {out!r}"
+        # the plan-limits hook: the same command for Claude and (managed) Codex,
+        # answering from a Codex session file even with no Claude login
+        usage = machine.succeed("jq -r '.hooks.UserPromptSubmit[0].hooks[0].command' /home/agent/.claude/settings.json").strip()
+        req = machine.succeed("cat /etc/codex/requirements.toml")
+        assert usage in req and "PostToolUse" in req, f"codex managed hooks: {req!r}"
+        machine.succeed(
+            "install -D -o agent -g agent ${codexSession} /home/agent/.codex/sessions/2026/01/01/rollout-t.jsonl && "
+            "chown -R agent:agent /home/agent/.codex/sessions && install -m 644 ${usageEvent} /tmp/ev.json"
+        )
+        out = machine.succeed(f"su -s /bin/sh agent -c '{usage} < /tmp/ev.json' | jq -r .hookSpecificOutput.additionalContext").strip()
+        assert "Codex 5h 12%" in out and "week 40%" in out and "20% of 475k" in out, f"usage line: {out!r}"
+        out = machine.succeed(f"{usage} < /tmp/ev.json").strip()
+        assert out == "", f"answered for root: {out!r}"
         # a CLI-owned key survives the merge
         # as_agent() single-quotes its command, so write the CLI key as root
         machine.succeed("""jq '.theme = "dark"' /home/agent/.claude/settings.json > /tmp/s && install -o agent -g agent -m 600 /tmp/s /home/agent/.claude/settings.json""")
