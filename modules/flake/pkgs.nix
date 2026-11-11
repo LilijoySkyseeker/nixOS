@@ -21,6 +21,8 @@
 
   # Claude Code from llm-agents, which packages new releases within a day;
   # nixos-unstable lagged days behind a new model's support (Fable 5.2, 2026-11)
+  # TODO: drop when claude-code is 2.1.321+ in nixos-unstable (owner: back to
+  # nixpkgs once it has it)
   flake.overlays.llm-agents = _: prev: {
     inherit (inputs.llm-agents.packages.${prev.stdenv.hostPlatform.system}) claude-code;
   };

@@ -433,6 +433,11 @@
                   ];
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
+                  # Paseo 0.15.3's model picker lacks Fable 5.2 but lists the
+                  # models named here (label = the id)
+                  # TODO: drop when paseo is 0.15.4+ in nixos-unstable (keep the
+                  # merge's del() below: it takes the key out of the file)
+                  env.ANTHROPIC_DEFAULT_FABLE_MODEL = "claude-fable-5-2";
                   # the plan-limits line for the model (agent-usage-line.py)
                   hooks.UserPromptSubmit = usageHooks.UserPromptSubmit;
                   # bypass mode still asks before an rm it can't rule out as
@@ -468,10 +473,20 @@
               f=/home/agent/.claude/settings.json
               mkdir -p /home/agent/.claude
               [ -s "$f" ] || echo '{}' > "$f"
-              # the merge only adds keys: take out the old PostToolUse usage hook
-              # TODO: drop when /home/agent/.claude/settings.json has no
-              # agent-usage-line under hooks.PostToolUse (and use plain '.[0] * .[1]')
-              ${pkgs.jq}/bin/jq -s '(.[0] | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array" then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not)) else . end) * .[1]' "$f" ${managed} > "$f.tmp"
+              # the merge only adds keys, so the filter takes out what managed
+              # stopped setting, then merges
+              ${pkgs.jq}/bin/jq -s '
+                .[0]
+                # TODO: drop when /home/agent/.claude/settings.json has no
+                # agent-usage-line under hooks.PostToolUse
+                | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array"
+                  then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not))
+                  else . end
+                # the Fable stopgap's key (keep this when dropping the key above,
+                # until the file no longer has it)
+                | if (.env | type) == "object" then del(.env.ANTHROPIC_DEFAULT_FABLE_MODEL) else . end
+                | . * $managed[0]
+              ' "$f" --slurpfile managed ${managed} > "$f.tmp"
               mv "$f.tmp" "$f"
             '';
         };
