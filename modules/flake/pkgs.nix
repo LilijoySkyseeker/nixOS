@@ -19,12 +19,21 @@
     });
   };
 
+  # Claude Code from llm-agents, which packages new releases within a day;
+  # nixos-unstable lagged days behind a new model's support (Fable 5.2, 2026-11)
+  flake.overlays.llm-agents = _: prev: {
+    inherit (inputs.llm-agents.packages.${prev.stdenv.hostPlatform.system}) claude-code;
+  };
+
   flake.pkgsUnstable = import inputs.nixpkgs-unstable {
     system = "x86_64-linux";
     config = {
       allowUnfree = true;
     };
-    overlays = [ config.flake.overlays.unstable-build-fixes ];
+    overlays = [
+      config.flake.overlays.unstable-build-fixes
+      config.flake.overlays.llm-agents
+    ];
   };
 
   flake.pkgsStable = import inputs.nixpkgs-stable {

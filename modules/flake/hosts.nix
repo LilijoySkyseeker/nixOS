@@ -41,8 +41,13 @@ in
       };
       modules = [
         ../../hosts/torrent/configuration.nix
-        # local-ai's Paseo takes codex from the host's pkgs
-        { nixpkgs.overlays = [ config.flake.overlays.unstable-build-fixes ]; }
+        # local-ai's Paseo takes codex and claude-code from the host's pkgs
+        {
+          nixpkgs.overlays = [
+            config.flake.overlays.unstable-build-fixes
+            config.flake.overlays.llm-agents
+          ];
+        }
         nixosModules."profile-pc"
         nixosModules."pull-deploy"
         nixosModules."nfs-homelab-mounts"
