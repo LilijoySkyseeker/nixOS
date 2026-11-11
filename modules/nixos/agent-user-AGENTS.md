@@ -27,11 +27,8 @@ the `other-agents` skill.
   ones. Details and quirks: the `torrent-machine` skill.
 - The GPU is the owner's desktop card, and their desktop and games come
   first: check VRAM before a big job and free the GPU when you're done.
-- The harness gives you, not the owner, the plan limits (5-hour and
-  weekly, Claude and Codex, shared by every agent) and your context use:
-  with each message from the owner, and after a tool step where a figure
-  crosses 50, 75 or 90%. It's there so the owner never has to tell you;
-  don't repeat it in your replies.
+- The harness gives you, not the owner, the plan limits and your context
+  use; don't repeat them in your replies.
 
 ## Places
 

@@ -1,19 +1,11 @@
-"""Hook for Claude Code and Codex: tell the model its plan limits and context.
+"""UserPromptSubmit hook for Claude Code and Codex: pass the model its plan
+limits (and Codex's context) as hookSpecificOutput.additionalContext.
 
-Reads the hook event on stdin and prints hookSpecificOutput.additionalContext:
-- UserPromptSubmit: always one line.
-- PostToolUse: a line only when a figure has crossed 50, 75 or 90% since the
-  last line in this session.
-
-Sources:
-- Claude limits: Claude Code's get_usage control request (no model call),
-  cached for every agent, since they share one account.
-- Codex limits: `codex app-server`'s account/rateLimits/read (no model
-  call), cached like Claude's; if that fails, the newest token_count record
-  in Codex's session files, which is only as fresh as the last Codex turn.
-- Codex context: the token_count records in its own session file. Claude's
-  own context comes from Claude Code itself
-  (CLAUDE_CODE_ENABLE_TOKEN_USAGE_ATTACHMENT), not from here.
+- Claude limits: Claude Code's get_usage control request (no model call).
+- Codex limits: `codex app-server`'s account/rateLimits/read (no model call).
+- Both cached for 5 minutes, shared by every agent (one account each).
+- Codex context: the last token_count record in its own session file.
+  Claude's comes from Claude Code itself (CLAUDE_CODE_ENABLE_TOKEN_USAGE_ATTACHMENT).
 
 Any failure prints nothing: a hook must never break a session.
 """
@@ -30,15 +22,9 @@ from datetime import datetime
 from pathlib import Path
 
 INNER = "AGENT_USAGE_LINE_INNER"
-BANDS = (50, 75, 90)
 TTL = 300
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
 CACHE = CACHE / "agent-usage-line"
-CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
-
-
-def band(pct):
-    return sum(pct >= b for b in BANDS)
 
 
 def when(ts):
@@ -92,9 +78,8 @@ def fetch_claude():
 
 
 def fetch_codex():
-    """Codex's windows from its app-server; it must keep stdin open until it
-    answers (closed early, it exits without replying). Raw reads on the pipe,
-    so the deadline bounds every wait and no reply sits unseen in a buffer."""
+    """Codex's windows from its app-server, which exits without answering if
+    stdin closes first. Raw reads, so the deadline bounds every wait."""
     reqs = [
         {"jsonrpc": "2.0", "id": 1, "method": "initialize",
          "params": {"clientInfo": {"name": "agent-usage-line", "version": "1"}}},
@@ -112,9 +97,18 @@ def fetch_codex():
         while True:
             *lines, buf = buf.split(b"\n")
             for line in lines:
-                windows = codex_reply(line)
-                if windows is not False:
-                    return windows
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(d, dict) and d.get("id") == 2:
+                    rl = (d.get("result") or {}).get("rateLimits") or {}
+                    windows = []
+                    for key, name in (("primary", "5h"), ("secondary", "week")):
+                        w = rl.get(key)
+                        if w and w.get("usedPercent") is not None and w.get("resetsAt"):
+                            windows.append((name, w["usedPercent"], w["resetsAt"]))
+                    return windows or None
             left = deadline - time.time()
             if left <= 0 or not select.select([fd], [], [], left)[0]:
                 return None
@@ -125,24 +119,6 @@ def fetch_codex():
     finally:
         p.kill()
         p.wait()
-
-
-def codex_reply(line):
-    """The windows in app-server's rateLimits reply (None if it has none),
-    or False for any other line."""
-    try:
-        d = json.loads(line)
-    except ValueError:
-        return False
-    if not isinstance(d, dict) or d.get("id") != 2:
-        return False
-    rl = (d.get("result") or {}).get("rateLimits") or {}
-    windows = []
-    for key, name in (("primary", "5h"), ("secondary", "week")):
-        w = rl.get(key)
-        if w and w.get("usedPercent") is not None and w.get("resetsAt"):
-            windows.append((name, w["usedPercent"], w["resetsAt"]))
-    return windows or None
 
 
 def cached(family, fetch):
@@ -174,57 +150,24 @@ def cached(family, fetch):
         return entry["windows"], entry["at"]
 
 
-def last_token_count(path, need_limits=False):
-    """The last token_count record in a Codex session file (reads its tail)."""
+def codex_context(path):
+    """Context used, from the last token_count record in a Codex session file."""
     with open(path, "rb") as f:
         f.seek(0, os.SEEK_END)
-        size = f.tell()
-        f.seek(max(0, size - 1_000_000))
+        f.seek(max(0, f.tell() - 1_000_000))
         tail = f.read().decode("utf-8", "replace")
     for line in reversed(tail.splitlines()):
         if '"token_count"' not in line:
             continue
         try:
-            p = json.loads(line).get("payload") or {}
+            info = (json.loads(line).get("payload") or {}).get("info") or {}
         except ValueError:
             continue
-        if p.get("type") == "token_count" and (
-                not need_limits or codex_limits(p)):
-            return p
+        last, window = info.get("last_token_usage"), info.get("model_context_window")
+        if last and window:
+            used = last.get("input_tokens", 0) + last.get("output_tokens", 0)
+            return 100 * used / window, window
     return None
-
-
-def newest_codex_limits():
-    """Codex windows from the most recently written session file that has
-    them, across the last week of session folders (any session counts:
-    the account is shared)."""
-    days = sorted(CODEX_SESSIONS.glob("*/*/*"), reverse=True)[:8]
-    files = [f for d in days for f in d.glob("rollout-*.jsonl")]
-    files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-    for f in files[:20]:
-        tc = last_token_count(f, need_limits=True)
-        if tc:
-            return codex_limits(tc), f.stat().st_mtime
-    return [], 0
-
-
-def codex_limits(tc):
-    rl = (tc or {}).get("rate_limits") or {}
-    windows = []
-    for key, name in (("primary", "5h"), ("secondary", "week")):
-        w = rl.get(key)
-        if w and w.get("used_percent") is not None and w.get("resets_at"):
-            windows.append((name, w["used_percent"], w["resets_at"]))
-    return windows
-
-
-def codex_context(tc):
-    info = (tc or {}).get("info") or {}
-    last, window = info.get("last_token_usage"), info.get("model_context_window")
-    if not last or not window:
-        return None
-    used = last.get("input_tokens", 0) + last.get("output_tokens", 0)
-    return 100 * used / window, window
 
 
 def fmt_windows(family, windows, read_at):
@@ -249,55 +192,25 @@ def main():
     if os.environ.get(INNER) or pwd.getpwuid(os.geteuid()).pw_name != "agent":
         return
     event = json.load(sys.stdin)
-    name = event.get("hook_event_name", "")
-    if name not in ("UserPromptSubmit", "PostToolUse"):
+    if event.get("hook_event_name") != "UserPromptSubmit":
         return
     transcript = event.get("transcript_path") or ""
-    is_codex = "/.codex/" in transcript
 
     ctx = None
-    if is_codex:
+    if "/.codex/" in transcript:
         try:
-            ctx = codex_context(last_token_count(transcript))
+            ctx = codex_context(transcript)
         except OSError:
             pass
-    # the live read, unless a Codex turn has recorded newer figures since
-    codex, codex_at = cached("codex", fetch_codex)
-    try:
-        logged, logged_at = newest_codex_limits()
-    except OSError:
-        logged, logged_at = [], 0
-    if logged and logged_at > codex_at:
-        codex, codex_at = logged, logged_at
-    claude, claude_at = cached("claude", fetch_claude)
-
-    # one threshold band per figure; a window's reset time is part of its
-    # key, so a reset starts it again
-    now = time.time()
-    bands = {f"claude {n} {r}": band(p) for n, p, r in claude if r > now}
-    bands.update({f"codex {n} {r}": band(p) for n, p, r in codex if r > now})
-    if ctx:
-        bands["context"] = band(ctx[0])
-    state = CACHE / "sessions" / (event.get("session_id") or "none")
-    try:
-        seen = json.loads(state.read_text())
-    except (OSError, ValueError):
-        seen = {}
-    crossed = any(b > seen.get(k, 0) for k, b in bands.items())
-    if name == "PostToolUse" and not crossed:
-        return
-    state.parent.mkdir(parents=True, exist_ok=True)
-    state.write_text(json.dumps(bands))
-
-    parts = [fmt_windows("Claude", claude, claude_at),
-             fmt_windows("Codex", codex, codex_at)]
+    parts = [fmt_windows("Claude", *cached("claude", fetch_claude)),
+             fmt_windows("Codex", *cached("codex", fetch_codex))]
     line = "Plan usage, shared by every agent on the account: "
     line += "; ".join(p for p in parts if p) or "unknown"
     if ctx:
         line += f". Your context: {ctx[0]:.0f}% of {ctx[1] // 1000}k used"
     line += "."
     print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": name, "additionalContext": line}}))
+        "hookEventName": "UserPromptSubmit", "additionalContext": line}}))
 
 
 if __name__ == "__main__":
