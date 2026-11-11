@@ -55,8 +55,7 @@
     audio-cpp.url = "github:0xShug0/audio.cpp";
     audio-cpp.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
-    # claude-desktop until nixpkgs has it (NixOS/nixpkgs#537215), and
-    # claude-code until nixos-unstable catches up (modules/flake/pkgs.nix)
+    # claude-desktop, until nixpkgs has it (NixOS/nixpkgs#537215)
     llm-agents.url = "github:numtide/llm-agents.nix";
     llm-agents.inputs.nixpkgs.follows = "nixpkgs-unstable";
     llm-agents.inputs.flake-parts.follows = "flake-parts";
