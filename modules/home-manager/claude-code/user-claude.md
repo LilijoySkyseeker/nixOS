@@ -24,7 +24,8 @@ In this order. Each has to pass before effort goes into the next.
    what it showed and go again.
 4. **Optimise.** Make what survived faster, cheaper, lighter or stronger,
    against a measure that serves the goal.
-5. **Automate.** Make it permanent. It isn't done until it lasts without you.
+5. **Automate.** Make it permanent. It isn't done until it lasts without you
+   and can't be used wrong.
 
 What each rule means, and why: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`. Applying them to a thing someone else made: the

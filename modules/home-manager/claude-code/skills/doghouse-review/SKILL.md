@@ -53,8 +53,11 @@ optimisation of a part whose place isn't settled.
 
 **5. What becomes permanent.** Anything the plan freezes (a hook, a job, a
 check, a schedule, a rule): has it run by hand and proven useful first? Is
-the fix declarative and reproducible, or does it live in someone's head? A
-check added for a problem that's gone goes in the table as a deletion.
+the fix declarative and reproducible, or does it live in someone's head? Does
+it rely on someone getting it right (a warning, a reminder, a check to
+remember)? Then make the mistake impossible, ideally by removing the wrong
+way; if not, obvious; if not, survivable. A check added for a problem that's
+gone goes in the table as a deletion.
 
 **End with the one question** whose answer would change the review most, if
 there is one.
