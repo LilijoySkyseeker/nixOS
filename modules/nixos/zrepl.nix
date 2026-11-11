@@ -44,13 +44,26 @@ _: {
         keep_receiver = keepReceiver;
       };
 
-      sourcePruning =
+      # the sender keeps a short undo window; the receiver's grid is per copy
+      mkSourcePruning =
+        receiverGrid:
         mkPruning
           [
             notReplicatedRule
             (gridRule "1x1h(keep=all) | 48x1h | 7x1d")
           ]
-          [ (gridRule "1x15m(keep=all) | 168x1h | 30x1d | 12x30d") ];
+          [ (gridRule receiverGrid) ];
+
+      # the owner's call (2026-10-26, ADR-0002 decision 7): irreplaceable data
+      # keeps about a year on zbackup, replaceable data a month
+      # - the PCs' homes: about five weeks (15m all, hourly for a week, daily
+      #   for a month). They mix both classes; until Steam, VMs and caches move
+      #   out of them, a month, as the owner decided. A year of their churn
+      #   filled zbackup (84% on 2026-11-11)
+      remotePruning = mkSourcePruning "1x15m(keep=all) | 168x1h | 30x1d";
+      # - homelab's own data (storage and state are irreplaceable and exist
+      #   nowhere else; offsite keeps about two weeks): about a year
+      localPruning = mkSourcePruning "1x15m(keep=all) | 168x1h | 30x1d | 12x30d";
 
       # placeholder.encryption is required: zrepl's "unspecified" default
       # fails every receive that creates a placeholder, and configcheck
@@ -114,7 +127,7 @@ _: {
         root_fs = r.rootFs;
         interval = "15m";
         recv = mkRecv;
-        pruning = sourcePruning;
+        pruning = remotePruning;
       }) cfg.pull.remotes;
 
       # source+pull, not push+sink, so replication has its own interval
@@ -142,7 +155,7 @@ _: {
           root_fs = "${cfg.local.rootFs}/${cfg.local.clientIdentity}";
           interval = "15m";
           recv = mkRecv;
-          pruning = sourcePruning;
+          pruning = localPruning;
         }
       ];
 
