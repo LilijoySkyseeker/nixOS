@@ -7,9 +7,22 @@ _: {
       cfg = config.myBuildHost;
     in
     {
-      options.myBuildHost.clientKeys = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        description = "SSH public keys (the clients' host keys) allowed to build here.";
+      options.myBuildHost.clients = lib.mkOption {
+        type = lib.types.listOf (
+          lib.types.submodule {
+            options = {
+              key = lib.mkOption {
+                type = lib.types.str;
+                description = "The client's SSH public key (its host key).";
+              };
+              address = lib.mkOption {
+                type = lib.types.str;
+                description = "The only source address the key is accepted from (its tailnet IPv4).";
+              };
+            };
+          }
+        );
+        description = "Hosts allowed to build here.";
       };
 
       config = {
@@ -19,13 +32,17 @@ _: {
           group = "nix-builder";
           # sshd runs the forced command through the login shell
           useDefaultShell = true;
+          # the key works only from the client's own address: a copied key
+          # is useless from anywhere else
           openssh.authorizedKeys.keys = map (
-            key: ''command="${config.nix.package}/bin/nix-daemon --stdio",restrict ${key}''
-          ) cfg.clientKeys;
+            c: ''from="${c.address}",command="${config.nix.package}/bin/nix-daemon --stdio",restrict ${c.key}''
+          ) cfg.clients;
         };
 
-        # ssh-ng builds of arbitrary derivations need a trusted user, which
-        # is root-equivalent over this host's store
+        # trusted, which is root-equivalent over this host's store: an
+        # untrusted builder refuses any input the client built itself
+        # ("lacks a signature by a trusted key"), and NixOS builds many
+        # small config files locally; tests/remote-builds.nix shows it
         nix.settings.trusted-users = [ "nix-builder" ];
 
         # the owner's desktop comes first: every daemon build (remote, the
@@ -95,6 +112,8 @@ _: {
         # instead of hanging
         programs.ssh.extraConfig = ''
           Host ${cfg.hostName}
+            # IPv4, the source address the build host's key restriction names
+            AddressFamily inet
             ConnectTimeout 5
             ServerAliveInterval 15
             ServerAliveCountMax 4

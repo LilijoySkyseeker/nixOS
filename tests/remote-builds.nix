@@ -15,13 +15,19 @@ let
   # a derivation with no inputs: the VMs have no network, and the nonce
   # gives every subtest its own store path
   probe = pkgs.writeText "probe.nix" ''
-    { nonce, sleep ? "0" }:
-    derivation {
-      name = "remote-build-probe-''${nonce}";
-      system = "x86_64-linux";
-      builder = "/bin/sh";
-      args = [ "-c" "${pkgs.coreutils}/bin/sleep ''${sleep} && echo ''${nonce} > $out" ];
-    }
+    { nonce, sleep ? "0", withDep ? "" }:
+    let
+      mk = name: script: extra: derivation ({
+        inherit name;
+        system = "x86_64-linux";
+        builder = "/bin/sh";
+        args = [ "-c" script ];
+      } // extra);
+      dep = mk "probe-dep-''${withDep}" "echo dep-''${withDep} > $out" { };
+    in
+    mk "remote-build-probe-''${nonce}"
+      "${pkgs.coreutils}/bin/sleep ''${sleep} && ${pkgs.coreutils}/bin/cat $src > $out && echo ''${nonce} >> $out"
+      ({ src = /etc/probe-src.txt; } // (if withDep == "" then { } else { inherit dep; }))
   '';
 
   common = {
@@ -31,6 +37,7 @@ let
     nix.settings.sandbox = false;
     system.extraDependencies = [ pkgs.coreutils ];
     environment.etc."probe.nix".source = probe;
+    environment.etc."probe-src.txt".text = "source file\n";
   };
 in
 pkgs.testers.runNixOSTest {
@@ -38,13 +45,23 @@ pkgs.testers.runNixOSTest {
 
   nodes = {
     builder =
-      { ... }:
+      { nodes, ... }:
       {
         imports = [
           buildHostModule
           common
         ];
-        myBuildHost.clientKeys = [ snakeOilEd25519PublicKey ];
+        myBuildHost.clients = [
+          {
+            key = snakeOilEd25519PublicKey;
+            address = nodes.client.networking.primaryIPAddress;
+          }
+        ];
+        # the client's key, to try it from the wrong address
+        environment.etc."ssh/test_client_key" = {
+          source = snakeOilEd25519PrivateKey;
+          mode = "0600";
+        };
 
         # like torrent: daemon access is limited, nix-builder is trusted
         nix.settings.allowed-users = [ "@wheel" ];
@@ -113,7 +130,7 @@ pkgs.testers.runNixOSTest {
         blog, path = build(client, "first", user="alice")
         assert "ssh-ng://nix-builder@builder" in blog, blog
         builder.succeed(f"nix-store --check-validity {path}")
-        assert client.succeed(f"cat {path}").strip() == "first"
+        assert client.succeed(f"cat {path}").strip().endswith("first")
 
     with subtest("an output the build host already has is copied, not rebuilt"):
         start = time.monotonic()
@@ -123,7 +140,20 @@ pkgs.testers.runNixOSTest {
         _, path = build(client, "prebuilt", sleep=60)
         took = time.monotonic() - start
         assert took < 30, f"took {took:.0f}s: rebuilt instead of copied"
-        assert client.succeed(f"cat {path}").strip() == "prebuilt"
+        assert client.succeed(f"cat {path}").strip().endswith("prebuilt")
+
+    with subtest("an input only the client has is uploaded"):
+        # why nix-builder is trusted: an untrusted one refuses this upload
+        # ("lacks a signature by a trusted key") and the build fails
+        client.succeed(
+            "nix-build /etc/probe.nix --no-out-link --builders \"\" -A dep "
+            "--argstr nonce x --argstr withDep localonly"
+        )
+        path = client.succeed(
+            "nix-build /etc/probe.nix --no-out-link --argstr nonce withdep "
+            "--argstr withDep localonly"
+        ).strip()
+        builder.succeed(f"nix-store --check-validity {path}")
 
     with subtest("root's builds need ssh on PATH, as in pull-deploy's unit"):
         # root builds in-process, not through the daemon, so the hook finds
@@ -149,6 +179,16 @@ pkgs.testers.runNixOSTest {
         builder.wait_until_succeeds(f"test $(journalctl -u sshd --no-pager | grep -c 'Accepted publickey for nix-builder') -gt {before}", timeout=10)
         builder.fail("test -e /tmp/escaped")
 
+    with subtest("the key is refused from any other address"):
+        builder.fail(
+            "timeout 15 ssh -n -i /etc/ssh/test_client_key -o StrictHostKeyChecking=no "
+            "-o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5 "
+            "nix-builder@127.0.0.1 true"
+        )
+        builder.succeed(
+            "journalctl -u sshd --no-pager | grep -q 'correct key but not from a permitted host'"
+        )
+
     with subtest("remote builds run at idle CPU and IO priority"):
         client.succeed(
             "systemd-run --unit sched-probe -p Environment=PATH=/run/current-system/sw/bin "
@@ -166,7 +206,7 @@ pkgs.testers.runNixOSTest {
         _, path = build(client, "offline")
         took = time.monotonic() - start
         assert took < 60, f"fallback took {took:.0f}s"
-        assert client.succeed(f"cat {path}").strip() == "offline"
+        assert client.succeed(f"cat {path}").strip().endswith("offline")
         builder.unblock()
         builder.fail(f"nix-store --check-validity {path}")
   '';
