@@ -482,7 +482,7 @@
                 | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array"
                   then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not))
                   else . end
-                # the Fable stopgap's key (keep this when dropping the key above,
+                # the Fable stopgap key (keep this when dropping that key above,
                 # until the file no longer has it)
                 | if (.env | type) == "object" then del(.env.ANTHROPIC_DEFAULT_FABLE_MODEL) else . end
                 | . * $managed[0]
