@@ -8,8 +8,11 @@ Reads the hook event on stdin and prints hookSpecificOutput.additionalContext:
 Sources:
 - Claude limits: Claude Code's get_usage control request (no model call),
   cached for every agent, since they share one account.
-- Codex limits and context: the token_count records Codex writes to its
-  session file. Claude's own context comes from Claude Code itself
+- Codex limits: `codex app-server`'s account/rateLimits/read (no model
+  call), cached like Claude's; if that fails, the newest token_count record
+  in Codex's session files, which is only as fresh as the last Codex turn.
+- Codex context: the token_count records in its own session file. Claude's
+  own context comes from Claude Code itself
   (CLAUDE_CODE_ENABLE_TOKEN_USAGE_ATTACHMENT), not from here.
 
 Any failure prints nothing: a hook must never break a session.
@@ -19,6 +22,7 @@ import fcntl
 import json
 import os
 import pwd
+import select
 import subprocess
 import sys
 import time
@@ -27,7 +31,7 @@ from pathlib import Path
 
 INNER = "AGENT_USAGE_LINE_INNER"
 BANDS = (50, 75, 90)
-CLAUDE_TTL = 300
+TTL = 300
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
 CACHE = CACHE / "agent-usage-line"
 CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
@@ -87,33 +91,74 @@ def fetch_claude():
     return None
 
 
-def claude_limits():
-    """Cached Claude windows and when they were read; one agent refreshes
+def fetch_codex():
+    """Codex's windows from its app-server; it must keep stdin open until it
+    answers (closed early, it exits without replying)."""
+    reqs = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"clientInfo": {"name": "agent-usage-line", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "account/rateLimits/read"},
+    ]
+    p = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                         text=True)
+    try:
+        p.stdin.write("".join(json.dumps(r) + "\n" for r in reqs))
+        p.stdin.flush()
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if not select.select([p.stdout], [], [], deadline - time.time())[0]:
+                break
+            line = p.stdout.readline()
+            if not line:
+                break
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if d.get("id") != 2:
+                continue
+            rl = (d.get("result") or {}).get("rateLimits") or {}
+            windows = []
+            for key, name in (("primary", "5h"), ("secondary", "week")):
+                w = rl.get(key)
+                if w and w.get("usedPercent") is not None and w.get("resetsAt"):
+                    windows.append((name, w["usedPercent"], w["resetsAt"]))
+            return windows or None
+        return None
+    finally:
+        p.kill()
+        p.wait()
+
+
+def cached(family, fetch):
+    """A family's cached windows and when they were read; one agent refreshes
     while the rest read, and a failed refresh waits a full TTL too."""
     CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / "claude.json"
+    path = CACHE / f"{family}.json"
     try:
-        cached = json.loads(path.read_text())
+        entry = json.loads(path.read_text())
     except (OSError, ValueError):
-        cached = {"tried": 0, "at": 0, "windows": []}
-    if time.time() - cached["tried"] < CLAUDE_TTL:
-        return cached["windows"], cached["at"]
-    with open(CACHE / "claude.lock", "w") as lock:
+        entry = {"tried": 0, "at": 0, "windows": []}
+    if time.time() - entry["tried"] < TTL:
+        return entry["windows"], entry["at"]
+    with open(CACHE / f"{family}.lock", "w") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            return cached["windows"], cached["at"]
-        cached["tried"] = time.time()
+            return entry["windows"], entry["at"]
+        entry["tried"] = time.time()
         try:
-            windows = fetch_claude()
+            windows = fetch()
         except (OSError, subprocess.SubprocessError, ValueError, KeyError):
             windows = None
         if windows is not None:
-            cached.update(at=cached["tried"], windows=windows)
+            entry.update(at=entry["tried"], windows=windows)
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(cached))
+        tmp.write_text(json.dumps(entry))
         tmp.replace(path)
-        return cached["windows"], cached["at"]
+        return entry["windows"], entry["at"]
 
 
 def last_token_count(path, need_limits=False):
@@ -181,7 +226,7 @@ def fmt_windows(family, windows, read_at):
     if not parts:
         return None
     text = f"{family} " + ", ".join(parts)
-    if now - read_at > 3 * CLAUDE_TTL:
+    if now - read_at > 3 * TTL:
         text += f" [as of {when(read_at)}]"
     return text
 
@@ -203,11 +248,13 @@ def main():
             ctx = codex_context(last_token_count(transcript))
         except OSError:
             pass
-    try:
-        codex, codex_at = newest_codex_limits()
-    except OSError:
-        codex, codex_at = [], 0
-    claude, claude_at = claude_limits()
+    codex, codex_at = cached("codex", fetch_codex)
+    if not codex:
+        try:
+            codex, codex_at = newest_codex_limits()
+        except OSError:
+            codex, codex_at = [], 0
+    claude, claude_at = cached("claude", fetch_claude)
 
     # one threshold band per figure; a window's reset time is part of its
     # key, so a reset starts it again
