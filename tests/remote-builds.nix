@@ -110,8 +110,8 @@ pkgs.testers.runNixOSTest {
         return out, out.strip().splitlines()[-1]
 
     with subtest("a user's build runs on the build host"):
-        log, path = build(client, "first", user="alice")
-        assert "ssh-ng://nix-builder@builder" in log, log
+        blog, path = build(client, "first", user="alice")
+        assert "ssh-ng://nix-builder@builder" in blog, blog
         builder.succeed(f"nix-store --check-validity {path}")
         assert client.succeed(f"cat {path}").strip() == "first"
 
@@ -125,19 +125,40 @@ pkgs.testers.runNixOSTest {
         assert took < 30, f"took {took:.0f}s: rebuilt instead of copied"
         assert client.succeed(f"cat {path}").strip() == "prebuilt"
 
-    with subtest("the client's key runs only nix-daemon"):
-        out = client.succeed(
-            "timeout 15 ssh -n -i /etc/ssh/test_client_key -o ConnectTimeout=5 "
-            "nix-builder@builder 'id -u' 2>&1 || true"
-        )
-        assert "uid=" not in out and not out.strip().isdigit(), out
+    with subtest("root's builds need ssh on PATH, as in pull-deploy's unit"):
+        # root builds in-process, not through the daemon, so the hook finds
+        # ssh on the caller's PATH; pull-deploy's unit adds openssh for this
+        base = "${pkgs.nix}/bin:${pkgs.coreutils}/bin"
+        for nonce, path_ in (("rootpath", f"{base}:${pkgs.openssh}/bin"), ("rootnossh", base)):
+            out = client.succeed(
+                f"env -i PATH={path_} nix-build /etc/probe.nix "
+                f"--no-out-link --argstr nonce {nonce} 2>/dev/null"
+            ).strip()
+            remote = builder.execute(f"nix-store --check-validity {out}")[0] == 0
+            assert remote == (nonce == "rootpath"), f"{nonce}: built remotely={remote}"
 
-    with subtest("builds run at idle CPU and IO priority"):
-        props = builder.succeed(
-            "systemctl show nix-daemon -p CPUSchedulingPolicy -p IOSchedulingClass"
+    with subtest("the client's key logs in but runs only nix-daemon"):
+        accepted = lambda: int(builder.succeed(
+            "journalctl -u sshd --no-pager | grep -c 'Accepted publickey for nix-builder' || true"
+        ).strip())
+        before = accepted()
+        client.succeed(
+            "timeout 15 ssh -n -i /etc/ssh/test_client_key -o ConnectTimeout=5 "
+            "nix-builder@builder 'touch /tmp/escaped' >/dev/null 2>&1 || true"
         )
-        assert "CPUSchedulingPolicy=5" in props, props
-        assert "IOSchedulingClass=3" in props, props
+        builder.wait_until_succeeds(f"test $(journalctl -u sshd --no-pager | grep -c 'Accepted publickey for nix-builder') -gt {before}", timeout=10)
+        builder.fail("test -e /tmp/escaped")
+
+    with subtest("remote builds run at idle CPU and IO priority"):
+        client.succeed(
+            "systemd-run --unit sched-probe -p Environment=PATH=/run/current-system/sw/bin "
+            "nix-build /etc/probe.nix --no-out-link --argstr nonce sched --argstr sleep 30"
+        )
+        pid = builder.wait_until_succeeds("pgrep -f '^/nix/store/[^ ]*/bin/sleep 30'", timeout=20).split()[0]
+        cpu = builder.succeed(f"${pkgs.util-linux}/bin/chrt -p {pid}")
+        io = builder.succeed(f"${pkgs.util-linux}/bin/ionice -p {pid}")
+        assert "SCHED_IDLE" in cpu, cpu
+        assert io.strip().startswith("idle"), io
 
     with subtest("with the build host unreachable, it builds locally"):
         builder.block()

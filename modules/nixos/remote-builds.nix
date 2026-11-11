@@ -59,7 +59,9 @@ _: {
         };
         maxJobs = lib.mkOption {
           type = lib.types.int;
-          default = 8;
+          # high on purpose: with every slot busy, Nix builds the overflow
+          # locally instead of waiting
+          default = 16;
           description = "Builds to run on the build host at once.";
         };
       };
@@ -89,7 +91,8 @@ _: {
           publicKey = cfg.hostKey;
         };
         # unreachable: give up fast and build locally; a link that drops
-        # mid-build fails within a minute instead of hanging
+        # mid-build fails that build (no local retry) within a minute
+        # instead of hanging
         programs.ssh.extraConfig = ''
           Host ${cfg.hostName}
             ConnectTimeout 5

@@ -90,7 +90,9 @@ torrent's `nix-builder` with this machine's SSH host key, which torrent
 lets run only `nix-daemon --stdio`. Whatever torrent already has (most of
 this machine's closure, since its own system shares it) is copied rather
 than built. When torrent is off or unreachable, the connection gives up
-after 5 seconds and the build runs here.
+after 5 seconds and the build runs here. If torrent drops away during a
+build, that build fails rather than restarting here; run it again (the
+nightly deploy just tries the next night).
 
 - A build shows `on 'ssh-ng://nix-builder@torrent'` when it ran there.
 - To build here on purpose: `--builders ''` (for `nix` and `nixos-rebuild`).
