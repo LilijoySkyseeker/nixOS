@@ -93,7 +93,8 @@ def fetch_claude():
 
 def fetch_codex():
     """Codex's windows from its app-server; it must keep stdin open until it
-    answers (closed early, it exits without replying)."""
+    answers (closed early, it exits without replying). Raw reads on the pipe,
+    so the deadline bounds every wait and no reply sits unseen in a buffer."""
     reqs = [
         {"jsonrpc": "2.0", "id": 1, "method": "initialize",
          "params": {"clientInfo": {"name": "agent-usage-line", "version": "1"}}},
@@ -101,35 +102,47 @@ def fetch_codex():
         {"jsonrpc": "2.0", "id": 2, "method": "account/rateLimits/read"},
     ]
     p = subprocess.Popen(["codex", "app-server"], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                         text=True)
+                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     try:
-        p.stdin.write("".join(json.dumps(r) + "\n" for r in reqs))
+        p.stdin.write("".join(json.dumps(r) + "\n" for r in reqs).encode())
         p.stdin.flush()
+        fd = p.stdout.fileno()
+        buf = b""
         deadline = time.time() + 10
-        while time.time() < deadline:
-            if not select.select([p.stdout], [], [], deadline - time.time())[0]:
-                break
-            line = p.stdout.readline()
-            if not line:
-                break
-            try:
-                d = json.loads(line)
-            except ValueError:
-                continue
-            if d.get("id") != 2:
-                continue
-            rl = (d.get("result") or {}).get("rateLimits") or {}
-            windows = []
-            for key, name in (("primary", "5h"), ("secondary", "week")):
-                w = rl.get(key)
-                if w and w.get("usedPercent") is not None and w.get("resetsAt"):
-                    windows.append((name, w["usedPercent"], w["resetsAt"]))
-            return windows or None
-        return None
+        while True:
+            *lines, buf = buf.split(b"\n")
+            for line in lines:
+                windows = codex_reply(line)
+                if windows is not False:
+                    return windows
+            left = deadline - time.time()
+            if left <= 0 or not select.select([fd], [], [], left)[0]:
+                return None
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                return None
+            buf += chunk
     finally:
         p.kill()
         p.wait()
+
+
+def codex_reply(line):
+    """The windows in app-server's rateLimits reply (None if it has none),
+    or False for any other line."""
+    try:
+        d = json.loads(line)
+    except ValueError:
+        return False
+    if not isinstance(d, dict) or d.get("id") != 2:
+        return False
+    rl = (d.get("result") or {}).get("rateLimits") or {}
+    windows = []
+    for key, name in (("primary", "5h"), ("secondary", "week")):
+        w = rl.get(key)
+        if w and w.get("usedPercent") is not None and w.get("resetsAt"):
+            windows.append((name, w["usedPercent"], w["resetsAt"]))
+    return windows or None
 
 
 def cached(family, fetch):
@@ -248,12 +261,14 @@ def main():
             ctx = codex_context(last_token_count(transcript))
         except OSError:
             pass
+    # the live read, unless a Codex turn has recorded newer figures since
     codex, codex_at = cached("codex", fetch_codex)
-    if not codex:
-        try:
-            codex, codex_at = newest_codex_limits()
-        except OSError:
-            codex, codex_at = [], 0
+    try:
+        logged, logged_at = newest_codex_limits()
+    except OSError:
+        logged, logged_at = [], 0
+    if logged and logged_at > codex_at:
+        codex, codex_at = logged, logged_at
     claude, claude_at = cached("claude", fetch_claude)
 
     # one threshold band per figure; a window's reset time is part of its
