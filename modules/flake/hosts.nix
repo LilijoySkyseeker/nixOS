@@ -30,6 +30,7 @@ in
         nixosModules.hibernate
         nixosModules."hibernate-only"
         nixosModules."reboot-notice"
+        nixosModules."remote-builds"
       ];
     };
     torrent = inputs.nixpkgs-unstable.lib.nixosSystem {
@@ -75,6 +76,7 @@ in
         # torrent only: its RX 7900 XTX serves the local models
         nixosModules."local-ai"
         nixosModules."local-ai-speech"
+        nixosModules."build-host"
       ];
     };
     # its own release pin (nixpkgs-homelab), not nixpkgs-stable

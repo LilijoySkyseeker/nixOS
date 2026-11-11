@@ -222,12 +222,12 @@
   # zrepl's ssh has no TTY to accept an unknown host key, so pin source hosts' keys
   programs.ssh.knownHosts.torrent = {
     hostNames = [ "torrent" ];
-    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJESBjkAOLvKdaRlpAg/CiBh/WvW0lzb4QScEw40o3Kc";
+    publicKey = vars.sshHostKeys.torrent;
   };
 
   programs.ssh.knownHosts.thinkpad = {
     hostNames = [ "thinkpad" ];
-    publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF2TU4+7NDf2QOY8x/48KYt/1WX1jtCRhUOwKgYW7pNY";
+    publicKey = vars.sshHostKeys.thinkpad;
   };
 
   myZrepl = {

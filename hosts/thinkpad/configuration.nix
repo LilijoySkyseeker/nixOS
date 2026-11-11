@@ -18,6 +18,12 @@
     requireACPower = true;
   };
 
+  # builds go to torrent over the tailnet; locally only when it's unreachable
+  myRemoteBuilds = {
+    hostName = "torrent";
+    hostKey = vars.sshHostKeys.torrent;
+  };
+
   hardware.cpu.intel.updateMicrocode = true;
 
   services.keyd = {

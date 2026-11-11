@@ -60,8 +60,12 @@
     };
   };
 
-  # sshd only carries zrepl's stdinserver transport: tailnet-only, root is
-  # forced-commands-only, and there must be no other root keys
+  # thinkpad's nix daemon builds here (modules/nixos/remote-builds.nix)
+  myBuildHost.clientKeys = [ vars.sshHostKeys.thinkpad ];
+
+  # sshd carries zrepl's stdinserver transport and nix-builder's forced
+  # nix-daemon: tailnet-only, root is forced-commands-only, and there must
+  # be no other root keys
   services.openssh = {
     enable = true;
     openFirewall = false;
