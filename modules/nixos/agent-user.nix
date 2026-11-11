@@ -86,17 +86,6 @@
             ];
           }
         ];
-        PostToolUse = [
-          {
-            hooks = [
-              {
-                type = "command";
-                command = "${usageLine}";
-                timeout = 30;
-              }
-            ];
-          }
-        ];
       };
       # long jobs as their own unit (agent-task@NAME): see agent-tools/agent-task.sh
       agentTask = pkgs.writeShellApplication {
@@ -446,7 +435,6 @@
                   workflowSizeGuideline = "unrestricted";
                   # the plan-limits line for the model (agent-usage-line.py)
                   hooks.UserPromptSubmit = usageHooks.UserPromptSubmit;
-                  hooks.PostToolUse = usageHooks.PostToolUse;
                   # bypass mode still asks before an rm it can't rule out as
                   # dangerous; in Paseo that prompt stalls unattended work
                   hooks.PermissionRequest = [
@@ -480,7 +468,10 @@
               f=/home/agent/.claude/settings.json
               mkdir -p /home/agent/.claude
               [ -s "$f" ] || echo '{}' > "$f"
-              ${pkgs.jq}/bin/jq -s '.[0] * .[1]' "$f" ${managed} > "$f.tmp"
+              # the merge only adds keys: take out the old PostToolUse usage hook
+              # TODO: drop when /home/agent/.claude/settings.json has no
+              # agent-usage-line under hooks.PostToolUse (and use plain '.[0] * .[1]')
+              ${pkgs.jq}/bin/jq -s '(.[0] | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array" then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not)) else . end) * .[1]' "$f" ${managed} > "$f.tmp"
               mv "$f.tmp" "$f"
             '';
         };

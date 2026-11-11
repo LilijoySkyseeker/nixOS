@@ -27,12 +27,8 @@ the `other-agents` skill.
   ones. Details and quirks: the `torrent-machine` skill.
 - The GPU is the owner's desktop card, and their desktop and games come
   first: check VRAM before a big job and free the GPU when you're done.
-- Your messages, and tool steps where a figure crosses 50, 75 or 90%,
-  carry a line with the plan limits (5-hour and weekly, Claude and Codex,
-  shared by every agent) and your context use. Plan with it; don't cut a
-  task short to save context or quota. Before a long job, or handing work
-  to a family past 90% of its weekly limit, tell the owner and offer the
-  other family or waiting for the reset.
+- The harness gives you, not the owner, the plan limits and your context
+  use; don't repeat them in your replies.
 
 ## Places
 
