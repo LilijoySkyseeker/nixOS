@@ -134,19 +134,9 @@
           fetchCurlImpersonate
           pkgs.xvfb-run
           pkgs.poppler-utils
-          (pkgs.writeShellScriptBin "browser-fetch" (
-            # off while the locked chromium is older than 157.0.8103.50; turns itself back on
-            # TODO: drop when chromium 157.0.8103.50 is in nixos-unstable (NixOS/nixpkgs#585754)
-            if lib.versionOlder pkgs.chromium.version "157.0.8103.50" then
-              ''
-                echo "browser-fetch: off until chromium 157.0.8103.50 reaches nixos-unstable (NixOS/nixpkgs#585754)" >&2
-                exit 1
-              ''
-            else
-              ''
-                exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool ''${2:-}
-              ''
-          ))
+          (pkgs.writeShellScriptBin "browser-fetch" ''
+            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool ''${2:-}
+          '')
           (pkgs.writeShellScriptBin "extract-text" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
           '')
