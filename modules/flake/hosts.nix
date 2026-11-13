@@ -44,7 +44,6 @@ in
         # local-ai's Paseo takes codex and claude-code from the host's pkgs
         {
           nixpkgs.overlays = [
-            config.flake.overlays.unstable-build-fixes
             config.flake.overlays.llm-agents
           ];
         }
