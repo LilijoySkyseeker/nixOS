@@ -134,19 +134,9 @@
           fetchCurlImpersonate
           pkgs.xvfb-run
           pkgs.poppler-utils
-          (pkgs.writeShellScriptBin "browser-fetch" (
-            # off while the locked chromium is older than 157.0.8103.50; turns itself back on
-            # TODO: drop when chromium 157.0.8103.50 is in nixos-unstable (NixOS/nixpkgs#585754)
-            if lib.versionOlder pkgs.chromium.version "157.0.8103.50" then
-              ''
-                echo "browser-fetch: off until chromium 157.0.8103.50 reaches nixos-unstable (NixOS/nixpkgs#585754)" >&2
-                exit 1
-              ''
-            else
-              ''
-                exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool ''${2:-}
-              ''
-          ))
+          (pkgs.writeShellScriptBin "browser-fetch" ''
+            exec ${fetchPython}/bin/python3 ${./agent-tools/browser-fetch.py} "$1" ${pkgs.chromium}/bin/chromium ${pkgs.xdotool}/bin/xdotool ''${2:-}
+          '')
           (pkgs.writeShellScriptBin "extract-text" ''
             exec ${fetchPython}/bin/python3 ${./agent-tools/extract-text.py} "$@"
           '')
@@ -433,11 +423,6 @@
                   ];
                   # the machine's full resources, as the agents' instructions grant
                   workflowSizeGuideline = "unrestricted";
-                  # Paseo 0.15.3's model picker lacks Fable 5.2 but lists the
-                  # models named here (label = the id)
-                  # TODO: drop when paseo is 0.15.4+ in nixos-unstable (keep the
-                  # merge's del() below: it takes the key out of the file)
-                  env.ANTHROPIC_DEFAULT_FABLE_MODEL = "claude-fable-5-2";
                   # the plan-limits line for the model (agent-usage-line.py)
                   hooks.UserPromptSubmit = usageHooks.UserPromptSubmit;
                   # bypass mode still asks before an rm it can't rule out as
@@ -482,8 +467,9 @@
                 | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array"
                   then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not))
                   else . end
-                # the Fable stopgap key (keep this when dropping that key above,
-                # until the file no longer has it)
+                # the Fable stopgap key, gone from managed since Paseo 0.15.4
+                # TODO: drop when /home/agent/.claude/settings.json has no
+                # env.ANTHROPIC_DEFAULT_FABLE_MODEL
                 | if (.env | type) == "object" then del(.env.ANTHROPIC_DEFAULT_FABLE_MODEL) else . end
                 | . * $managed[0]
               ' "$f" --slurpfile managed ${managed} > "$f.tmp"
