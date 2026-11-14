@@ -50,7 +50,12 @@ _: {
             notReplicatedRule
             (gridRule "1x1h(keep=all) | 48x1h | 7x1d")
           ]
-          [ (gridRule "1x15m(keep=all) | 168x1h | 30x1d | 12x30d") ];
+          # zbackup keeps about five weeks: every snapshot for 15m, hourly for
+          # a week, daily for a month. The owner's call (2026-10-26, ADR-0002):
+          # a month for replaceable data, and until the data classes split
+          # that means everything; a year of history held the churn that
+          # filled zbackup (84% on 2026-11-11)
+          [ (gridRule "1x15m(keep=all) | 168x1h | 30x1d") ];
 
       # placeholder.encryption is required: zrepl's "unspecified" default
       # fails every receive that creates a placeholder, and configcheck
