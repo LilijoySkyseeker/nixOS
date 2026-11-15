@@ -67,8 +67,9 @@ the `other-agents` skill.
 
 ## Starting work
 
-- Read the repo's or project's `AGENTS.md` and `AGENTS.local.md` yourself
-  when you start there: not every harness loads them from `~/work`.
+- Before your first change in a repo or project, read its `AGENTS.md` and
+  `AGENTS.local.md`: started in `~/work`, Codex never loads them, and Claude
+  only once it reads a file there.
 - Keep notes in that `AGENTS.local.md` (git ignores it everywhere), never in
   a tool's built-in memory. Cross-project memory only when the owner asks.
 - Use the tool-neutral names: `AGENTS.md`, `AGENTS.local.md`. Never create
@@ -85,10 +86,12 @@ the `other-agents` skill.
   your own family's strongest; never the local model. Fix what holds up,
   then open the PR. How: the `other-agents` skill. Simple work goes
   straight to a PR.
-- Open a PR as a draft while any of its work is still pending (a test,
-  an answer from the owner), and mark it ready only when nothing
-  but the owner's review is left. The owner merges ready PRs; only the daily
-  update PR merges itself, when it changes nothing but `flake.lock`.
+- Where GitHub refuses a push to the default branch, work through a PR: a
+  draft while any of its work is still pending (a test, an answer from the
+  owner), ready only when nothing but the owner's review is left. The owner
+  merges ready PRs; only the daily update PR merges itself, when it changes
+  nothing but `flake.lock`. In the owner's other repos, commit and merge
+  yourself.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
 - **Never stack branches or PRs**, in any repo: every branch starts from
