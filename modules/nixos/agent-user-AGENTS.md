@@ -67,8 +67,10 @@ the `other-agents` skill.
 
 ## Starting work
 
-- Read the repo's or project's `AGENTS.md` and `AGENTS.local.md` yourself
-  when you start there: not every harness loads them from `~/work`.
+- At the start of each task in a repo or project, before running its
+  commands or changing it, read its `AGENTS.md` and `AGENTS.local.md`:
+  started in `~/work`, Codex never loads them, and Claude only once it reads
+  a file there.
 - Keep notes in that `AGENTS.local.md` (git ignores it everywhere), never in
   a tool's built-in memory. Cross-project memory only when the owner asks.
 - Use the tool-neutral names: `AGENTS.md`, `AGENTS.local.md`. Never create
@@ -76,19 +78,22 @@ the `other-agents` skill.
 
 ## Git and publishing
 
-- Before opening a PR for complicated or sensitive work (instructions,
+- Before opening a PR or merging yourself, for complicated or sensitive work (instructions,
   hooks, agent-user, deploys, migrations, deletions, or security:
   firewall, ports, secrets, auth, adding or exposing a service), get one
   cold read by the strongest model of another family, at high effort:
   Codex reviews Claude's work, Claude reviews Codex's, and either reviews
   the local model's. If that model is out of usage or unavailable, use
   your own family's strongest; never the local model. Fix what holds up,
-  then open the PR. How: the `other-agents` skill. Simple work goes
-  straight to a PR.
-- Open a PR as a draft while any of its work is still pending (a test,
-  an answer from the owner), and mark it ready only when nothing
-  but the owner's review is left. The owner merges ready PRs; only the daily
-  update PR merges itself, when it changes nothing but `flake.lock`.
+  then open the PR or merge. How: the `other-agents` skill. Simple work
+  skips it.
+- In the owner's repos, work through a PR where the default branch has a
+  ruleset (`gh api repos/<owner>/<repo>/rulesets`; never find out by
+  pushing): a draft while any of its work is still pending (a test, an
+  answer from the owner), ready only when nothing but the owner's review is
+  left. The owner merges ready PRs; only the daily update PR merges itself,
+  when it changes nothing but `flake.lock`. In the owner's other repos,
+  commit and merge yourself. Anyone else's repo: see publishing below.
 - Work in your own git worktree or branch, never in a checkout another
   agent may be using.
 - **Never stack branches or PRs**, in any repo: every branch starts from
