@@ -17,7 +17,7 @@
     operation = "boot";
   };
 
-  environment.systemPackages = [ pkgs-unstable.bambu-studio ];
+  environment.systemPackages = [ pkgs-unstable.orca-slicer ];
 
   powerManagement.cpuFreqGovernor = "performance";
 
