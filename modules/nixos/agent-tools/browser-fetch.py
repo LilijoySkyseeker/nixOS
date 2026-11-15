@@ -16,11 +16,11 @@ import time
 
 import nodriver as uc
 
-# keep in step with web-fetch.sh's blocked()
+# a challenge page's window title starts with one of these (keep in step with web-fetch.sh's blocked())
 CHALLENGE = re.compile(
-    r"just a moment|attention required|please wait|verifying( you|\.\.\.|…)"
+    r"^\s*(?:just a moment|attention required|please wait|verifying( you|\.\.\.|…)"
     r"|temporarily unavailable|prove your humanity|making sure you.{0,8}not a bot"
-    r"|client challenge|checking your browser|checking if the site",
+    r"|client challenge|checking your browser|checking if the site)",
     re.IGNORECASE,
 )
 CHROMIUM, XDOTOOL = sys.argv[2], sys.argv[3]

@@ -31,11 +31,11 @@ body=$(mktemp) status=$(mktemp)
 trap 'rm -f "$body" "$status"' EXIT
 ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
 
-# a wall: an error status, or a challenge page served with 200
-# (keep the phrases in step with browser-fetch.py's CHALLENGE)
+# a wall: an error status, or a challenge page served with 200 whose title
+# starts with a challenge phrase (keep them in step with browser-fetch.py's CHALLENGE)
 blocked() {
   case $1 in 2??) ;; *) return 0 ;; esac
-  grep -qiE '<title>[^<]*(just a moment|attention required|access denied|please wait|verifying( you|\.\.\.|…)|are you a robot|temporarily unavailable|prove your humanity|making sure you.{0,8}not a bot|client challenge|checking your browser|checking if the site)' "$body"
+  grep -qiE '<title[^>]*>[[:space:]]*(just a moment|attention required|access denied|please wait|verifying( you|\.\.\.|…)|are you a robot|temporarily unavailable|prove your humanity|making sure you.{0,8}not a bot|client challenge|checking your browser|checking if the site)' "$body"
 }
 # the site's own origin as Referer: some serve PDFs only to their own pages
 origin=$(printf '%s' "$url" | grep -oE '^https?://[^/?#]+' || true)
