@@ -14,6 +14,7 @@ _: {
         perl
         binutils # strings
         xxd
+        imagemagick # magick: resize, pad, montage, SVG to PNG
       ];
     };
 }

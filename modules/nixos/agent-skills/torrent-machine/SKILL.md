@@ -96,7 +96,7 @@ leaves as you, through the same egress firewall.
   repo's clones and worktrees are already allowed; its `.envrc` only turns
   on the git hooks (`direnv exec . true` once per clone).
 - **Missing tools:** `nix shell nixpkgs#<pkg>` (for example `pciutils` for
-  `lspci`, `sox`, `imagemagick`). `xvfb-run` is only inside `web-fetch`.
+  `lspci`, `sox`). `xvfb-run` is only inside `web-fetch`.
 - **Playwright:** there is no `/opt/pw-browsers`; launch with
   `executablePath` set to `$(nix build --no-link --print-out-paths nixpkgs#chromium)/bin/chromium`.
 - **Claude Code's shell** replaces `grep` with ugrep and `find` with bfs.
