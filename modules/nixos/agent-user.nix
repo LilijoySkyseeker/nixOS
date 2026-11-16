@@ -462,11 +462,6 @@
               # stopped setting, then merges
               ${pkgs.jq}/bin/jq -s '
                 .[0]
-                # TODO: drop when /home/agent/.claude/settings.json has no
-                # agent-usage-line under hooks.PostToolUse
-                | if (.hooks | type) == "object" and (.hooks.PostToolUse | type) == "array"
-                  then .hooks.PostToolUse |= map(select(tostring | contains("agent-usage-line") | not))
-                  else . end
                 # the Fable stopgap key, gone from managed since Paseo 0.15.4
                 # TODO: drop when /home/agent/.claude/settings.json has no
                 # env.ANTHROPIC_DEFAULT_FABLE_MODEL
