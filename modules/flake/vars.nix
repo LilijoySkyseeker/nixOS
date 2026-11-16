@@ -10,6 +10,12 @@ _: {
     # public half of homelab's zrepl pull key (private: homelab_zrepl_key
     # sops secret); both source hosts pin it to a forced `zrepl stdinserver`
     zreplPullerKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOoS9ClNSmPtMu4wlvJNDXq8ZD8klgRguXR08RrSe3i/ homelab-zrepl-puller";
+    # the PCs' SSH host public keys: pinned by homelab's zrepl, and thinkpad
+    # logs in to torrent's nix-builder with its own (modules/nixos/remote-builds.nix)
+    sshHostKeys = {
+      torrent = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJESBjkAOLvKdaRlpAg/CiBh/WvW0lzb4QScEw40o3Kc";
+      thinkpad = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF2TU4+7NDf2QOY8x/48KYt/1WX1jtCRhUOwKgYW7pNY";
+    };
     username = "lilijoy";
     domain = "skyseekerlabs.net.";
     # shared numeric IDs that must stay consistent across files
