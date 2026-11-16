@@ -7,11 +7,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794715585,
-        "narHash": "sha256-0mFR2Zce/0FB08rREGJ31RHDEcy3ZSVZnL3n++GN3mI=",
+        "lastModified": 1794811069,
+        "narHash": "sha256-Z9/neNhnf4rXdiX5STwKYrWm/JFFlzSdB3QtGAwK93M=",
         "owner": "0xShug0",
         "repo": "audio.cpp",
-        "rev": "6b0260ec8002e69a20c4ab2949fc312113c95bdf",
+        "rev": "2872e36e992c8dd98fcc47de094bd703e1ff6dab",
         "type": "github"
       },
       "original": {
@@ -416,11 +416,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1794721493,
-        "narHash": "sha256-7extb+ld6xPCzcVuhVdvcvGPLu/qtDRrhFJmH68jXfM=",
+        "lastModified": 1794808658,
+        "narHash": "sha256-RbvK/ghvMuWWx/riUqtCZCxjZFji2n3onTo2Kg60T3s=",
         "owner": "numtide",
         "repo": "llm-agents.nix",
-        "rev": "aeb1afe1529c5dc7dcdc54d644a8aed212d99dd0",
+        "rev": "733d5b0fa81d5aad7c623dca8d8170ce411fba1d",
         "type": "github"
       },
       "original": {
@@ -466,11 +466,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794132860,
-        "narHash": "sha256-iGNtQnUZsi+v6/4NbtYr+dsmASa6GkzXtUcTpE8F3mE=",
+        "lastModified": 1794739050,
+        "narHash": "sha256-PCGNIyAydZcdUXCxEXTjrS1+wWS+k9E+ENqBkUK2Mpg=",
         "owner": "nix-community",
         "repo": "nix-index-database",
-        "rev": "af9249ca33bc2efaae5d071e4c67ddef19dcb681",
+        "rev": "9bd074026d6db75b59aae8cd6071b5f2fe27a36c",
         "type": "github"
       },
       "original": {
