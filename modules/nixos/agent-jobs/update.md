@@ -66,7 +66,9 @@ fleet and against what the update fixes, and keep `Security.md` true.
      NixOS Discourse security categories
      (`https://discourse.nixos.org/c/announcements/security/56.rss`,
      `https://discourse.nixos.org/c/dev/security/21.rss`), and whether fixes have reached
-     the channels the fleet follows (status.nixos.org);
+     the channels the fleet follows
+     (`curl -L https://channels.nixos.org/<channel>/git-revision`; status.nixos.org
+     fills its table with JavaScript, so it reads empty);
    - advisories: oss-security (`https://seclists.org/rss/oss-sec.rss`),
      the CISA Known Exploited Vulnerabilities catalog, GitHub security
      advisories and OSV for software the fleet runs. A project's whole
@@ -80,7 +82,9 @@ fleet and against what the update fixes, and keep `Security.md` true.
      `https://hn.algolia.com/api/v1/search_by_date?tags=front_page`), for big
      events like #140's (a compromised CA, found in the news, fixed with a
      small stopgap that names its own removal condition).
-   Read a source through its feed where it has one (`web-fetch --feed`).
+   Read a source through its feed where it has one, with the `web-fetch
+   --feed` command in Bash: the WebFetch tool refuses some of them
+   (arstechnica.com).
 10. **Judge each item:** does a host run the affected version, on master
     and after your update? Is it reachable (internet, tailnet, LAN, local
     only)? Is it exploited in the wild? Is the fix in a channel yet?
