@@ -21,7 +21,7 @@ you expect.
   embedded in the brief.
 - Codex: from an empty folder, naming in the brief any paths to read (it
   can read anywhere, write nowhere; started in a repo, it loads the repo's
-  skills): `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -m gpt-6-astra -c model_reasoning_effort=high -C "$(mktemp -d)" "<brief>" < /dev/null`.
+  skills): `HOME=/home/agent/.cold CODEX_HOME=/home/agent/.cold/.codex codex exec --ephemeral --skip-git-repo-check -m gpt-6.2-astra -c model_reasoning_effort=high -C "$(mktemp -d)" "<brief>" < /dev/null`.
 
 **Reviews.** When one is due: your global instructions. The model and
 effort in these commands are each family's strongest at high, pinned
