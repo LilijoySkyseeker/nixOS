@@ -41,10 +41,9 @@ in
       };
       modules = [
         ../../hosts/torrent/configuration.nix
-        # local-ai's Paseo takes codex and claude-code from the host's pkgs
+        # local-ai's Paseo comes from the host's pkgs
         {
           nixpkgs.overlays = [
-            config.flake.overlays.llm-agents
             config.flake.overlays.paseo-hold
           ];
         }
