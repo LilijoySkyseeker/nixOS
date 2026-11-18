@@ -126,7 +126,7 @@
           ],
           "what": "a skill that re-pitches the work from its goal down, in short plain sentences and the project's terms, with numbered questions",
           "why": "six re-pitch requests in 2026-09-06/09-08 during one review loop, none since; owner asked for the skill (TODO 2026-10-27). Insurance, not a measured reduction",
-          "predicted": "re-pitch requests stay at 0 per 100 owner messages from 0; when the skill runs, no second re-pitch request within the owner's next 2 messages",
+          "predicted": "when the skill runs, the owner doesn't ask again for a re-pitch of the same work within their next 2 messages in that session, in at least 4 of 5 uses; untested if it runs fewer than 3 times in the window",
           "observed": null,
           "by_family": null,
           "status": "proposed"
