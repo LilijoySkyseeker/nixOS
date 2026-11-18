@@ -96,12 +96,13 @@ leaves as you, through the same egress firewall.
   repo's clones and worktrees are already allowed; its `.envrc` only turns
   on the git hooks (`direnv exec . true` once per clone).
 - **Missing tools:** `nix shell nixpkgs#<pkg>` (for example `pciutils` for
-  `lspci`, `sox`, `imagemagick`). `xvfb-run` is only inside `web-fetch`.
+  `lspci`, `sox`). `xvfb-run` is only inside `web-fetch`.
 - **Playwright:** there is no `/opt/pw-browsers`; launch with
   `executablePath` set to `$(nix build --no-link --print-out-paths nixpkgs#chromium)/bin/chromium`.
 - **Claude Code's shell** replaces `grep` with ugrep and `find` with bfs.
-  ugrep rejects some bounded repeats under `-i` ("exceeds complexity
-  limits"), and bfs rejects GNU find's relative `-newermt '-15 minutes'`
+  ugrep rejects bounded repeats around `.` such as `.{0,200}`, with or
+  without `-i` ("exceeds complexity limits"): use `rg` or Python's `re`
+  for those. bfs rejects GNU find's relative `-newermt '-15 minutes'`
   (use `-mmin -15`). Codex shells have the GNU tools.
 - **Python on downloaded data:** run it with `-I`, from a directory that
   holds only your own scripts.

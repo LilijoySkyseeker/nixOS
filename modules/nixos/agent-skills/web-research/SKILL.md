@@ -33,7 +33,13 @@ one page at a time across all agents: expect to queue behind another.
 ## Papers
 
 The open routes are often quicker than the publisher: arXiv, Europe PMC,
-and the Unpaywall, OpenAlex and Crossref APIs.
+and the Unpaywall, OpenAlex and Crossref APIs. Europe PMC's REST API gives
+full text (`www.ebi.ac.uk/europepmc/webservices/rest/<PMCID>/fullTextXML`) and
+abstracts (`.../rest/search?query=...&resultType=core`). OpenAlex and
+Semantic Scholar have 429'd when several agents searched at once, while
+Europe PMC, Crossref and PubMed's E-utilities answered. They limit too
+(E-utilities 3 requests a second, Crossref one at a time), so pace
+requests and back off on an empty or 429 answer.
 
 ## The line
 
@@ -58,13 +64,18 @@ Routes that work where the obvious one doesn't:
 
 - **Reddit:** thread pages and `.json` are walled; append `.rss?limit=500`
   to the thread URL (`web-fetch --feed`, or `-o FILE` for the whole Atom).
-  Images come from `i.redd.it/<id>.jpeg`.
+  Images come from `i.redd.it/<id>.jpeg`. To search a subreddit, use the
+  Arctic Shift API
+  (`arctic-shift.photon-reddit.com/api/posts/search?subreddit=X&query=Y`,
+  `/api/comments/tree?link_id=ID`), one request every 3-4 seconds;
+  WebSearch refuses `reddit.com` as a domain filter.
 - **Search engines:** Google search through `web-fetch` is intermittent: it
   passes on a well-used profile (it did over IPv6 on 2026-11-09), but can
   give a 429 and a reCAPTCHA (seen over IPv4). Don't
   retry it; repeat visits risk the household IP. Google News RSS
-  (`news.google.com/rss/search?q=...`) and Bing through plain curl work;
-  Bing ignores quote marks, so it can't do exact-phrase searches.
+  (`news.google.com/rss/search?q=...`) works. Bing through curl or
+  `web-fetch` isn't dependable: it has returned unrelated pages, generic
+  boilerplate, or results for the first word only; use the WebSearch tool.
 - **YouTube:** refuses this household's IPv4 ("Sign in to confirm you're not
   a bot") but serves its IPv6, which agents may use to Google's ranges only.
   yt-dlp picks IPv6 by itself; add `-6` if a run still asks you to sign in.
