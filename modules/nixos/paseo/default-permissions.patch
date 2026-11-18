@@ -1,8 +1,8 @@
 diff --git a/packages/server/src/server/agent/providers/claude/agent.ts b/packages/server/src/server/agent/providers/claude/agent.ts
-index d232185..0116b69 100644
+index e49b4847e..15a8c7847 100644
 --- a/packages/server/src/server/agent/providers/claude/agent.ts
 +++ b/packages/server/src/server/agent/providers/claude/agent.ts
-@@ -1055,9 +1055,9 @@ function claudeModeCatalog(env: NodeJS.ProcessEnv): {
+@@ -1067,9 +1067,9 @@ function claudeModeCatalog(env: NodeJS.ProcessEnv): {
    defaultModeId: PermissionMode;
  } {
    if (claudeAutoModeUnavailableOn(env)) {
@@ -14,7 +14,7 @@ index d232185..0116b69 100644
  }
  
  function coerceSessionMetadata(metadata: AgentMetadata | undefined): Partial<AgentSessionConfig> {
-@@ -2436,7 +2436,11 @@ class ClaudeAgentSession implements AgentSession {
+@@ -2462,7 +2462,11 @@ class ClaudeAgentSession implements AgentSession {
        );
      }
  
@@ -28,10 +28,10 @@ index d232185..0116b69 100644
        this.planResumeMode = this.currentMode;
      }
 diff --git a/packages/server/src/server/agent/providers/codex-app-server-agent.ts b/packages/server/src/server/agent/providers/codex-app-server-agent.ts
-index 2aecd18..bbd4742 100644
+index efee1076b..c1788b648 100644
 --- a/packages/server/src/server/agent/providers/codex-app-server-agent.ts
 +++ b/packages/server/src/server/agent/providers/codex-app-server-agent.ts
-@@ -276,7 +276,7 @@ const CODEX_MODES: AgentMode[] = [
+@@ -291,7 +291,7 @@ const CODEX_MODES: AgentMode[] = [
    },
  ];
  
@@ -39,8 +39,8 @@ index 2aecd18..bbd4742 100644
 +const DEFAULT_CODEX_MODE_ID = "full-access";
  
  interface CodexAppServerClientLike {
-   request(method: string, params?: unknown): Promise<unknown>;
-@@ -3559,8 +3559,11 @@ export class CodexAppServerAgentSession implements AgentSession {
+   request(method: string, params?: unknown, timeoutMs?: number): Promise<unknown>;
+@@ -3746,8 +3746,11 @@ export class CodexAppServerAgentSession implements AgentSession {
      if (config.modeId !== undefined) {
        validateCodexMode(config.modeId);
      }
@@ -54,7 +54,7 @@ index 2aecd18..bbd4742 100644
      this.providerOptions =
        validateProviderOptions("codex", CodexProviderOptionsSchema, config.providerOptions) ?? {};
      this.config = config;
-@@ -4077,6 +4080,14 @@ export class CodexAppServerAgentSession implements AgentSession {
+@@ -4303,6 +4306,14 @@ export class CodexAppServerAgentSession implements AgentSession {
      if (!this.client || !this.currentThreadId) return;
      // Paseo reads history only when it replays it; the resume response needs no turns.
      const params: Record<string, unknown> = { threadId: this.currentThreadId, excludeTurns: true };
@@ -69,7 +69,7 @@ index 2aecd18..bbd4742 100644
      if (this.deps.customCodexConfig) {
        // Resume otherwise prefers the provider stored on the thread, including
        // the unnamespaced key emitted by earlier Paseo versions.
-@@ -7482,17 +7493,15 @@ export class CodexAppServerAgentClient implements AgentClient {
+@@ -8042,17 +8053,15 @@ export class CodexAppServerAgentClient implements AgentClient {
      ]);
      return {
        models,

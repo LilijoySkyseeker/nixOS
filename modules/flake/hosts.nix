@@ -44,7 +44,7 @@ in
         # local-ai's Paseo comes from the host's pkgs
         {
           nixpkgs.overlays = [
-            config.flake.overlays.paseo-hold
+            config.flake.overlays.paseo-0-16-1
           ];
         }
         nixosModules."profile-pc"
