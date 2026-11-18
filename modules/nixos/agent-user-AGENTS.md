@@ -128,7 +128,8 @@ the `other-agents` skill.
   this file being wrong or missing a fact), say so in one line in your
   reply and append an entry to `~/work/ENVIRONMENT.md`: the date, which
   agent you are, what failed (command and error), what you did instead,
-  and the fix you'd suggest. Log it even when the workaround was easy;
-  quiet workarounds are how these stayed invisible. Mistakes in your own
+  and the fix you'd suggest. Log it at the moment you work around it,
+  before carrying on, even when the workaround was easy; quiet
+  workarounds are how these stayed invisible. Mistakes in your own
   work don't go there. Anything you need but can't get (an account, a
   tool) goes there too; the weekly maintenance job brings it to the owner.
