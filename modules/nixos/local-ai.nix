@@ -135,8 +135,16 @@ _: {
             baseUrl = "${swapUrl}/v1";
             api = "openai-completions";
             apiKey = "local";
-            # sends enable_thinking and preserve_thinking; effort is the server's
-            compat.thinkingFormat = "qwen-chat-template";
+            # Pi's thinking level picks the template's effort; the server's
+            # default (medium) applies when Pi sends none
+            compat = {
+              thinkingFormat = "chat-template";
+              chatTemplateKwargs = {
+                enable_thinking."$var" = "thinking.enabled";
+                reasoning_effort."$var" = "thinking.effort";
+                preserve_thinking = true;
+              };
+            };
             models = [
               {
                 id = "qwen3.8-27b";
@@ -146,6 +154,19 @@ _: {
                   "text"
                   "image"
                 ];
+                # the template knows low, medium and xhigh
+                thinkingLevelMap = {
+                  minimal = null;
+                  low = "low";
+                  medium = "medium";
+                  high = "xhigh";
+                };
+                # Qwen's non-thinking sampling; thinking uses the server's
+                samplingParamsByThinkingLevel.off = {
+                  temperature = 0.7;
+                  top_p = 0.8;
+                  presence_penalty = 1.5;
+                };
                 # the server's -c
                 contextWindow = 65536;
                 maxTokens = 32768;

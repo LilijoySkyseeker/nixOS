@@ -59,6 +59,8 @@ pkgs.testers.runNixOSTest {
       resumeScript = builtins.elemAt (pkgs.lib.splitString " " resumeExec) 1;
     in
     ''
+      import json
+
       machine.wait_for_unit("multi-user.target")
 
       machine.wait_for_unit("llama-swap.service")
@@ -92,6 +94,16 @@ pkgs.testers.runNixOSTest {
           pis = machine.succeed("jq -c . /home/agent/.pi/agent/settings.json")
           assert '"defaultModel":"qwen3.8-27b"' in pis, pis
           assert machine.succeed("readlink /home/agent/.pi/agent/AGENTS.md").strip().startswith("/nix/store/")
+          # what Pi sends per thinking level, caught by a stub in place of the server
+          machine.succeed("mkdir -p /tmp/pihome/.pi/agent && sed s/:8080/:18093/ /home/agent/.pi/agent/models.json > /tmp/pihome/.pi/agent/models.json")
+          machine.succeed("${pkgs.python3}/bin/python3 -I ${./pi-request-stub.py} /tmp/req.jsonl >/dev/null 2>&1 &")
+          machine.wait_for_open_port(18093)
+          def sent(level):
+              machine.succeed(f"HOME=/tmp/pihome timeout 60 {pi} -p --no-session --model local/qwen3.8-27b --thinking {level} hi </dev/null >/dev/null 2>&1 || true")
+              return json.loads(machine.succeed("tail -1 /tmp/req.jsonl"))
+          off, high = sent("off"), sent("high")
+          assert off["chat_template_kwargs"]["enable_thinking"] is False and off["temperature"] == 0.7, off
+          assert high["chat_template_kwargs"]["reasoning_effort"] == "xhigh" and high["temperature"] is None, high
           assert machine.succeed("jq -r .daemon.mcp.injectIntoAgents /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
           # stale one
