@@ -45,6 +45,7 @@ in
         {
           nixpkgs.overlays = [
             config.flake.overlays.llm-agents
+            config.flake.overlays.paseo-hold
           ];
         }
         nixosModules."profile-pc"
