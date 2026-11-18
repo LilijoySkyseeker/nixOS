@@ -1,6 +1,6 @@
 ---
 name: goal-setting
-description: Use when the owner first proposes an idea, project, feature or change, before any design or work starts. Not for quick questions, or work that already has its three lines.
+description: Use when the owner first proposes a project, feature or change to build, before any design or work starts. Not for conversation, brainstorming or exploring an idea for fun, quick questions, or work that already has its three lines; if unsure, ask whether they want to build it before drafting lines.
 ---
 
 # Goal setting
@@ -9,7 +9,8 @@ This is rule 0 of the six, run before work rather than in review. The
 rule's definition and reasons: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`.
 
-Before any work on a new idea, settle three lines with me:
+Before building a new project, feature or change, settle three lines
+with me. Conversation and exploring an idea for fun don't need them:
 
 - **Goal:** what it's for, one level above the thing itself.
 - **Out of scope:** what it won't do.
