@@ -33,6 +33,12 @@ in
           SKIP_NSSWITCH_CONF = "TRUE";
           MEMORY = "4G";
           USE_MEOWICE_FLAGS = "TRUE";
+          # Java4Shell (CVE-2026-114938, https://calif.io/java4shell/): the AVX-512
+          # Base64 decoder intrinsic corrupts the heap on malformed input; Geyser
+          # decodes Bedrock clients' login JWTs before the whitelist check
+          # TODO: drop when the itzg/minecraft-server image homelab runs ships a JDK
+          # with CVE-2026-114938 fixed (Oracle November 2026 CPU)
+          JVM_XX_OPTS = "-XX:-UseBASE64Intrinsics";
           MOTD = "GC and Friends";
           DIFFICULTY = "hard";
           MODE = "survival";

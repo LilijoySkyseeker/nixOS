@@ -67,12 +67,13 @@ hand-off that never happens, with the error in `~/.paseo/daemon.log`.
   session, kept like chat transcripts (backed up with `/home`). Threads restore
   their spoken lines from them, because provider history doesn't hold them.
 - Errors: `grep GPT-Live ~/.paseo/daemon.log`.
-- Patch source: `~/work/repos/external/paseo-credits`, worktree
-  `paseo-live-0.15`, branch `feat/gpt-live-0.15`: Paseo 0.15.0 with the other
-  four patches committed in order, then this one. Regenerate with
-  `git diff <limit-fallback commit>..feat/gpt-live-0.15`. When nixpkgs moves Paseo
-  to a new version, rebuild that base from the new tag and the repo's patches,
-  then replay the voice commits on it.
+- Patch source: `~/work/repos/external/paseo-port-0.16`, branch `port-0.16`:
+  Paseo v0.16.1 with the five patches in `modules/nixos/paseo` as one commit
+  each, in the order `local-ai.nix` applies them (this one last). Regenerate a
+  patch with `git diff <commit>^ <commit>`. When Paseo moves to a new version:
+  commit the repo's patches in order on the old tag, then
+  `git rebase --onto <new tag> <old tag>`; git's three-way merge carries most
+  hunks, and the conflicts left are where upstream changed the same code.
 
 ## Rollback
 

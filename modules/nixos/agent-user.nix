@@ -463,14 +463,10 @@
               f=/home/agent/.claude/settings.json
               mkdir -p /home/agent/.claude
               [ -s "$f" ] || echo '{}' > "$f"
-              # the merge only adds keys, so the filter takes out what managed
-              # stopped setting, then merges
+              # the merge only adds keys: to take out a key managed stopped
+              # setting, filter it here before the merge
               ${pkgs.jq}/bin/jq -s '
                 .[0]
-                # the Fable stopgap key, gone from managed since Paseo 0.15.4
-                # TODO: drop when /home/agent/.claude/settings.json has no
-                # env.ANTHROPIC_DEFAULT_FABLE_MODEL
-                | if (.env | type) == "object" then del(.env.ANTHROPIC_DEFAULT_FABLE_MODEL) else . end
                 | . * $managed[0]
               ' "$f" --slurpfile managed ${managed} > "$f.tmp"
               mv "$f.tmp" "$f"
