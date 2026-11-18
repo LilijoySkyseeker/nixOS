@@ -1,6 +1,6 @@
 ---
 name: goal-setting
-description: Use when the owner first proposes an idea, project, feature or change, before any design or work starts. Not for quick questions, or work that already has its three lines.
+description: Use when the owner first proposes a project, feature or change to build, before any design or work starts. Not for conversation, brainstorming or exploring an idea for fun, quick questions, or work that already has its three lines; if unsure, ask whether they want to build it before drafting lines.
 ---
 
 # Goal setting
