@@ -9,7 +9,8 @@ This is rule 0 of the six, run before work rather than in review. The
 rule's definition and reasons: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`.
 
-Before any work on a new idea, settle three lines with me:
+Before building a new project, feature or change, settle three lines
+with me. Conversation and exploring an idea for fun don't need them:
 
 - **Goal:** what it's for, one level above the thing itself.
 - **Out of scope:** what it won't do.

@@ -1,11 +1,16 @@
 {
-  "measure": "owner messages that were babysitting, per 100 owner messages, from sessions the owner started in Paseo; floor (labellers see one agent reply back)",
+  "measure": "owner messages per 100 owner messages, from sessions the owner started in Paseo; a floor (labellers see one agent reply back). Each attempt is observed over the 4 weeks after it merges; under 500 owner messages in that window is insufficient evidence, not success.",
   "baseline": {
     "window": "2026-10-18/2026-11-17",
     "owner_messages": 1898,
     "babysitting": 178,
     "per_100": 9.4,
-    "by_family_per_100": { "opus": 9, "gpt": 9, "fable": 10, "qwen": 25 },
+    "by_family_per_100": {
+      "opus": 9,
+      "gpt": 9,
+      "fable": 10,
+      "qwen": 25
+    },
     "evidence": "~/work/projects/agent-tuning/baseline-2026-11.md"
   },
   "next_id": 5,
@@ -15,77 +20,98 @@
       "id": "P1",
       "name": "environment friction not logged unless the owner asks",
       "opened": "2026-11-18",
-      "baseline_per_month": 9,
       "attempts": [
         {
           "date": "2026-11-18",
           "commit": "docs(agents): log environment friction when working around it",
-          "files": ["modules/nixos/agent-user-AGENTS.md"],
+          "files": [
+            "modules/nixos/agent-user-AGENTS.md"
+          ],
           "what": "the ENVIRONMENT.md rule says to log at the moment of the workaround, before carrying on",
-          "why": "every missed case was a mid-task workaround; the rule said what to log but not when",
-          "predicted": "owner prompts to log friction: 9 a month to under 2",
+          "why": "most missed cases were mid-task workarounds and the rule said what to log but not when; hypothesis, not established",
+          "predicted": "owner prompts to log an environment failure: 0.42 per 100 owner messages to under 0.1",
           "observed": null,
           "by_family": null,
           "status": "proposed"
         }
-      ]
+      ],
+      "baseline": {
+        "count": 8,
+        "per_100": 0.42
+      }
     },
     {
       "id": "P2",
       "name": "asks whether to continue work the owner already agreed to",
       "opened": "2026-11-18",
-      "baseline_per_month": 20,
       "attempts": [
         {
           "date": "2026-11-18",
           "commit": "docs(agents): carry agreed work through without check-ins",
-          "files": ["modules/nixos/agent-user-AGENTS.md"],
-          "what": "agreed work runs to the end; stop only for the owner's decisions, Boundaries, or a real blocker",
+          "files": [
+            "modules/nixos/agent-user-AGENTS.md"
+          ],
+          "what": "agreed work runs to the next point the owner must act; every gate still holds",
           "why": "nothing said agreed work runs to the end; decision and boundary rules read as reasons to check in",
-          "predicted": "bare proceed/yes replies to a needless check-in: about 20 a month to under 5",
+          "predicted": "bare proceed/yes replies to a needless check-in: 0.79 per 100 owner messages to under 0.2",
           "observed": null,
           "by_family": null,
           "status": "proposed"
         }
-      ]
+      ],
+      "baseline": {
+        "count": 15,
+        "per_100": 0.79
+      }
     },
     {
       "id": "P3",
       "name": "goal-setting run on conversation and exploration",
       "opened": "2026-11-18",
-      "baseline_per_month": 4,
       "attempts": [
         {
           "date": "2026-11-18",
           "commit": "goal-setting: fire for things to build, not conversation",
-          "files": ["modules/home-manager/claude-code/skills/goal-setting/SKILL.md"],
-          "what": "trigger narrowed to a project, feature or change to build; conversation and fun exploration named as out; ask when unsure",
+          "files": [
+            "modules/home-manager/claude-code/skills/goal-setting/SKILL.md",
+            "modules/home-manager/claude-code/user-claude.md"
+          ],
+          "what": "trigger narrowed to a project, feature or change to build; conversation and fun exploration named as out; ask when unsure; the skill body and the owner's 'Before any work starts' line narrowed the same way",
           "why": "the trigger was 'an idea', which every conversation contains",
-          "predicted": "owner pushback on unwanted goal-setting: at least 4 a month to 0-1",
+          "predicted": "owner pushback on unwanted goal-setting: 0.21 per 100 owner messages to under 0.05",
           "observed": null,
           "by_family": null,
           "status": "proposed"
         }
-      ]
+      ],
+      "baseline": {
+        "count": 4,
+        "per_100": 0.21
+      }
     },
     {
       "id": "P4",
       "name": "required cold read skipped before a PR",
       "opened": "2026-11-18",
-      "baseline_per_month": 3,
       "attempts": [
         {
           "date": "2026-11-18",
           "commit": "docs(agents): the cold read leaves a line in the PR body",
-          "files": ["modules/nixos/agent-user-AGENTS.md"],
+          "files": [
+            "modules/nixos/agent-user-AGENTS.md"
+          ],
           "what": "the PR body names the reviewer and its findings; without that line the PR isn't ready",
           "why": "the review left no trace, so a skipped one was only found by the owner asking",
-          "predicted": "owner asks about a missing review: 3 a month to 0; PRs needing a read but missing the line are countable",
+          "predicted": "owner asks whether a required cold read was done: 0.16 per 100 owner messages to 0",
           "observed": null,
           "by_family": null,
           "status": "proposed"
         }
-      ]
+      ],
+      "baseline": {
+        "count": 3,
+        "per_100": 0.16
+      }
     }
   ]
 }

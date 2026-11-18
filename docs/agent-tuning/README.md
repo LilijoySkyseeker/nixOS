@@ -14,6 +14,10 @@ that failed or were reverted stay in the file.
 - **Statuses:** `proposed` (in an open PR), `live` (merged; the date it
   merged starts the observation window), `held`, `partial`, `failed`,
   `reverted`.
+- **Checking:** not automated yet. The weekly maintenance stage that
+  counts outcomes and fills in `observed` is a separate PR, started after
+  the one that created this file merges. Until then, outcomes are checked
+  by hand.
 - **Privacy:** only counts, causes and predictions go here; the repo is
   public. The owner's messages and session IDs stay in
   `~/work/projects/agent-tuning/`.

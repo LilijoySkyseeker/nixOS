@@ -29,7 +29,8 @@ In this order. Each has to pass before effort goes into the next.
 
 What each rule means, and why: `/home/agent/vault/Areas/Engineering/Golden
 Engineering Rules.md`. Applying them to a thing someone else made: the
-`doghouse-review` skill. Before any work starts: the `goal-setting` skill.
+`doghouse-review` skill. Before building anything new: the `goal-setting`
+skill.
 
 ## While working
 

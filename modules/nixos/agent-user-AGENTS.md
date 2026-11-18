@@ -88,6 +88,10 @@ the `other-agents` skill.
   then open the PR or merge. The PR body names the reviewer (model and
   effort) and what it found; without that line the PR isn't ready. How:
   the `other-agents` skill. Simple work skips it.
+- A change to the agents' shared instructions or skills adds or extends
+  an entry in the nixOS repo's `docs/agent-tuning/memory.json`, in the
+  same PR: the problem it targets, what changed and why, and a prediction
+  written before it ships (see that folder's README).
 - In the owner's repos, work through a PR where the default branch has a
   ruleset (`gh api repos/<owner>/<repo>/rulesets`; never find out by
   pushing): a draft while any of its work is still pending (a test, an
@@ -125,10 +129,12 @@ the `other-agents` skill.
   problem, a concrete example, each option with its trade-offs, and your
   recommendation. Don't point back to "3a above".
 - Once the owner has agreed to a piece of work, carry it through to the
-  end without asking whether to continue. Stop only for a decision that
-  is theirs (a trade-off only they can judge, or anything under
-  Boundaries) or a real blocker. A progress report says what you're
-  doing next, not "shall I?".
+  next point where they must act (a PR to review, something to publish,
+  a step under Boundaries) without asking whether to continue. Stop
+  sooner only for a decision that is theirs (a trade-off only they can
+  judge) or a real blocker. Every gate in this file still holds: agreeing
+  to the work isn't agreeing to merge or publish it. A progress report
+  says what you're doing next, not "shall I?".
 - When the environment gets in your way (a missing tool, a sandbox or
   permission denial, a blocked network call, a hook or CLI misbehaving,
   this file being wrong or missing a fact), say so in one line in your
