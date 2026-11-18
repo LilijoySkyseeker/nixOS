@@ -29,6 +29,11 @@
           instructions = ".codex/AGENTS.md";
           skills = ".agents/skills";
         };
+        # also reads codex's .agents/skills
+        pi = {
+          instructions = ".pi/agent/AGENTS.md";
+          skills = null;
+        };
       };
       # orientation, then the user's working rule (the
       # same file as their own user-level CLAUDE.md, so there's no copy to
@@ -600,6 +605,8 @@
           "d /home/agent/.codex 0700 agent agent -"
           # codex's user skill directory lives under it
           "d /home/agent/.agents 0755 agent agent -"
+          "d /home/agent/.pi 0700 agent agent -"
+          "d /home/agent/.pi/agent 0700 agent agent -"
         ]
         # each harness's instructions and skill links
         ++ lib.concatLists (
@@ -607,14 +614,16 @@
             name: harness:
             [
               "L+ /home/agent/${harness.instructions} - - - - ${instructionsFor name}"
-              "d /home/agent/${harness.skills} 0755 agent agent -"
             ]
-            ++ lib.concatMap (
-              dir:
-              lib.mapAttrsToList (skill: _: "L+ /home/agent/${harness.skills}/${skill} - - - - ${dir}/${skill}") (
-                builtins.readDir dir
-              )
-            ) skillDirs
+            ++ lib.optionals (harness.skills != null) (
+              [ "d /home/agent/${harness.skills} 0755 agent agent -" ]
+              ++ lib.concatMap (
+                dir:
+                lib.mapAttrsToList (skill: _: "L+ /home/agent/${harness.skills}/${skill} - - - - ${dir}/${skill}") (
+                  builtins.readDir dir
+                )
+              ) skillDirs
+            )
           ) harnesses
         );
 

@@ -59,6 +59,8 @@ pkgs.testers.runNixOSTest {
       resumeScript = builtins.elemAt (pkgs.lib.splitString " " resumeExec) 1;
     in
     ''
+      import json
+
       machine.wait_for_unit("multi-user.target")
 
       machine.wait_for_unit("llama-swap.service")
@@ -85,19 +87,35 @@ pkgs.testers.runNixOSTest {
       with subtest("paseo: agent sandbox"):
           machine.wait_for_unit("paseo-agent-config.service")
           cfg = machine.succeed("cat /home/agent/.paseo/config.json")
-          machine.succeed("runuser -u agent -- env HOME=/home/agent ${pkgs.python3}/bin/python ${./paseo-local-codex.py}")
+          # local-pi's Pi lists the local model as its default, from the repo's files
+          pi = machine.succeed("jq -r '.agents.providers.\"local-pi\".command[0]' /home/agent/.paseo/config.json").strip()
+          models = machine.succeed(f"runuser -u agent -- env HOME=/home/agent {pi} --list-models")
+          assert "qwen3.8-27b" in models and "local" in models, models
+          pis = machine.succeed("jq -c . /home/agent/.pi/agent/settings.json")
+          assert '"defaultModel":"qwen3.8-27b"' in pis, pis
+          assert machine.succeed("readlink /home/agent/.pi/agent/AGENTS.md").strip().startswith("/nix/store/")
+          # what Pi sends per thinking level, caught by a stub in place of the server
+          machine.succeed("mkdir -p /tmp/pihome/.pi/agent && sed s/:8080/:18093/ /home/agent/.pi/agent/models.json > /tmp/pihome/.pi/agent/models.json")
+          machine.succeed("${pkgs.python3}/bin/python3 -I ${./pi-request-stub.py} /tmp/req.jsonl >/dev/null 2>&1 &")
+          machine.wait_for_open_port(18093)
+          def sent(level):
+              machine.succeed(f"HOME=/tmp/pihome timeout 60 {pi} -p --no-session --model local/qwen3.8-27b --thinking {level} hi </dev/null >/dev/null 2>&1 || true")
+              return json.loads(machine.succeed("tail -1 /tmp/req.jsonl"))
+          off, high = sent("off"), sent("high")
+          assert off["chat_template_kwargs"]["enable_thinking"] is False and off["temperature"] == 0.7, off
+          assert high["chat_template_kwargs"]["reasoning_effort"] == "xhigh" and high["temperature"] is None, high
           assert machine.succeed("jq -r .daemon.mcp.injectIntoAgents /home/agent/.paseo/config.json").strip() == "false", cfg
           # the hash comes from the credential, and the merge writes it back over a
           # stale one
           want = machine.succeed("cat /etc/paseo-test-hash").strip()
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want, cfg
-          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = true | .agents.providers.antigravity.enabled = true | .agents.providers."local-codex".env.OPENAI_BASE_URL = "http://stale"' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
+          machine.succeed("""jq '.daemon.auth.password = "x" | .agents.providers.opencode.enabled = true | .agents.providers.antigravity.enabled = true | .agents.providers."local-pi".env.STALE = "1" | .agents.providers."local-codex".enabled = true' /home/agent/.paseo/config.json > /tmp/c && install -o agent -g agent -m 600 /tmp/c /home/agent/.paseo/config.json""")
           machine.succeed("systemctl restart paseo-agent-config")
           assert machine.succeed("jq -r .daemon.auth.password /home/agent/.paseo/config.json").strip() == want
-          for p in ["opencode", "antigravity"]:
-              assert machine.succeed(f"jq -r .agents.providers.{p}.enabled /home/agent/.paseo/config.json").strip() == "false", p
-          # a key the repo dropped from local-codex: Paseo would build a second provider from it
-          assert machine.succeed("""jq -r '.agents.providers."local-codex".env.OPENAI_BASE_URL' /home/agent/.paseo/config.json""").strip() == "null"
+          for p in ["opencode", "antigravity", "local-codex"]:
+              assert machine.succeed(f"""jq -r '.agents.providers."{p}".enabled' /home/agent/.paseo/config.json""").strip() == "false", p
+          # a key the repo dropped from local-pi goes from the live config too
+          assert machine.succeed("""jq -r '.agents.providers."local-pi".env.STALE' /home/agent/.paseo/config.json""").strip() == "null"
           prop = lambda p: machine.succeed(f"systemctl show paseo -p {p} --value").strip()
           # every agent session and scheduled job runs in this unit
           for p, want in [("User", "agent"), ("Slice", "agent.slice"), ("PrivateDevices", "yes"), ("NoNewPrivileges", "yes"),

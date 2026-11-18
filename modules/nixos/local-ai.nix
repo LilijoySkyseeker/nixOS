@@ -101,44 +101,15 @@ _: {
               ];
             };
             codex.command = [ (lib.getExe pkgs.codex) ];
-            local-codex = {
-              extends = "codex";
+            # the local model in Pi: four tools and a ~1.5K-token system prompt,
+            # where Codex's ~10-25K re-prefilled on every cold start (trial
+            # 2026-11-18: 9/9 tasks in 238 s, OpenCode 9/9 in 673 s). Pi reads
+            # its model and default from piModels and piSettings
+            local-pi = {
+              extends = "pi";
               label = "Local";
-              description = "A local model on torrent's GPU (llama-swap), in the Codex harness";
-              # Scope these overrides to the local harness: cloud models keep
-              # their own context budgets and timeouts. Compact well before
-              # long image histories make prompt processing take minutes.
-              # Allow 15 idle minutes for cold prefill instead of cancelling
-              # and retrying it every five minutes.
-              command = [
-                (lib.getExe pkgs.codex)
-                "-c"
-                "model_context_window=131072"
-                "-c"
-                "model_auto_compact_token_limit=32768"
-                "-c"
-                "model_provider=local"
-                "-c"
-                "model_providers.local.name=Local"
-                "-c"
-                "model_providers.local.base_url=${swapUrl}/v1"
-                "-c"
-                "model_providers.local.wire_api=responses"
-                "-c"
-                "model_providers.local.env_key=OPENAI_API_KEY"
-                "-c"
-                "model_providers.local.stream_idle_timeout_ms=900000"
-              ];
-              env = {
-                OPENAI_API_KEY = "local";
-              };
-              models = [
-                {
-                  id = "qwen3.8-27b";
-                  label = "Qwen3.8-27B (local)";
-                  isDefault = true;
-                }
-              ];
+              description = "A local model on torrent's GPU (llama-swap), in the Pi harness";
+              command = [ (lib.getExe pkgs.pi-coding-agent) ];
             };
           }
           # providers removed from torrent: the merge keeps old keys, so their
@@ -148,10 +119,71 @@ _: {
               [
                 "opencode"
                 "antigravity"
+                # the local model moved to Pi (2026-11-18)
+                "local-codex"
               ]
               (_: {
                 enabled = false;
               });
+        }
+      );
+
+      # Pi's endpoint for the local model, wholly the repo's; Pi only reads it
+      piModels = pkgs.writeText "pi-models.json" (
+        builtins.toJSON {
+          providers.local = {
+            baseUrl = "${swapUrl}/v1";
+            api = "openai-completions";
+            apiKey = "local";
+            # Pi's thinking level picks the template's effort; the server's
+            # default (medium) applies when Pi sends none
+            compat = {
+              thinkingFormat = "chat-template";
+              chatTemplateKwargs = {
+                enable_thinking."$var" = "thinking.enabled";
+                reasoning_effort."$var" = "thinking.effort";
+                preserve_thinking = true;
+              };
+            };
+            models = [
+              {
+                id = "qwen3.8-27b";
+                name = "Qwen3.8-27B (local)";
+                reasoning = true;
+                input = [
+                  "text"
+                  "image"
+                ];
+                # the template knows low, medium and xhigh
+                thinkingLevelMap = {
+                  minimal = null;
+                  low = "low";
+                  medium = "medium";
+                  high = "xhigh";
+                };
+                # Qwen's non-thinking sampling; thinking uses the server's
+                samplingParamsByThinkingLevel.off = {
+                  temperature = 0.7;
+                  top_p = 0.8;
+                  presence_penalty = 1.5;
+                };
+                # the server's -c
+                contextWindow = 65536;
+                maxTokens = 32768;
+              }
+            ];
+          };
+        }
+      );
+      # merged into Pi's settings.json, which Pi also writes itself
+      piSettings = pkgs.writeText "pi-settings.json" (
+        builtins.toJSON {
+          defaultProvider = "local";
+          defaultModel = "qwen3.8-27b";
+          # local work stays local: no install/update reporting
+          enableInstallTelemetry = false;
+          # llama-swap manages models, not Pi's /llama router
+          extensions = [ "-builtin:llama.cpp" ];
         }
       );
 
@@ -265,10 +297,20 @@ _: {
               cmd = lib.concatStringsSep " " [
                 llamaServer
                 "--port \${PORT}"
-                "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD-Q4_K_M.gguf"
+                # Unsloth's Dynamic 3.1 re-upload of 2026-11-11
+                "-m ${models}/qwen3.8-27b/Qwen3.8-27B-UD3.1-Q4_K_M.gguf"
                 "--mmproj ${models}/qwen3.8-27b/mmproj-F16.gguf"
-                "-ngl 99 -c 131072"
+                # one slot, flash attention on, q8_0 KV: about 20.5 GB in VRAM,
+                # where f16 KV over 4 auto slots filled the card and spilled to GTT
+                "-ngl 99 -c 65536 -np 1 -fa on -ctk q8_0 -ctv q8_0"
+                # the model's own multi-token prediction head, about 2x generation
+                "--spec-type draft-mtp"
+                # Qwen's thinking-mode sampling; llama-server's defaults differ
+                "--temp 1.0 --top-p 0.95 --top-k 20 --min-p 0"
                 "--jinja --chat-template-file ${qwenTemplate}"
+                # the template defaults to xhigh, which thinks for minutes over small tasks
+                "--chat-template-kwargs '{\"reasoning_effort\":\"medium\"}'"
+                "--metrics"
               ];
             };
           };
@@ -305,12 +347,12 @@ _: {
           f=/home/agent/.paseo/config.json
           mkdir -p -m 700 /home/agent/.paseo
           [ -s "$f" ] || echo '{}' > "$f"
-          # the merge keeps old keys; local-codex is wholly the repo's, so a key
+          # the merge keeps old keys; local-pi is wholly the repo's, so a key
           # removed from it here also goes from the live config
           ${lib.getExe pkgs.jq} -s '
-            .[1].agents.providers."local-codex" as $local
+            .[1].agents.providers."local-pi" as $local
             | (.[0] * .[1])
-            | .agents.providers."local-codex" = $local
+            | .agents.providers."local-pi" = $local
           ' "$f" ${paseoManaged} > "$f.tmp"
           # voice on unless it was turned off in the app; in the managed keys, a
           # restart would undo the app's switch
@@ -322,6 +364,13 @@ _: {
           ${lib.getExe pkgs.jq} --rawfile h "$hash" '.daemon.auth.password = ($h | rtrimstr("\n"))' "$f.tmp" > "$f.tmp2"
           mv "$f.tmp2" "$f.tmp"
           mv "$f.tmp" "$f"
+          # Pi, local-pi's harness
+          mkdir -p -m 700 /home/agent/.pi/agent
+          ln -sfn ${piModels} /home/agent/.pi/agent/models.json
+          p=/home/agent/.pi/agent/settings.json
+          [ -s "$p" ] || echo '{}' > "$p"
+          ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$p" ${piSettings} > "$p.tmp"
+          mv "$p.tmp" "$p"
           # a switch re-runs this step but leaves Paseo running: hand it the
           # new config (new sessions get the new Claude Code and Codex). Not
           # running yet at boot; Paseo reads the file when it starts
