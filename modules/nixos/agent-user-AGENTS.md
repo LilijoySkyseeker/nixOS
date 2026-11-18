@@ -123,6 +123,11 @@ the `other-agents` skill.
 - When you put a decision to the owner, restate it in full every time: the
   problem, a concrete example, each option with its trade-offs, and your
   recommendation. Don't point back to "3a above".
+- Once the owner has agreed to a piece of work, carry it through to the
+  end without asking whether to continue. Stop only for a decision that
+  is theirs (a trade-off only they can judge, or anything under
+  Boundaries) or a real blocker. A progress report says what you're
+  doing next, not "shall I?".
 - When the environment gets in your way (a missing tool, a sandbox or
   permission denial, a blocked network call, a hook or CLI misbehaving,
   this file being wrong or missing a fact), say so in one line in your
