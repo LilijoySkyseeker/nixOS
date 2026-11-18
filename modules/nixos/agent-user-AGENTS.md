@@ -85,8 +85,9 @@ the `other-agents` skill.
   Codex reviews Claude's work, Claude reviews Codex's, and either reviews
   the local model's. If that model is out of usage or unavailable, use
   your own family's strongest; never the local model. Fix what holds up,
-  then open the PR or merge. How: the `other-agents` skill. Simple work
-  skips it.
+  then open the PR or merge. The PR body names the reviewer (model and
+  effort) and what it found; without that line the PR isn't ready. How:
+  the `other-agents` skill. Simple work skips it.
 - In the owner's repos, work through a PR where the default branch has a
   ruleset (`gh api repos/<owner>/<repo>/rulesets`; never find out by
   pushing): a draft while any of its work is still pending (a test, an
