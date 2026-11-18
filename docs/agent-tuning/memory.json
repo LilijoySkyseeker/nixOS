@@ -13,7 +13,7 @@
     },
     "evidence": "~/work/projects/agent-tuning/baseline-2026-11.md"
   },
-  "next_id": 5,
+  "next_id": 6,
   "aliases": {},
   "problems": [
     {
@@ -111,6 +111,30 @@
       "baseline": {
         "count": 3,
         "per_100": 0.16
+      }
+    },
+    {
+      "id": "P5",
+      "name": "owner can't follow where the work has got to",
+      "opened": "2026-11-18",
+      "attempts": [
+        {
+          "date": "2026-11-18",
+          "commit": "skills: add wait-what, re-pitch where the work stands",
+          "files": [
+            "modules/home-manager/claude-code/skills/wait-what/SKILL.md"
+          ],
+          "what": "a skill that re-pitches the work from its goal down, in short plain sentences and the project's terms, with numbered questions",
+          "why": "six re-pitch requests in 2026-09-06/09-08 during one review loop, none since; owner asked for the skill (TODO 2026-10-27). Insurance, not a measured reduction",
+          "predicted": "re-pitch requests stay at 0 per 100 owner messages from 0; when the skill runs, no second re-pitch request within the owner's next 2 messages",
+          "observed": null,
+          "by_family": null,
+          "status": "proposed"
+        }
+      ],
+      "baseline": {
+        "count": 0,
+        "per_100": 0.0
       }
     }
   ]
