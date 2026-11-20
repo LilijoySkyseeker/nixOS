@@ -8,6 +8,7 @@ in
   flake.modules.nixos.base =
     {
       config,
+      pkgs,
       pkgs-unstable,
       pkgs-stable,
       inputs,
@@ -66,6 +67,11 @@ in
       ];
 
       boot.zfs.forceImportRoot = false;
+
+      # SCTP can't load, even on request: nothing here uses kernel SCTP, and an unprivileged
+      # socket() would autoload it for nginx2root's undisclosed SCTP privilege escalation.
+      # TODO: drop when the nginx2root SCTP kernel fix (https://nginx2root.com/) is in every host's locked kernel
+      boot.extraModprobeConfig = "install sctp ${pkgs.coreutils}/bin/false";
 
       # authKeyFile logs in on boot; per-host non-reusable key, pre-tagged tag:<hostname>
       services.tailscale = {
