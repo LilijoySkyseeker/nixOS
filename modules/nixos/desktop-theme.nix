@@ -36,6 +36,9 @@ in
       stylix.targets.qt.enable = false;
       # flake.theme gives the prompt its palette, on the servers too
       stylix.targets.starship.enable = false;
+      # home-manager removed programs.wayprompt; stylix's target still sets it, failing eval.
+      # TODO: drop when stylix removes its wayprompt target (https://github.com/nix-community/stylix/issues/2556).
+      stylix.targets.wayprompt.enable = false;
     };
   };
 }
