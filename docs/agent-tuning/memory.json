@@ -32,7 +32,7 @@
           "predicted": "owner prompts to log an environment failure: 0.42 per 100 owner messages to under 0.1",
           "observed": null,
           "by_family": null,
-          "status": "proposed"
+          "status": "live"
         }
       ],
       "baseline": {
@@ -56,7 +56,7 @@
           "predicted": "bare proceed/yes replies to a needless check-in: 0.79 per 100 owner messages to under 0.2",
           "observed": null,
           "by_family": null,
-          "status": "proposed"
+          "status": "live"
         }
       ],
       "baseline": {
@@ -81,7 +81,7 @@
           "predicted": "owner pushback on unwanted goal-setting: 0.21 per 100 owner messages to under 0.05",
           "observed": null,
           "by_family": null,
-          "status": "proposed"
+          "status": "live"
         }
       ],
       "baseline": {
@@ -105,7 +105,7 @@
           "predicted": "owner asks whether a required cold read was done: 0.16 per 100 owner messages to 0",
           "observed": null,
           "by_family": null,
-          "status": "proposed"
+          "status": "live"
         }
       ],
       "baseline": {
@@ -129,7 +129,7 @@
           "predicted": "when the skill runs, the owner doesn't ask again for a re-pitch of the same work within their next 2 messages in that session, in at least 4 of 5 uses; untested if it runs fewer than 3 times in the window",
           "observed": null,
           "by_family": null,
-          "status": "proposed"
+          "status": "live"
         }
       ],
       "baseline": {

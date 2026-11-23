@@ -74,7 +74,18 @@ shell_only() {
   ! grep -qiE '<title>[^<]+' "$body" && return 0
   [ "$(extract-text "$url" < "$body" | wc -c)" -lt 300 ]
 }
-if blocked "$code" || shell_only; then
+# -o of a file (by the URL's extension) that came back as an HTML page: a
+# wall, such as an untitled JavaScript challenge, not the file
+page_for_file() {
+  [ "$mode" = file ] || return 1
+  local path=${url%%[?#]*}
+  case ${path,,} in
+  *.pdf | *.epub | *.jpg | *.jpeg | *.png | *.gif | *.webp | *.zip | *.mp3 | *.mp4) ;;
+  *) return 1 ;;
+  esac
+  grep -qiE '<(!doctype html|html|head|body|script)' < <(head -c 1024 "$body")
+}
+if blocked "$code" || shell_only || page_for_file; then
   # feeds stay on the curl tiers: Chromium shows XML as a page of its own
   case $mode in feed)
     echo "web-fetch: blocked ($code) at $tier" >&2
@@ -93,7 +104,7 @@ if blocked "$code" || shell_only; then
   type=text/html
   tier=browser
 fi
-if blocked "$code"; then
+if blocked "$code" || page_for_file; then
   echo "web-fetch: blocked or failed after every tier (last: $tier, $code)" >&2
   exit 1
 fi
