@@ -60,12 +60,16 @@ in
           # would kill the run before its post-switch steps (as nixos-upgrade)
           restartIfChanged = false;
           unitConfig.X-StopOnRemoval = false;
+          # openssh: root builds in this process, not through the daemon, so
+          # a remote builder's ssh is looked up on this PATH (thinkpad's
+          # myRemoteBuilds); without it the build quietly runs locally
           path = with pkgs; [
             git
             nixos-rebuild
             nix
             coreutils
             systemd
+            config.programs.ssh.package
           ];
           script = ''
             set -euo pipefail

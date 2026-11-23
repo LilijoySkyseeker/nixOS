@@ -61,6 +61,12 @@
         localAiModule = config.flake.modules.nixos."local-ai";
       };
 
+      remote-builds = import ../../tests/remote-builds.nix {
+        pkgs = config.flake.pkgsUnstable;
+        buildHostModule = config.flake.modules.nixos."build-host";
+        remoteBuildsModule = config.flake.modules.nixos."remote-builds";
+      };
+
       docker-userns-remap = import ../../tests/docker-userns-remap.nix {
         pkgs = config.flake.pkgsUnstable;
         dockerUsernsModule = config.flake.modules.nixos."docker-userns-remap";
