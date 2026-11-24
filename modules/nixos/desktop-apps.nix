@@ -69,10 +69,27 @@ _: {
         # the list is all there is: anything else in the system installation is
         # uninstalled when this unit next runs (boot or switch); ~/.var/app stays
         uninstallUnmanaged = true;
+        # setting remotes replaces nix-flatpak's default list, so flathub is restated
+        remotes = [
+          {
+            name = "flathub";
+            location = "https://dl.flathub.org/repo/flathub.flatpakrepo";
+          }
+          # Ladybird isn't on Flathub; this is the project's own repo, per
+          # https://download.ladybird.org/releases.json
+          {
+            name = "ladybird";
+            location = "https://flatpak.ladybird.org/ladybird.flatpakrepo";
+          }
+        ];
         packages = [
           "info.beyondallreason.bar"
           "com.github.tchx84.Flatseal"
           "io.github.amit9838.mousam"
+          {
+            appId = "org.ladybird.Ladybird";
+            origin = "ladybird";
+          }
         ];
       };
     };
