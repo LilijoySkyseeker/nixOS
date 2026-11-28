@@ -47,7 +47,12 @@ _: {
               yaml.enable = true;
               html.enable = true;
               css.enable = true;
-              docker.enable = true;
+              docker = {
+                enable = true;
+                # hadolint 2.15.1 fails to build in nixos-unstable (language-docker 16.0.0 rejects time 1.14)
+                # TODO: drop when nixos-unstable's hadolint builds (cache.nixos.org has it)
+                extraDiagnostics.enable = false;
+              };
             };
             lsp.formatOnSave = true;
             lsp.trouble.enable = true;
